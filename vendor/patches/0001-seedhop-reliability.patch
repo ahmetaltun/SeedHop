@@ -1,0 +1,385 @@
+--- a/crates/librqbit/src/session.rs
++++ b/crates/librqbit/src/session.rs
+@@ -123,6 +123,8 @@
+ 
+     // Lifecycle management
+     cancellation_token: CancellationToken,
++    // SeedHop: await session-owned tasks instead of guessing at shutdown latency.
++    shutdown_tasks: parking_lot::Mutex<Vec<tokio::task::JoinHandle<()>>>,
+     _cancellation_token_drop_guard: DropGuard,
+ 
+     // Runtime settings
+@@ -789,6 +791,7 @@
+                 db: RwLock::new(Default::default()),
+                 _cancellation_token_drop_guard: token.clone().drop_guard(),
+                 cancellation_token: token,
++                shutdown_tasks: parking_lot::Mutex::new(Vec::new()),
+                 announce_port: listen_result.as_ref().and_then(|l| l.announce_port),
+                 listen_addr: listen_result.as_ref().map(|l| l.addr),
+                 default_storage_factory: opts.default_storage_factory,
+@@ -1048,7 +1051,8 @@
+         name: impl Into<Cow<'static, str>>,
+         fut: impl std::future::Future<Output = anyhow::Result<()>> + Send + 'static,
+     ) {
+-        spawn_with_cancel(span, name, self.cancellation_token.clone(), fut);
++        let task = spawn_with_cancel(span, name, self.cancellation_token.clone(), fut);
++        self.shutdown_tasks.lock().push(task);
+     }
+ 
+     pub(crate) fn rs(&self) -> Option<tracing::Id> {
+@@ -1057,6 +1061,14 @@
+ 
+     /// Stop the session and all managed tasks.
+     pub async fn stop(&self) {
++        if let Err(error) = self.stop_and_wait().await {
++            tracing::error!(?error, "session shutdown failed");
++        }
++    }
++
++    /// SeedHop: cancellation barrier for all tasks spawned through this session.
++    /// The caller must also tear down its Tokio runtime before releasing its disk lock.
++    pub async fn stop_and_wait(&self) -> anyhow::Result<()> {
+         let torrents = self
+             .db
+             .read()
+@@ -1070,8 +1082,12 @@
+             }
+         }
+         self.cancellation_token.cancel();
+-        // this sucks, but hopefully will be enough
+-        tokio::time::sleep(Duration::from_secs(1)).await;
++        let tasks = std::mem::take(&mut *self.shutdown_tasks.lock());
++        for task in tasks {
++            task.await
++                .context("session task panicked during shutdown")?;
++        }
++        Ok(())
+     }
+ 
+     /// Run a callback given the currently managed torrents.
+@@ -1475,10 +1491,7 @@
+ 
+         if let Some(p) = self.persistence.as_ref() {
+             if let Err(e) = p.delete(id).await {
+-                error!(
+-                    ?id,
+-                    "error deleting torrent from persistence database: {e:#}"
+-                );
++                return Err(e).context("error deleting torrent from persistence database");
+             } else {
+                 debug!(?id, "deleted torrent from persistence database")
+             }
+@@ -1488,16 +1501,9 @@
+             (Err(e), true) => return Err(e).context("torrent deleted, but could not delete files"),
+             (Ok(storage), true) => {
+                 debug!("will delete files");
+-                remove_files_and_dirs(&metadata.file_infos, &storage);
+-                if removed.shared().options.output_folder != self.output_folder
+-                    && let Err(e) = storage.remove_directory_if_empty(Path::new(""))
+-                {
+-                    warn!(
+-                        ?id,
+-                        "error removing {:?}: {e:#}",
+-                        removed.shared().options.output_folder
+-                    )
+-                }
++                remove_files_and_dirs(&metadata.file_infos, &storage)?;
++                // SeedHop: explicit destinations belong to the user, not to the torrent.
++                // Remove only empty directories inside the torrent, never the selected root.
+             }
+             (_, false) => {
+                 debug!("not deleting files")
+@@ -1593,24 +1599,26 @@
+         )
+     }
+ 
+-    async fn try_update_persistence_metadata(&self, handle: &ManagedTorrentHandle) {
+-        if let Some(p) = self.persistence.as_ref()
+-            && let Err(e) = p.update_metadata(handle.id(), handle).await
+-        {
+-            warn!(storage=?p, error=?e, "error updating metadata")
+-        }
++    pub async fn try_update_persistence_metadata(
++        &self,
++        handle: &ManagedTorrentHandle,
++    ) -> anyhow::Result<()> {
++        if let Some(p) = self.persistence.as_ref() {
++            p.update_metadata(handle.id(), handle).await?;
++        }
++        Ok(())
+     }
+ 
+     pub async fn pause(&self, handle: &ManagedTorrentHandle) -> anyhow::Result<()> {
+         handle.pause()?;
+-        self.try_update_persistence_metadata(handle).await;
++        self.try_update_persistence_metadata(handle).await?;
+         Ok(())
+     }
+ 
+     pub async fn unpause(self: &Arc<Self>, handle: &ManagedTorrentHandle) -> anyhow::Result<()> {
+         let peer_rx = self.make_peer_rx_managed_torrent(handle, true);
+         handle.start(peer_rx, false)?;
+-        self.try_update_persistence_metadata(handle).await;
++        self.try_update_persistence_metadata(handle).await?;
+         Ok(())
+     }
+ 
+@@ -1620,7 +1628,7 @@
+         only_files: &HashSet<usize>,
+     ) -> anyhow::Result<()> {
+         handle.update_only_files(only_files)?;
+-        self.try_update_persistence_metadata(handle).await;
++        self.try_update_persistence_metadata(handle).await?;
+         Ok(())
+     }
+ 
+@@ -1728,7 +1736,8 @@
+     pub seen_peers: Vec<SocketAddr>,
+ }
+ 
+-fn remove_files_and_dirs(infos: &FileInfos, files: &dyn TorrentStorage) {
++fn remove_files_and_dirs(infos: &FileInfos, files: &dyn TorrentStorage) -> anyhow::Result<()> {
++    let mut failure = None;
+     let mut all_dirs = HashSet::new();
+     for (id, fi) in infos.iter().enumerate() {
+         if fi.attrs.padding {
+@@ -1737,6 +1746,7 @@
+         let mut fname = &*fi.relative_filename;
+         if let Err(e) = files.remove_file(id, fname) {
+             warn!(?fi.relative_filename, error=?e, "could not delete file");
++            failure.get_or_insert(e);
+         } else {
+             debug!(?fi.relative_filename, "deleted the file")
+         }
+@@ -1760,6 +1770,10 @@
+             debug!("removed {dir:?}")
+         }
+     }
++    if let Some(error) = failure {
++        return Err(error).context("transfer removed, but some files could not be deleted");
++    }
++    Ok(())
+ }
+ 
+ // Ad adapter for converting stats into the format that tracker_comms accepts.
+--- a/crates/librqbit/src/session_persistence/json.rs
++++ b/crates/librqbit/src/session_persistence/json.rs
+@@ -104,11 +104,18 @@
+         tmp.write_all(&buf)
+             .await
+             .with_context(|| format!("error writing {tmp_filename:?}"))?;
++        tmp.sync_all()
++            .await
++            .context("error syncing session database")?;
+         trace!(?tmp_filename, "wrote to temp file");
+ 
+         tokio::fs::rename(&tmp_filename, &self.db_filename)
+             .await
+             .context("error renaming persistence file")?;
++        tokio::fs::File::open(&self.output_folder)
++            .await?
++            .sync_all()
++            .await?;
+         trace!(filename=?self.db_filename, "wrote persistence");
+         Ok(())
+     }
+@@ -159,26 +166,48 @@
+ 
+         if write_torrent_file && !torrent_bytes.is_empty() {
+             let torrent_bytes_file = self.torrent_bytes_filename(&torrent.info_hash());
++            let pending_metadata = torrent_bytes_file.with_extension("torrent.pending");
+             match tokio::fs::OpenOptions::new()
+                 .create(true)
+                 .write(true)
+                 .truncate(true)
+-                .open(&torrent_bytes_file)
++                .open(&pending_metadata)
+                 .await
+             {
+                 Ok(mut f) => {
+-                    if let Err(e) = f.write_all(&torrent_bytes).await {
+-                        warn!(error=?e, file=?torrent_bytes_file, "error writing torrent bytes")
+-                    }
++                    f.write_all(&torrent_bytes)
++                        .await
++                        .context("error writing torrent metadata")?;
++                    f.sync_all()
++                        .await
++                        .context("error syncing torrent metadata")?;
+                 }
+                 Err(e) => {
+-                    warn!(error=?e, file=?torrent_bytes_file, "error opening torrent bytes file")
+-                }
+-            }
+-        }
+-
+-        self.db_content.write().await.torrents.insert(id, st);
+-        self.flush().await?;
++                    return Err(e).context("error opening torrent metadata");
++                }
++            }
++            tokio::fs::rename(&pending_metadata, &torrent_bytes_file)
++                .await
++                .context("error replacing torrent metadata")?;
++            tokio::fs::File::open(&self.output_folder)
++                .await?
++                .sync_all()
++                .await?;
++        }
++
++        let previous = self.db_content.write().await.torrents.insert(id, st);
++        if let Err(error) = self.flush().await {
++            let mut db = self.db_content.write().await;
++            match previous {
++                Some(previous) => {
++                    db.torrents.insert(id, previous);
++                }
++                None => {
++                    db.torrents.remove(&id);
++                }
++            }
++            return Err(error);
++        }
+ 
+         Ok(())
+     }
+--- a/crates/librqbit/src/storage/filesystem/fs.rs
++++ b/crates/librqbit/src/storage/filesystem/fs.rs
+@@ -88,6 +88,9 @@
+     }
+ 
+     fn remove_file(&self, _file_id: usize, filename: &Path) -> anyhow::Result<()> {
++        #[cfg(unix)]
++        return secure_remove(&self.output_folder, filename);
++        #[cfg(not(unix))]
+         Ok(std::fs::remove_file(self.output_folder.join(filename))?)
+     }
+ 
+@@ -137,7 +140,15 @@
+                 files.push(OpenedFile::new_dummy());
+                 continue;
+             };
++            #[cfg(unix)]
++            let f = secure_open(
++                &self.output_folder,
++                relative_path,
++                shared.options.allow_overwrite,
++            )?;
++            #[cfg(not(unix))]
+             std::fs::create_dir_all(full_path.parent().context("bug: no parent")?)?;
++            #[cfg(not(unix))]
+             let f = if shared.options.allow_overwrite {
+                 OpenOptions::new()
+                     .create(true)
+@@ -167,3 +178,111 @@
+         Ok(())
+     }
+ }
++
++/// SeedHop: traverse using directory descriptors, so swapping a symlink between
++/// preflight and open cannot redirect writes outside the selected directory.
++#[cfg(unix)]
++fn secure_open(root: &Path, relative: &Path, reuse: bool) -> anyhow::Result<std::fs::File> {
++    use nix::libc;
++    use std::{
++        ffi::CString,
++        os::{
++            fd::{AsRawFd, FromRawFd},
++            unix::{ffi::OsStrExt, fs::OpenOptionsExt},
++        },
++        path::Component,
++    };
++    let mut directory = OpenOptions::new()
++        .read(true)
++        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
++        .open(root)?;
++    let components: Vec<_> = relative.components().collect();
++    anyhow::ensure!(!components.is_empty(), "empty torrent filename");
++    for (index, component) in components.iter().enumerate() {
++        let Component::Normal(name) = component else {
++            anyhow::bail!("unsafe torrent path")
++        };
++        let name = CString::new(name.as_bytes())?;
++        let last = index + 1 == components.len();
++        if !last {
++            // SAFETY: names are terminated C strings; the parent descriptor is live.
++            let created = unsafe { libc::mkdirat(directory.as_raw_fd(), name.as_ptr(), 0o755) };
++            if created != 0
++                && std::io::Error::last_os_error().kind() != std::io::ErrorKind::AlreadyExists
++            {
++                return Err(std::io::Error::last_os_error().into());
++            }
++        }
++        let flags = libc::O_NOFOLLOW
++            | libc::O_CLOEXEC
++            | if last {
++                libc::O_RDWR | libc::O_CREAT | if reuse { 0 } else { libc::O_EXCL }
++            } else {
++                libc::O_RDONLY | libc::O_DIRECTORY
++            };
++        // SAFETY: descriptor/name are valid; the returned owned fd is wrapped once.
++        let fd = unsafe { libc::openat(directory.as_raw_fd(), name.as_ptr(), flags, 0o644) };
++        if fd < 0 {
++            return Err(std::io::Error::last_os_error())
++                .context("refused unsafe or unavailable torrent path");
++        }
++        let file = unsafe { std::fs::File::from_raw_fd(fd) };
++        if last {
++            return Ok(file);
++        }
++        directory = file;
++    }
++    unreachable!()
++}
++
++#[cfg(unix)]
++fn secure_remove(root: &Path, relative: &Path) -> anyhow::Result<()> {
++    use nix::libc;
++    use std::{
++        ffi::CString,
++        os::{
++            fd::{AsRawFd, FromRawFd},
++            unix::{ffi::OsStrExt, fs::OpenOptionsExt},
++        },
++        path::Component,
++    };
++    let mut directory = OpenOptions::new()
++        .read(true)
++        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
++        .open(root)?;
++    let components: Vec<_> = relative.components().collect();
++    anyhow::ensure!(!components.is_empty(), "empty torrent filename");
++    for (index, component) in components.iter().enumerate() {
++        let Component::Normal(name) = component else {
++            anyhow::bail!("unsafe deletion path")
++        };
++        let name = CString::new(name.as_bytes())?;
++        if index + 1 == components.len() {
++            let result = unsafe { libc::unlinkat(directory.as_raw_fd(), name.as_ptr(), 0) };
++            if result == 0 {
++                return Ok(());
++            }
++            let error = std::io::Error::last_os_error();
++            if error.kind() == std::io::ErrorKind::NotFound {
++                return Ok(());
++            }
++            return Err(error.into());
++        }
++        let fd = unsafe {
++            libc::openat(
++                directory.as_raw_fd(),
++                name.as_ptr(),
++                libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
++            )
++        };
++        if fd < 0 {
++            let error = std::io::Error::last_os_error();
++            if error.kind() == std::io::ErrorKind::NotFound {
++                return Ok(());
++            }
++            return Err(error.into());
++        }
++        directory = unsafe { std::fs::File::from_raw_fd(fd) };
++    }
++    Ok(())
++}

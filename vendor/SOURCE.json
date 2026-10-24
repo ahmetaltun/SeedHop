@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/ikatson/rqbit",
+  "revision": "a499d2f243d124e144aef137afe7cb304a6e3f36",
+  "version": "9.0.1",
+  "archive_sha256": "d4ca70697e9284dd09883730bdc7dc5452efff0232c75a42b1f8949383726a24",
+  "modified_files": [
+    "crates/librqbit/src/session.rs",
+    "crates/librqbit/src/session_persistence/json.rs",
+    "crates/librqbit/src/storage/filesystem/fs.rs"
+  ]
+}

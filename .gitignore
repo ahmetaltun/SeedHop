@@ -1,0 +1,18 @@
+/target/
+/.build/
+/.cache/
+.DS_Store
+/macOS/Generated/
+*.xcuserstate
+xcuserdata/
+__pycache__/
+*.py[cod]
+
+# Local configuration and signing material
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile

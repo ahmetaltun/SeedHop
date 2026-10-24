@@ -1,0 +1,133 @@
+use crate::{CoreError, FileRecord, Result, TorrentPreview, TorrentRecord};
+use librqbit::{ManagedTorrent, TorrentStatsState};
+use sha1::{Digest, Sha1};
+
+pub fn engine_error(error: impl std::fmt::Display) -> CoreError {
+    CoreError::Engine(error.to_string())
+}
+
+pub fn preview(bytes: Vec<u8>) -> Result<TorrentPreview> {
+    if bytes.len() > 32 * 1024 * 1024 {
+        return Err(CoreError::InvalidInput(
+            "The torrent metadata exceeds 32 MB.".into(),
+        ));
+    }
+    let meta = librqbit::torrent_from_bytes(&bytes).map_err(|e| {
+        if bytes
+            .windows(b"12:meta versioni2e".len())
+            .any(|w| w == b"12:meta versioni2e")
+        {
+            CoreError::Unsupported
+        } else {
+            engine_error(e)
+        }
+    })?;
+    let id = meta.info_hash.as_string();
+    let info = meta.info.data.validate().map_err(engine_error)?;
+    let files: Vec<_> = info
+        .iter_file_details()
+        .enumerate()
+        .map(|(index, f)| FileRecord {
+            index: index as u32,
+            name: f.filename.to_string(),
+            size: f.len,
+            downloaded: 0,
+            selected: true,
+        })
+        .collect();
+    if files.is_empty() {
+        return Err(CoreError::Unsupported);
+    }
+    Ok(TorrentPreview {
+        id,
+        name: info
+            .name()
+            .map(|v| v.into_owned())
+            .unwrap_or_else(|| "Untitled torrent".into()),
+        total_bytes: files.iter().map(|f| f.size).sum(),
+        files,
+        torrent_bytes: bytes,
+    })
+}
+
+pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
+    let stats = torrent.stats();
+    let down = stats
+        .live
+        .as_ref()
+        .map(|s| s.download_speed.as_bytes())
+        .unwrap_or(0);
+    let up = stats
+        .live
+        .as_ref()
+        .map(|s| s.upload_speed.as_bytes())
+        .unwrap_or(0);
+    let state = match stats.state {
+        TorrentStatsState::Initializing { .. } => "checking",
+        TorrentStatsState::Paused => "paused",
+        TorrentStatsState::Error => "error",
+        TorrentStatsState::Live if stats.finished => "seeding",
+        TorrentStatsState::Live if down == 0 => "waiting",
+        TorrentStatsState::Live => "downloading",
+    };
+    let selected = torrent.only_files();
+    let files = torrent
+        .with_metadata(|meta| {
+            meta.info
+                .iter_file_details()
+                .enumerate()
+                .map(|(i, file)| FileRecord {
+                    index: i as u32,
+                    name: file.filename.to_string(),
+                    size: file.len,
+                    downloaded: stats.file_progress.get(i).copied().unwrap_or(0),
+                    selected: selected.as_ref().is_none_or(|s| s.contains(&i)),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let peers = stats
+        .live
+        .as_ref()
+        .map(|v| v.snapshot.peer_stats.live)
+        .unwrap_or(0);
+    TorrentRecord {
+        id: torrent.info_hash().as_string(),
+        name: torrent
+            .name()
+            .unwrap_or_else(|| "Resolving metadata…".into()),
+        state: state.into(),
+        total_bytes: stats.total_bytes,
+        downloaded_bytes: stats.progress_bytes,
+        uploaded_bytes: stats.uploaded_bytes,
+        download_rate: down,
+        upload_rate: up,
+        peers,
+        destination: torrent.output_folder().to_string_lossy().into_owned(),
+        files,
+        trackers: torrent
+            .shared()
+            .trackers
+            .iter()
+            .map(|u| u.to_string())
+            .collect(),
+        error: stats.error,
+    }
+}
+
+/// Small deterministic fixture creator; independent clients can verify the output.
+pub fn create_fixture(name: &str, content: &[u8]) -> Vec<u8> {
+    let mut bytes = format!(
+        "d4:infod6:lengthi{}e4:name{}:{}12:piece lengthi16384e6:pieces{}:",
+        content.len(),
+        name.len(),
+        name,
+        content.chunks(16384).count() * 20
+    )
+    .into_bytes();
+    for piece in content.chunks(16384) {
+        bytes.extend_from_slice(&Sha1::digest(piece));
+    }
+    bytes.extend_from_slice(b"ee");
+    bytes
+}
