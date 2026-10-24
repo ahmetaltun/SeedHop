@@ -29,6 +29,13 @@ overview, file-selection, and tracker information. Tracker credentials are not
 displayed. Columns can be resized, reordered, hidden, and restored through the
 native header customization menu. Selection uses stable info hashes.
 
+Explicit search and filter changes clear selections that are no longer visible;
+live snapshots retain the selected identities. Multi-selection gets an aggregate
+inspector with separate pause and resume actions. Commands capture their targets
+at invocation, and removal confirmation keeps its original targets even if the
+selection changes. In-flight changes display saving feedback and prevent
+overlapping writes to the same transfer.
+
 Empty, no-results, connecting, switching, and error states have explicit copy
 and actions. File lists use lazy stacks. Polling pauses when the library window
 is hidden; byte values are formatted for the user's locale.
@@ -40,6 +47,13 @@ metadata, size, destination, selected files, paused option, and explicit reuse
 of existing files. Cancel sends an explicit cancellation request to the engine.
 Existing files are never silently reused or overwritten.
 
+Each lookup has a fresh cancellation identity; a late result cannot update a
+dismissed sheet or a later lookup. Torrent bytes are read off the main actor,
+with the 32 MB bound checked against the open file and while reading. A failed
+file read retains its source and offers a retry. Adding is not cancellable once
+submitted: the sheet stays open until the engine confirms or reports an error.
+Successful imports clear the previous search/filter and select the new transfer.
+
 ## Accessibility and interaction
 
 Native buttons, fields, table selection, checkboxes, segmented controls, and
@@ -48,13 +62,19 @@ text; custom progress includes an accessibility value. Inspector transitions
 respect Reduce Motion. Every icon-only control has a label or help text.
 
 Shortcuts: Command-N add, Command-O open, Shift-Command-V paste magnet,
-Command-R resume, Command-period pause, Command-delete remove,
+Command-F find transfer, Command-R resume, Command-period pause, Command-delete remove,
 Option-Command-I inspector, Option-Command-Q quit and stop transfers.
+Escape clears search, then releases its focus; Escape cancels metadata lookup
+while an import is resolving.
 
 ## Visual QA
 
-`make render` produces 12 light/dark fixture screens. Sample transfers are
+`make render` produces 18 light/dark fixture screens, including multi-selection,
+empty-filter, and connection-recovery states. Sample transfers are
 available only through explicit design-preview mode. These renders verify
 layout and typography; they do not prove VoiceOver navigation, live keyboard
 interaction, or full system contrast behavior. Those remain manual acceptance
 checks recorded in `VALIDATION.md`.
+
+See `UX-REVIEW.md` for the follow-up review, executable regressions, and the
+remaining live walkthrough checklist.

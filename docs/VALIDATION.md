@@ -20,6 +20,8 @@ validation exception is omitted from certificate-backed and release builds.
 | Rust formatting and Clippy | PASS | Workspace checks with warnings denied |
 | Authenticated foreground XPC | PASS, ad-hoc | In-app `--verify-engine` smoke test |
 | XPC metadata, paused add, limits, restart, restore, removal | PASS | Isolated smoke-test library |
+| Import presentation model against real XPC/Rust | PASS, ad-hoc | Off-main file reading, real metadata, and paused addition through `ImportSession` |
+| Swift UX presentation regressions | PASS | 13 controlled-transport scenarios; not a native input or accessibility certification |
 | Exclusive ownership across processes | PASS | Competing startup rejected while child owns lease |
 | Abrupt process death and restoration | PASS | Child killed after durable commands; lock and state recovered |
 | Persistence failures reach callers | PASS | Read-only session directory fault |
@@ -29,7 +31,7 @@ validation exception is omitted from certificate-backed and release builds.
 | Multi-file downloading | PASS | Controlled tracker swarm, nested paths, exact byte comparison |
 | Metadata cancellation | PASS | Genuinely pending tracker request cancelled explicitly |
 | Independent qBittorrent interoperability | PASS, seeding direction | SeedHop → qBittorrent v5.3.0alpha1, 1 MiB |
-| Visual rendering | PASS | 12 light/dark, compact, empty, import, files, and settings renders |
+| Visual rendering | PASS | 18 light/dark library, compact, empty, import, files, settings, multi-selection, filter, and recovery renders |
 
 Independent transfer SHA-256:
 `631b84027d6b9e52b539c4e8373622d23032dfadc64d60af87339c9037e4f769`.
@@ -41,6 +43,14 @@ The reverse-direction qBittorrent seed attempt did not pass: the local test
 instance closed even a separate Python plain-v1 handshake probe. Its cause
 is not established. Downloading is verified by the controlled multi-file swarm;
 bidirectional qBittorrent interoperability must not be inferred from the seeding test.
+
+The UX follow-up and manual walkthrough checklist are in `UX-REVIEW.md`.
+Cancellation and stale replies, action-target stability, removal confirmation,
+overlapping file saves, duplicate adds, and file-read retries have executable
+Swift regression coverage. These checks use a controlled transport; the separate
+XPC smoke check exercises the real import model and Rust helper. Native UI
+automation is unavailable in the current environment, so pointer/keyboard and
+VoiceOver completion remain unverified.
 
 ## Remaining acceptance gates
 
@@ -62,6 +72,7 @@ bidirectional qBittorrent interoperability must not be inferred from the seeding
 make build
 make test
 make lint
+make ux-test
 make render
 cargo run -p seedhop-core --bin seedhop-lab -- fixture .build/fixture
 .build/SeedHop.app/Contents/MacOS/SeedHop --verify-engine "$PWD/.build/fixture"

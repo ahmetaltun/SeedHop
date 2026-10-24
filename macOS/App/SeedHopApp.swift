@@ -2,7 +2,8 @@ import SwiftUI
 
 @main struct SeedHopApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @StateObject private var store = LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine"))
+    @StateObject private var store = LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine") || ProcessInfo.processInfo.arguments.contains("--verify-ux"))
+    @FocusedValue(\.librarySearch) private var librarySearch
     var body: some Scene {
         WindowGroup("SeedHop",id:"library") {
             LibraryView().environmentObject(store).onAppear { delegate.store = store }
@@ -13,15 +14,18 @@ import SwiftUI
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing:.newItem) {
-                Button("Add Torrent…") { store.incomingFile = nil; store.incomingMagnet = ""; store.showImport = true }.keyboardShortcut("n")
+                Button("Add Torrent…") { store.beginImport() }.keyboardShortcut("n")
                 Button("Open Torrent File…") { store.openFiles() }.keyboardShortcut("o")
                 Button("Paste Magnet Link…") { store.pasteMagnet() }.keyboardShortcut("v",modifiers:[.command,.shift])
             }
+            CommandGroup(after:.textEditing) {
+                Button("Find Transfer…") { librarySearch?.focus() }.keyboardShortcut("f").disabled(librarySearch == nil)
+            }
             CommandMenu("Transfers") {
-                Button("Resume Selected") { store.toggleSelected(paused:false) }.keyboardShortcut("r").disabled(store.selection.isEmpty)
-                Button("Pause Selected") { store.toggleSelected(paused:true) }.keyboardShortcut(".").disabled(store.selection.isEmpty)
+                Button("Resume Selected") { store.toggleSelected(paused:false) }.keyboardShortcut("r").disabled(!store.canResumeSelection)
+                Button("Pause Selected") { store.toggleSelected(paused:true) }.keyboardShortcut(".").disabled(!store.canPauseSelection)
                 Divider()
-                Button("Remove Selected…") { store.showRemoval = true }.keyboardShortcut(.delete).disabled(store.selection.isEmpty)
+                Button("Remove Selected…") { store.requestRemoval() }.keyboardShortcut(.delete).disabled(!store.canActOnSelection)
                 Button("Show Inspector") { store.showInspector.toggle() }.keyboardShortcut("i",modifiers:[.command,.option])
             }
             CommandGroup(before:.appTermination) { Button("Quit and Stop Transfers") { delegate.stopEverything = true; NSApp.terminate(nil) }.keyboardShortcut("q",modifiers:[.command,.option]) }
@@ -43,6 +47,10 @@ import SwiftUI
     }
     func applicationDidFinishLaunching(_ notification:Notification) {
         #if SEEDHOP_DEVELOPMENT
+        if ProcessInfo.processInfo.arguments.contains("--verify-ux") {
+            Task { do { try await UXSelfTest.run(); exit(0) } catch { fputs("UX verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--verify-engine") {
             Task { do { try await EngineSelfTest.run(); exit(0) } catch { fputs("XPC verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
         }

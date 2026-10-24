@@ -9,6 +9,15 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self { case .all:return "square.stack.3d.up"; case .downloading:return "arrow.down.circle"; case .seeding:return "arrow.up.circle"; case .paused:return "pause.circle"; case .attention:return "exclamationmark.circle" }
     }
+    var emptyTitle: String {
+        switch self {
+        case .all: return "No transfers yet"
+        case .downloading: return "No downloads in progress"
+        case .seeding: return "No transfers seeding"
+        case .paused: return "No paused transfers"
+        case .attention: return "Everything looks good"
+        }
+    }
     func includes(_ t: TorrentItem) -> Bool {
         switch self { case .all:return true; case .downloading:return t.isActive; case .seeding:return t.state == "seeding"; case .paused:return t.isPaused; case .attention:return t.state == "error" }
     }
@@ -17,8 +26,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
 @MainActor final class LibraryStore: ObservableObject {
     @Published var torrents: [TorrentItem] = []
     @Published var selection = Set<String>()
-    @Published var filter: LibraryFilter = .all
-    @Published var search = ""
+    @Published var filter: LibraryFilter = .all { didSet { if oldValue != filter { reconcileVisibleSelection() } } }
+    @Published var search = "" { didSet { if oldValue != search { reconcileVisibleSelection() } } }
     @Published var connected = false
     @Published var connecting = false
     @Published var switching = false
@@ -28,7 +37,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     @Published var incomingMagnet = ""
     @Published var incomingFile: URL?
     @Published var showRemoval = false
-    @Published var deleteFiles = false
+    @Published private(set) var removalTargets: [TorrentItem] = []
+    @Published private(set) var busyTransfers = Set<String>()
     @Published var downloadLimit: UInt32 = 0
     @Published var uploadLimit: UInt32 = 0
     @Published var listenPort: UInt16 = 0
@@ -37,14 +47,15 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     @Published var downloadDirectory = UserDefaults.standard.string(forKey:"downloadDirectory") ?? FileManager.default.urls(for:.downloadsDirectory,in:.userDomainMask)[0].path
     @Published var completionNotifications = UserDefaults.standard.object(forKey:"completionNotifications") as? Bool ?? false
     let designPreview: Bool
-    let client = EngineClient()
+    let client: any EngineTransport
     private var polling: Task<Void,Never>?
     private var reconnect: Task<Void,Never>?
 
-    init(designPreview: Bool = false) {
+    init(designPreview: Bool = false, client: (any EngineTransport)? = nil) {
         self.designPreview = designPreview
+        self.client = client ?? EngineClient()
         if designPreview { torrents = PreviewFixtures.torrents; selection = [torrents[0].id]; connected = true; return }
-        client.onInterruption = { [weak self] in
+        self.client.onInterruption = { [weak self] in
             guard let self, !self.switching else { return }
             self.connected = false
             self.reconnect?.cancel()
@@ -56,9 +67,22 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     var downloadRate: UInt64 { torrents.reduce(0) { $0 + $1.downloadRate } }
     var uploadRate: UInt64 { torrents.reduce(0) { $0 + $1.uploadRate } }
     var totalDownloaded: UInt64 { torrents.reduce(0) { $0 + $1.downloadedBytes } }
+    var canActOnSelection: Bool { canChangeTransfers && !selected.isEmpty && selected.allSatisfy { !busyTransfers.contains($0.id) } }
+    var canResumeSelection: Bool { canActOnSelection && selected.contains { $0.isPaused || $0.state == "error" } }
+    var canPauseSelection: Bool { canActOnSelection && selected.contains { !$0.isPaused } }
+    var canChangeTransfers: Bool { connected && !switching && !designPreview }
+
+    private func reconcileVisibleSelection() {
+        let remaining = selection.intersection(Set(visibleTorrents.map(\.id)))
+        if remaining != selection { selection = remaining }
+    }
+
+    func revealTransfer(_ id: String) {
+        filter = .all; search = ""; selection = [id]
+    }
 
     func start() async {
-        guard !designPreview, !connecting, !switching else { return }
+        guard !designPreview, !connected, !connecting, !switching else { return }
         connecting = true; defer { connecting = false }
         do {
             let service = SMAppService.agent(plistName:SeedHopIdentity.agentPlist)
@@ -114,17 +138,50 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         return try await client.send(request)
     }
     func toggleSelected(paused: Bool) {
+        guard canActOnSelection else { return }
+        let items = selected.filter { paused ? !$0.isPaused : ($0.isPaused || $0.state == "error") }
+        let ids = Set(items.map(\.id))
+        guard !ids.isEmpty else { return }
+        error = nil
+        busyTransfers.formUnion(ids)
         Task {
-            do { for item in selected { var r = EngineRequest(command:"pause"); r.id = item.id; r.paused = paused; _ = try await perform(r) }; await refresh() }
+            defer { busyTransfers.subtract(ids) }
+            do { for item in items { var r = EngineRequest(command:"pause"); r.id = item.id; r.paused = paused; _ = try await perform(r) } }
             catch { self.error = error.localizedDescription }
+            await refresh()
         }
     }
-    func removeSelected() {
-        let items = selected; let deleting = deleteFiles
-        Task { do { for item in items { var r = EngineRequest(command:"remove"); r.id = item.id; r.deleteFiles = deleting; _ = try await perform(r) }; selection.removeAll(); await refresh() } catch { self.error = error.localizedDescription } }
+    func requestRemoval() {
+        guard canActOnSelection else { return }
+        removalTargets = selected
+        showRemoval = true
+    }
+    func removeConfirmed(deleteFiles: Bool) {
+        let items = removalTargets
+        let ids = Set(items.map(\.id))
+        guard canChangeTransfers, !ids.isEmpty, busyTransfers.isDisjoint(with:ids) else { return }
+        error = nil
+        busyTransfers.formUnion(ids)
+        Task {
+            defer {
+                busyTransfers.subtract(ids)
+                if Set(removalTargets.map(\.id)) == ids { removalTargets = [] }
+            }
+            do { for item in items { var r = EngineRequest(command:"remove"); r.id = item.id; r.deleteFiles = deleteFiles; _ = try await perform(r); selection.remove(item.id) } }
+            catch { self.error = error.localizedDescription }
+            await refresh()
+        }
     }
     func setFileSelection(_ item: TorrentItem, indices: [UInt32]) {
-        Task { do { var r = EngineRequest(command:"select"); r.id = item.id; r.selected = indices; _ = try await perform(r); await refresh() } catch { self.error = error.localizedDescription } }
+        guard canChangeTransfers, !busyTransfers.contains(item.id), !indices.isEmpty else { return }
+        error = nil
+        busyTransfers.insert(item.id)
+        Task {
+            defer { busyTransfers.remove(item.id) }
+            do { var r = EngineRequest(command:"select"); r.id = item.id; r.selected = indices.sorted(); _ = try await perform(r) }
+            catch { self.error = error.localizedDescription }
+            await refresh()
+        }
     }
     func setLimits(download: UInt32, upload: UInt32) async throws {
         var r = EngineRequest(command:"limits"); r.downloadLimit = download; r.uploadLimit = upload
@@ -184,12 +241,17 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
     func openFiles() {
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.init(filenameExtension:"torrent")!]; panel.allowsMultipleSelection = false
-        panel.begin { result in if result == .OK, let url = panel.url { self.incomingFile = url; self.incomingMagnet = ""; self.showImport = true } }
+        panel.begin { result in if result == .OK, let url = panel.url { self.beginImport(file:url) } }
     }
-    func pasteMagnet() { incomingMagnet = NSPasteboard.general.string(forType:.string) ?? ""; incomingFile = nil; showImport = true }
+    func beginImport(magnet: String = "", file: URL? = nil) {
+        guard !showImport else { return }
+        incomingMagnet = magnet; incomingFile = file; showImport = true
+    }
+    func pasteMagnet() { beginImport(magnet:NSPasteboard.general.string(forType:.string) ?? "") }
     func open(_ urls: [URL]) {
         guard let url = urls.first else { return }
-        if url.scheme == "magnet" { incomingMagnet = url.absoluteString; incomingFile = nil } else { incomingFile = url; incomingMagnet = "" }
-        showImport = true
+        if url.scheme?.lowercased() == "magnet" { beginImport(magnet:url.absoluteString) }
+        else if url.isFileURL && url.pathExtension.lowercased() == "torrent" { beginImport(file:url) }
+        else { error = "Choose a .torrent file or a magnet link to add a transfer." }
     }
 }

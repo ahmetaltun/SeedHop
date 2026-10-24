@@ -1,7 +1,14 @@
 import Foundation
 import ServiceManagement
 
-@MainActor final class EngineClient {
+@MainActor protocol EngineTransport: AnyObject {
+    var onInterruption: (() -> Void)? { get set }
+    func connect(background: Bool) throws
+    func invalidate()
+    func send(_ request: EngineRequest) async throws -> EngineReply
+}
+
+@MainActor final class EngineClient: EngineTransport {
     private var connection: NSXPCConnection?
     private(set) var background = false
     var onInterruption: (() -> Void)?

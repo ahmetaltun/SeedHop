@@ -74,12 +74,14 @@ struct InlineNotice: View {
     let title: String
     let message: String
     var retry: (() -> Void)?
+    var dismiss: (() -> Void)?
     var body: some View {
         HStack(alignment:.top,spacing:12) {
             Image(systemName:"exclamationmark.circle.fill").foregroundStyle(.orange)
             VStack(alignment:.leading,spacing:4) { Text(title).font(.system(size:12,weight:.semibold)); Text(message).font(.system(size:12)).foregroundStyle(.secondary).textSelection(.enabled) }
             Spacer(minLength:4)
             if let retry { Button("Retry",action:retry).controlSize(.small) }
+            if let dismiss { Button(action:dismiss) { Image(systemName:"xmark") }.buttonStyle(.plain).accessibilityLabel("Dismiss message") }
         }.padding(14).background(Color.orange.opacity(0.07),in:RoundedRectangle(cornerRadius:10))
     }
 }

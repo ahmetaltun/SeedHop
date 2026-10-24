@@ -33,13 +33,21 @@ enum PreviewFixtures {
             try capture(LibraryView().environmentObject(store),size:NSSize(width:1240,height:780),appearance:appearance,to:output.appendingPathComponent("library-\(name).png"))
             store.showInspector = false
             try capture(LibraryView().environmentObject(store),size:NSSize(width:820,height:620),appearance:appearance,to:output.appendingPathComponent("compact-\(name).png"))
+            store.showInspector = true; store.selection = [PreviewFixtures.torrents[0].id,PreviewFixtures.torrents[4].id]
+            try capture(LibraryView().environmentObject(store),size:NSSize(width:1240,height:780),appearance:appearance,to:output.appendingPathComponent("selection-\(name).png"))
+            store.showInspector = false; store.filter = .attention
+            try capture(LibraryView().environmentObject(store),size:NSSize(width:1000,height:700),appearance:appearance,to:output.appendingPathComponent("filter-\(name).png"))
+            store.filter = .all; store.connected = false
+            store.error = "SeedHop couldn’t reach its engine. Your library has been preserved. Try reconnecting to continue."
+            try capture(LibraryView().environmentObject(store),size:NSSize(width:1000,height:700),appearance:appearance,to:output.appendingPathComponent("recovery-\(name).png"))
+            store.error = nil; store.connected = true
             store.torrents = []; store.selection = []
             try capture(LibraryView().environmentObject(store),size:NSSize(width:1000,height:700),appearance:appearance,to:output.appendingPathComponent("empty-\(name).png"))
             try capture(ImportView().environmentObject(store),size:NSSize(width:600,height:432),appearance:appearance,to:output.appendingPathComponent("add-\(name).png"))
             try capture(ImportView(preview:PreviewFixtures.importPreview).environmentObject(store),size:NSSize(width:600,height:680),appearance:appearance,to:output.appendingPathComponent("files-\(name).png"))
             try capture(SettingsView().environmentObject(store),size:NSSize(width:570,height:560),appearance:appearance,to:output.appendingPathComponent("settings-\(name).png"))
         }
-        print("Rendered 12 explicitly labeled fixture screens to \(output.path)")
+        print("Rendered 18 fixture screens to \(output.path); library fixtures are explicitly labeled sample data")
     }
     private static func capture<V:View>(_ view:V,size:NSSize,appearance:NSAppearance.Name,to url:URL) throws {
         let window = NSWindow(contentRect:NSRect(origin:.zero,size:size),styleMask:[.borderless],backing:.buffered,defer:false)

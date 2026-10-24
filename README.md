@@ -51,8 +51,8 @@ make render
 ```
 
 Design-preview mode uses labeled sample data and cannot issue transfer commands.
-The renderer writes light/dark main-window, compact, empty, import, file-selection,
-and settings screenshots under `.build/design/`. It renders app-owned views,
+The renderer writes 18 light/dark main-window, compact, empty, import, file-selection,
+settings, multi-selection, empty-filter, and recovery screenshots under `.build/design/`. It renders app-owned views,
 not the user's screen. See [design system](docs/DESIGN.md).
 
 ## Verify
@@ -60,6 +60,7 @@ not the user's screen. See [design system](docs/DESIGN.md).
 ```sh
 make test
 make lint
+make ux-test
 cargo run -p seedhop-core --bin seedhop-lab -- fixture .build/fixture
 .build/SeedHop.app/Contents/MacOS/SeedHop --verify-engine "$PWD/.build/fixture"
 python3 scripts/interop.py
@@ -69,6 +70,11 @@ Tests need local socket access. The XPC smoke test uses an isolated library
 inside the supplied fixture directory. The interoperability test launches an
 isolated qBittorrent profile, verifies a deterministic fixture, and closes that
 test process afterward; it does not use your normal qBittorrent profile.
+
+`make ux-test` runs deterministic Swift presentation regressions with delayed
+engine replies. The XPC smoke test also exercises the actual import presentation
+model against the Rust helper. These checks do not replace a live keyboard,
+pointer, or VoiceOver walkthrough. See [UX review](docs/UX-REVIEW.md).
 
 ## Structure
 
