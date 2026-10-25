@@ -17,4 +17,6 @@ sha1 = "0.10"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
+sha2 = "0.10"
+librqbit-peer-protocol = { path = "../../vendor/rqbit/crates/peer_binary_protocol" }
 tempfile = "3"

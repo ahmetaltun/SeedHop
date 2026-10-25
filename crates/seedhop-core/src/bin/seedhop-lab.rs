@@ -14,6 +14,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let args: Vec<_> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
+        Some(command @ ("inspect-v2" | "verify-v2-piece")) => {
+            let path = args.get(2).ok_or("missing torrent")?;
+            let file = std::fs::File::open(path)?;
+            use std::io::Read;
+            let mut bytes = Vec::new();
+            file.take(seedhop_core::v2::MAX_METAINFO_LENGTH as u64 + 1)
+                .read_to_end(&mut bytes)?;
+            let meta = seedhop_core::v2::Metainfo::parse(&bytes)?.ok_or("This is a v1 torrent.")?;
+            if command == "verify-v2-piece" {
+                let index: u64 = args.get(3).ok_or("missing piece index")?.parse()?;
+                let piece = std::fs::File::open(args.get(4).ok_or("missing piece data file")?)?;
+                let mut data = Vec::new();
+                piece.take(meta.piece_length() + 1).read_to_end(&mut data)?;
+                meta.verify_piece(index, &data)?;
+                println!("Verified SHA-256 piece {index}");
+            } else {
+                println!("{}", serde_json::to_string_pretty(&meta)?);
+            }
+        }
         Some("seed") => {
             use std::io::Write;
             let torrent = std::fs::read(args.get(2).ok_or("missing torrent")?)?;
@@ -137,7 +156,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => {
             return Err(
-                "Usage: seedhop-lab fixture DIRECTORY | seed TORRENT STATE FILES | download TORRENT STATE DOWNLOADS [INDICES] | download-magnet MAGNET STATE DOWNLOADS [INDICES] | hold STATE DOWNLOADS".into(),
+                "Usage: seedhop-lab inspect-v2 TORRENT | verify-v2-piece TORRENT INDEX FILE | fixture DIRECTORY | seed TORRENT STATE FILES | download TORRENT STATE DOWNLOADS [INDICES] | download-magnet MAGNET STATE DOWNLOADS [INDICES] | hold STATE DOWNLOADS".into(),
             );
         }
     }

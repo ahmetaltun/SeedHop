@@ -1,8 +1,9 @@
 # Engine audit — rqbit 9.0.1
 
 Baseline: `a499d2f243d124e144aef137afe7cb304a6e3f36`.
-`vendor/SOURCE.json` records archive provenance. The unified local patch is
-`vendor/patches/0001-seedhop-reliability.patch`; upstream's license is retained.
+`vendor/SOURCE.json` records archive provenance. Local deltas are recorded in
+`vendor/patches/0001-seedhop-reliability.patch` and
+`vendor/patches/0002-seedhop-bep52.patch`; upstream's license is retained.
 
 ## Reliability changes
 
@@ -49,7 +50,7 @@ the engine does not write into rqbit's separate application directories.
 | File selection, limits, pause | `session.rs`, `limits.rs` | Exposed through core and UI |
 | Session persistence | `session_persistence/json.rs` | Enabled with reliability patches |
 | Streaming primitives | `ManagedTorrent::stream` | Not exposed in this milestone |
-| v2/hybrid | v2 error groundwork exists; session uses v1 info hashes | No full v2 claim; hybrid v1 behavior not certified |
+| v2/hybrid | Shared BEP 52 metadata, SHA-256 verification, aligned storage, hash wire messages and magnet layers | Enabled through the v2 swarm; nine independent transfer/magnet/selection cases pass. See `BITTORRENT-V2.md` |
 | Encryption | No MSE/RC4 handshake implementation found in reviewed protocol/connection sources | Roadmap gap |
 | uTP | `listen.rs`, `librqbit-utp` | Experimental upstream; disabled here |
 | Rarest-first and priorities | Upstream README documents sequential-only selection | Roadmap gap |
@@ -82,3 +83,12 @@ atomic limits persistence. Freeing space permits Resume and settings retry;
 updated settings survive restart. These checks required two application Resume
 fixes and no additional upstream patches. Physical drive removal, interface loss,
 APFS faults, and sleep/wake remain separate gates. See `RECOVERY.md`.
+
+## BEP 52 follow-up
+
+The focused second patch adds v2 identities, aligned piece/file accounting,
+SHA-256 download and restart checks, hash proof exchange, authenticated magnet
+layers, and persisted full hashes. Nine qBittorrent cases pass for pure v2 and
+hybrids through the v2 swarm, including uploads, downloads, selection and both
+magnet identities. Hybrids select v2 rather than simultaneous dual-swarm operation.
+See `BITTORRENT-V2.md` and `results/v2-wire-2026-10-25.json`.

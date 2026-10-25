@@ -75,6 +75,21 @@ impl<'a> FileOps<'a> {
         progress: &AtomicU64,
         pause_requested: &AtomicBool,
     ) -> anyhow::Result<BF> {
+        if self.torrent.info().v2.is_some() {
+            let mut have = BF::from_boxed_slice(
+                vec![0u8; self.torrent.lengths().piece_bitfield_bytes()].into(),
+            );
+            for piece in self.torrent.lengths().iter_piece_infos() {
+                if pause_requested.load(Ordering::Relaxed) {
+                    bail!("initial check paused");
+                }
+                if self.check_piece(piece.piece_index).unwrap_or(false) {
+                    have.set(piece.piece_index.get() as usize, true);
+                }
+                progress.fetch_add(piece.len as u64, Ordering::Relaxed);
+            }
+            return Ok(have);
+        }
         let mut have_pieces =
             BF::from_boxed_slice(vec![0u8; self.torrent.lengths().piece_bitfield_bytes()].into());
         let mut piece_files = Vec::<usize>::new();
@@ -188,6 +203,24 @@ impl<'a> FileOps<'a> {
             return Ok(true);
         }
 
+        if let Some(v2) = &self.torrent.info().v2 {
+            let (file_idx, fi) = self
+                .file_infos
+                .iter()
+                .enumerate()
+                .find(|(_, fi)| fi.piece_range.contains(&piece_index.get()))
+                .context("piece has no file")?;
+            let start = self.torrent.lengths().piece_offset(piece_index) - fi.offset_in_torrent;
+            return match v2.verify_piece_reader(piece_index.get() as u64, |offset, buf| {
+                self.files
+                    .pread_exact(file_idx, start + offset, buf)
+                    .map_err(std::io::Error::other)
+            }) {
+                Ok(()) => Ok(true),
+                Err(librqbit_core::v2::V2Error::HashMismatch) => Ok(false),
+                Err(error) => Err(error.into()),
+            };
+        }
         let mut h = Sha1::new();
         let piece_length = self.torrent.lengths().piece_length(piece_index);
         let mut absolute_offset = self.torrent.lengths().piece_offset(piece_index);
@@ -197,11 +230,13 @@ impl<'a> FileOps<'a> {
 
         for (file_idx, fi) in self.file_infos.iter().enumerate() {
             let file_len = fi.len;
-            if absolute_offset > file_len {
-                absolute_offset -= file_len;
+            if absolute_offset >= fi.offset_in_torrent + file_len
+                || absolute_offset < fi.offset_in_torrent
+            {
                 continue;
             }
-            let file_remaining_len = file_len - absolute_offset;
+            let position = absolute_offset - fi.offset_in_torrent;
+            let file_remaining_len = file_len - position;
 
             let to_read_in_file: usize =
                 std::cmp::min(file_remaining_len, piece_remaining_bytes as u64).try_into()?;
@@ -212,7 +247,7 @@ impl<'a> FileOps<'a> {
             update_hash_from_file(
                 file_idx,
                 fi,
-                absolute_offset,
+                position,
                 self.files,
                 &mut h,
                 &mut buf,
@@ -231,7 +266,7 @@ impl<'a> FileOps<'a> {
                 break;
             }
 
-            absolute_offset = 0;
+            absolute_offset += to_read_in_file as u64;
         }
 
         match self
@@ -260,6 +295,23 @@ impl<'a> FileOps<'a> {
         }
     }
 
+    pub fn serve_hashes(
+        &self,
+        request: &peer_binary_protocol::HashRequest,
+    ) -> anyhow::Result<Vec<[u8; 32]>> {
+        let v2 = self
+            .torrent
+            .info()
+            .v2
+            .as_ref()
+            .context("not a v2 torrent")?;
+        Ok(v2.serve_hashes(request, |file, offset, buf| {
+            self.files
+                .pread_exact(file, offset, buf)
+                .map_err(std::io::Error::other)
+        })?)
+    }
+
     pub fn read_chunk(
         &self,
         who_sent: PeerHandle,
@@ -270,15 +322,20 @@ impl<'a> FileOps<'a> {
             anyhow::bail!("read_chunk(): not enough capacity in the provided buffer")
         }
         let mut absolute_offset = self.torrent.lengths().chunk_absolute_offset(chunk_info);
-        let mut buf = result_buf;
+        let mut buf = &mut result_buf[..chunk_info.size as usize];
+        // Only hybrid upload requests can span a BEP 47 alignment gap.
+        // Unfilled bytes are virtual padding, never bytes from another file.
+        buf.fill(0);
 
         for (file_idx, file_info) in self.file_infos.iter().enumerate() {
             let file_len = file_info.len;
-            if absolute_offset > file_len {
-                absolute_offset -= file_len;
+            if absolute_offset >= file_info.offset_in_torrent + file_len
+                || absolute_offset < file_info.offset_in_torrent
+            {
                 continue;
             }
-            let file_remaining_len = file_len - absolute_offset;
+            let position = absolute_offset - file_info.offset_in_torrent;
+            let file_remaining_len = file_len - position;
             let to_read_in_file = std::cmp::min(file_remaining_len, buf.len() as u64).try_into()?;
 
             trace!(
@@ -289,7 +346,7 @@ impl<'a> FileOps<'a> {
                 buf[..to_read_in_file].fill(0);
             } else {
                 self.files
-                    .pread_exact(file_idx, absolute_offset, &mut buf[..to_read_in_file])
+                    .pread_exact(file_idx, position, &mut buf[..to_read_in_file])
                     .with_context(|| {
                         format!("error reading {file_idx} bytes, file_id: {to_read_in_file}")
                     })?;
@@ -301,7 +358,7 @@ impl<'a> FileOps<'a> {
                 break;
             }
 
-            absolute_offset = 0;
+            absolute_offset += to_read_in_file as u64;
         }
 
         Ok(())
@@ -318,12 +375,14 @@ impl<'a> FileOps<'a> {
 
         for (file_idx, file_info) in self.file_infos.iter().enumerate() {
             let file_len = file_info.len;
-            if absolute_offset > file_len {
-                absolute_offset -= file_len;
+            if absolute_offset >= file_info.offset_in_torrent + file_len
+                || absolute_offset < file_info.offset_in_torrent
+            {
                 continue;
             }
+            let position = absolute_offset - file_info.offset_in_torrent;
 
-            let remaining_len = file_len - absolute_offset;
+            let remaining_len = file_len - position;
             let to_write = std::cmp::min(data.len() as u64, remaining_len).try_into()?;
 
             trace!(
@@ -341,7 +400,7 @@ impl<'a> FileOps<'a> {
             if !file_info.attrs.padding {
                 let written = self
                     .files
-                    .pwrite_all_vectored(file_idx, absolute_offset, slices)
+                    .pwrite_all_vectored(file_idx, position, slices)
                     .with_context(|| {
                         format!(
                             "error writing to file {file_idx} (\"{:?}\")",
@@ -355,7 +414,7 @@ impl<'a> FileOps<'a> {
                 break;
             }
 
-            absolute_offset = 0;
+            absolute_offset += to_write as u64;
         }
 
         Ok(())

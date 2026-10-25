@@ -83,7 +83,7 @@ struct ImportView: View {
             Divider()
             HStack {
                 if let preview = session.preview { Text("\(session.selected.count) selected · \(SizeText.bytes(preview.files.filter { session.selected.contains($0.index) }.reduce(0) { $0 + $1.size }))").font(.system(size:10)).foregroundStyle(.secondary) }
-                else { Label(store.designPreview ? "Design preview · sample data" : "BitTorrent v1 preview",systemImage:store.designPreview ? "paintpalette" : "info.circle").font(.system(size:10)).foregroundStyle(.secondary) }
+                else { Label(store.designPreview ? "Design preview · sample data" : "BitTorrent v1 + v2",systemImage:store.designPreview ? "paintpalette" : "info.circle").font(.system(size:10)).foregroundStyle(.secondary) }
                 Spacer()
                 Button("Cancel") { cancel(); dismiss() }.keyboardShortcut(.cancelAction).disabled(session.adding)
                 Button { session.preview == nil ? resolve() : add() } label: { HStack(spacing:6) { if session.adding { ProgressView().controlSize(.mini) }; Text(session.adding ? "Adding…" : session.preview == nil ? "Continue" : session.paused ? "Add to Library" : "Start Download") } }

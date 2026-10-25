@@ -513,18 +513,35 @@ impl Default for SessionOptions {
     }
 }
 
-fn torrent_file_from_info_bytes(info_bytes: &[u8], trackers: &[url::Url]) -> anyhow::Result<Bytes> {
+fn torrent_file_from_info_bytes(
+    info_bytes: &[u8],
+    trackers: &[url::Url],
+    v2: Option<&librqbit_core::v2::Metainfo>,
+) -> anyhow::Result<Bytes> {
     #[derive(Serialize)]
     struct Tmp<'a> {
         announce: &'a str,
         #[serde(rename = "announce-list")]
         announce_list: &'a [&'a [url::Url]],
         info: bencode::raw_value::RawValue<&'a [u8]>,
+        #[serde(rename = "piece layers", skip_serializing_if = "Option::is_none")]
+        layers: Option<std::collections::BTreeMap<buffers::ByteBufOwned, buffers::ByteBufOwned>>,
     }
 
     let mut w = Vec::new();
     let v = Tmp {
         info: bencode::raw_value::RawValue(info_bytes),
+        layers: v2.map(|v| {
+            v.piece_layers()
+                .into_iter()
+                .map(|(key, value)| {
+                    (
+                        buffers::ByteBufOwned(Bytes::copy_from_slice(&key)),
+                        buffers::ByteBufOwned(value.into()),
+                    )
+                })
+                .collect()
+        }),
         announce: trackers.first().map(|s| s.as_str()).unwrap_or(""),
         announce_list: &[trackers],
     };
@@ -543,6 +560,7 @@ pub(crate) struct CheckedIncomingConnection {
 
 struct InternalAddResult {
     info_hash: Id20,
+    v2_hash: Option<librqbit_core::Id32>,
     metadata: Option<TorrentMetadata>,
     trackers: Vec<url::Url>,
     name: Option<String>,
@@ -933,7 +951,7 @@ impl Session {
         }
 
         let mut read_buf = ReadBuf::new();
-        let h = read_buf
+        let mut h = read_buf
             .read_handshake(&mut reader, rwtimeout)
             .await
             .context("error reading handshake")?;
@@ -948,10 +966,21 @@ impl Session {
             .read()
             .torrents
             .iter()
-            .find(|(_, t)| t.info_hash() == h.info_hash)
+            .find(|(_, t)| {
+                t.info_hash() == h.info_hash
+                    || (h.reserved & 0x10 != 0
+                        && t.with_metadata(|m| {
+                            m.info.info().v2.as_ref().is_some_and(|v| v.is_hybrid())
+                                && m.v1_info_hash == h.info_hash
+                        })
+                        .unwrap_or(false))
+            })
             .map(|(id, t)| (*id, t.clone()))
             .with_context(|| format!("didn't find a matching torrent {:?}", h.info_hash))?;
 
+        // A v1 hybrid handshake may explicitly offer a BEP 52 upgrade.
+        // Normalize only after matching both the v1 identity and the upgrade bit.
+        h.info_hash = torrent.info_hash();
         let live = torrent
             .live_wait_initializing(Duration::from_secs(5))
             .await
@@ -1111,9 +1140,11 @@ impl Session {
                 AddTorrent::Url(magnet) if magnet.starts_with("magnet:") || magnet.len() == 40 => {
                     let magnet = Magnet::parse(&magnet)
                         .context("provided path is not a valid magnet URL")?;
-                    let info_hash = magnet
-                        .as_id20()
-                        .context("magnet link didn't contain a BTv1 infohash")?;
+                    let v2_hash = magnet.as_id32();
+                    let info_hash = v2_hash
+                        .map(|h| h.truncate_for_dht())
+                        .or_else(|| magnet.as_id20())
+                        .context("magnet has no supported info hash")?;
                     if let Some(so) = magnet.get_select_only() {
                         // Only overwrite opts.only_files if user didn't specify
                         if opts.only_files.is_none() {
@@ -1123,6 +1154,7 @@ impl Session {
 
                     InternalAddResult {
                         info_hash,
+                        v2_hash,
                         trackers: magnet
                             .trackers
                             .into_iter()
@@ -1168,6 +1200,13 @@ impl Session {
 
                     InternalAddResult {
                         info_hash: torrent.meta.info_hash,
+                        v2_hash: torrent
+                            .meta
+                            .info
+                            .data
+                            .v2
+                            .as_ref()
+                            .map(|v| librqbit_core::Id32::new(v.info_hash())),
                         metadata: Some(TorrentMetadata::new(
                             torrent.meta.info.data.validate()?,
                             torrent.torrent_bytes,
@@ -1237,7 +1276,8 @@ impl Session {
         mut opts: AddTorrentOptions,
     ) -> anyhow::Result<AddTorrentResponse> {
         let InternalAddResult {
-            info_hash,
+            mut info_hash,
+            v2_hash,
             metadata,
             trackers,
             name,
@@ -1272,7 +1312,7 @@ impl Session {
                         "no known way to resolve peers (no DHT, no trackers, no initial_peers)",
                     )?;
                     let resolved_magnet = self
-                        .resolve_magnet(info_hash, peer_rx, &trackers, opts.peer_opts)
+                        .resolve_magnet(info_hash, v2_hash, peer_rx, &trackers, opts.peer_opts)
                         .await?;
 
                     // Add back seen_peers into the peer stream, as we consumed some peers
@@ -1290,6 +1330,9 @@ impl Session {
             }
         };
 
+        if let Some(v2) = &metadata.info.info().v2 {
+            info_hash = librqbit_core::Id32::new(v2.info_hash()).truncate_for_dht();
+        }
         trace!("Torrent metadata: {:#?}", &metadata.info.info());
 
         let only_files = compute_only_files(
@@ -1348,6 +1391,15 @@ impl Session {
                     None
                 }
             }) {
+                let existing = handle
+                    .with_metadata(|m| m.info.info().v2.as_ref().map(|v| v.info_hash()))
+                    .ok()
+                    .flatten();
+                let incoming = metadata.info.info().v2.as_ref().map(|v| v.info_hash());
+                anyhow::ensure!(
+                    existing == incoming,
+                    "truncated wire identity collision; full torrent identities differ"
+                );
                 return Ok(AddTorrentResponse::AlreadyManaged(id, handle));
             }
 
@@ -1643,6 +1695,7 @@ impl Session {
     async fn resolve_magnet(
         self: &Arc<Self>,
         info_hash: Id20,
+        v2_hash: Option<librqbit_core::Id32>,
         peer_rx: PeerStream,
         trackers: &[url::Url],
         peer_opts: Option<PeerConnectionOptions>,
@@ -1650,6 +1703,7 @@ impl Session {
         match read_metainfo_from_peer_receiver(
             self.peer_id,
             info_hash,
+            v2_hash,
             Default::default(),
             peer_rx,
             Some(self.merge_peer_opts(peer_opts)),
@@ -1665,13 +1719,14 @@ impl Session {
                 seen,
             } => {
                 trace!(?info, "received result from DHT");
+                let torrent_bytes = torrent_file_from_info_bytes(
+                    info_bytes.as_ref(),
+                    trackers,
+                    info.v2.as_deref(),
+                )?;
                 let info = info.validate()?;
                 Ok(ResolveMagnetResult {
-                    metadata: TorrentMetadata::new(
-                        info,
-                        torrent_file_from_info_bytes(info_bytes.as_ref(), trackers)?,
-                        info_bytes.0,
-                    )?,
+                    metadata: TorrentMetadata::new(info, torrent_bytes, info_bytes.0)?,
                     peer_rx: rx,
                     seen_peers: {
                         let seen = seen.into_iter().collect_vec();

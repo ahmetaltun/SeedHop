@@ -5,7 +5,7 @@ use buffers::{ByteBuf, ByteBufOwned};
 use bytes::Bytes;
 use librqbit_core::{
     constants::CHUNK_SIZE,
-    hash_id::Id20,
+    hash_id::{Id20, Id32},
     lengths::{ChunkInfo, last_element_size},
     torrent_metainfo::TorrentMetaV1Info,
 };
@@ -34,6 +34,7 @@ pub(crate) async fn read_metainfo_from_peer(
     addr: SocketAddr,
     peer_id: Id20,
     info_hash: Id20,
+    v2_hash: Option<Id32>,
     peer_connection_options: Option<PeerConnectionOptions>,
     spawner: BlockingSpawner,
     connector: Arc<StreamConnector>,
@@ -46,10 +47,14 @@ pub(crate) async fn read_metainfo_from_peer(
     let handler = Handler {
         addr,
         info_hash,
+        v2_hash,
+        handshake_hash: Mutex::new(None),
+        layers: Mutex::new(None),
+        pending_info: Mutex::new(None),
         writer_tx,
         result_tx: Mutex::new(Some(result_tx)),
         locked: RwLock::new(None),
-        client_name_and_version,
+        client_name_and_version: client_name_and_version.clone(),
     };
     let connection = PeerConnection::new(
         addr,
@@ -57,21 +62,40 @@ pub(crate) async fn read_metainfo_from_peer(
         peer_id,
         handler,
         peer_connection_options,
-        spawner,
-        connector,
+        spawner.clone(),
+        connector.clone(),
     );
 
     let result_reader = result_rx;
     let (_, brx) = tokio::sync::broadcast::channel(1);
     let connection_runner = async move { connection.manage_peer_outgoing(writer_rx, brx).await };
 
-    tokio::select! {
-        result = result_reader => Ok(result??),
+    let result = tokio::select! {
+        result = result_reader => result??,
         whatever = connection_runner => match whatever {
             Ok(_) => anyhow::bail!("connection runner completed first"),
-            Err(e) => Err(e.into())
+            Err(e) => return Err(e.into())
+        }
+    };
+    // A btih-only hybrid magnet first authenticates SHA-1, then reconnects using
+    // its committed SHA-256 identity to fetch v2 Merkle layers.
+    if v2_hash.is_none() {
+        if let Some(pending) = librqbit_core::v2::PendingMetainfo::from_info(result.1.as_ref())? {
+            let full = Id32::new(pending.info_hash());
+            return Box::pin(read_metainfo_from_peer(
+                addr,
+                peer_id,
+                full.truncate_for_dht(),
+                Some(full),
+                peer_connection_options,
+                spawner,
+                connector,
+                client_name_and_version,
+            ))
+            .await;
         }
     }
+    Ok(result)
 }
 
 #[derive(Default)]
@@ -112,6 +136,7 @@ impl HandlerLocked {
         &mut self,
         d: &UtMetadataData<ByteBuf>,
         info_hash: &Id20,
+        v2_hash: Option<Id32>,
     ) -> anyhow::Result<bool> {
         let piece = d.piece();
         if piece as usize >= self.total_pieces {
@@ -137,7 +162,12 @@ impl HandlerLocked {
             // check metadata
             let mut hash = Sha1::new();
             hash.update(&self.buffer);
-            if hash.finish() != info_hash.0 {
+            let matches = if let Some(expected) = v2_hash {
+                librqbit_core::v2::sha256(&self.buffer) == expected.0
+            } else {
+                hash.finish() == info_hash.0
+            };
+            if !matches {
                 anyhow::bail!("info checksum invalid");
             }
             Ok(true)
@@ -152,6 +182,10 @@ pub type TorrentAndInfoBytes = (TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned);
 struct Handler {
     addr: SocketAddr,
     info_hash: Id20,
+    v2_hash: Option<Id32>,
+    handshake_hash: Mutex<Option<Id20>>,
+    layers: Mutex<Option<librqbit_core::v2::PendingMetainfo>>,
+    pending_info: Mutex<Option<TorrentAndInfoBytes>>,
     writer_tx: UnboundedSender<WriterRequest>,
     result_tx: Mutex<
         Option<
@@ -162,7 +196,49 @@ struct Handler {
     client_name_and_version: String,
 }
 
+impl Handler {
+    fn complete_info(&self, info: TorrentAndInfoBytes) -> anyhow::Result<()> {
+        self.result_tx
+            .lock()
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("metadata already complete"))?
+            .send(Ok(info))
+            .map_err(|_| anyhow::anyhow!("metadata consumer closed"))
+    }
+    fn request_next_layer(&self) -> anyhow::Result<()> {
+        let next = self.layers.lock().as_ref().and_then(|p| p.next_request());
+        if let Some(request) = next {
+            self.writer_tx
+                .send(WriterRequest::Message(Message::HashRequest(request)))?;
+        } else {
+            let pending = self
+                .layers
+                .lock()
+                .take()
+                .ok_or_else(|| anyhow::anyhow!("no pending metadata"))?;
+            let meta = pending.finish()?;
+            let mut info = self
+                .pending_info
+                .lock()
+                .take()
+                .ok_or_else(|| anyhow::anyhow!("missing info dictionary"))?;
+            info.0.v2 = Some(Arc::new(meta));
+            self.complete_info(info)?;
+        }
+        Ok(())
+    }
+}
 impl PeerConnectionHandler for Handler {
+    // A hybrid peer can answer metadata discovery with its v2 wire identity.
+    // No content is accepted until the original full SHA-1 commitment and this
+    // candidate's truncated SHA-256 identity both match the received info bytes.
+    fn accepts_metadata_hash_upgrade(&self, _hash: Id20) -> bool {
+        self.v2_hash.is_none()
+    }
+
+    fn is_v2(&self) -> bool {
+        self.v2_hash.is_some()
+    }
     fn should_send_bitfield(&self) -> bool {
         false
     }
@@ -172,6 +248,7 @@ impl PeerConnectionHandler for Handler {
     }
 
     fn on_handshake(&self, handshake: Handshake, _kind: ConnectionKind) -> anyhow::Result<()> {
+        *self.handshake_hash.lock() = Some(handshake.info_hash);
         if !handshake.supports_extended() {
             anyhow::bail!(
                 "this peer does not support extended handshaking, which is a prerequisite to download metadata"
@@ -183,13 +260,28 @@ impl PeerConnectionHandler for Handler {
     async fn on_received_message(&self, msg: Message<'_>) -> anyhow::Result<()> {
         trace!("{}: received message: {:?}", self.addr, msg);
 
-        if let Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Data(utdata))) = msg {
-            let piece_ready = self
-                .locked
-                .write()
+        if let Message::Hashes {
+            request,
+            ref hashes,
+        } = msg
+        {
+            self.layers
+                .lock()
                 .as_mut()
-                .unwrap()
-                .record_piece(&utdata, &self.info_hash)?;
+                .ok_or_else(|| anyhow::anyhow!("unsolicited hashes"))?
+                .accept(request, hashes)?;
+            self.request_next_layer()?;
+            return Ok(());
+        }
+        if let Message::HashReject(_) = msg {
+            anyhow::bail!("peer rejected required Merkle hashes");
+        }
+        if let Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Data(utdata))) = msg {
+            let piece_ready = self.locked.write().as_mut().unwrap().record_piece(
+                &utdata,
+                &self.info_hash,
+                self.v2_hash,
+            )?;
             if piece_ready {
                 let buf = Bytes::from(self.locked.write().take().unwrap().buffer);
                 let info = from_bytes::<TorrentMetaV1Info<ByteBuf>>(&buf)
@@ -203,14 +295,28 @@ impl PeerConnectionHandler for Handler {
                     })
                     .map(|i| (i, ByteBufOwned(buf)));
 
-                self.result_tx
-                    .lock()
-                    .take()
-                    .ok_or_else(|| anyhow::anyhow!("oneshot is consumed"))?
-                    .send(info)
-                    .map_err(|_| {
-                        anyhow::anyhow!("torrent info deserialized, but consumer closed")
-                    })?;
+                let info = info?;
+                if let Some(candidate) = *self.handshake_hash.lock()
+                    && candidate != self.info_hash
+                {
+                    anyhow::ensure!(
+                        candidate.0 == librqbit_core::v2::sha256(info.1.as_ref())[..20],
+                        "hybrid metadata handshake identity mismatch"
+                    );
+                }
+                if self.v2_hash.is_some() {
+                    let pending =
+                        librqbit_core::v2::PendingMetainfo::from_info(info.1.as_ref())?
+                            .ok_or_else(|| anyhow::anyhow!("v2 magnet supplied v1 metadata"))?;
+                    if Some(Id32::new(pending.info_hash())) != self.v2_hash {
+                        anyhow::bail!("v2 metadata identity mismatch");
+                    }
+                    *self.pending_info.lock() = Some(info);
+                    *self.layers.lock() = Some(pending);
+                    self.request_next_layer()?;
+                } else {
+                    self.complete_info(info)?;
+                }
             }
         }
         Ok(())

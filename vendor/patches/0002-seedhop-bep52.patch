@@ -1,0 +1,2385 @@
+diff --git a/crates/buffers/src/lib.rs b/crates/buffers/src/lib.rs
+index e099426..3f82533 100644
+--- a/crates/buffers/src/lib.rs
++++ b/crates/buffers/src/lib.rs
+@@ -98,6 +98,9 @@ impl CloneToOwned for ByteBuf<'_> {
+     type Target = ByteBufOwned;
+ 
+     fn clone_to_owned(&self, within_buffer: Option<&Bytes>) -> Self::Target {
++        if self.0.is_empty() {
++            return ByteBufOwned::default();
++        }
+         // Try zero-copy from the provided buffer.
+         if let Some(within_buffer) = within_buffer {
+             let haystack = within_buffer.as_ptr() as usize;
+diff --git a/crates/librqbit/src/create_torrent_file.rs b/crates/librqbit/src/create_torrent_file.rs
+index 53b1501..fa5003f 100644
+--- a/crates/librqbit/src/create_torrent_file.rs
++++ b/crates/librqbit/src/create_torrent_file.rs
+@@ -159,6 +159,7 @@ async fn create_torrent_raw<'a>(
+     }
+     Ok(CreateTorrentRawResult {
+         info: TorrentMetaV1Info {
++            v2: None,
+             name: Some(name),
+             pieces: piece_hashes.into(),
+             piece_length,
+diff --git a/crates/librqbit/src/dht_utils.rs b/crates/librqbit/src/dht_utils.rs
+index f2f35d0..dea568d 100644
+--- a/crates/librqbit/src/dht_utils.rs
++++ b/crates/librqbit/src/dht_utils.rs
+@@ -30,6 +30,7 @@ pub enum ReadMetainfoResult<Rx> {
+ pub async fn read_metainfo_from_peer_receiver<A: Stream<Item = SocketAddr> + Unpin>(
+     peer_id: Id20,
+     info_hash: Id20,
++    v2_hash: Option<librqbit_core::Id32>,
+     initial_addrs: Vec<SocketAddr>,
+     addrs_stream: A,
+     peer_connection_options: Option<PeerConnectionOptions>,
+@@ -51,6 +52,7 @@ pub async fn read_metainfo_from_peer_receiver<A: Stream<Item = SocketAddr> + Unp
+                 addr,
+                 peer_id,
+                 info_hash,
++                v2_hash,
+                 peer_connection_options,
+                 // This shouldn't be called anyway as we aren't reading/writing to disk, so it's
+                 // ok not to use a shared one.
+diff --git a/crates/librqbit/src/file_ops.rs b/crates/librqbit/src/file_ops.rs
+index febba96..0aa6da3 100644
+--- a/crates/librqbit/src/file_ops.rs
++++ b/crates/librqbit/src/file_ops.rs
+@@ -75,6 +75,21 @@ impl<'a> FileOps<'a> {
+         progress: &AtomicU64,
+         pause_requested: &AtomicBool,
+     ) -> anyhow::Result<BF> {
++        if self.torrent.info().v2.is_some() {
++            let mut have = BF::from_boxed_slice(
++                vec![0u8; self.torrent.lengths().piece_bitfield_bytes()].into(),
++            );
++            for piece in self.torrent.lengths().iter_piece_infos() {
++                if pause_requested.load(Ordering::Relaxed) {
++                    bail!("initial check paused");
++                }
++                if self.check_piece(piece.piece_index).unwrap_or(false) {
++                    have.set(piece.piece_index.get() as usize, true);
++                }
++                progress.fetch_add(piece.len as u64, Ordering::Relaxed);
++            }
++            return Ok(have);
++        }
+         let mut have_pieces =
+             BF::from_boxed_slice(vec![0u8; self.torrent.lengths().piece_bitfield_bytes()].into());
+         let mut piece_files = Vec::<usize>::new();
+@@ -188,6 +203,24 @@ impl<'a> FileOps<'a> {
+             return Ok(true);
+         }
+ 
++        if let Some(v2) = &self.torrent.info().v2 {
++            let (file_idx, fi) = self
++                .file_infos
++                .iter()
++                .enumerate()
++                .find(|(_, fi)| fi.piece_range.contains(&piece_index.get()))
++                .context("piece has no file")?;
++            let start = self.torrent.lengths().piece_offset(piece_index) - fi.offset_in_torrent;
++            return match v2.verify_piece_reader(piece_index.get() as u64, |offset, buf| {
++                self.files
++                    .pread_exact(file_idx, start + offset, buf)
++                    .map_err(std::io::Error::other)
++            }) {
++                Ok(()) => Ok(true),
++                Err(librqbit_core::v2::V2Error::HashMismatch) => Ok(false),
++                Err(error) => Err(error.into()),
++            };
++        }
+         let mut h = Sha1::new();
+         let piece_length = self.torrent.lengths().piece_length(piece_index);
+         let mut absolute_offset = self.torrent.lengths().piece_offset(piece_index);
+@@ -197,11 +230,13 @@ impl<'a> FileOps<'a> {
+ 
+         for (file_idx, fi) in self.file_infos.iter().enumerate() {
+             let file_len = fi.len;
+-            if absolute_offset > file_len {
+-                absolute_offset -= file_len;
++            if absolute_offset >= fi.offset_in_torrent + file_len
++                || absolute_offset < fi.offset_in_torrent
++            {
+                 continue;
+             }
+-            let file_remaining_len = file_len - absolute_offset;
++            let position = absolute_offset - fi.offset_in_torrent;
++            let file_remaining_len = file_len - position;
+ 
+             let to_read_in_file: usize =
+                 std::cmp::min(file_remaining_len, piece_remaining_bytes as u64).try_into()?;
+@@ -212,7 +247,7 @@ impl<'a> FileOps<'a> {
+             update_hash_from_file(
+                 file_idx,
+                 fi,
+-                absolute_offset,
++                position,
+                 self.files,
+                 &mut h,
+                 &mut buf,
+@@ -231,7 +266,7 @@ impl<'a> FileOps<'a> {
+                 break;
+             }
+ 
+-            absolute_offset = 0;
++            absolute_offset += to_read_in_file as u64;
+         }
+ 
+         match self
+@@ -260,6 +295,23 @@ impl<'a> FileOps<'a> {
+         }
+     }
+ 
++    pub fn serve_hashes(
++        &self,
++        request: &peer_binary_protocol::HashRequest,
++    ) -> anyhow::Result<Vec<[u8; 32]>> {
++        let v2 = self
++            .torrent
++            .info()
++            .v2
++            .as_ref()
++            .context("not a v2 torrent")?;
++        Ok(v2.serve_hashes(request, |file, offset, buf| {
++            self.files
++                .pread_exact(file, offset, buf)
++                .map_err(std::io::Error::other)
++        })?)
++    }
++
+     pub fn read_chunk(
+         &self,
+         who_sent: PeerHandle,
+@@ -270,15 +322,20 @@ impl<'a> FileOps<'a> {
+             anyhow::bail!("read_chunk(): not enough capacity in the provided buffer")
+         }
+         let mut absolute_offset = self.torrent.lengths().chunk_absolute_offset(chunk_info);
+-        let mut buf = result_buf;
++        let mut buf = &mut result_buf[..chunk_info.size as usize];
++        // Only hybrid upload requests can span a BEP 47 alignment gap.
++        // Unfilled bytes are virtual padding, never bytes from another file.
++        buf.fill(0);
+ 
+         for (file_idx, file_info) in self.file_infos.iter().enumerate() {
+             let file_len = file_info.len;
+-            if absolute_offset > file_len {
+-                absolute_offset -= file_len;
++            if absolute_offset >= file_info.offset_in_torrent + file_len
++                || absolute_offset < file_info.offset_in_torrent
++            {
+                 continue;
+             }
+-            let file_remaining_len = file_len - absolute_offset;
++            let position = absolute_offset - file_info.offset_in_torrent;
++            let file_remaining_len = file_len - position;
+             let to_read_in_file = std::cmp::min(file_remaining_len, buf.len() as u64).try_into()?;
+ 
+             trace!(
+@@ -289,7 +346,7 @@ impl<'a> FileOps<'a> {
+                 buf[..to_read_in_file].fill(0);
+             } else {
+                 self.files
+-                    .pread_exact(file_idx, absolute_offset, &mut buf[..to_read_in_file])
++                    .pread_exact(file_idx, position, &mut buf[..to_read_in_file])
+                     .with_context(|| {
+                         format!("error reading {file_idx} bytes, file_id: {to_read_in_file}")
+                     })?;
+@@ -301,7 +358,7 @@ impl<'a> FileOps<'a> {
+                 break;
+             }
+ 
+-            absolute_offset = 0;
++            absolute_offset += to_read_in_file as u64;
+         }
+ 
+         Ok(())
+@@ -318,12 +375,14 @@ impl<'a> FileOps<'a> {
+ 
+         for (file_idx, file_info) in self.file_infos.iter().enumerate() {
+             let file_len = file_info.len;
+-            if absolute_offset > file_len {
+-                absolute_offset -= file_len;
++            if absolute_offset >= file_info.offset_in_torrent + file_len
++                || absolute_offset < file_info.offset_in_torrent
++            {
+                 continue;
+             }
++            let position = absolute_offset - file_info.offset_in_torrent;
+ 
+-            let remaining_len = file_len - absolute_offset;
++            let remaining_len = file_len - position;
+             let to_write = std::cmp::min(data.len() as u64, remaining_len).try_into()?;
+ 
+             trace!(
+@@ -341,7 +400,7 @@ impl<'a> FileOps<'a> {
+             if !file_info.attrs.padding {
+                 let written = self
+                     .files
+-                    .pwrite_all_vectored(file_idx, absolute_offset, slices)
++                    .pwrite_all_vectored(file_idx, position, slices)
+                     .with_context(|| {
+                         format!(
+                             "error writing to file {file_idx} (\"{:?}\")",
+@@ -355,7 +414,7 @@ impl<'a> FileOps<'a> {
+                 break;
+             }
+ 
+-            absolute_offset = 0;
++            absolute_offset += to_write as u64;
+         }
+ 
+         Ok(())
+diff --git a/crates/librqbit/src/lib.rs b/crates/librqbit/src/lib.rs
+index 29843e0..86f415c 100644
+--- a/crates/librqbit/src/lib.rs
++++ b/crates/librqbit/src/lib.rs
+@@ -123,3 +123,5 @@ pub const fn client_name_and_version() -> &'static str {
+ pub fn try_increase_nofile_limit() -> anyhow::Result<u64> {
+     Ok(rlimit::increase_nofile_limit(1024 * 1024)?)
+ }
++
++pub use librqbit_core::v2;
+diff --git a/crates/librqbit/src/peer_connection.rs b/crates/librqbit/src/peer_connection.rs
+index c06259a..12b14e9 100644
+--- a/crates/librqbit/src/peer_connection.rs
++++ b/crates/librqbit/src/peer_connection.rs
+@@ -34,6 +34,12 @@ use crate::{
+ };
+ 
+ pub trait PeerConnectionHandler {
++    fn accepts_metadata_hash_upgrade(&self, _hash: Id20) -> bool {
++        false
++    }
++    fn is_v2(&self) -> bool {
++        false
++    }
+     fn on_connected(&self, _connection_time: Duration) {}
+     fn should_send_bitfield(&self) -> bool;
+     fn serialize_bitfield_message_to_buf(&self, buf: &mut [u8]) -> anyhow::Result<usize>;
+@@ -170,7 +176,7 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
+         );
+ 
+         let mut write_buf = Box::new([0u8; MAX_MSG_LEN]);
+-        let handshake = Handshake::new(self.info_hash, self.peer_id);
++        let handshake = Handshake::new(self.info_hash, self.peer_id).with_v2(self.handler.is_v2());
+         let hlen = handshake.serialize_unchecked_len(&mut *write_buf);
+         with_timeout(
+             "writing handshake",
+@@ -228,7 +234,8 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
+             self.handler.on_connected(now.elapsed());
+ 
+             let mut write_buf = Box::new([0u8; MAX_MSG_LEN]);
+-            let handshake = Handshake::new(self.info_hash, self.peer_id);
++            let handshake =
++                Handshake::new(self.info_hash, self.peer_id).with_v2(self.handler.is_v2());
+             let hsz = handshake.serialize_unchecked_len(&mut *write_buf);
+             with_timeout(
+                 "writing",
+@@ -247,7 +254,9 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
+                 decoded_id=?try_decode_peer_id(h.peer_id),
+                 "connected",
+             );
+-            if h.info_hash != self.info_hash {
++            if h.info_hash != self.info_hash
++                && !self.handler.accepts_metadata_hash_upgrade(h.info_hash)
++            {
+                 return Err(Error::WrongInfoHash);
+             }
+ 
+diff --git a/crates/librqbit/src/peer_info_reader/mod.rs b/crates/librqbit/src/peer_info_reader/mod.rs
+index 94fcb87..0b7a9db 100644
+--- a/crates/librqbit/src/peer_info_reader/mod.rs
++++ b/crates/librqbit/src/peer_info_reader/mod.rs
+@@ -5,7 +5,7 @@ use buffers::{ByteBuf, ByteBufOwned};
+ use bytes::Bytes;
+ use librqbit_core::{
+     constants::CHUNK_SIZE,
+-    hash_id::Id20,
++    hash_id::{Id20, Id32},
+     lengths::{ChunkInfo, last_element_size},
+     torrent_metainfo::TorrentMetaV1Info,
+ };
+@@ -34,6 +34,7 @@ pub(crate) async fn read_metainfo_from_peer(
+     addr: SocketAddr,
+     peer_id: Id20,
+     info_hash: Id20,
++    v2_hash: Option<Id32>,
+     peer_connection_options: Option<PeerConnectionOptions>,
+     spawner: BlockingSpawner,
+     connector: Arc<StreamConnector>,
+@@ -46,10 +47,14 @@ pub(crate) async fn read_metainfo_from_peer(
+     let handler = Handler {
+         addr,
+         info_hash,
++        v2_hash,
++        handshake_hash: Mutex::new(None),
++        layers: Mutex::new(None),
++        pending_info: Mutex::new(None),
+         writer_tx,
+         result_tx: Mutex::new(Some(result_tx)),
+         locked: RwLock::new(None),
+-        client_name_and_version,
++        client_name_and_version: client_name_and_version.clone(),
+     };
+     let connection = PeerConnection::new(
+         addr,
+@@ -57,21 +62,40 @@ pub(crate) async fn read_metainfo_from_peer(
+         peer_id,
+         handler,
+         peer_connection_options,
+-        spawner,
+-        connector,
++        spawner.clone(),
++        connector.clone(),
+     );
+ 
+     let result_reader = result_rx;
+     let (_, brx) = tokio::sync::broadcast::channel(1);
+     let connection_runner = async move { connection.manage_peer_outgoing(writer_rx, brx).await };
+ 
+-    tokio::select! {
+-        result = result_reader => Ok(result??),
++    let result = tokio::select! {
++        result = result_reader => result??,
+         whatever = connection_runner => match whatever {
+             Ok(_) => anyhow::bail!("connection runner completed first"),
+-            Err(e) => Err(e.into())
++            Err(e) => return Err(e.into())
++        }
++    };
++    // A btih-only hybrid magnet first authenticates SHA-1, then reconnects using
++    // its committed SHA-256 identity to fetch v2 Merkle layers.
++    if v2_hash.is_none() {
++        if let Some(pending) = librqbit_core::v2::PendingMetainfo::from_info(result.1.as_ref())? {
++            let full = Id32::new(pending.info_hash());
++            return Box::pin(read_metainfo_from_peer(
++                addr,
++                peer_id,
++                full.truncate_for_dht(),
++                Some(full),
++                peer_connection_options,
++                spawner,
++                connector,
++                client_name_and_version,
++            ))
++            .await;
+         }
+     }
++    Ok(result)
+ }
+ 
+ #[derive(Default)]
+@@ -112,6 +136,7 @@ impl HandlerLocked {
+         &mut self,
+         d: &UtMetadataData<ByteBuf>,
+         info_hash: &Id20,
++        v2_hash: Option<Id32>,
+     ) -> anyhow::Result<bool> {
+         let piece = d.piece();
+         if piece as usize >= self.total_pieces {
+@@ -137,7 +162,12 @@ impl HandlerLocked {
+             // check metadata
+             let mut hash = Sha1::new();
+             hash.update(&self.buffer);
+-            if hash.finish() != info_hash.0 {
++            let matches = if let Some(expected) = v2_hash {
++                librqbit_core::v2::sha256(&self.buffer) == expected.0
++            } else {
++                hash.finish() == info_hash.0
++            };
++            if !matches {
+                 anyhow::bail!("info checksum invalid");
+             }
+             Ok(true)
+@@ -152,6 +182,10 @@ pub type TorrentAndInfoBytes = (TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned);
+ struct Handler {
+     addr: SocketAddr,
+     info_hash: Id20,
++    v2_hash: Option<Id32>,
++    handshake_hash: Mutex<Option<Id20>>,
++    layers: Mutex<Option<librqbit_core::v2::PendingMetainfo>>,
++    pending_info: Mutex<Option<TorrentAndInfoBytes>>,
+     writer_tx: UnboundedSender<WriterRequest>,
+     result_tx: Mutex<
+         Option<
+@@ -162,7 +196,49 @@ struct Handler {
+     client_name_and_version: String,
+ }
+ 
++impl Handler {
++    fn complete_info(&self, info: TorrentAndInfoBytes) -> anyhow::Result<()> {
++        self.result_tx
++            .lock()
++            .take()
++            .ok_or_else(|| anyhow::anyhow!("metadata already complete"))?
++            .send(Ok(info))
++            .map_err(|_| anyhow::anyhow!("metadata consumer closed"))
++    }
++    fn request_next_layer(&self) -> anyhow::Result<()> {
++        let next = self.layers.lock().as_ref().and_then(|p| p.next_request());
++        if let Some(request) = next {
++            self.writer_tx
++                .send(WriterRequest::Message(Message::HashRequest(request)))?;
++        } else {
++            let pending = self
++                .layers
++                .lock()
++                .take()
++                .ok_or_else(|| anyhow::anyhow!("no pending metadata"))?;
++            let meta = pending.finish()?;
++            let mut info = self
++                .pending_info
++                .lock()
++                .take()
++                .ok_or_else(|| anyhow::anyhow!("missing info dictionary"))?;
++            info.0.v2 = Some(Arc::new(meta));
++            self.complete_info(info)?;
++        }
++        Ok(())
++    }
++}
+ impl PeerConnectionHandler for Handler {
++    // A hybrid peer can answer metadata discovery with its v2 wire identity.
++    // No content is accepted until the original full SHA-1 commitment and this
++    // candidate's truncated SHA-256 identity both match the received info bytes.
++    fn accepts_metadata_hash_upgrade(&self, _hash: Id20) -> bool {
++        self.v2_hash.is_none()
++    }
++
++    fn is_v2(&self) -> bool {
++        self.v2_hash.is_some()
++    }
+     fn should_send_bitfield(&self) -> bool {
+         false
+     }
+@@ -172,6 +248,7 @@ impl PeerConnectionHandler for Handler {
+     }
+ 
+     fn on_handshake(&self, handshake: Handshake, _kind: ConnectionKind) -> anyhow::Result<()> {
++        *self.handshake_hash.lock() = Some(handshake.info_hash);
+         if !handshake.supports_extended() {
+             anyhow::bail!(
+                 "this peer does not support extended handshaking, which is a prerequisite to download metadata"
+@@ -183,13 +260,28 @@ impl PeerConnectionHandler for Handler {
+     async fn on_received_message(&self, msg: Message<'_>) -> anyhow::Result<()> {
+         trace!("{}: received message: {:?}", self.addr, msg);
+ 
+-        if let Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Data(utdata))) = msg {
+-            let piece_ready = self
+-                .locked
+-                .write()
++        if let Message::Hashes {
++            request,
++            ref hashes,
++        } = msg
++        {
++            self.layers
++                .lock()
+                 .as_mut()
+-                .unwrap()
+-                .record_piece(&utdata, &self.info_hash)?;
++                .ok_or_else(|| anyhow::anyhow!("unsolicited hashes"))?
++                .accept(request, hashes)?;
++            self.request_next_layer()?;
++            return Ok(());
++        }
++        if let Message::HashReject(_) = msg {
++            anyhow::bail!("peer rejected required Merkle hashes");
++        }
++        if let Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Data(utdata))) = msg {
++            let piece_ready = self.locked.write().as_mut().unwrap().record_piece(
++                &utdata,
++                &self.info_hash,
++                self.v2_hash,
++            )?;
+             if piece_ready {
+                 let buf = Bytes::from(self.locked.write().take().unwrap().buffer);
+                 let info = from_bytes::<TorrentMetaV1Info<ByteBuf>>(&buf)
+@@ -203,14 +295,28 @@ impl PeerConnectionHandler for Handler {
+                     })
+                     .map(|i| (i, ByteBufOwned(buf)));
+ 
+-                self.result_tx
+-                    .lock()
+-                    .take()
+-                    .ok_or_else(|| anyhow::anyhow!("oneshot is consumed"))?
+-                    .send(info)
+-                    .map_err(|_| {
+-                        anyhow::anyhow!("torrent info deserialized, but consumer closed")
+-                    })?;
++                let info = info?;
++                if let Some(candidate) = *self.handshake_hash.lock()
++                    && candidate != self.info_hash
++                {
++                    anyhow::ensure!(
++                        candidate.0 == librqbit_core::v2::sha256(info.1.as_ref())[..20],
++                        "hybrid metadata handshake identity mismatch"
++                    );
++                }
++                if self.v2_hash.is_some() {
++                    let pending =
++                        librqbit_core::v2::PendingMetainfo::from_info(info.1.as_ref())?
++                            .ok_or_else(|| anyhow::anyhow!("v2 magnet supplied v1 metadata"))?;
++                    if Some(Id32::new(pending.info_hash())) != self.v2_hash {
++                        anyhow::bail!("v2 metadata identity mismatch");
++                    }
++                    *self.pending_info.lock() = Some(info);
++                    *self.layers.lock() = Some(pending);
++                    self.request_next_layer()?;
++                } else {
++                    self.complete_info(info)?;
++                }
+             }
+         }
+         Ok(())
+diff --git a/crates/librqbit/src/session.rs b/crates/librqbit/src/session.rs
+index f7bba2e..e819e54 100644
+--- a/crates/librqbit/src/session.rs
++++ b/crates/librqbit/src/session.rs
+@@ -513,18 +513,35 @@ impl Default for SessionOptions {
+     }
+ }
+ 
+-fn torrent_file_from_info_bytes(info_bytes: &[u8], trackers: &[url::Url]) -> anyhow::Result<Bytes> {
++fn torrent_file_from_info_bytes(
++    info_bytes: &[u8],
++    trackers: &[url::Url],
++    v2: Option<&librqbit_core::v2::Metainfo>,
++) -> anyhow::Result<Bytes> {
+     #[derive(Serialize)]
+     struct Tmp<'a> {
+         announce: &'a str,
+         #[serde(rename = "announce-list")]
+         announce_list: &'a [&'a [url::Url]],
+         info: bencode::raw_value::RawValue<&'a [u8]>,
++        #[serde(rename = "piece layers", skip_serializing_if = "Option::is_none")]
++        layers: Option<std::collections::BTreeMap<buffers::ByteBufOwned, buffers::ByteBufOwned>>,
+     }
+ 
+     let mut w = Vec::new();
+     let v = Tmp {
+         info: bencode::raw_value::RawValue(info_bytes),
++        layers: v2.map(|v| {
++            v.piece_layers()
++                .into_iter()
++                .map(|(key, value)| {
++                    (
++                        buffers::ByteBufOwned(Bytes::copy_from_slice(&key)),
++                        buffers::ByteBufOwned(value.into()),
++                    )
++                })
++                .collect()
++        }),
+         announce: trackers.first().map(|s| s.as_str()).unwrap_or(""),
+         announce_list: &[trackers],
+     };
+@@ -543,6 +560,7 @@ pub(crate) struct CheckedIncomingConnection {
+ 
+ struct InternalAddResult {
+     info_hash: Id20,
++    v2_hash: Option<librqbit_core::Id32>,
+     metadata: Option<TorrentMetadata>,
+     trackers: Vec<url::Url>,
+     name: Option<String>,
+@@ -933,7 +951,7 @@ impl Session {
+         }
+ 
+         let mut read_buf = ReadBuf::new();
+-        let h = read_buf
++        let mut h = read_buf
+             .read_handshake(&mut reader, rwtimeout)
+             .await
+             .context("error reading handshake")?;
+@@ -948,10 +966,21 @@ impl Session {
+             .read()
+             .torrents
+             .iter()
+-            .find(|(_, t)| t.info_hash() == h.info_hash)
++            .find(|(_, t)| {
++                t.info_hash() == h.info_hash
++                    || (h.reserved & 0x10 != 0
++                        && t.with_metadata(|m| {
++                            m.info.info().v2.as_ref().is_some_and(|v| v.is_hybrid())
++                                && m.v1_info_hash == h.info_hash
++                        })
++                        .unwrap_or(false))
++            })
+             .map(|(id, t)| (*id, t.clone()))
+             .with_context(|| format!("didn't find a matching torrent {:?}", h.info_hash))?;
+ 
++        // A v1 hybrid handshake may explicitly offer a BEP 52 upgrade.
++        // Normalize only after matching both the v1 identity and the upgrade bit.
++        h.info_hash = torrent.info_hash();
+         let live = torrent
+             .live_wait_initializing(Duration::from_secs(5))
+             .await
+@@ -1111,9 +1140,11 @@ impl Session {
+                 AddTorrent::Url(magnet) if magnet.starts_with("magnet:") || magnet.len() == 40 => {
+                     let magnet = Magnet::parse(&magnet)
+                         .context("provided path is not a valid magnet URL")?;
+-                    let info_hash = magnet
+-                        .as_id20()
+-                        .context("magnet link didn't contain a BTv1 infohash")?;
++                    let v2_hash = magnet.as_id32();
++                    let info_hash = v2_hash
++                        .map(|h| h.truncate_for_dht())
++                        .or_else(|| magnet.as_id20())
++                        .context("magnet has no supported info hash")?;
+                     if let Some(so) = magnet.get_select_only() {
+                         // Only overwrite opts.only_files if user didn't specify
+                         if opts.only_files.is_none() {
+@@ -1123,6 +1154,7 @@ impl Session {
+ 
+                     InternalAddResult {
+                         info_hash,
++                        v2_hash,
+                         trackers: magnet
+                             .trackers
+                             .into_iter()
+@@ -1168,6 +1200,13 @@ impl Session {
+ 
+                     InternalAddResult {
+                         info_hash: torrent.meta.info_hash,
++                        v2_hash: torrent
++                            .meta
++                            .info
++                            .data
++                            .v2
++                            .as_ref()
++                            .map(|v| librqbit_core::Id32::new(v.info_hash())),
+                         metadata: Some(TorrentMetadata::new(
+                             torrent.meta.info.data.validate()?,
+                             torrent.torrent_bytes,
+@@ -1237,7 +1276,8 @@ impl Session {
+         mut opts: AddTorrentOptions,
+     ) -> anyhow::Result<AddTorrentResponse> {
+         let InternalAddResult {
+-            info_hash,
++            mut info_hash,
++            v2_hash,
+             metadata,
+             trackers,
+             name,
+@@ -1272,7 +1312,7 @@ impl Session {
+                         "no known way to resolve peers (no DHT, no trackers, no initial_peers)",
+                     )?;
+                     let resolved_magnet = self
+-                        .resolve_magnet(info_hash, peer_rx, &trackers, opts.peer_opts)
++                        .resolve_magnet(info_hash, v2_hash, peer_rx, &trackers, opts.peer_opts)
+                         .await?;
+ 
+                     // Add back seen_peers into the peer stream, as we consumed some peers
+@@ -1290,6 +1330,9 @@ impl Session {
+             }
+         };
+ 
++        if let Some(v2) = &metadata.info.info().v2 {
++            info_hash = librqbit_core::Id32::new(v2.info_hash()).truncate_for_dht();
++        }
+         trace!("Torrent metadata: {:#?}", &metadata.info.info());
+ 
+         let only_files = compute_only_files(
+@@ -1348,6 +1391,15 @@ impl Session {
+                     None
+                 }
+             }) {
++                let existing = handle
++                    .with_metadata(|m| m.info.info().v2.as_ref().map(|v| v.info_hash()))
++                    .ok()
++                    .flatten();
++                let incoming = metadata.info.info().v2.as_ref().map(|v| v.info_hash());
++                anyhow::ensure!(
++                    existing == incoming,
++                    "truncated wire identity collision; full torrent identities differ"
++                );
+                 return Ok(AddTorrentResponse::AlreadyManaged(id, handle));
+             }
+ 
+@@ -1643,6 +1695,7 @@ impl Session {
+     async fn resolve_magnet(
+         self: &Arc<Self>,
+         info_hash: Id20,
++        v2_hash: Option<librqbit_core::Id32>,
+         peer_rx: PeerStream,
+         trackers: &[url::Url],
+         peer_opts: Option<PeerConnectionOptions>,
+@@ -1650,6 +1703,7 @@ impl Session {
+         match read_metainfo_from_peer_receiver(
+             self.peer_id,
+             info_hash,
++            v2_hash,
+             Default::default(),
+             peer_rx,
+             Some(self.merge_peer_opts(peer_opts)),
+@@ -1665,13 +1719,14 @@ impl Session {
+                 seen,
+             } => {
+                 trace!(?info, "received result from DHT");
++                let torrent_bytes = torrent_file_from_info_bytes(
++                    info_bytes.as_ref(),
++                    trackers,
++                    info.v2.as_deref(),
++                )?;
+                 let info = info.validate()?;
+                 Ok(ResolveMagnetResult {
+-                    metadata: TorrentMetadata::new(
+-                        info,
+-                        torrent_file_from_info_bytes(info_bytes.as_ref(), trackers)?,
+-                        info_bytes.0,
+-                    )?,
++                    metadata: TorrentMetadata::new(info, torrent_bytes, info_bytes.0)?,
+                     peer_rx: rx,
+                     seen_peers: {
+                         let seen = seen.into_iter().collect_vec();
+diff --git a/crates/librqbit/src/session_persistence/json.rs b/crates/librqbit/src/session_persistence/json.rs
+index 3b6e480..7d42200 100644
+--- a/crates/librqbit/src/session_persistence/json.rs
++++ b/crates/librqbit/src/session_persistence/json.rs
+@@ -150,6 +150,16 @@ impl JsonSessionPersistenceStore {
+                 .map(|u| u.to_string())
+                 .collect(),
+             info_hash: torrent.info_hash(),
++            info_hash_v2: torrent
++                .with_metadata(|m| {
++                    m.info
++                        .info()
++                        .v2
++                        .as_ref()
++                        .map(|v| librqbit_core::Id32::new(v.info_hash()).as_string())
++                })
++                .ok()
++                .flatten(),
+             // we don't serialize this here, but to a file instead.
+             torrent_bytes: Default::default(),
+             only_files: torrent.only_files().clone(),
+diff --git a/crates/librqbit/src/session_persistence/mod.rs b/crates/librqbit/src/session_persistence/mod.rs
+index c5b11d5..5a958a8 100644
+--- a/crates/librqbit/src/session_persistence/mod.rs
++++ b/crates/librqbit/src/session_persistence/mod.rs
+@@ -24,6 +24,8 @@ pub struct SerializedTorrent {
+         deserialize_with = "deserialize_info_hash"
+     )]
+     info_hash: Id20,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    info_hash_v2: Option<String>,
+     #[serde(skip)]
+     torrent_bytes: Bytes,
+     trackers: HashSet<String>,
+@@ -37,6 +39,24 @@ impl SerializedTorrent {
+         &self.info_hash
+     }
+     pub fn into_add_torrent(self) -> anyhow::Result<(AddTorrent<'static>, AddTorrentOptions)> {
++        if let Some(expected) = &self.info_hash_v2 {
++            anyhow::ensure!(
++                !self.torrent_bytes.is_empty(),
++                "v2 metadata file is missing; restore the preserved .torrent file"
++            );
++            let parsed = librqbit_core::torrent_metainfo::torrent_from_bytes(&self.torrent_bytes)?;
++            let v2 = parsed
++                .info
++                .data
++                .v2
++                .as_ref()
++                .context("saved v2 torrent contains v1 metadata")?;
++            anyhow::ensure!(
++                librqbit_core::Id32::new(v2.info_hash()).as_string() == *expected
++                    && parsed.info_hash == self.info_hash,
++                "saved v2 identity does not match metadata"
++            );
++        }
+         let add_torrent = if !self.torrent_bytes.is_empty() {
+             AddTorrent::TorrentFileBytes(self.torrent_bytes)
+         } else {
+diff --git a/crates/librqbit/src/session_persistence/postgres.rs b/crates/librqbit/src/session_persistence/postgres.rs
+index c81a007..92e4ae0 100644
+--- a/crates/librqbit/src/session_persistence/postgres.rs
++++ b/crates/librqbit/src/session_persistence/postgres.rs
+@@ -34,6 +34,7 @@ impl TorrentsTableRecord {
+             self.id as TorrentId,
+             SerializedTorrent {
+                 info_hash: Id20::from_bytes(&self.info_hash).ok()?,
++                info_hash_v2: None,
+                 torrent_bytes: self.torrent_bytes.into(),
+                 trackers: self.trackers.into_iter().collect(),
+                 output_folder: PathBuf::from(self.output_folder),
+diff --git a/crates/librqbit/src/torrent_state/initializing.rs b/crates/librqbit/src/torrent_state/initializing.rs
+index 37789dc..617ae90 100644
+--- a/crates/librqbit/src/torrent_state/initializing.rs
++++ b/crates/librqbit/src/torrent_state/initializing.rs
+@@ -154,7 +154,7 @@ impl TorrentStateInitializing {
+                     })
+                     .enumerate()
+                 {
+-                    if fo.check_piece(piece_id).is_err() {
++                    if !fo.check_piece(piece_id).unwrap_or(false) {
+                         return true;
+                     }
+ 
+@@ -242,7 +242,7 @@ impl TorrentStateInitializing {
+         let chunk_tracker = ChunkTracker::new(
+             have_pieces.into_dyn(),
+             selected_pieces,
+-            *self.metadata.lengths(),
++            self.metadata.lengths().clone(),
+             &self.metadata.file_infos,
+         )
+         .context("error creating chunk tracker")?;
+diff --git a/crates/librqbit/src/torrent_state/live/mod.rs b/crates/librqbit/src/torrent_state/live/mod.rs
+index b4146d8..f0a384d 100644
+--- a/crates/librqbit/src/torrent_state/live/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/mod.rs
+@@ -233,7 +233,7 @@ impl TorrentStateLive {
+         let up_speed_estimator = SpeedEstimator::default();
+ 
+         let have_bytes = paused.chunk_tracker.get_hns().have_bytes;
+-        let lengths = *paused.chunk_tracker.get_lengths();
++        let lengths = paused.chunk_tracker.get_lengths().clone();
+ 
+         // TODO: make it configurable
+         let file_priorities = {
+@@ -277,7 +277,7 @@ impl TorrentStateLive {
+                 have_bytes: AtomicU64::new(have_bytes),
+                 ..Default::default()
+             },
+-            lengths,
++            lengths: lengths.clone(),
+             peer_semaphore: Arc::new(Semaphore::new(
+                 paused.shared.options.peer_limit.unwrap_or(128),
+             )),
+@@ -1036,6 +1036,9 @@ struct PeerHandler {
+ }
+ 
+ impl PeerConnectionHandler for &'_ PeerHandler {
++    fn is_v2(&self) -> bool {
++        self.state.metadata.info.info().v2.is_some()
++    }
+     fn on_connected(&self, connection_time: Duration) {
+         self.counters
+             .outgoing_connections
+@@ -1056,6 +1059,21 @@ impl PeerConnectionHandler for &'_ PeerHandler {
+         }
+ 
+         match message {
++            Message::HashRequest(request) => {
++                let hashes = self
++                    .state
++                    .shared
++                    .spawner
++                    .block_in_place_with_semaphore(|| self.state.file_ops().serve_hashes(&request))
++                    .await;
++                let response = match hashes {
++                    Ok(hashes) => Message::Hashes { request, hashes },
++                    Err(_) => Message::HashReject(request),
++                };
++                self.tx
++                    .send(WriterRequest::Message(response))
++                    .map_err(|_| anyhow::anyhow!("peer writer closed"))?;
++            }
+             Message::Request(request) => {
+                 self.on_download_request(request)
+                     .context("on_download_request")?;
+@@ -1063,6 +1081,14 @@ impl PeerConnectionHandler for &'_ PeerHandler {
+             Message::Bitfield(b) => self
+                 .on_bitfield(b.clone_to_owned(None))
+                 .context("on_bitfield")?,
++            Message::Reject(request) => {
++                // Disconnecting releases this peer's in-flight pieces through the
++                // existing cleanup path, so rejected requests cannot stall them.
++                anyhow::bail!("peer rejected payload request {request:?}");
++            }
++            Message::Hashes { .. } | Message::HashReject(_) => {
++                anyhow::bail!("unsolicited hash response during payload transfer");
++            }
+             Message::Choke => self.on_i_am_choked(),
+             Message::Unchoke => self.on_i_am_unchoked(),
+             Message::Interested => self.on_peer_interested(),
+@@ -1488,11 +1514,35 @@ impl PeerHandler {
+             }
+         };
+ 
+-        let chunk_info = match self.state.lengths.chunk_info_from_received_data(
+-            piece_index,
+-            request.begin,
+-            request.length,
+-        ) {
++        let chunk_info = match self
++            .state
++            .lengths
++            .chunk_info_from_received_data(piece_index, request.begin, request.length)
++            .or_else(|| {
++                // Hybrid peers may request a whole 16 KiB block across a padding gap.
++                // Return zeros for the gap without reading into the following file.
++                if self
++                    .state
++                    .metadata
++                    .info
++                    .info()
++                    .v2
++                    .as_ref()
++                    .is_some_and(|v| v.is_hybrid())
++                    && request.length == 16384
++                {
++                    self.state
++                        .lengths
++                        .iter_chunk_infos(piece_index)
++                        .find(|c| c.offset == request.begin && c.size < request.length)
++                        .map(|mut c| {
++                            c.size = request.length;
++                            c
++                        })
++                } else {
++                    None
++                }
++            }) {
+             Some(d) => d,
+             None => {
+                 anyhow::bail!(
+diff --git a/crates/librqbit/src/torrent_state/mod.rs b/crates/librqbit/src/torrent_state/mod.rs
+index cfe483c..102801f 100644
+--- a/crates/librqbit/src/torrent_state/mod.rs
++++ b/crates/librqbit/src/torrent_state/mod.rs
+@@ -138,6 +138,7 @@ pub struct TorrentMetadata {
+     pub info: ValidatedTorrentMetaV1Info<ByteBufOwned>,
+     pub torrent_bytes: Bytes,
+     pub info_bytes: Bytes,
++    pub v1_info_hash: Id20,
+     pub file_infos: FileInfos,
+ }
+ 
+@@ -160,9 +161,14 @@ impl TorrentMetadata {
+             })
+             .collect::<anyhow::Result<Vec<FileInfo>>>()?;
+ 
++        use sha1w::ISha1;
++        let mut hash = sha1w::Sha1::new();
++        hash.update(&info_bytes);
++        let v1_info_hash = Id20::new(hash.finish());
+         Ok(Self {
+             info,
+             torrent_bytes,
++            v1_info_hash,
+             info_bytes,
+             file_infos,
+         })
+diff --git a/crates/librqbit/src/upnp_server_adapter.rs b/crates/librqbit/src/upnp_server_adapter.rs
+index 3c7f35e..d830341 100644
+--- a/crates/librqbit/src/upnp_server_adapter.rs
++++ b/crates/librqbit/src/upnp_server_adapter.rs
+@@ -396,6 +396,7 @@ mod tests {
+             announce_list: vec![],
+             info: bencode::WithRawBytes {
+                 data: TorrentMetaV1Info {
++                    v2: None,
+                     name: name.map(|n| n.as_bytes().into()),
+                     pieces: b""[..].into(),
+                     piece_length: 1,
+diff --git a/crates/librqbit_core/Cargo.toml b/crates/librqbit_core/Cargo.toml
+index ee44678..9cb38ba 100644
+--- a/crates/librqbit_core/Cargo.toml
++++ b/crates/librqbit_core/Cargo.toml
+@@ -15,6 +15,7 @@ sha1-crypto-hash = ["sha1w/sha1-crypto-hash"]
+ sha1-ring = ["sha1w/sha1-ring"]
+ 
+ [dependencies]
++sha2 = "0.10"
+ tracing.workspace = true
+ tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+ hex.workspace = true
+diff --git a/crates/librqbit_core/src/lengths.rs b/crates/librqbit_core/src/lengths.rs
+index e3e1429..8d8ab90 100644
+--- a/crates/librqbit_core/src/lengths.rs
++++ b/crates/librqbit_core/src/lengths.rs
+@@ -32,10 +32,12 @@ pub struct ChunkInfo {
+     pub offset: u32,
+ }
+ 
+-#[derive(Debug, Clone, Copy)]
++#[derive(Debug, Clone)]
+ pub struct Lengths {
+     // The total length of the torrent in bytes.
+     total_length: u64,
++    piece_lengths: Option<std::sync::Arc<[u32]>>,
++    num_pieces: u32,
+ 
+     // The length in bytes of each piece (except the last one).
+     piece_length: u32,
+@@ -62,10 +64,10 @@ impl std::fmt::Debug for ValidPieceIndex {
+ }
+ 
+ impl ValidPieceIndex {
+-    pub const fn get(&self) -> u32 {
++    pub fn get(&self) -> u32 {
+         self.0
+     }
+-    pub const fn get_usize(&self) -> usize {
++    pub fn get_usize(&self) -> usize {
+         self.0 as usize
+     }
+ }
+@@ -74,6 +76,9 @@ impl Lengths {
+     pub fn from_torrent<ByteBuf: AsRef<[u8]>>(
+         torrent: &crate::torrent_metainfo::TorrentMetaV1Info<ByteBuf>,
+     ) -> crate::Result<Lengths> {
++        if let Some(v2) = &torrent.v2 {
++            return Self::from_v2(v2);
++        }
+         let total_length = torrent
+             .iter_file_details_raw(encoding_rs::UTF_8)?
+             .map(|d| d.len)
+@@ -81,14 +86,54 @@ impl Lengths {
+         Lengths::new(total_length, torrent.piece_length)
+     }
+ 
++    pub fn from_v2(v2: &crate::v2::Metainfo) -> crate::Result<Self> {
++        let invalid = || Error::V2InvalidTorrent;
++        let count: u32 = v2.piece_count().try_into().map_err(|_| invalid())?;
++        let piece_length = v2.piece_length() as u32;
++        if (count as u64) * (piece_length as u64 / CHUNK_SIZE as u64) > u32::MAX as u64 {
++            return Err(invalid());
++        }
++        let mut pieces = Vec::with_capacity(count as usize);
++        for file in v2.files() {
++            let mut remaining = file.length();
++            while remaining > 0 {
++                let length = remaining.min(piece_length as u64);
++                pieces.push(length as u32);
++                remaining -= length;
++            }
++        }
++        Ok(Self {
++            total_length: v2.total_bytes(),
++            num_pieces: count,
++            last_piece_id: count.saturating_sub(1),
++            last_piece_length: pieces.last().copied().unwrap_or(0),
++            piece_lengths: Some(pieces.into()),
++            piece_length,
++            chunks_per_piece: piece_length.div_ceil(CHUNK_SIZE),
++        })
++    }
++
+     pub fn new(total_length: u64, piece_length: u32) -> crate::Result<Self> {
+         if total_length == 0 {
+             return Err(Error::BadTorrentZeroLength);
+         }
+-        let total_pieces = total_length.div_ceil(piece_length as u64) as u32;
++        if piece_length == 0 {
++            return Err(Error::V2InvalidPieceLength(0));
++        }
++        let total_pieces: u32 = total_length
++            .div_ceil(piece_length as u64)
++            .try_into()
++            .map_err(|_| Error::V2InvalidTorrent)?;
++        if (total_pieces as u64) * (piece_length as u64).div_ceil(CHUNK_SIZE as u64)
++            > u32::MAX as u64
++        {
++            return Err(Error::V2InvalidTorrent);
++        }
+         Ok(Self {
+             piece_length,
+             total_length,
++            piece_lengths: None,
++            num_pieces: total_pieces,
+             chunks_per_piece: (piece_length as u64).div_ceil(CHUNK_SIZE as u64) as u32,
+             last_piece_id: total_pieces - 1,
+             last_piece_length: last_element_size(total_length, piece_length as u64) as u32,
+@@ -96,19 +141,19 @@ impl Lengths {
+     }
+ 
+     // How many bytes are required to store a bitfield where there's one bit for each piece.
+-    pub const fn piece_bitfield_bytes(&self) -> usize {
++    pub fn piece_bitfield_bytes(&self) -> usize {
+         self.total_pieces().div_ceil(8) as usize
+     }
+ 
+     // How many bytes are required to store a bitfield where there's one bit for each chunk.
+-    pub const fn chunk_bitfield_bytes(&self) -> usize {
++    pub fn chunk_bitfield_bytes(&self) -> usize {
+         self.total_chunks().div_ceil(8) as usize
+     }
+-    pub const fn total_length(&self) -> u64 {
++    pub fn total_length(&self) -> u64 {
+         self.total_length
+     }
+-    pub const fn validate_piece_index(&self, index: u32) -> Option<ValidPieceIndex> {
+-        if index > self.last_piece_id {
++    pub fn validate_piece_index(&self, index: u32) -> Option<ValidPieceIndex> {
++        if index >= self.num_pieces {
+             return None;
+         }
+         Some(ValidPieceIndex(index))
+@@ -117,51 +162,57 @@ impl Lengths {
+         self.validate_piece_index(index)
+             .ok_or(Error::InvalidPieceIndex(index))
+     }
+-    pub const fn default_piece_length(&self) -> u32 {
++    pub fn default_piece_length(&self) -> u32 {
+         self.piece_length
+     }
+-    pub const fn default_chunks_per_piece(&self) -> u32 {
++    pub fn default_chunks_per_piece(&self) -> u32 {
+         self.chunks_per_piece
+     }
+-    pub const fn total_chunks(&self) -> u32 {
++    pub fn total_chunks(&self) -> u32 {
+         // TODO: test
++        if self.num_pieces == 0 {
++            return 0;
++        }
+         self.last_piece_id * self.default_chunks_per_piece()
+             + self.chunks_per_piece(self.last_piece_id())
+     }
+-    pub const fn last_piece_id(&self) -> ValidPieceIndex {
++    pub fn last_piece_id(&self) -> ValidPieceIndex {
+         ValidPieceIndex(self.last_piece_id)
+     }
+-    pub const fn total_pieces(&self) -> u32 {
+-        self.last_piece_id + 1
++    pub fn total_pieces(&self) -> u32 {
++        self.num_pieces
+     }
+-    pub const fn piece_length(&self, index: ValidPieceIndex) -> u32 {
++    pub fn piece_length(&self, index: ValidPieceIndex) -> u32 {
++        if let Some(lengths) = &self.piece_lengths {
++            return lengths[index.0 as usize];
++        }
+         if index.0 == self.last_piece_id {
+             return self.last_piece_length;
+         }
+         self.piece_length
+     }
+-    pub const fn chunk_absolute_offset(&self, chunk_info: &ChunkInfo) -> u64 {
++    pub fn chunk_absolute_offset(&self, chunk_info: &ChunkInfo) -> u64 {
+         self.piece_offset(chunk_info.piece_index) + chunk_info.offset as u64
+     }
+-    pub const fn piece_offset(&self, index: ValidPieceIndex) -> u64 {
++    pub fn piece_offset(&self, index: ValidPieceIndex) -> u64 {
+         index.0 as u64 * self.piece_length as u64
+     }
+ 
+     pub fn iter_piece_infos(&self) -> impl Iterator<Item = PieceInfo> + 'static {
+-        let last_id = self.last_piece_id;
+-        let last_len = self.last_piece_length;
+-        let pl = self.piece_length;
++        let lengths = self.clone();
+         (0..self.total_pieces()).map(move |idx| PieceInfo {
+             piece_index: ValidPieceIndex(idx),
+-            len: if idx == last_id { last_len } else { pl },
++            len: lengths.piece_length(ValidPieceIndex(idx)),
+         })
+     }
+ 
+     // A helper to iterate over pieces in a file.
+     pub fn iter_pieces_within_offset(&self, offset_bytes: u64, len: u64) -> std::ops::Range<u32> {
+         // Validation and correction
+-        let offset_bytes = offset_bytes.min(self.total_length);
+-        let end_bytes = (offset_bytes + len).min(self.total_length);
++        let address_length =
++            self.piece_offset(self.last_piece_id()) + self.last_piece_length as u64;
++        let offset_bytes = offset_bytes.min(address_length);
++        let end_bytes = (offset_bytes + len).min(address_length);
+ 
+         let start_piece_id = (offset_bytes / self.piece_length as u64) as u32;
+         let end_piece_id = if end_bytes == offset_bytes {
+@@ -217,18 +268,15 @@ impl Lengths {
+             absolute_index,
+         })
+     }
+-    pub const fn chunk_range(&self, index: ValidPieceIndex) -> std::ops::Range<usize> {
++    pub fn chunk_range(&self, index: ValidPieceIndex) -> std::ops::Range<usize> {
+         let start = index.0 * self.chunks_per_piece;
+         let end = start + self.chunks_per_piece(index);
+         start as usize..end as usize
+     }
+-    pub const fn chunks_per_piece(&self, index: ValidPieceIndex) -> u32 {
+-        if index.0 == self.last_piece_id {
+-            return self.last_piece_length.div_ceil(CHUNK_SIZE);
+-        }
+-        self.chunks_per_piece
++    pub fn chunks_per_piece(&self, index: ValidPieceIndex) -> u32 {
++        self.piece_length(index).div_ceil(CHUNK_SIZE)
+     }
+-    pub const fn chunk_offset_in_piece(
++    pub fn chunk_offset_in_piece(
+         &self,
+         piece_index: ValidPieceIndex,
+         chunk_index: u32,
+diff --git a/crates/librqbit_core/src/lib.rs b/crates/librqbit_core/src/lib.rs
+index 70218d0..a44684e 100644
+--- a/crates/librqbit_core/src/lib.rs
++++ b/crates/librqbit_core/src/lib.rs
+@@ -13,3 +13,5 @@ pub use hash_id::{Id20, Id32};
+ 
+ pub use error::Error;
+ pub type Result<T> = std::result::Result<T, Error>;
++
++pub mod v2;
+diff --git a/crates/librqbit_core/src/torrent_metainfo.rs b/crates/librqbit_core/src/torrent_metainfo.rs
+index ae276ce..c7f2c62 100644
+--- a/crates/librqbit_core/src/torrent_metainfo.rs
++++ b/crates/librqbit_core/src/torrent_metainfo.rs
+@@ -35,6 +35,12 @@ pub fn torrent_from_bytes<'de>(
+     let mut digest = sha1w::Sha1::new();
+     digest.update(t.info.raw_bytes.as_ref());
+     t.info_hash = Id20::new(digest.finish());
++    if let Some(v2) = crate::v2::Metainfo::parse(buf)
++        .map_err(|e| <bencode::DeserializeError as serde::de::Error>::custom(e.to_string()))?
++    {
++        t.info_hash = Id20::new(v2.info_hash()[..20].try_into().unwrap());
++        t.info.data.v2 = Some(std::sync::Arc::new(v2));
++    }
+     Ok(t)
+ }
+ 
+@@ -44,6 +50,7 @@ fn is_false(b: &bool) -> bool {
+ 
+ /// A parsed .torrent file.
+ #[derive(Serialize, Deserialize, Debug, Clone)]
++#[serde(bound(deserialize = "BufType: serde::Deserialize<'de> + Default"))]
+ pub struct TorrentMetaV1<BufType> {
+     #[serde(skip_serializing_if = "Option::is_none")]
+     pub announce: Option<BufType>,
+@@ -82,10 +89,14 @@ impl<BufType> TorrentMetaV1<BufType> {
+ 
+ /// Main torrent information, shared by .torrent files and magnet link contents.
+ #[derive(Default, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
++#[serde(bound(deserialize = "BufType: serde::Deserialize<'de> + Default"))]
+ pub struct TorrentMetaV1Info<BufType> {
+     #[serde(skip_serializing_if = "Option::is_none")]
+     pub name: Option<BufType>,
++    #[serde(default)]
+     pub pieces: BufType,
++    #[serde(skip)]
++    pub v2: Option<std::sync::Arc<crate::v2::Metainfo>>,
+     #[serde(rename = "piece length")]
+     pub piece_length: u32,
+ 
+@@ -124,6 +135,7 @@ pub struct FileIteratorName<'a, BufType> {
+ pub enum FileIteratorNameData<'a, BufType> {
+     Single(Option<&'a BufType>),
+     Tree(&'a [BufType]),
++    V2(&'a [String]),
+ }
+ 
+ impl<BufType> std::fmt::Debug for FileIteratorName<'_, BufType>
+@@ -179,13 +191,16 @@ where
+     /// Iterate path components as bytes.
+     pub fn iter_components_bytes(&self) -> impl Iterator<Item = &'a [u8]> + use<'a, BufType> {
+         let it = match self.data {
++            FileIteratorNameData::V2(parts) => {
++                return Either::Left(parts.iter().map(|p| p.as_bytes()));
++            }
+             FileIteratorNameData::Single(None) => {
+-                return Either::Left(once(&b"torrent-content"[..]));
++                return Either::Right(Either::Left(once(&b"torrent-content"[..])));
+             }
+             FileIteratorNameData::Single(Some(name)) => Either::Left(once((*name).as_ref())),
+             FileIteratorNameData::Tree(t) => Either::Right(t.iter().map(|bb| bb.as_ref())),
+         };
+-        Either::Right(it)
++        Either::Right(Either::Right(it))
+     }
+ }
+ 
+@@ -294,6 +309,10 @@ impl<BufType: AsRef<[u8]>> ValidatedTorrentMetaV1Info<BufType> {
+             .scan(0u64, move |acc_offset, details| {
+                 let offset = *acc_offset;
+                 *acc_offset += details.len;
++                if self.info.v2.is_some() && details.len > 0 {
++                    *acc_offset = acc_offset.div_ceil(self.info.piece_length as u64)
++                        * self.info.piece_length as u64;
++                }
+                 Some(FileDetailsExt {
+                     pieces: self.lengths.iter_pieces_within_offset(offset, details.len),
+                     details,
+@@ -388,7 +407,21 @@ impl<BufType: AsRef<[u8]>> TorrentMetaV1Info<BufType> {
+         &self,
+         encoding: &'static Encoding,
+     ) -> crate::Result<impl Iterator<Item = FileDetails<'_, BufType>>> {
+-        match (self.length, self.files.as_ref()) {
++        if let Some(v2) = &self.v2 {
++            return Ok(Either::Left(v2.files().iter().map(move |file| {
++                FileDetails {
++                    filename: FileIteratorName {
++                        encoding,
++                        data: FileIteratorNameData::V2(file.path()),
++                    },
++                    len: file.length(),
++                    attr: None,
++                    sha1: None,
++                    symlink_path: None,
++                }
++            })));
++        }
++        let v1 = match (self.length, self.files.as_ref()) {
+             // Single-file
+             (Some(length), None) => Ok(Either::Left(once(FileDetails {
+                 filename: FileIteratorName {
+@@ -418,7 +451,8 @@ impl<BufType: AsRef<[u8]>> TorrentMetaV1Info<BufType> {
+                 })))
+             }
+             _ => Err(Error::BadTorrentBothSingleAndMultiFile),
+-        }
++        }?;
++        Ok(Either::Right(v1))
+     }
+ }
+ 
+@@ -470,6 +504,7 @@ where
+         TorrentMetaV1Info {
+             name: self.name.clone_to_owned(within_buffer),
+             pieces: self.pieces.clone_to_owned(within_buffer),
++            v2: self.v2.clone(),
+             piece_length: self.piece_length,
+             length: self.length,
+             md5sum: self.md5sum.clone_to_owned(within_buffer),
+diff --git a/crates/peer_binary_protocol/src/lib.rs b/crates/peer_binary_protocol/src/lib.rs
+index 95f096b..50d9cf3 100644
+--- a/crates/peer_binary_protocol/src/lib.rs
++++ b/crates/peer_binary_protocol/src/lib.rs
+@@ -3,6 +3,8 @@
+ // Can be used outside of librqbit.
+ 
+ mod double_buf;
++mod hash_messages;
++pub use hash_messages::HashRequest;
+ pub mod extended;
+ 
+ use std::hint::unreachable_unchecked;
+@@ -26,12 +28,7 @@ const PIECE_MESSAGE_PREAMBLE_LEN: usize = PREAMBLE_LEN + INTEGER_LEN * 2;
+ pub const PIECE_MESSAGE_DEFAULT_LEN: usize = PIECE_MESSAGE_PREAMBLE_LEN + CHUNK_SIZE as usize;
+ 
+ // extended message ut_metadata request is the largest known message.
+-const MAX_MSG_LEN_LEN_JUST_IN_CASE_EXTRA: usize = 64;
+-pub const MAX_MSG_LEN: usize = PREAMBLE_LEN
+-    + 1
+-    + b"d8:msg_typei1e5:piecei42e10:total_sizei16384ee".len()
+-    + CHUNK_SIZE as usize
+-    + MAX_MSG_LEN_LEN_JUST_IN_CASE_EXTRA;
++pub const MAX_MSG_LEN: usize = 32 * 1024 - 4;
+ 
+ const PSTR_BT1: &str = "BitTorrent protocol";
+ 
+@@ -85,6 +82,8 @@ impl core::fmt::Debug for MsgIdDebug {
+ 
+ #[derive(thiserror::Error, Debug)]
+ pub enum MessageDeserializeError {
++    #[error("invalid BEP 52 hash request or hash payload")]
++    InvalidHashRequest,
+     #[error("not enough data (msgid={1:?}): expected at least {0} more bytes")]
+     NotEnoughData(usize, Option<MsgIdDebug>),
+     #[error("need a contiguous input to deserialize")]
+@@ -220,6 +219,13 @@ impl<'a> Piece<ByteBuf<'a>> {
+ pub enum Message<'a> {
+     Request(Request),
+     Cancel(Request),
++    Reject(Request),
++    HashRequest(HashRequest),
++    HashReject(HashRequest),
++    Hashes {
++        request: HashRequest,
++        hashes: Vec<[u8; 32]>,
++    },
+     Bitfield(ByteBuf<'a>),
+     KeepAlive,
+     Have(u32),
+@@ -271,12 +277,39 @@ impl Message<'_> {
+         }
+ 
+         match self {
+-            Message::Request(request) | Message::Cancel(request) => {
++            Message::HashRequest(request)
++            | Message::HashReject(request)
++            | Message::Hashes { request, .. } => {
++                let hashes = match self {
++                    Self::Hashes { hashes, .. } => hashes.as_slice(),
++                    _ => &[],
++                };
++                let length = 53 + hashes.len() * 32;
++                check_len!(length);
++                let id = match self {
++                    Self::HashRequest(_) => 21,
++                    Self::HashReject(_) => 23,
++                    _ => 22,
++                };
++                write_preamble!((length - 5) as u32, id);
++                request.encode(&mut out[5..53]);
++                for (part, hash) in out[53..length]
++                    .as_chunks_mut::<32>()
++                    .0
++                    .iter_mut()
++                    .zip(hashes)
++                {
++                    *part = *hash;
++                }
++                Ok(length)
++            }
++            Message::Request(request) | Message::Cancel(request) | Message::Reject(request) => {
+                 const TOTAL_LEN: usize = PREAMBLE_LEN + INTEGER_LEN * 3;
+                 check_len!(TOTAL_LEN);
+                 let msg_id = match self {
+                     Message::Request(..) => MSGID_REQUEST,
+                     Message::Cancel(..) => MSGID_CANCEL,
++                    Message::Reject(..) => 16,
+                     _ => unsafe { unreachable_unchecked() },
+                 };
+                 write_preamble!((INTEGER_LEN * 3) as u32, msg_id);
+@@ -411,7 +444,35 @@ impl Message<'_> {
+                     .ok_or(MessageDeserializeError::NeedContiguous)?;
+                 Ok((Message::Bitfield(ByteBuf::from(data)), total_len))
+             }
+-            MSGID_REQUEST | MSGID_CANCEL => {
++            21..=23 => {
++                check_msg_len!(min 48);
++                let request = HashRequest::decode(buf.consume::<48>().unwrap());
++                if !request.valid() {
++                    return Err(MessageDeserializeError::InvalidHashRequest);
++                }
++                let message = match msg_id {
++                    21 | 23 => {
++                        check_msg_len!(48);
++                        if msg_id == 21 {
++                            Message::HashRequest(request)
++                        } else {
++                            Message::HashReject(request)
++                        }
++                    }
++                    _ => {
++                        if (msg_len - 48) % 32 != 0 || (msg_len - 48) / 32 > 544 {
++                            return Err(MessageDeserializeError::InvalidHashRequest);
++                        }
++                        let mut hashes = Vec::with_capacity((msg_len - 48) / 32);
++                        for _ in 0..(msg_len - 48) / 32 {
++                            hashes.push(buf.consume::<32>().unwrap());
++                        }
++                        Message::Hashes { request, hashes }
++                    }
++                };
++                Ok((message, total_len))
++            }
++            MSGID_REQUEST | MSGID_CANCEL | 16 => {
+                 check_msg_len!(12);
+                 const I32: usize = 4;
+                 const I32_3: usize = I32 * 3;
+@@ -423,6 +484,8 @@ impl Message<'_> {
+                 };
+                 let req = if msg_id == MSGID_REQUEST {
+                     Message::Request(request)
++                } else if msg_id == 16 {
++                    Message::Reject(request)
+                 } else {
+                     Message::Cancel(request)
+                 };
+@@ -506,6 +569,13 @@ impl Handshake {
+         Ok((h, LEN))
+     }
+ 
++    pub fn with_v2(mut self, enabled: bool) -> Self {
++        if enabled {
++            self.reserved |= 0x10;
++        }
++        self
++    }
++
+     pub fn supports_extended(&self) -> bool {
+         self.reserved.to_be_bytes()[5] & 0x10 > 0
+     }
+diff --git a/crates/librqbit_core/src/v2.rs b/crates/librqbit_core/src/v2.rs
+new file mode 100644
+index 0000000..7c057bb
+--- /dev/null
++++ b/crates/librqbit_core/src/v2.rs
+@@ -0,0 +1,883 @@
++//! BEP 52 metainfo, Merkle trees and authenticated piece verification.
++use serde::Serialize;
++use sha2::{Digest, Sha256};
++use std::{
++    collections::{BTreeMap, BTreeSet},
++    sync::Arc,
++};
++
++pub const BLOCK_LENGTH: u64 = 16 * 1024;
++pub const MAX_METAINFO_LENGTH: usize = 32 * 1024 * 1024;
++type Hash = [u8; 32];
++type Result<T> = std::result::Result<T, V2Error>;
++
++#[derive(Debug, thiserror::Error, PartialEq, Eq)]
++pub enum V2Error {
++    #[error("Invalid torrent metadata: {0}")]
++    Invalid(&'static str),
++    #[error("Torrent metadata version {0} is not supported.")]
++    Version(u64),
++    #[error("The piece data does not match its SHA-256 hash.")]
++    HashMismatch,
++    #[error("Could not read piece data: {0}")]
++    Read(String),
++}
++
++#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
++#[serde(rename_all = "camelCase")]
++pub struct Metainfo {
++    info_hash: Hash,
++    name: String,
++    piece_length: u64,
++    hybrid: bool,
++    total_bytes: u64,
++    piece_count: u64,
++    files: Vec<File>,
++}
++
++#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
++#[serde(rename_all = "camelCase")]
++pub struct File {
++    path: Vec<String>,
++    length: u64,
++    pieces_root: Option<Hash>,
++    first_piece: u64,
++    piece_count: u64,
++    #[serde(skip)]
++    piece_hashes: Arc<[Hash]>,
++}
++
++impl File {
++    pub fn path(&self) -> &[String] {
++        &self.path
++    }
++    pub fn length(&self) -> u64 {
++        self.length
++    }
++    pub fn pieces_root(&self) -> Option<Hash> {
++        self.pieces_root
++    }
++    pub fn first_piece(&self) -> u64 {
++        self.first_piece
++    }
++    pub fn piece_count(&self) -> u64 {
++        self.piece_count
++    }
++}
++
++impl Metainfo {
++    /// Returns None for v1. Version detection uses dictionary keys, never byte scanning.
++    pub fn parse(bytes: &[u8]) -> Result<Option<Self>> {
++        Self::parse_inner(bytes, true)
++    }
++    fn parse_inner(bytes: &[u8], require_layers: bool) -> Result<Option<Self>> {
++        if bytes.len() > MAX_METAINFO_LENGTH {
++            return Err(V2Error::Invalid("metadata exceeds 32 MB"));
++        }
++        let mut parser = Parser {
++            bytes,
++            at: 0,
++            nodes: 0,
++            canonical: true,
++        };
++        let root = parser.value(0)?;
++        if parser.at != bytes.len() {
++            return Err(V2Error::Invalid("trailing data"));
++        }
++        let info = root.required(b"info")?;
++        let Some(version) = info.get(b"meta version")? else {
++            return Ok(None);
++        };
++        let version = version.number()?;
++        if version != 2 {
++            return Err(V2Error::Version(version));
++        }
++        if !parser.canonical {
++            return Err(V2Error::Invalid("v2 dictionary keys are not sorted"));
++        }
++        let piece_length = info.required(b"piece length")?.number()?;
++        if piece_length < BLOCK_LENGTH
++            || !piece_length.is_power_of_two()
++            || piece_length > u32::MAX as u64
++        {
++            return Err(V2Error::Invalid(
++                "piece length must be a power of two from 16 KiB to 2 GiB",
++            ));
++        }
++        let tree = info.required(b"file tree")?;
++        let mut files = Vec::new();
++        let mut path_budget = MAX_METAINFO_LENGTH;
++        walk_tree(tree, &mut Vec::new(), &mut files, &mut path_budget)?;
++        if files.is_empty() {
++            return Err(V2Error::Invalid("file tree contains no files"));
++        }
++        let layers: BTreeMap<_, _> = root
++            .required(b"piece layers")?
++            .dict()?
++            .iter()
++            .map(|(key, value)| (*key, value))
++            .collect();
++        let mut used_layers = BTreeMap::<Hash, (u64, Arc<[Hash]>)>::new();
++        let mut total_bytes = 0u64;
++        let mut piece_count = 0u64;
++        for file in &mut files {
++            file.first_piece = piece_count;
++            file.piece_count = file.length.div_ceil(piece_length);
++            total_bytes = total_bytes
++                .checked_add(file.length)
++                .ok_or(V2Error::Invalid("total length overflows"))?;
++            piece_count = piece_count
++                .checked_add(file.piece_count)
++                .ok_or(V2Error::Invalid("piece count overflows"))?;
++            if file.length > piece_length {
++                if !require_layers {
++                    continue;
++                }
++                let hash = file.pieces_root.as_ref().unwrap();
++                let value = layers
++                    .get(hash.as_slice())
++                    .ok_or(V2Error::Invalid("missing piece layer"))?
++                    .bytes()?;
++                if value.len() as u64 / 32 != file.piece_count || value.len() % 32 != 0 {
++                    return Err(V2Error::Invalid(
++                        "piece layer has the wrong number of hashes",
++                    ));
++                }
++                if let Some((length, hashes)) = used_layers.get(hash) {
++                    if *length != file.length {
++                        return Err(V2Error::Invalid(
++                            "shared pieces root has inconsistent file lengths",
++                        ));
++                    }
++                    file.piece_hashes = hashes.clone();
++                } else {
++                    let hashes: Vec<Hash> = value.as_chunks::<32>().0.to_vec();
++                    let padding = zero_hash(piece_length / BLOCK_LENGTH);
++                    if merkle_root(hashes.clone(), padding) != *hash {
++                        return Err(V2Error::HashMismatch);
++                    }
++                    file.piece_hashes = hashes.into();
++                    used_layers.insert(*hash, (file.length, file.piece_hashes.clone()));
++                }
++            }
++        }
++        if require_layers && layers.len() != used_layers.len() {
++            return Err(V2Error::Invalid("unreferenced piece layer"));
++        }
++        let hybrid = info.get(b"pieces")?.is_some();
++        if hybrid {
++            validate_hybrid(info, &files, piece_length)?;
++        } else if info.get(b"files")?.is_some() || info.get(b"length")?.is_some() {
++            return Err(V2Error::Invalid("v1 file layout without v1 piece hashes"));
++        }
++        let name = info
++            .get(b"name")?
++            .map(Value::bytes)
++            .transpose()?
++            .map(|v| String::from_utf8_lossy(v).into_owned())
++            .unwrap_or_else(|| "Untitled torrent".into());
++        Ok(Some(Self {
++            info_hash: Sha256::digest(info.raw).into(),
++            name,
++            piece_length,
++            hybrid,
++            total_bytes,
++            piece_count,
++            files,
++        }))
++    }
++
++    pub fn piece_layers(&self) -> BTreeMap<Hash, Vec<u8>> {
++        self.files
++            .iter()
++            .filter(|f| !f.piece_hashes.is_empty())
++            .map(|f| {
++                (
++                    f.pieces_root.unwrap(),
++                    f.piece_hashes.iter().flatten().copied().collect(),
++                )
++            })
++            .collect()
++    }
++    pub fn info_hash(&self) -> Hash {
++        self.info_hash
++    }
++    pub fn is_hybrid(&self) -> bool {
++        self.hybrid
++    }
++    pub fn files(&self) -> &[File] {
++        &self.files
++    }
++    pub fn total_bytes(&self) -> u64 {
++        self.total_bytes
++    }
++    pub fn piece_count(&self) -> u64 {
++        self.piece_count
++    }
++    pub fn piece_length(&self) -> u64 {
++        self.piece_length
++    }
++
++    fn request_file(&self, request: &HashRequest) -> Result<(usize, &File, u32)> {
++        if !request.valid() {
++            return Err(V2Error::Invalid("invalid hash request"));
++        }
++        let (index, file) = self
++            .files
++            .iter()
++            .enumerate()
++            .find(|(_, f)| f.pieces_root == Some(request.pieces_root))
++            .ok_or(V2Error::Invalid("unknown pieces root"))?;
++        let height = file
++            .length
++            .div_ceil(BLOCK_LENGTH)
++            .next_power_of_two()
++            .ilog2();
++        if request.base_layer >= height
++            || request.proof_layers >= height - request.base_layer
++            || u64::from(request.index) + u64::from(request.length)
++                > (1u64 << (height - request.base_layer))
++        {
++            return Err(V2Error::Invalid("hash request is outside the file tree"));
++        }
++        Ok((index, file, height))
++    }
++
++    /// Produce base nodes followed by the uncle hashes defined by BEP 52.
++    pub fn serve_hashes(
++        &self,
++        request: &HashRequest,
++        mut read: impl FnMut(usize, u64, &mut [u8]) -> std::io::Result<()>,
++    ) -> Result<Vec<Hash>> {
++        let (file_index, file, _) = self.request_file(request)?;
++        let piece_layer = (self.piece_length / BLOCK_LENGTH).ilog2();
++        fn node(
++            file: &File,
++            file_index: usize,
++            layer: u32,
++            index: u64,
++            piece_layer: u32,
++            read: &mut impl FnMut(usize, u64, &mut [u8]) -> std::io::Result<()>,
++        ) -> Result<Hash> {
++            if layer == piece_layer && !file.piece_hashes.is_empty() {
++                return Ok(file
++                    .piece_hashes
++                    .get(index as usize)
++                    .copied()
++                    .unwrap_or_else(|| zero_hash(1u64 << layer)));
++            }
++            let start = index * (BLOCK_LENGTH << layer);
++            if start >= file.length {
++                return Ok(zero_hash(1u64 << layer));
++            }
++            if layer == 0 {
++                let mut block = [0u8; BLOCK_LENGTH as usize];
++                let length = (file.length - start).min(BLOCK_LENGTH) as usize;
++                read(file_index, start, &mut block[..length])
++                    .map_err(|e| V2Error::Read(e.to_string()))?;
++                return Ok(Sha256::digest(&block[..length]).into());
++            }
++            Ok(pair(
++                node(file, file_index, layer - 1, index * 2, piece_layer, read)?,
++                node(
++                    file,
++                    file_index,
++                    layer - 1,
++                    index * 2 + 1,
++                    piece_layer,
++                    read,
++                )?,
++            ))
++        }
++        let mut hashes = Vec::with_capacity(request.length as usize + 32);
++        for index in request.index..request.index + request.length {
++            hashes.push(node(
++                file,
++                file_index,
++                request.base_layer,
++                index as u64,
++                piece_layer,
++                &mut read,
++            )?);
++        }
++        let mut layer = request.base_layer + request.length.ilog2();
++        let mut index = request.index >> request.length.ilog2();
++        let target = request.base_layer + request.proof_layers + 1;
++        while layer < target {
++            hashes.push(node(
++                file,
++                file_index,
++                layer,
++                (index ^ 1) as u64,
++                piece_layer,
++                &mut read,
++            )?);
++            index >>= 1;
++            layer += 1;
++        }
++        Ok(hashes)
++    }
++
++    /// Authenticate a correlated, complete proof against the root from the info dictionary.
++    pub fn verify_hashes(&self, request: &HashRequest, hashes: &[Hash]) -> Result<()> {
++        let (_, _, height) = self.request_file(request)?;
++        let subtree_height = request.length.ilog2();
++        let proof_count = (request.proof_layers + 1).saturating_sub(subtree_height) as usize;
++        if request.base_layer + request.proof_layers + 1 != height
++            || hashes.len() != request.length as usize + proof_count
++        {
++            return Err(V2Error::Invalid(
++                "incomplete or incorrectly sized root proof",
++            ));
++        }
++        let mut computed = merkle_root(hashes[..request.length as usize].to_vec(), [0; 32]);
++        let mut index = request.index >> subtree_height;
++        for uncle in &hashes[request.length as usize..] {
++            computed = if index & 1 == 0 {
++                pair(computed, *uncle)
++            } else {
++                pair(*uncle, computed)
++            };
++            index >>= 1;
++        }
++        if computed != request.pieces_root {
++            return Err(V2Error::HashMismatch);
++        }
++        Ok(())
++    }
++
++    pub fn piece_size(&self, index: u64) -> Result<u64> {
++        let file = self
++            .files
++            .iter()
++            .find(|f| index >= f.first_piece && index - f.first_piece < f.piece_count)
++            .ok_or(V2Error::Invalid("piece index out of range"))?;
++        Ok((file.length - (index - file.first_piece) * self.piece_length).min(self.piece_length))
++    }
++
++    /// Read and verify a complete wire piece using a bounded block buffer.
++    pub fn verify_piece_reader(
++        &self,
++        index: u64,
++        mut read: impl FnMut(u64, &mut [u8]) -> std::io::Result<()>,
++    ) -> Result<()> {
++        let file = self
++            .files
++            .iter()
++            .find(|f| index >= f.first_piece && index - f.first_piece < f.piece_count)
++            .ok_or(V2Error::Invalid("piece index out of range"))?;
++        let local = index - file.first_piece;
++        let length = self.piece_size(index)?;
++        let mut block = [0u8; BLOCK_LENGTH as usize];
++        let mut hashes = Vec::new();
++        let mut offset = 0;
++        while offset < length {
++            let count = (length - offset).min(BLOCK_LENGTH) as usize;
++            read(offset, &mut block[..count]).map_err(|e| V2Error::Read(e.to_string()))?;
++            hashes.push(Sha256::digest(&block[..count]).into());
++            offset += count as u64;
++        }
++        let expected = if file.length <= self.piece_length {
++            file.pieces_root.unwrap()
++        } else {
++            hashes.resize((self.piece_length / BLOCK_LENGTH) as usize, [0; 32]);
++            *file
++                .piece_hashes
++                .get(local as usize)
++                .ok_or(V2Error::Invalid("piece layer unavailable"))?
++        };
++        if merkle_root(hashes, [0; 32]) != expected {
++            return Err(V2Error::HashMismatch);
++        }
++        Ok(())
++    }
++
++    pub fn verify_piece(&self, index: u64, data: &[u8]) -> Result<()> {
++        if data.len() as u64 != self.piece_size(index)? {
++            return Err(V2Error::Invalid("incorrect piece data length"));
++        }
++        self.verify_piece_reader(index, |offset, output| {
++            output.copy_from_slice(&data[offset as usize..offset as usize + output.len()]);
++            Ok(())
++        })
++    }
++}
++
++fn pair(left: Hash, right: Hash) -> Hash {
++    let mut hash = Sha256::new();
++    hash.update(left);
++    hash.update(right);
++    hash.finalize().into()
++}
++
++fn zero_hash(mut blocks: u64) -> Hash {
++    let mut hash = [0; 32];
++    while blocks > 1 {
++        hash = pair(hash, hash);
++        blocks /= 2;
++    }
++    hash
++}
++
++fn merkle_root(mut hashes: Vec<Hash>, padding: Hash) -> Hash {
++    debug_assert!(!hashes.is_empty());
++    hashes.resize(hashes.len().next_power_of_two(), padding);
++    while hashes.len() > 1 {
++        for index in 0..hashes.len() / 2 {
++            hashes[index] = pair(hashes[index * 2], hashes[index * 2 + 1]);
++        }
++        hashes.truncate(hashes.len() / 2);
++    }
++    hashes[0]
++}
++
++fn component(bytes: &[u8]) -> Result<String> {
++    let value = std::str::from_utf8(bytes)
++        .map_err(|_| V2Error::Invalid("file names must be valid UTF-8 on this platform"))?;
++    if value.len() > 255
++        || value.is_empty()
++        || matches!(value, "." | "..")
++        || value.bytes().any(|b| matches!(b, 0 | b'/' | b'\\'))
++    {
++        return Err(V2Error::Invalid("unsafe file path component"));
++    }
++    Ok(value.into())
++}
++
++fn walk_tree(
++    tree: &Value<'_>,
++    path: &mut Vec<String>,
++    files: &mut Vec<File>,
++    path_budget: &mut usize,
++) -> Result<()> {
++    let entries = tree.dict()?;
++    if let Some((_, properties)) = entries.iter().find(|(key, _)| key.is_empty()) {
++        if path.is_empty() || entries.len() != 1 {
++            return Err(V2Error::Invalid(
++                "file tree node is both a file and a directory",
++            ));
++        }
++        // Symlinks need separate storage semantics and are deliberately not followed.
++        if properties.get(b"symlink path")?.is_some()
++            || properties
++                .get(b"attr")?
++                .map(Value::bytes)
++                .transpose()?
++                .is_some_and(|a| a.contains(&b'l'))
++        {
++            return Err(V2Error::Invalid("symbolic links are not supported"));
++        }
++        let length = properties.required(b"length")?.number()?;
++        let pieces_root = properties
++            .get(b"pieces root")?
++            .map(|v| {
++                v.bytes()?
++                    .try_into()
++                    .map_err(|_| V2Error::Invalid("pieces root must be 32 bytes"))
++            })
++            .transpose()?;
++        if (length == 0) != pieces_root.is_none() {
++            return Err(V2Error::Invalid(
++                "nonempty files require a root; empty files must omit it",
++            ));
++        }
++        // A long shared prefix must not expand a small input into unbounded owned paths.
++        let path_length = path.iter().map(|part| part.len() + 1).sum::<usize>();
++        *path_budget = path_budget
++            .checked_sub(path_length)
++            .ok_or(V2Error::Invalid("total file paths exceed 32 MiB"))?;
++        files.push(File {
++            path: path.clone(),
++            length,
++            pieces_root,
++            first_piece: 0,
++            piece_count: 0,
++            piece_hashes: Arc::from([]),
++        });
++    } else {
++        if entries.is_empty() {
++            return Err(V2Error::Invalid("empty directory in file tree"));
++        }
++        for (key, child) in entries {
++            path.push(component(key)?);
++            if path.iter().map(|part| part.len() + 1).sum::<usize>() > 4096 {
++                return Err(V2Error::Invalid("file path exceeds 4096 bytes"));
++            }
++            walk_tree(child, path, files, path_budget)?;
++            path.pop();
++        }
++    }
++    Ok(())
++}
++
++fn validate_hybrid(info: &Value<'_>, files: &[File], piece_length: u64) -> Result<()> {
++    let pieces = info.required(b"pieces")?.bytes()?;
++    let mut offset = 0u64;
++    if let Some(length) = info.get(b"length")? {
++        if info.get(b"symlink path")?.is_some()
++            || info
++                .get(b"attr")?
++                .map(Value::bytes)
++                .transpose()?
++                .is_some_and(|a| a.contains(&b'l'))
++        {
++            return Err(V2Error::Invalid("symbolic links are not supported"));
++        }
++        if info.get(b"files")?.is_some()
++            || files.len() != 1
++            || files[0].path.len() != 1
++            || length.number()? != files[0].length
++            || info.required(b"name")?.bytes()? != files[0].path[0].as_bytes()
++        {
++            return Err(V2Error::Invalid(
++                "hybrid single-file layout differs from v2",
++            ));
++        }
++        offset = length.number()?;
++    } else {
++        let mut next_file = 0;
++        let mut previous_was_padding = false;
++        let mut paths = BTreeSet::new();
++        for entry in info.required(b"files")?.list()? {
++            let length = entry.required(b"length")?.number()?;
++            let path: Vec<String> = entry
++                .required(b"path")?
++                .list()?
++                .iter()
++                .map(|v| component(v.bytes()?))
++                .collect::<Result<_>>()?;
++            if path.is_empty() || !paths.insert(path.clone()) {
++                return Err(V2Error::Invalid("duplicate or empty hybrid path"));
++            }
++            let attr = entry
++                .get(b"attr")?
++                .map(Value::bytes)
++                .transpose()?
++                .unwrap_or_default();
++            if attr.contains(&b'l') || entry.get(b"symlink path")?.is_some() {
++                return Err(V2Error::Invalid("symbolic links are not supported"));
++            }
++            if attr.contains(&b'p') {
++                let padding = (piece_length - offset % piece_length) % piece_length;
++                if next_file == 0 || previous_was_padding || padding == 0 || length != padding {
++                    return Err(V2Error::Invalid("incorrect hybrid padding"));
++                }
++                previous_was_padding = true;
++            } else {
++                let file = files
++                    .get(next_file)
++                    .ok_or(V2Error::Invalid("extra v1 file in hybrid"))?;
++                if file.path != path
++                    || file.length != length
++                    || (length != 0 && !offset.is_multiple_of(piece_length))
++                {
++                    return Err(V2Error::Invalid(
++                        "hybrid file order, length or alignment differs from v2",
++                    ));
++                }
++                next_file += 1;
++                previous_was_padding = false;
++            }
++            offset = offset
++                .checked_add(length)
++                .ok_or(V2Error::Invalid("hybrid size overflows"))?;
++        }
++        if next_file != files.len() {
++            return Err(V2Error::Invalid("missing v1 file in hybrid"));
++        }
++        // A padding filename must not alias a real file or one of its parent directories.
++        for path in &paths {
++            for end in 1..path.len() {
++                if paths.contains(&path[..end]) {
++                    return Err(V2Error::Invalid("hybrid file/directory path collision"));
++                }
++            }
++        }
++    }
++    if pieces.len() % 20 != 0 || pieces.len() as u64 / 20 != offset.div_ceil(piece_length) {
++        return Err(V2Error::Invalid("incorrect v1 piece hash count in hybrid"));
++    }
++    Ok(())
++}
++
++// Borrow raw spans for hashing, retain dictionary order and reject duplicates.
++// Bound recursion and node count before allocation, including ignored extension fields.
++struct Value<'a> {
++    raw: &'a [u8],
++    kind: Kind<'a>,
++}
++enum Kind<'a> {
++    Bytes(&'a [u8]),
++    Number(&'a [u8]),
++    List(Vec<Value<'a>>),
++    Dict(Vec<(&'a [u8], Value<'a>)>),
++}
++impl<'a> Value<'a> {
++    fn dict(&self) -> Result<&[(&'a [u8], Value<'a>)]> {
++        match &self.kind {
++            Kind::Dict(v) => Ok(v),
++            _ => Err(V2Error::Invalid("expected dictionary")),
++        }
++    }
++    fn list(&self) -> Result<&[Value<'a>]> {
++        match &self.kind {
++            Kind::List(v) => Ok(v),
++            _ => Err(V2Error::Invalid("expected list")),
++        }
++    }
++    fn bytes(&self) -> Result<&'a [u8]> {
++        match self.kind {
++            Kind::Bytes(v) => Ok(v),
++            _ => Err(V2Error::Invalid("expected byte string")),
++        }
++    }
++    fn number(&self) -> Result<u64> {
++        match self.kind {
++            Kind::Number(v) => std::str::from_utf8(v)
++                .unwrap()
++                .parse()
++                .map_err(|_| V2Error::Invalid("expected unsigned 64-bit integer")),
++            _ => Err(V2Error::Invalid("expected integer")),
++        }
++    }
++    fn get(&self, key: &[u8]) -> Result<Option<&Value<'a>>> {
++        Ok(self.dict()?.iter().find(|(k, _)| *k == key).map(|(_, v)| v))
++    }
++    fn required(&self, key: &[u8]) -> Result<&Value<'a>> {
++        self.get(key)?
++            .ok_or(V2Error::Invalid("missing required field"))
++    }
++}
++struct Parser<'a> {
++    bytes: &'a [u8],
++    at: usize,
++    nodes: usize,
++    canonical: bool,
++}
++impl<'a> Parser<'a> {
++    fn value(&mut self, depth: usize) -> Result<Value<'a>> {
++        self.nodes += 1;
++        if depth > 64 || self.nodes > 200_000 {
++            return Err(V2Error::Invalid("metadata nesting or entry limit exceeded"));
++        }
++        let start = self.at;
++        let tag = *self
++            .bytes
++            .get(self.at)
++            .ok_or(V2Error::Invalid("truncated bencode"))?;
++        self.at += 1;
++        let kind = match tag {
++            b'd' => {
++                let mut entries = Vec::new();
++                let mut seen = BTreeSet::new();
++                while self.bytes.get(self.at) != Some(&b'e') {
++                    let key = self.value(depth + 1)?.bytes()?;
++                    if !seen.insert(key) {
++                        return Err(V2Error::Invalid("duplicate dictionary key"));
++                    }
++                    if entries.last().is_some_and(|(previous, _)| *previous > key) {
++                        self.canonical = false;
++                    }
++                    entries.push((key, self.value(depth + 1)?));
++                }
++                self.at += 1;
++                Kind::Dict(entries)
++            }
++            b'l' => {
++                let mut values = Vec::new();
++                while self.bytes.get(self.at) != Some(&b'e') {
++                    values.push(self.value(depth + 1)?);
++                }
++                self.at += 1;
++                Kind::List(values)
++            }
++            b'i' => {
++                let end = self.bytes[self.at..]
++                    .iter()
++                    .position(|b| *b == b'e')
++                    .ok_or(V2Error::Invalid("unterminated integer"))?
++                    + self.at;
++                let number = &self.bytes[self.at..end];
++                let digits = number.strip_prefix(b"-").unwrap_or(number);
++                if digits.is_empty()
++                    || !digits.iter().all(u8::is_ascii_digit)
++                    || (digits.len() > 1 && digits[0] == b'0')
++                    || number == b"-0"
++                {
++                    return Err(V2Error::Invalid("noncanonical integer"));
++                }
++                self.at = end + 1;
++                Kind::Number(number)
++            }
++            b'0'..=b'9' => {
++                let end = self.bytes[start..]
++                    .iter()
++                    .position(|b| *b == b':')
++                    .ok_or(V2Error::Invalid("missing string length"))?
++                    + start;
++                let digits = &self.bytes[start..end];
++                if !digits.iter().all(u8::is_ascii_digit) || (digits.len() > 1 && digits[0] == b'0')
++                {
++                    return Err(V2Error::Invalid("noncanonical string length"));
++                }
++                let length: usize = std::str::from_utf8(digits)
++                    .unwrap()
++                    .parse()
++                    .map_err(|_| V2Error::Invalid("string length overflows"))?;
++                self.at = (end + 1)
++                    .checked_add(length)
++                    .filter(|n| *n <= self.bytes.len())
++                    .ok_or(V2Error::Invalid("truncated string"))?;
++                Kind::Bytes(&self.bytes[end + 1..self.at])
++            }
++            _ => return Err(V2Error::Invalid("unknown bencode tag")),
++        };
++        Ok(Value {
++            raw: &self.bytes[start..self.at],
++            kind,
++        })
++    }
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
++pub struct HashRequest {
++    pub pieces_root: [u8; 32],
++    pub base_layer: u32,
++    pub index: u32,
++    pub length: u32,
++    pub proof_layers: u32,
++}
++impl HashRequest {
++    pub fn valid(&self) -> bool {
++        self.base_layer < 32
++            && self.proof_layers < 32
++            && self.base_layer + self.proof_layers < 32
++            && self.length >= 2
++            && self.length <= 512
++            && self.length.is_power_of_two()
++            && self.index.is_multiple_of(self.length)
++            && self.index.checked_add(self.length).is_some()
++    }
++    pub fn encode(&self, buf: &mut [u8]) {
++        buf[..32].copy_from_slice(&self.pieces_root);
++        for (chunk, value) in buf[32..48].as_chunks_mut::<4>().0.iter_mut().zip([
++            self.base_layer,
++            self.index,
++            self.length,
++            self.proof_layers,
++        ]) {
++            *chunk = value.to_be_bytes();
++        }
++    }
++    pub fn decode(buf: [u8; 48]) -> Self {
++        Self {
++            pieces_root: buf[..32].try_into().unwrap(),
++            base_layer: u32::from_be_bytes(buf[32..36].try_into().unwrap()),
++            index: u32::from_be_bytes(buf[36..40].try_into().unwrap()),
++            length: u32::from_be_bytes(buf[40..44].try_into().unwrap()),
++            proof_layers: u32::from_be_bytes(buf[44..48].try_into().unwrap()),
++        }
++    }
++}
++
++/// Metadata from ut_metadata has authenticated roots but no external piece layers.
++/// This type cannot be used for payload verification until every requested proof passes.
++pub struct PendingMetainfo {
++    meta: Metainfo,
++    requests: std::collections::VecDeque<HashRequest>,
++    layers: BTreeMap<Hash, Vec<Hash>>,
++}
++impl PendingMetainfo {
++    pub fn from_info(info: &[u8]) -> Result<Option<Self>> {
++        let bytes = [b"d4:info".as_slice(), info, b"12:piece layersdee"].concat();
++        let Some(meta) = Metainfo::parse_inner(&bytes, false)? else {
++            return Ok(None);
++        };
++        let mut layers = BTreeMap::new();
++        let mut requests = std::collections::VecDeque::new();
++        let mut total = 0u64;
++        for file in &meta.files {
++            if file.length <= meta.piece_length {
++                continue;
++            }
++            let root = file.pieces_root.unwrap();
++            if layers.contains_key(&root) {
++                continue;
++            }
++            total = total
++                .checked_add(file.piece_count * 32)
++                .ok_or(V2Error::Invalid("piece layers overflow"))?;
++            if total > MAX_METAINFO_LENGTH as u64 {
++                return Err(V2Error::Invalid("piece layers exceed 32 MiB"));
++            }
++            layers.insert(root, vec![[0; 32]; file.piece_count as usize]);
++            let base = (meta.piece_length / BLOCK_LENGTH).ilog2();
++            let height = file
++                .length
++                .div_ceil(BLOCK_LENGTH)
++                .next_power_of_two()
++                .ilog2();
++            let mut index = 0u64;
++            while index < file.piece_count {
++                let length = (file.piece_count - index)
++                    .min(512)
++                    .next_power_of_two()
++                    .max(2);
++                let request = HashRequest {
++                    pieces_root: root,
++                    base_layer: base,
++                    index: index
++                        .try_into()
++                        .map_err(|_| V2Error::Invalid("hash index overflows"))?,
++                    length: length as u32,
++                    proof_layers: height - base - 1,
++                };
++                meta.request_file(&request)?;
++                requests.push_back(request);
++                index += length;
++            }
++        }
++        Ok(Some(Self {
++            meta,
++            requests,
++            layers,
++        }))
++    }
++    pub fn info_hash(&self) -> Hash {
++        self.meta.info_hash
++    }
++    pub fn next_request(&self) -> Option<HashRequest> {
++        self.requests.front().copied()
++    }
++    pub fn accept(&mut self, request: HashRequest, hashes: &[Hash]) -> Result<()> {
++        if self.next_request() != Some(request) {
++            return Err(V2Error::Invalid("unsolicited hash response"));
++        }
++        self.meta.verify_hashes(&request, hashes)?;
++        let layer = self.layers.get_mut(&request.pieces_root).unwrap();
++        let start = request.index as usize;
++        let count = (layer.len() - start).min(request.length as usize);
++        layer[start..start + count].copy_from_slice(&hashes[..count]);
++        self.requests.pop_front();
++        Ok(())
++    }
++    pub fn finish(mut self) -> Result<Metainfo> {
++        if !self.requests.is_empty() {
++            return Err(V2Error::Invalid("piece layers are incomplete"));
++        }
++        let mut shared = BTreeMap::<Hash, Arc<[Hash]>>::new();
++        for file in &mut self.meta.files {
++            if file.length > self.meta.piece_length {
++                let root = file.pieces_root.unwrap();
++                let layer = shared
++                    .entry(root)
++                    .or_insert_with(|| self.layers.remove(&root).unwrap().into());
++                file.piece_hashes = layer.clone();
++            }
++        }
++        Ok(self.meta)
++    }
++}
++pub fn sha256(bytes: &[u8]) -> Hash {
++    Sha256::digest(bytes).into()
++}
+diff --git a/crates/peer_binary_protocol/src/hash_messages.rs b/crates/peer_binary_protocol/src/hash_messages.rs
+new file mode 100644
+index 0000000..02ba085
+--- /dev/null
++++ b/crates/peer_binary_protocol/src/hash_messages.rs
+@@ -0,0 +1 @@
++pub use librqbit_core::v2::HashRequest;

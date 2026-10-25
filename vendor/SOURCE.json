@@ -4,8 +4,28 @@
   "version": "9.0.1",
   "archive_sha256": "d4ca70697e9284dd09883730bdc7dc5452efff0232c75a42b1f8949383726a24",
   "modified_files": [
+    "crates/buffers/src/lib.rs",
+    "crates/librqbit/src/create_torrent_file.rs",
+    "crates/librqbit/src/dht_utils.rs",
+    "crates/librqbit/src/file_ops.rs",
+    "crates/librqbit/src/lib.rs",
+    "crates/librqbit/src/peer_connection.rs",
+    "crates/librqbit/src/peer_info_reader/mod.rs",
     "crates/librqbit/src/session.rs",
     "crates/librqbit/src/session_persistence/json.rs",
-    "crates/librqbit/src/storage/filesystem/fs.rs"
+    "crates/librqbit/src/session_persistence/mod.rs",
+    "crates/librqbit/src/session_persistence/postgres.rs",
+    "crates/librqbit/src/storage/filesystem/fs.rs",
+    "crates/librqbit/src/torrent_state/initializing.rs",
+    "crates/librqbit/src/torrent_state/live/mod.rs",
+    "crates/librqbit/src/torrent_state/mod.rs",
+    "crates/librqbit/src/upnp_server_adapter.rs",
+    "crates/librqbit_core/Cargo.toml",
+    "crates/librqbit_core/src/lengths.rs",
+    "crates/librqbit_core/src/lib.rs",
+    "crates/librqbit_core/src/torrent_metainfo.rs",
+    "crates/librqbit_core/src/v2.rs",
+    "crates/peer_binary_protocol/src/hash_messages.rs",
+    "crates/peer_binary_protocol/src/lib.rs"
   ]
 }

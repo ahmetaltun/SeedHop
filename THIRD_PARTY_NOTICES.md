@@ -273,6 +273,7 @@ SeedHop uses the following resolved Rust packages. Upstream source and license f
 | serde_with | 3.24.0 | MIT OR Apache-2.0 |
 | serde_with_macros | 3.24.0 | MIT OR Apache-2.0 |
 | sha1 | 0.10.7 | MIT OR Apache-2.0 |
+| sha2 | 0.10.9 | MIT OR Apache-2.0 |
 | sharded-slab | 0.1.7 | MIT |
 | shlex | 2.0.1 | MIT OR Apache-2.0 |
 | simd-adler32 | 0.3.10 | MIT |

@@ -3,6 +3,8 @@
 // Can be used outside of librqbit.
 
 mod double_buf;
+mod hash_messages;
+pub use hash_messages::HashRequest;
 pub mod extended;
 
 use std::hint::unreachable_unchecked;
@@ -26,12 +28,7 @@ const PIECE_MESSAGE_PREAMBLE_LEN: usize = PREAMBLE_LEN + INTEGER_LEN * 2;
 pub const PIECE_MESSAGE_DEFAULT_LEN: usize = PIECE_MESSAGE_PREAMBLE_LEN + CHUNK_SIZE as usize;
 
 // extended message ut_metadata request is the largest known message.
-const MAX_MSG_LEN_LEN_JUST_IN_CASE_EXTRA: usize = 64;
-pub const MAX_MSG_LEN: usize = PREAMBLE_LEN
-    + 1
-    + b"d8:msg_typei1e5:piecei42e10:total_sizei16384ee".len()
-    + CHUNK_SIZE as usize
-    + MAX_MSG_LEN_LEN_JUST_IN_CASE_EXTRA;
+pub const MAX_MSG_LEN: usize = 32 * 1024 - 4;
 
 const PSTR_BT1: &str = "BitTorrent protocol";
 
@@ -85,6 +82,8 @@ impl core::fmt::Debug for MsgIdDebug {
 
 #[derive(thiserror::Error, Debug)]
 pub enum MessageDeserializeError {
+    #[error("invalid BEP 52 hash request or hash payload")]
+    InvalidHashRequest,
     #[error("not enough data (msgid={1:?}): expected at least {0} more bytes")]
     NotEnoughData(usize, Option<MsgIdDebug>),
     #[error("need a contiguous input to deserialize")]
@@ -220,6 +219,13 @@ impl<'a> Piece<ByteBuf<'a>> {
 pub enum Message<'a> {
     Request(Request),
     Cancel(Request),
+    Reject(Request),
+    HashRequest(HashRequest),
+    HashReject(HashRequest),
+    Hashes {
+        request: HashRequest,
+        hashes: Vec<[u8; 32]>,
+    },
     Bitfield(ByteBuf<'a>),
     KeepAlive,
     Have(u32),
@@ -271,12 +277,39 @@ impl Message<'_> {
         }
 
         match self {
-            Message::Request(request) | Message::Cancel(request) => {
+            Message::HashRequest(request)
+            | Message::HashReject(request)
+            | Message::Hashes { request, .. } => {
+                let hashes = match self {
+                    Self::Hashes { hashes, .. } => hashes.as_slice(),
+                    _ => &[],
+                };
+                let length = 53 + hashes.len() * 32;
+                check_len!(length);
+                let id = match self {
+                    Self::HashRequest(_) => 21,
+                    Self::HashReject(_) => 23,
+                    _ => 22,
+                };
+                write_preamble!((length - 5) as u32, id);
+                request.encode(&mut out[5..53]);
+                for (part, hash) in out[53..length]
+                    .as_chunks_mut::<32>()
+                    .0
+                    .iter_mut()
+                    .zip(hashes)
+                {
+                    *part = *hash;
+                }
+                Ok(length)
+            }
+            Message::Request(request) | Message::Cancel(request) | Message::Reject(request) => {
                 const TOTAL_LEN: usize = PREAMBLE_LEN + INTEGER_LEN * 3;
                 check_len!(TOTAL_LEN);
                 let msg_id = match self {
                     Message::Request(..) => MSGID_REQUEST,
                     Message::Cancel(..) => MSGID_CANCEL,
+                    Message::Reject(..) => 16,
                     _ => unsafe { unreachable_unchecked() },
                 };
                 write_preamble!((INTEGER_LEN * 3) as u32, msg_id);
@@ -411,7 +444,35 @@ impl Message<'_> {
                     .ok_or(MessageDeserializeError::NeedContiguous)?;
                 Ok((Message::Bitfield(ByteBuf::from(data)), total_len))
             }
-            MSGID_REQUEST | MSGID_CANCEL => {
+            21..=23 => {
+                check_msg_len!(min 48);
+                let request = HashRequest::decode(buf.consume::<48>().unwrap());
+                if !request.valid() {
+                    return Err(MessageDeserializeError::InvalidHashRequest);
+                }
+                let message = match msg_id {
+                    21 | 23 => {
+                        check_msg_len!(48);
+                        if msg_id == 21 {
+                            Message::HashRequest(request)
+                        } else {
+                            Message::HashReject(request)
+                        }
+                    }
+                    _ => {
+                        if (msg_len - 48) % 32 != 0 || (msg_len - 48) / 32 > 544 {
+                            return Err(MessageDeserializeError::InvalidHashRequest);
+                        }
+                        let mut hashes = Vec::with_capacity((msg_len - 48) / 32);
+                        for _ in 0..(msg_len - 48) / 32 {
+                            hashes.push(buf.consume::<32>().unwrap());
+                        }
+                        Message::Hashes { request, hashes }
+                    }
+                };
+                Ok((message, total_len))
+            }
+            MSGID_REQUEST | MSGID_CANCEL | 16 => {
                 check_msg_len!(12);
                 const I32: usize = 4;
                 const I32_3: usize = I32 * 3;
@@ -423,6 +484,8 @@ impl Message<'_> {
                 };
                 let req = if msg_id == MSGID_REQUEST {
                     Message::Request(request)
+                } else if msg_id == 16 {
+                    Message::Reject(request)
                 } else {
                     Message::Cancel(request)
                 };
@@ -504,6 +567,13 @@ impl Handshake {
             peer_id: Id20::new(b[48..68].try_into().unwrap()),
         };
         Ok((h, LEN))
+    }
+
+    pub fn with_v2(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.reserved |= 0x10;
+        }
+        self
     }
 
     pub fn supports_extended(&self) -> bool {

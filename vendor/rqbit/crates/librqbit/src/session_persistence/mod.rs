@@ -24,6 +24,8 @@ pub struct SerializedTorrent {
         deserialize_with = "deserialize_info_hash"
     )]
     info_hash: Id20,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    info_hash_v2: Option<String>,
     #[serde(skip)]
     torrent_bytes: Bytes,
     trackers: HashSet<String>,
@@ -37,6 +39,24 @@ impl SerializedTorrent {
         &self.info_hash
     }
     pub fn into_add_torrent(self) -> anyhow::Result<(AddTorrent<'static>, AddTorrentOptions)> {
+        if let Some(expected) = &self.info_hash_v2 {
+            anyhow::ensure!(
+                !self.torrent_bytes.is_empty(),
+                "v2 metadata file is missing; restore the preserved .torrent file"
+            );
+            let parsed = librqbit_core::torrent_metainfo::torrent_from_bytes(&self.torrent_bytes)?;
+            let v2 = parsed
+                .info
+                .data
+                .v2
+                .as_ref()
+                .context("saved v2 torrent contains v1 metadata")?;
+            anyhow::ensure!(
+                librqbit_core::Id32::new(v2.info_hash()).as_string() == *expected
+                    && parsed.info_hash == self.info_hash,
+                "saved v2 identity does not match metadata"
+            );
+        }
         let add_torrent = if !self.torrent_bytes.is_empty() {
             AddTorrent::TorrentFileBytes(self.torrent_bytes)
         } else {

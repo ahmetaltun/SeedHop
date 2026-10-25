@@ -138,6 +138,7 @@ pub struct TorrentMetadata {
     pub info: ValidatedTorrentMetaV1Info<ByteBufOwned>,
     pub torrent_bytes: Bytes,
     pub info_bytes: Bytes,
+    pub v1_info_hash: Id20,
     pub file_infos: FileInfos,
 }
 
@@ -160,9 +161,14 @@ impl TorrentMetadata {
             })
             .collect::<anyhow::Result<Vec<FileInfo>>>()?;
 
+        use sha1w::ISha1;
+        let mut hash = sha1w::Sha1::new();
+        hash.update(&info_bytes);
+        let v1_info_hash = Id20::new(hash.finish());
         Ok(Self {
             info,
             torrent_bytes,
+            v1_info_hash,
             info_bytes,
             file_infos,
         })

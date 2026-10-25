@@ -198,7 +198,7 @@ struct LibraryView: View {
                 Button("Open torrent file…") { store.openFiles() }.buttonStyle(.borderedProminent).tint(Design.green)
                 Button("Paste magnet link") { store.pasteMagnet() }.buttonStyle(.bordered)
             }.controlSize(.large).padding(.top,24)
-            Text("BitTorrent v1 · Files stay on your Mac").font(.system(size:10)).foregroundStyle(.tertiary).padding(.top,17)
+            Text("BitTorrent v1 + v2 · Files stay on your Mac").font(.system(size:10)).foregroundStyle(.tertiary).padding(.top,17)
             Spacer(); Spacer().frame(height:45)
         }.frame(maxWidth:.infinity,maxHeight:.infinity)
     }

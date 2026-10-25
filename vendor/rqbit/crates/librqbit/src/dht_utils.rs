@@ -30,6 +30,7 @@ pub enum ReadMetainfoResult<Rx> {
 pub async fn read_metainfo_from_peer_receiver<A: Stream<Item = SocketAddr> + Unpin>(
     peer_id: Id20,
     info_hash: Id20,
+    v2_hash: Option<librqbit_core::Id32>,
     initial_addrs: Vec<SocketAddr>,
     addrs_stream: A,
     peer_connection_options: Option<PeerConnectionOptions>,
@@ -51,6 +52,7 @@ pub async fn read_metainfo_from_peer_receiver<A: Stream<Item = SocketAddr> + Unp
                 addr,
                 peer_id,
                 info_hash,
+                v2_hash,
                 peer_connection_options,
                 // This shouldn't be called anyway as we aren't reading/writing to disk, so it's
                 // ok not to use a shared one.

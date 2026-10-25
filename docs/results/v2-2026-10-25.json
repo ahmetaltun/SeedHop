@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-25",
+  "scope": "BEP 52 metadata/payload verification and hybrid v1 fallback; no SeedHop v2 peer transfer",
+  "cases": [
+    {
+      "format": "v2",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "verifiedPieces": 7,
+      "verifiedBytes": 140012,
+      "metainfoAndPieces": "PASS",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "independentContentRecheck": "PASS"
+    },
+    {
+      "format": "hybrid",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "verifiedPieces": 7,
+      "verifiedBytes": 140012,
+      "metainfoAndPieces": "PASS",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "independentContentRecheck": "PASS",
+      "hybridV1Download": "PASS"
+    }
+  ]
+}

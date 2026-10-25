@@ -42,8 +42,8 @@ struct SettingsView: View {
                                 HStack { if let limitError { Text(limitError).font(.system(size:10)).foregroundStyle(.orange) }; Spacer(); Button(saving ? "Saving…" : "Apply limits",action:saveLimits).disabled(saving) }
                             }.textFieldStyle(.roundedBorder)
                         }
-                        group("Connection") { VStack(spacing:13) { info("Engine",store.connected ? "Connected" : "Disconnected"); info("Incoming TCP port",store.listenPort == 0 ? "Assigned when connected" : "\(store.listenPort)"); info("Protocol", "BitTorrent v1") } }
-                        Text("This preview re-verifies files after restart. BitTorrent v2, encrypted peers, and advanced connection controls are on the roadmap.").font(.system(size:11)).foregroundStyle(.secondary).lineSpacing(4)
+                        group("Connection") { VStack(spacing:13) { info("Engine",store.connected ? "Connected" : "Disconnected"); info("Incoming TCP port",store.listenPort == 0 ? "Assigned when connected" : "\(store.listenPort)"); info("Protocol", "BitTorrent v1 + v2") } }
+                        Text("This preview re-verifies files after restart. Encrypted peers and advanced connection controls are on the roadmap.").font(.system(size:11)).foregroundStyle(.secondary).lineSpacing(4)
                     } else {
                         VStack(spacing:15) { BrandMark(size:72); Text("SeedHop").font(.system(size:30,weight:.semibold,design:.rounded)); Text("0.1.0 · Milestone 0").font(.system(size:12)).foregroundStyle(.secondary); Text("A thoughtful home for your torrents.").font(.system(size:13)); Text("Built with SwiftUI, AppKit, and Rust.\nFree and open source.").font(.system(size:11)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(5) }.frame(maxWidth:.infinity).padding(.vertical,20)
                     }

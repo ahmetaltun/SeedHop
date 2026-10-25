@@ -15,6 +15,7 @@ sha1-crypto-hash = ["sha1w/sha1-crypto-hash"]
 sha1-ring = ["sha1w/sha1-ring"]
 
 [dependencies]
+sha2 = "0.10"
 tracing.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 hex.workspace = true

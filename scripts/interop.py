@@ -91,6 +91,7 @@ class Tracker:
     def __init__(self, work):
         self.peer = 0
         self.info_hash = ""
+        self.accepted_hashes = set()
         self.lock = threading.Lock()
         owner = self
 
@@ -101,7 +102,7 @@ class Tracker:
                           for pair in query.query.split("&") if "=" in pair
                           for key, value in [pair.split("=", 1)]}
                 advertised = int(values.get(b"port", b"0"))
-                valid = query.path == "/announce" and values.get(b"info_hash", b"").hex() == owner.info_hash
+                valid = query.path == "/announce" and (values.get(b"info_hash", b"").hex() == owner.info_hash or values.get(b"info_hash", b"").hex() in owner.accepted_hashes)
                 endpoint = owner.peer if valid and advertised != owner.peer else 0
                 peers = socket.inet_aton("127.0.0.1") + struct.pack("!H", endpoint) if endpoint else b""
                 body = bencode({b"interval": 1, b"peers": peers}) if valid else bencode({b"failure reason": b"Unknown fixture"})

@@ -35,6 +35,12 @@ pub fn torrent_from_bytes<'de>(
     let mut digest = sha1w::Sha1::new();
     digest.update(t.info.raw_bytes.as_ref());
     t.info_hash = Id20::new(digest.finish());
+    if let Some(v2) = crate::v2::Metainfo::parse(buf)
+        .map_err(|e| <bencode::DeserializeError as serde::de::Error>::custom(e.to_string()))?
+    {
+        t.info_hash = Id20::new(v2.info_hash()[..20].try_into().unwrap());
+        t.info.data.v2 = Some(std::sync::Arc::new(v2));
+    }
     Ok(t)
 }
 
@@ -44,6 +50,7 @@ fn is_false(b: &bool) -> bool {
 
 /// A parsed .torrent file.
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(bound(deserialize = "BufType: serde::Deserialize<'de> + Default"))]
 pub struct TorrentMetaV1<BufType> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub announce: Option<BufType>,
@@ -82,10 +89,14 @@ impl<BufType> TorrentMetaV1<BufType> {
 
 /// Main torrent information, shared by .torrent files and magnet link contents.
 #[derive(Default, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(bound(deserialize = "BufType: serde::Deserialize<'de> + Default"))]
 pub struct TorrentMetaV1Info<BufType> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<BufType>,
+    #[serde(default)]
     pub pieces: BufType,
+    #[serde(skip)]
+    pub v2: Option<std::sync::Arc<crate::v2::Metainfo>>,
     #[serde(rename = "piece length")]
     pub piece_length: u32,
 
@@ -124,6 +135,7 @@ pub struct FileIteratorName<'a, BufType> {
 pub enum FileIteratorNameData<'a, BufType> {
     Single(Option<&'a BufType>),
     Tree(&'a [BufType]),
+    V2(&'a [String]),
 }
 
 impl<BufType> std::fmt::Debug for FileIteratorName<'_, BufType>
@@ -179,13 +191,16 @@ where
     /// Iterate path components as bytes.
     pub fn iter_components_bytes(&self) -> impl Iterator<Item = &'a [u8]> + use<'a, BufType> {
         let it = match self.data {
+            FileIteratorNameData::V2(parts) => {
+                return Either::Left(parts.iter().map(|p| p.as_bytes()));
+            }
             FileIteratorNameData::Single(None) => {
-                return Either::Left(once(&b"torrent-content"[..]));
+                return Either::Right(Either::Left(once(&b"torrent-content"[..])));
             }
             FileIteratorNameData::Single(Some(name)) => Either::Left(once((*name).as_ref())),
             FileIteratorNameData::Tree(t) => Either::Right(t.iter().map(|bb| bb.as_ref())),
         };
-        Either::Right(it)
+        Either::Right(Either::Right(it))
     }
 }
 
@@ -294,6 +309,10 @@ impl<BufType: AsRef<[u8]>> ValidatedTorrentMetaV1Info<BufType> {
             .scan(0u64, move |acc_offset, details| {
                 let offset = *acc_offset;
                 *acc_offset += details.len;
+                if self.info.v2.is_some() && details.len > 0 {
+                    *acc_offset = acc_offset.div_ceil(self.info.piece_length as u64)
+                        * self.info.piece_length as u64;
+                }
                 Some(FileDetailsExt {
                     pieces: self.lengths.iter_pieces_within_offset(offset, details.len),
                     details,
@@ -388,7 +407,21 @@ impl<BufType: AsRef<[u8]>> TorrentMetaV1Info<BufType> {
         &self,
         encoding: &'static Encoding,
     ) -> crate::Result<impl Iterator<Item = FileDetails<'_, BufType>>> {
-        match (self.length, self.files.as_ref()) {
+        if let Some(v2) = &self.v2 {
+            return Ok(Either::Left(v2.files().iter().map(move |file| {
+                FileDetails {
+                    filename: FileIteratorName {
+                        encoding,
+                        data: FileIteratorNameData::V2(file.path()),
+                    },
+                    len: file.length(),
+                    attr: None,
+                    sha1: None,
+                    symlink_path: None,
+                }
+            })));
+        }
+        let v1 = match (self.length, self.files.as_ref()) {
             // Single-file
             (Some(length), None) => Ok(Either::Left(once(FileDetails {
                 filename: FileIteratorName {
@@ -418,7 +451,8 @@ impl<BufType: AsRef<[u8]>> TorrentMetaV1Info<BufType> {
                 })))
             }
             _ => Err(Error::BadTorrentBothSingleAndMultiFile),
-        }
+        }?;
+        Ok(Either::Right(v1))
     }
 }
 
@@ -470,6 +504,7 @@ where
         TorrentMetaV1Info {
             name: self.name.clone_to_owned(within_buffer),
             pieces: self.pieces.clone_to_owned(within_buffer),
+            v2: self.v2.clone(),
             piece_length: self.piece_length,
             length: self.length,
             md5sum: self.md5sum.clone_to_owned(within_buffer),

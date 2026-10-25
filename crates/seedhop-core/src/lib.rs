@@ -1,6 +1,7 @@
 pub mod adapter;
 mod model;
 pub mod storage;
+pub mod v2;
 use librqbit::{AddTorrent, AddTorrentOptions, Session, SessionOptions, SessionPersistenceConfig};
 pub use model::*;
 use std::{
@@ -60,6 +61,13 @@ impl Engine {
                     let metadata = session_dir.join(format!("{hash}.torrent"));
                     if let Ok(bytes) = std::fs::read(metadata) {
                         let preview = adapter::preview(bytes)?;
+                        if let Some(expected) = saved["info_hash_v2"].as_str()
+                            && expected != preview.id
+                        {
+                            return Err(CoreError::CorruptState(
+                                "Saved v2 identity does not match torrent metadata.".into(),
+                            ));
+                        }
                         storage::validate_destination(
                             Path::new(folder),
                             &preview
@@ -172,10 +180,9 @@ impl Engine {
                 "This preview accepts magnet links or .torrent files.".into(),
             ));
         }
-        if !parsed
-            .query_pairs()
-            .any(|(k, v)| k == "xt" && v.starts_with("urn:btih:"))
-        {
+        if !parsed.query_pairs().any(|(k, v)| {
+            k == "xt" && (v.starts_with("urn:btih:") || v.starts_with("urn:btmh:1220"))
+        }) {
             return Err(CoreError::Unsupported);
         }
         let (cancel, mut receiver) = tokio::sync::watch::channel(false);
@@ -268,11 +275,15 @@ impl Engine {
     }
 
     fn handle(&self, id: &str) -> Result<Arc<librqbit::ManagedTorrent>> {
-        let hash = id
-            .parse()
-            .map_err(|_| CoreError::InvalidInput("Invalid torrent identifier.".into()))?;
         self.session
-            .get(librqbit::api::TorrentIdOrHash::Hash(hash))
+            .with_torrents(|torrents| {
+                for (_, torrent) in torrents {
+                    if adapter::torrent_id(torrent) == id {
+                        return Some(torrent.clone());
+                    }
+                }
+                None
+            })
             .ok_or_else(|| {
                 CoreError::InvalidInput("This torrent is no longer in the library.".into())
             })

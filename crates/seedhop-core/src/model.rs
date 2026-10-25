@@ -6,7 +6,7 @@ pub enum CoreError {
     Busy,
     #[error("{0}")]
     InvalidInput(String),
-    #[error("This torrent format is not supported by this preview. Use a BitTorrent v1 torrent.")]
+    #[error("This torrent format is not supported. Use a BitTorrent v1, v2, or hybrid torrent.")]
     Unsupported,
     #[error("The operation was cancelled.")]
     Cancelled,

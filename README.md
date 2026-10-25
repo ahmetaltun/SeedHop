@@ -4,7 +4,7 @@
 
 A native macOS torrent client built with **SwiftUI, AppKit, and Rust**.
 The first milestone combines a carefully designed interface with a real
-BitTorrent v1 engine, authenticated XPC, and recovery tests.
+BitTorrent v1/v2 engine, authenticated XPC, and recovery tests.
 
 **Development build:** macOS 15+, Apple Silicon. This is an internal preview,
 not a notarized public release. See [validation status](docs/VALIDATION.md) for
@@ -66,6 +66,7 @@ cargo run -p seedhop-core --bin seedhop-lab -- fixture .build/fixture
 .build/SeedHop.app/Contents/MacOS/SeedHop --verify-engine "$PWD/.build/fixture"
 python3 scripts/interop.py
 make faults
+make v2-test
 ```
 
 Tests need local socket access. The XPC smoke test uses an isolated library
@@ -107,7 +108,9 @@ The app icon and its generation prompt are documented in [icon artwork](docs/ICO
 The foreground host is the default. Background mode and login restoration are
 separate opt-ins. Downloads are stored in your chosen folder; library state is
 under `~/Library/Application Support/SeedHop`. The app does not enable a local
-HTTP control server. BitTorrent v2, encrypted peers, RSS, search, remote control,
+HTTP control server. [BitTorrent v2 support](docs/BITTORRENT-V2.md) includes pure-v2
+and hybrid transfers, seeding, magnets, file selection, and SHA-256 restart checks.
+Encrypted peers, RSS, search, remote control,
 and advanced queueing remain roadmap work.
 
 ## License

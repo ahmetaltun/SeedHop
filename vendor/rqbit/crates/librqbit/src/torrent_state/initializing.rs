@@ -154,7 +154,7 @@ impl TorrentStateInitializing {
                     })
                     .enumerate()
                 {
-                    if fo.check_piece(piece_id).is_err() {
+                    if !fo.check_piece(piece_id).unwrap_or(false) {
                         return true;
                     }
 
@@ -242,7 +242,7 @@ impl TorrentStateInitializing {
         let chunk_tracker = ChunkTracker::new(
             have_pieces.into_dyn(),
             selected_pieces,
-            *self.metadata.lengths(),
+            self.metadata.lengths().clone(),
             &self.metadata.file_infos,
         )
         .context("error creating chunk tracker")?;

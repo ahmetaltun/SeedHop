@@ -233,7 +233,7 @@ impl TorrentStateLive {
         let up_speed_estimator = SpeedEstimator::default();
 
         let have_bytes = paused.chunk_tracker.get_hns().have_bytes;
-        let lengths = *paused.chunk_tracker.get_lengths();
+        let lengths = paused.chunk_tracker.get_lengths().clone();
 
         // TODO: make it configurable
         let file_priorities = {
@@ -277,7 +277,7 @@ impl TorrentStateLive {
                 have_bytes: AtomicU64::new(have_bytes),
                 ..Default::default()
             },
-            lengths,
+            lengths: lengths.clone(),
             peer_semaphore: Arc::new(Semaphore::new(
                 paused.shared.options.peer_limit.unwrap_or(128),
             )),
@@ -1036,6 +1036,9 @@ struct PeerHandler {
 }
 
 impl PeerConnectionHandler for &'_ PeerHandler {
+    fn is_v2(&self) -> bool {
+        self.state.metadata.info.info().v2.is_some()
+    }
     fn on_connected(&self, connection_time: Duration) {
         self.counters
             .outgoing_connections
@@ -1056,6 +1059,21 @@ impl PeerConnectionHandler for &'_ PeerHandler {
         }
 
         match message {
+            Message::HashRequest(request) => {
+                let hashes = self
+                    .state
+                    .shared
+                    .spawner
+                    .block_in_place_with_semaphore(|| self.state.file_ops().serve_hashes(&request))
+                    .await;
+                let response = match hashes {
+                    Ok(hashes) => Message::Hashes { request, hashes },
+                    Err(_) => Message::HashReject(request),
+                };
+                self.tx
+                    .send(WriterRequest::Message(response))
+                    .map_err(|_| anyhow::anyhow!("peer writer closed"))?;
+            }
             Message::Request(request) => {
                 self.on_download_request(request)
                     .context("on_download_request")?;
@@ -1063,6 +1081,14 @@ impl PeerConnectionHandler for &'_ PeerHandler {
             Message::Bitfield(b) => self
                 .on_bitfield(b.clone_to_owned(None))
                 .context("on_bitfield")?,
+            Message::Reject(request) => {
+                // Disconnecting releases this peer's in-flight pieces through the
+                // existing cleanup path, so rejected requests cannot stall them.
+                anyhow::bail!("peer rejected payload request {request:?}");
+            }
+            Message::Hashes { .. } | Message::HashReject(_) => {
+                anyhow::bail!("unsolicited hash response during payload transfer");
+            }
             Message::Choke => self.on_i_am_choked(),
             Message::Unchoke => self.on_i_am_unchoked(),
             Message::Interested => self.on_peer_interested(),
@@ -1488,11 +1514,35 @@ impl PeerHandler {
             }
         };
 
-        let chunk_info = match self.state.lengths.chunk_info_from_received_data(
-            piece_index,
-            request.begin,
-            request.length,
-        ) {
+        let chunk_info = match self
+            .state
+            .lengths
+            .chunk_info_from_received_data(piece_index, request.begin, request.length)
+            .or_else(|| {
+                // Hybrid peers may request a whole 16 KiB block across a padding gap.
+                // Return zeros for the gap without reading into the following file.
+                if self
+                    .state
+                    .metadata
+                    .info
+                    .info()
+                    .v2
+                    .as_ref()
+                    .is_some_and(|v| v.is_hybrid())
+                    && request.length == 16384
+                {
+                    self.state
+                        .lengths
+                        .iter_chunk_infos(piece_index)
+                        .find(|c| c.offset == request.begin && c.size < request.length)
+                        .map(|mut c| {
+                            c.size = request.length;
+                            c
+                        })
+                } else {
+                    None
+                }
+            }) {
             Some(d) => d,
             None => {
                 anyhow::bail!(

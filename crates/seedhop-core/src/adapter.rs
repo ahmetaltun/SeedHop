@@ -12,17 +12,15 @@ pub fn preview(bytes: Vec<u8>) -> Result<TorrentPreview> {
             "The torrent metadata exceeds 32 MB.".into(),
         ));
     }
-    let meta = librqbit::torrent_from_bytes(&bytes).map_err(|e| {
-        if bytes
-            .windows(b"12:meta versioni2e".len())
-            .any(|w| w == b"12:meta versioni2e")
-        {
-            CoreError::Unsupported
-        } else {
-            engine_error(e)
-        }
-    })?;
-    let id = meta.info_hash.as_string();
+    let meta =
+        librqbit::torrent_from_bytes(&bytes).map_err(|e| CoreError::InvalidInput(e.to_string()))?;
+    let id = meta
+        .info
+        .data
+        .v2
+        .as_ref()
+        .map(|v| v.info_hash().iter().map(|b| format!("{b:02x}")).collect())
+        .unwrap_or_else(|| meta.info_hash.as_string());
     let info = meta.info.data.validate().map_err(engine_error)?;
     let files: Vec<_> = info
         .iter_file_details()
@@ -92,7 +90,7 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
         .map(|v| v.snapshot.peer_stats.live)
         .unwrap_or(0);
     TorrentRecord {
-        id: torrent.info_hash().as_string(),
+        id: torrent_id(torrent),
         name: torrent
             .name()
             .unwrap_or_else(|| "Resolving metadata…".into()),
@@ -130,4 +128,20 @@ pub fn create_fixture(name: &str, content: &[u8]) -> Vec<u8> {
     }
     bytes.extend_from_slice(b"ee");
     bytes
+}
+
+/// Application identity retains all 256 bits; the engine's 20-byte key is wire-only.
+pub fn torrent_id(torrent: &ManagedTorrent) -> String {
+    torrent
+        .with_metadata(|meta| {
+            meta.info.info().v2.as_ref().map(|v| {
+                v.info_hash()
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect::<String>()
+            })
+        })
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| torrent.info_hash().as_string())
 }

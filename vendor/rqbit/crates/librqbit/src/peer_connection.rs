@@ -34,6 +34,12 @@ use crate::{
 };
 
 pub trait PeerConnectionHandler {
+    fn accepts_metadata_hash_upgrade(&self, _hash: Id20) -> bool {
+        false
+    }
+    fn is_v2(&self) -> bool {
+        false
+    }
     fn on_connected(&self, _connection_time: Duration) {}
     fn should_send_bitfield(&self) -> bool;
     fn serialize_bitfield_message_to_buf(&self, buf: &mut [u8]) -> anyhow::Result<usize>;
@@ -170,7 +176,7 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
         );
 
         let mut write_buf = Box::new([0u8; MAX_MSG_LEN]);
-        let handshake = Handshake::new(self.info_hash, self.peer_id);
+        let handshake = Handshake::new(self.info_hash, self.peer_id).with_v2(self.handler.is_v2());
         let hlen = handshake.serialize_unchecked_len(&mut *write_buf);
         with_timeout(
             "writing handshake",
@@ -228,7 +234,8 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
             self.handler.on_connected(now.elapsed());
 
             let mut write_buf = Box::new([0u8; MAX_MSG_LEN]);
-            let handshake = Handshake::new(self.info_hash, self.peer_id);
+            let handshake =
+                Handshake::new(self.info_hash, self.peer_id).with_v2(self.handler.is_v2());
             let hsz = handshake.serialize_unchecked_len(&mut *write_buf);
             with_timeout(
                 "writing",
@@ -247,7 +254,9 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
                 decoded_id=?try_decode_peer_id(h.peer_id),
                 "connected",
             );
-            if h.info_hash != self.info_hash {
+            if h.info_hash != self.info_hash
+                && !self.handler.accepts_metadata_hash_upgrade(h.info_hash)
+            {
                 return Err(Error::WrongInfoHash);
             }
 

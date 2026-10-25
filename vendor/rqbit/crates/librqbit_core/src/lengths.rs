@@ -32,10 +32,12 @@ pub struct ChunkInfo {
     pub offset: u32,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Lengths {
     // The total length of the torrent in bytes.
     total_length: u64,
+    piece_lengths: Option<std::sync::Arc<[u32]>>,
+    num_pieces: u32,
 
     // The length in bytes of each piece (except the last one).
     piece_length: u32,
@@ -62,10 +64,10 @@ impl std::fmt::Debug for ValidPieceIndex {
 }
 
 impl ValidPieceIndex {
-    pub const fn get(&self) -> u32 {
+    pub fn get(&self) -> u32 {
         self.0
     }
-    pub const fn get_usize(&self) -> usize {
+    pub fn get_usize(&self) -> usize {
         self.0 as usize
     }
 }
@@ -74,6 +76,9 @@ impl Lengths {
     pub fn from_torrent<ByteBuf: AsRef<[u8]>>(
         torrent: &crate::torrent_metainfo::TorrentMetaV1Info<ByteBuf>,
     ) -> crate::Result<Lengths> {
+        if let Some(v2) = &torrent.v2 {
+            return Self::from_v2(v2);
+        }
         let total_length = torrent
             .iter_file_details_raw(encoding_rs::UTF_8)?
             .map(|d| d.len)
@@ -81,14 +86,54 @@ impl Lengths {
         Lengths::new(total_length, torrent.piece_length)
     }
 
+    pub fn from_v2(v2: &crate::v2::Metainfo) -> crate::Result<Self> {
+        let invalid = || Error::V2InvalidTorrent;
+        let count: u32 = v2.piece_count().try_into().map_err(|_| invalid())?;
+        let piece_length = v2.piece_length() as u32;
+        if (count as u64) * (piece_length as u64 / CHUNK_SIZE as u64) > u32::MAX as u64 {
+            return Err(invalid());
+        }
+        let mut pieces = Vec::with_capacity(count as usize);
+        for file in v2.files() {
+            let mut remaining = file.length();
+            while remaining > 0 {
+                let length = remaining.min(piece_length as u64);
+                pieces.push(length as u32);
+                remaining -= length;
+            }
+        }
+        Ok(Self {
+            total_length: v2.total_bytes(),
+            num_pieces: count,
+            last_piece_id: count.saturating_sub(1),
+            last_piece_length: pieces.last().copied().unwrap_or(0),
+            piece_lengths: Some(pieces.into()),
+            piece_length,
+            chunks_per_piece: piece_length.div_ceil(CHUNK_SIZE),
+        })
+    }
+
     pub fn new(total_length: u64, piece_length: u32) -> crate::Result<Self> {
         if total_length == 0 {
             return Err(Error::BadTorrentZeroLength);
         }
-        let total_pieces = total_length.div_ceil(piece_length as u64) as u32;
+        if piece_length == 0 {
+            return Err(Error::V2InvalidPieceLength(0));
+        }
+        let total_pieces: u32 = total_length
+            .div_ceil(piece_length as u64)
+            .try_into()
+            .map_err(|_| Error::V2InvalidTorrent)?;
+        if (total_pieces as u64) * (piece_length as u64).div_ceil(CHUNK_SIZE as u64)
+            > u32::MAX as u64
+        {
+            return Err(Error::V2InvalidTorrent);
+        }
         Ok(Self {
             piece_length,
             total_length,
+            piece_lengths: None,
+            num_pieces: total_pieces,
             chunks_per_piece: (piece_length as u64).div_ceil(CHUNK_SIZE as u64) as u32,
             last_piece_id: total_pieces - 1,
             last_piece_length: last_element_size(total_length, piece_length as u64) as u32,
@@ -96,19 +141,19 @@ impl Lengths {
     }
 
     // How many bytes are required to store a bitfield where there's one bit for each piece.
-    pub const fn piece_bitfield_bytes(&self) -> usize {
+    pub fn piece_bitfield_bytes(&self) -> usize {
         self.total_pieces().div_ceil(8) as usize
     }
 
     // How many bytes are required to store a bitfield where there's one bit for each chunk.
-    pub const fn chunk_bitfield_bytes(&self) -> usize {
+    pub fn chunk_bitfield_bytes(&self) -> usize {
         self.total_chunks().div_ceil(8) as usize
     }
-    pub const fn total_length(&self) -> u64 {
+    pub fn total_length(&self) -> u64 {
         self.total_length
     }
-    pub const fn validate_piece_index(&self, index: u32) -> Option<ValidPieceIndex> {
-        if index > self.last_piece_id {
+    pub fn validate_piece_index(&self, index: u32) -> Option<ValidPieceIndex> {
+        if index >= self.num_pieces {
             return None;
         }
         Some(ValidPieceIndex(index))
@@ -117,51 +162,57 @@ impl Lengths {
         self.validate_piece_index(index)
             .ok_or(Error::InvalidPieceIndex(index))
     }
-    pub const fn default_piece_length(&self) -> u32 {
+    pub fn default_piece_length(&self) -> u32 {
         self.piece_length
     }
-    pub const fn default_chunks_per_piece(&self) -> u32 {
+    pub fn default_chunks_per_piece(&self) -> u32 {
         self.chunks_per_piece
     }
-    pub const fn total_chunks(&self) -> u32 {
+    pub fn total_chunks(&self) -> u32 {
         // TODO: test
+        if self.num_pieces == 0 {
+            return 0;
+        }
         self.last_piece_id * self.default_chunks_per_piece()
             + self.chunks_per_piece(self.last_piece_id())
     }
-    pub const fn last_piece_id(&self) -> ValidPieceIndex {
+    pub fn last_piece_id(&self) -> ValidPieceIndex {
         ValidPieceIndex(self.last_piece_id)
     }
-    pub const fn total_pieces(&self) -> u32 {
-        self.last_piece_id + 1
+    pub fn total_pieces(&self) -> u32 {
+        self.num_pieces
     }
-    pub const fn piece_length(&self, index: ValidPieceIndex) -> u32 {
+    pub fn piece_length(&self, index: ValidPieceIndex) -> u32 {
+        if let Some(lengths) = &self.piece_lengths {
+            return lengths[index.0 as usize];
+        }
         if index.0 == self.last_piece_id {
             return self.last_piece_length;
         }
         self.piece_length
     }
-    pub const fn chunk_absolute_offset(&self, chunk_info: &ChunkInfo) -> u64 {
+    pub fn chunk_absolute_offset(&self, chunk_info: &ChunkInfo) -> u64 {
         self.piece_offset(chunk_info.piece_index) + chunk_info.offset as u64
     }
-    pub const fn piece_offset(&self, index: ValidPieceIndex) -> u64 {
+    pub fn piece_offset(&self, index: ValidPieceIndex) -> u64 {
         index.0 as u64 * self.piece_length as u64
     }
 
     pub fn iter_piece_infos(&self) -> impl Iterator<Item = PieceInfo> + 'static {
-        let last_id = self.last_piece_id;
-        let last_len = self.last_piece_length;
-        let pl = self.piece_length;
+        let lengths = self.clone();
         (0..self.total_pieces()).map(move |idx| PieceInfo {
             piece_index: ValidPieceIndex(idx),
-            len: if idx == last_id { last_len } else { pl },
+            len: lengths.piece_length(ValidPieceIndex(idx)),
         })
     }
 
     // A helper to iterate over pieces in a file.
     pub fn iter_pieces_within_offset(&self, offset_bytes: u64, len: u64) -> std::ops::Range<u32> {
         // Validation and correction
-        let offset_bytes = offset_bytes.min(self.total_length);
-        let end_bytes = (offset_bytes + len).min(self.total_length);
+        let address_length =
+            self.piece_offset(self.last_piece_id()) + self.last_piece_length as u64;
+        let offset_bytes = offset_bytes.min(address_length);
+        let end_bytes = (offset_bytes + len).min(address_length);
 
         let start_piece_id = (offset_bytes / self.piece_length as u64) as u32;
         let end_piece_id = if end_bytes == offset_bytes {
@@ -217,18 +268,15 @@ impl Lengths {
             absolute_index,
         })
     }
-    pub const fn chunk_range(&self, index: ValidPieceIndex) -> std::ops::Range<usize> {
+    pub fn chunk_range(&self, index: ValidPieceIndex) -> std::ops::Range<usize> {
         let start = index.0 * self.chunks_per_piece;
         let end = start + self.chunks_per_piece(index);
         start as usize..end as usize
     }
-    pub const fn chunks_per_piece(&self, index: ValidPieceIndex) -> u32 {
-        if index.0 == self.last_piece_id {
-            return self.last_piece_length.div_ceil(CHUNK_SIZE);
-        }
-        self.chunks_per_piece
+    pub fn chunks_per_piece(&self, index: ValidPieceIndex) -> u32 {
+        self.piece_length(index).div_ceil(CHUNK_SIZE)
     }
-    pub const fn chunk_offset_in_piece(
+    pub fn chunk_offset_in_piece(
         &self,
         piece_index: ValidPieceIndex,
         chunk_index: u32,

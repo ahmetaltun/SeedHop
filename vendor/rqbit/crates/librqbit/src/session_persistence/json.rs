@@ -150,6 +150,16 @@ impl JsonSessionPersistenceStore {
                 .map(|u| u.to_string())
                 .collect(),
             info_hash: torrent.info_hash(),
+            info_hash_v2: torrent
+                .with_metadata(|m| {
+                    m.info
+                        .info()
+                        .v2
+                        .as_ref()
+                        .map(|v| librqbit_core::Id32::new(v.info_hash()).as_string())
+                })
+                .ok()
+                .flatten(),
             // we don't serialize this here, but to a file instead.
             torrent_bytes: Default::default(),
             only_files: torrent.only_files().clone(),

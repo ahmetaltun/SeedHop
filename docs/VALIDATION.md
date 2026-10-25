@@ -36,6 +36,7 @@ validation exception is omitted from certificate-backed and release builds.
 | Metadata cancellation | PASS | Genuinely pending tracker request cancelled explicitly |
 | Independent qBittorrent interoperability | PASS, both directions | 5 scenarios repeated twice against qBittorrent v5.3.0alpha1; 6,947,698 bytes compared exactly |
 | Independent magnet metadata and file selection | PASS | qBittorrent supplied metadata; selected nested files verified; piece-aligned unselected file progress remained zero |
+| v2/hybrid TCP, seeding, magnets and selection | PASS | Nine isolated qBittorrent scenarios; full identity, proofs, alignment and restart regression coverage |
 | Visual rendering | PASS | 22 light/dark library, compact, empty, import, files, settings, multi-selection, filter, recovery, and high-contrast renders |
 
 Independent transfer SHA-256:
@@ -81,8 +82,11 @@ certify physical keyboard input, VoiceOver, or reopening with a real transfer.
   sleep/wake on the target system. Controlled missing paths, TCP/tracker outages,
   and actual disk-full writes on a disposable HFS+ image now pass; these do not
   certify physical unplugging, APFS behavior, or system sleep/wake.
-- Add private-swarm, v2/hybrid, IPv6-only, and encrypted-peer fixtures before
-  advertising those capabilities.
+- Add private-swarm, IPv6-only, and encrypted-peer fixtures before advertising
+  those capabilities. Pure-v2 and hybrid TCP transfers, seeding, magnets, and
+  selection now pass nine independent peer scenarios; v2 DHT/UDP public-swarm
+  coverage remains separate. See `BITTORRENT-V2.md` and
+  `results/v2-wire-2026-10-25.json`.
 
 ## Reproduce
 

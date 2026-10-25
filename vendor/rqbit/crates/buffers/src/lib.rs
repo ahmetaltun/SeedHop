@@ -98,6 +98,9 @@ impl CloneToOwned for ByteBuf<'_> {
     type Target = ByteBufOwned;
 
     fn clone_to_owned(&self, within_buffer: Option<&Bytes>) -> Self::Target {
+        if self.0.is_empty() {
+            return ByteBufOwned::default();
+        }
         // Try zero-copy from the provided buffer.
         if let Some(within_buffer) = within_buffer {
             let haystack = within_buffer.as_ptr() as usize;

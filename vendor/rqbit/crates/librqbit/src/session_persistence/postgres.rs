@@ -34,6 +34,7 @@ impl TorrentsTableRecord {
             self.id as TorrentId,
             SerializedTorrent {
                 info_hash: Id20::from_bytes(&self.info_hash).ok()?,
+                info_hash_v2: None,
                 torrent_bytes: self.torrent_bytes.into(),
                 trackers: self.trackers.into_iter().collect(),
                 output_folder: PathBuf::from(self.output_folder),

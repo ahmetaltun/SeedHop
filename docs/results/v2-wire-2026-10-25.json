@@ -1,0 +1,87 @@
+{
+  "date": "2026-10-25",
+  "scope": "TCP/HTTP-tracker pure-v2 and hybrid interoperability through the v2 swarm",
+  "cases": [
+    {
+      "format": "v2",
+      "direction": "download",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "v2",
+      "direction": "upload",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "v2",
+      "direction": "magnet",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "v2",
+      "direction": "selective",
+      "bytes": 10,
+      "result": "PASS",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "hybrid",
+      "direction": "download",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "hybrid",
+      "direction": "upload",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "hybrid",
+      "direction": "selective",
+      "bytes": 10,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-v1",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    }
+  ]
+}

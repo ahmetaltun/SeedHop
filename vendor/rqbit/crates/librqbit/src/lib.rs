@@ -123,3 +123,5 @@ pub const fn client_name_and_version() -> &'static str {
 pub fn try_increase_nofile_limit() -> anyhow::Result<u64> {
     Ok(rlimit::increase_nofile_limit(1024 * 1024)?)
 }
+
+pub use librqbit_core::v2;
