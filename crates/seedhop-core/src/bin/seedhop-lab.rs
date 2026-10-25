@@ -26,7 +26,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 listen_port: 0,
             })
             .await?;
-            engine.add(torrent, downloads, vec![0], false, true).await?;
+            let selected = adapter::preview(torrent.clone())?
+                .files
+                .iter()
+                .map(|file| file.index)
+                .collect();
+            engine
+                .add(torrent, downloads, selected, false, true)
+                .await?;
             let deadline = Instant::now() + Duration::from_secs(10);
             loop {
                 let snapshot = engine.snapshot()?;
@@ -78,8 +85,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )?;
             println!("Created 1 MiB deterministic fixture in {}", root.display());
         }
-        Some("download") => {
-            let torrent = std::fs::read(args.get(2).ok_or("missing torrent")?)?;
+        Some(command @ ("download" | "download-magnet")) => {
+            let source = args.get(2).ok_or("missing torrent or magnet")?;
             let state = args.get(3).ok_or("missing state folder")?.clone();
             let downloads = args.get(4).ok_or("missing downloads folder")?.clone();
             let engine = Engine::open(EngineConfig {
@@ -89,8 +96,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 listen_port: 0,
             })
             .await?;
+            let metadata = if command == "download-magnet" {
+                tokio::time::timeout(
+                    Duration::from_secs(30),
+                    engine.inspect("interop-metadata".into(), Some(source.clone()), vec![]),
+                )
+                .await??
+            } else {
+                adapter::preview(std::fs::read(source)?)?
+            };
+            let selected = if let Some(indices) = args.get(5) {
+                indices
+                    .split(',')
+                    .map(str::parse::<u32>)
+                    .collect::<Result<Vec<_>, _>>()?
+            } else {
+                metadata.files.iter().map(|file| file.index).collect()
+            };
             let id = engine
-                .add(torrent, downloads, vec![0], false, false)
+                .add(metadata.torrent_bytes, downloads, selected, false, false)
                 .await?;
             let deadline = Instant::now() + Duration::from_secs(45);
             loop {
@@ -113,7 +137,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => {
             return Err(
-                "Usage: seedhop-lab fixture DIRECTORY | download TORRENT STATE DOWNLOADS".into(),
+                "Usage: seedhop-lab fixture DIRECTORY | seed TORRENT STATE FILES | download TORRENT STATE DOWNLOADS [INDICES] | download-magnet MAGNET STATE DOWNLOADS [INDICES] | hold STATE DOWNLOADS".into(),
             );
         }
     }

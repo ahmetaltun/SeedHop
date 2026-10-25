@@ -1,0 +1,457 @@
+{
+  "schemaVersion": 1,
+  "result": "PASS",
+  "cases": [
+    {
+      "case": "single",
+      "direction": "SeedHop \u2192 qBittorrent",
+      "artifacts": ".build/interop-upload-single-vv9sp0lu",
+      "result": "PASS",
+      "peer": "v5.3.0alpha1",
+      "peerBuild": {
+        "bitness": 64,
+        "boost": "1.91.0",
+        "libtorrent": "2.1.0.0",
+        "openssl": "3.6.3",
+        "platform": "macos",
+        "qt": "6.10.3",
+        "zlib": "1.2.12"
+      },
+      "infoHash": "46e7679885046484593b037452891ba7fb8c329e",
+      "files": [
+        {
+          "name": "seedhop-fixture.bin",
+          "bytes": 1048576,
+          "sha256": "631b84027d6b9e52b539c4e8373622d23032dfadc64d60af87339c9037e4f769"
+        }
+      ],
+      "bytesVerified": 1048576,
+      "source": "torrent file",
+      "transport": "plain v1 TCP; loopback tracker and peer traffic",
+      "run": 1
+    },
+    {
+      "case": "multi",
+      "direction": "SeedHop \u2192 qBittorrent",
+      "artifacts": ".build/interop-upload-multi-yrtou31j",
+      "result": "PASS",
+      "peer": "v5.3.0alpha1",
+      "peerBuild": {
+        "bitness": 64,
+        "boost": "1.91.0",
+        "libtorrent": "2.1.0.0",
+        "openssl": "3.6.3",
+        "platform": "macos",
+        "qt": "6.10.3",
+        "zlib": "1.2.12"
+      },
+      "infoHash": "bd87d81e4a2f114d8ffba584bcb48ea5747382ab",
+      "files": [
+        {
+          "name": "first.bin",
+          "bytes": 262144,
+          "sha256": "31a1f9dea0169551092d05e8bf4a446228c8c3eb4c9b713c66adcb7fd53c89be"
+        },
+        {
+          "name": "docs/second.bin",
+          "bytes": 98304,
+          "sha256": "430ca6b7762adeea4209fb19294bda018f1738145a32d1387cc28120719208c8"
+        },
+        {
+          "name": "optional/third.bin",
+          "bytes": 131219,
+          "sha256": "a79d2a5b831f9092e436fcf8b46e54aadab8df2647cb9fd07619dc0811e58e2a"
+        }
+      ],
+      "bytesVerified": 491667,
+      "source": "torrent file",
+      "transport": "plain v1 TCP; loopback tracker and peer traffic",
+      "run": 1
+    },
+    {
+      "case": "single",
+      "direction": "qBittorrent \u2192 SeedHop",
+      "artifacts": ".build/interop-download-single-5clwwbi6",
+      "result": "PASS",
+      "peer": "v5.3.0alpha1",
+      "peerBuild": {
+        "bitness": 64,
+        "boost": "1.91.0",
+        "libtorrent": "2.1.0.0",
+        "openssl": "3.6.3",
+        "platform": "macos",
+        "qt": "6.10.3",
+        "zlib": "1.2.12"
+      },
+      "infoHash": "46e7679885046484593b037452891ba7fb8c329e",
+      "handshakeAttempts": 4,
+      "files": [
+        {
+          "name": "seedhop-fixture.bin",
+          "bytes": 1048576,
+          "sha256": "631b84027d6b9e52b539c4e8373622d23032dfadc64d60af87339c9037e4f769"
+        }
+      ],
+      "bytesVerified": 1048576,
+      "source": "torrent file",
+      "transport": "plain v1 TCP; loopback tracker and peer traffic",
+      "run": 1,
+      "readinessEvidence": [
+        {
+          "error": "[Errno 54] Connection reset by peer"
+        },
+        {
+          "error": "[Errno 54] Connection reset by peer"
+        },
+        {
+          "error": "[Errno 54] Connection reset by peer"
+        },
+        {
+          "responseBytes": 68,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "case": "multi",
+      "direction": "qBittorrent \u2192 SeedHop",
+      "artifacts": ".build/interop-download-multi-rh2dodrs",
+      "result": "PASS",
+      "peer": "v5.3.0alpha1",
+      "peerBuild": {
+        "bitness": 64,
+        "boost": "1.91.0",
+        "libtorrent": "2.1.0.0",
+        "openssl": "3.6.3",
+        "platform": "macos",
+        "qt": "6.10.3",
+        "zlib": "1.2.12"
+      },
+      "infoHash": "bd87d81e4a2f114d8ffba584bcb48ea5747382ab",
+      "handshakeAttempts": 5,
+      "files": [
+        {
+          "name": "first.bin",
+          "bytes": 262144,
+          "sha256": "31a1f9dea0169551092d05e8bf4a446228c8c3eb4c9b713c66adcb7fd53c89be"
+        },
+        {
+          "name": "docs/second.bin",
+          "bytes": 98304,
+          "sha256": "430ca6b7762adeea4209fb19294bda018f1738145a32d1387cc28120719208c8"
+        },
+        {
+          "name": "optional/third.bin",
+          "bytes": 131219,
+          "sha256": "a79d2a5b831f9092e436fcf8b46e54aadab8df2647cb9fd07619dc0811e58e2a"
+        }
+      ],
+      "bytesVerified": 491667,
+      "source": "torrent file",
+      "transport": "plain v1 TCP; loopback tracker and peer traffic",
+      "run": 1,
+      "readinessEvidence": [
+        {
+          "responseBytes": 0,
+          "valid": false
+        },
+        {
+          "responseBytes": 0,
+          "valid": false
+        },
+        {
+          "responseBytes": 0,
+          "valid": false
+        },
+        {
+          "error": "[Errno 54] Connection reset by peer"
+        },
+        {
+          "responseBytes": 68,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "case": "magnet",
+      "direction": "qBittorrent \u2192 SeedHop",
+      "artifacts": ".build/interop-download-magnet-q1iv9rpn",
+      "result": "PASS",
+      "peer": "v5.3.0alpha1",
+      "peerBuild": {
+        "bitness": 64,
+        "boost": "1.91.0",
+        "libtorrent": "2.1.0.0",
+        "openssl": "3.6.3",
+        "platform": "macos",
+        "qt": "6.10.3",
+        "zlib": "1.2.12"
+      },
+      "infoHash": "bd87d81e4a2f114d8ffba584bcb48ea5747382ab",
+      "handshakeAttempts": 5,
+      "files": [
+        {
+          "name": "first.bin",
+          "bytes": 262144,
+          "sha256": "31a1f9dea0169551092d05e8bf4a446228c8c3eb4c9b713c66adcb7fd53c89be"
+        },
+        {
+          "name": "optional/third.bin",
+          "bytes": 131219,
+          "sha256": "a79d2a5b831f9092e436fcf8b46e54aadab8df2647cb9fd07619dc0811e58e2a"
+        }
+      ],
+      "bytesVerified": 393363,
+      "source": "magnet metadata",
+      "transport": "plain v1 TCP; loopback tracker and peer traffic",
+      "run": 1,
+      "readinessEvidence": [
+        {
+          "responseBytes": 0,
+          "valid": false
+        },
+        {
+          "error": "[Errno 54] Connection reset by peer"
+        },
+        {
+          "error": "[Errno 54] Connection reset by peer"
+        },
+        {
+          "error": "[Errno 54] Connection reset by peer"
+        },
+        {
+          "responseBytes": 68,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "case": "single",
+      "direction": "SeedHop \u2192 qBittorrent",
+      "artifacts": ".build/interop-upload-single-bbar2pw2",
+      "result": "PASS",
+      "peer": "v5.3.0alpha1",
+      "peerBuild": {
+        "bitness": 64,
+        "boost": "1.91.0",
+        "libtorrent": "2.1.0.0",
+        "openssl": "3.6.3",
+        "platform": "macos",
+        "qt": "6.10.3",
+        "zlib": "1.2.12"
+      },
+      "infoHash": "46e7679885046484593b037452891ba7fb8c329e",
+      "files": [
+        {
+          "name": "seedhop-fixture.bin",
+          "bytes": 1048576,
+          "sha256": "631b84027d6b9e52b539c4e8373622d23032dfadc64d60af87339c9037e4f769"
+        }
+      ],
+      "bytesVerified": 1048576,
+      "source": "torrent file",
+      "transport": "plain v1 TCP; loopback tracker and peer traffic",
+      "run": 2
+    },
+    {
+      "case": "multi",
+      "direction": "SeedHop \u2192 qBittorrent",
+      "artifacts": ".build/interop-upload-multi-n1za57ln",
+      "result": "PASS",
+      "peer": "v5.3.0alpha1",
+      "peerBuild": {
+        "bitness": 64,
+        "boost": "1.91.0",
+        "libtorrent": "2.1.0.0",
+        "openssl": "3.6.3",
+        "platform": "macos",
+        "qt": "6.10.3",
+        "zlib": "1.2.12"
+      },
+      "infoHash": "bd87d81e4a2f114d8ffba584bcb48ea5747382ab",
+      "files": [
+        {
+          "name": "first.bin",
+          "bytes": 262144,
+          "sha256": "31a1f9dea0169551092d05e8bf4a446228c8c3eb4c9b713c66adcb7fd53c89be"
+        },
+        {
+          "name": "docs/second.bin",
+          "bytes": 98304,
+          "sha256": "430ca6b7762adeea4209fb19294bda018f1738145a32d1387cc28120719208c8"
+        },
+        {
+          "name": "optional/third.bin",
+          "bytes": 131219,
+          "sha256": "a79d2a5b831f9092e436fcf8b46e54aadab8df2647cb9fd07619dc0811e58e2a"
+        }
+      ],
+      "bytesVerified": 491667,
+      "source": "torrent file",
+      "transport": "plain v1 TCP; loopback tracker and peer traffic",
+      "run": 2
+    },
+    {
+      "case": "single",
+      "direction": "qBittorrent \u2192 SeedHop",
+      "artifacts": ".build/interop-download-single-iudf2415",
+      "result": "PASS",
+      "peer": "v5.3.0alpha1",
+      "peerBuild": {
+        "bitness": 64,
+        "boost": "1.91.0",
+        "libtorrent": "2.1.0.0",
+        "openssl": "3.6.3",
+        "platform": "macos",
+        "qt": "6.10.3",
+        "zlib": "1.2.12"
+      },
+      "infoHash": "46e7679885046484593b037452891ba7fb8c329e",
+      "handshakeAttempts": 4,
+      "files": [
+        {
+          "name": "seedhop-fixture.bin",
+          "bytes": 1048576,
+          "sha256": "631b84027d6b9e52b539c4e8373622d23032dfadc64d60af87339c9037e4f769"
+        }
+      ],
+      "bytesVerified": 1048576,
+      "source": "torrent file",
+      "transport": "plain v1 TCP; loopback tracker and peer traffic",
+      "run": 2,
+      "readinessEvidence": [
+        {
+          "responseBytes": 0,
+          "valid": false
+        },
+        {
+          "responseBytes": 0,
+          "valid": false
+        },
+        {
+          "responseBytes": 0,
+          "valid": false
+        },
+        {
+          "responseBytes": 68,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "case": "multi",
+      "direction": "qBittorrent \u2192 SeedHop",
+      "artifacts": ".build/interop-download-multi-bvs2m6j1",
+      "result": "PASS",
+      "peer": "v5.3.0alpha1",
+      "peerBuild": {
+        "bitness": 64,
+        "boost": "1.91.0",
+        "libtorrent": "2.1.0.0",
+        "openssl": "3.6.3",
+        "platform": "macos",
+        "qt": "6.10.3",
+        "zlib": "1.2.12"
+      },
+      "infoHash": "bd87d81e4a2f114d8ffba584bcb48ea5747382ab",
+      "handshakeAttempts": 4,
+      "files": [
+        {
+          "name": "first.bin",
+          "bytes": 262144,
+          "sha256": "31a1f9dea0169551092d05e8bf4a446228c8c3eb4c9b713c66adcb7fd53c89be"
+        },
+        {
+          "name": "docs/second.bin",
+          "bytes": 98304,
+          "sha256": "430ca6b7762adeea4209fb19294bda018f1738145a32d1387cc28120719208c8"
+        },
+        {
+          "name": "optional/third.bin",
+          "bytes": 131219,
+          "sha256": "a79d2a5b831f9092e436fcf8b46e54aadab8df2647cb9fd07619dc0811e58e2a"
+        }
+      ],
+      "bytesVerified": 491667,
+      "source": "torrent file",
+      "transport": "plain v1 TCP; loopback tracker and peer traffic",
+      "run": 2,
+      "readinessEvidence": [
+        {
+          "responseBytes": 0,
+          "valid": false
+        },
+        {
+          "responseBytes": 0,
+          "valid": false
+        },
+        {
+          "responseBytes": 0,
+          "valid": false
+        },
+        {
+          "responseBytes": 68,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "case": "magnet",
+      "direction": "qBittorrent \u2192 SeedHop",
+      "artifacts": ".build/interop-download-magnet-gwj7f1vf",
+      "result": "PASS",
+      "peer": "v5.3.0alpha1",
+      "peerBuild": {
+        "bitness": 64,
+        "boost": "1.91.0",
+        "libtorrent": "2.1.0.0",
+        "openssl": "3.6.3",
+        "platform": "macos",
+        "qt": "6.10.3",
+        "zlib": "1.2.12"
+      },
+      "infoHash": "bd87d81e4a2f114d8ffba584bcb48ea5747382ab",
+      "handshakeAttempts": 5,
+      "files": [
+        {
+          "name": "first.bin",
+          "bytes": 262144,
+          "sha256": "31a1f9dea0169551092d05e8bf4a446228c8c3eb4c9b713c66adcb7fd53c89be"
+        },
+        {
+          "name": "optional/third.bin",
+          "bytes": 131219,
+          "sha256": "a79d2a5b831f9092e436fcf8b46e54aadab8df2647cb9fd07619dc0811e58e2a"
+        }
+      ],
+      "bytesVerified": 393363,
+      "source": "magnet metadata",
+      "transport": "plain v1 TCP; loopback tracker and peer traffic",
+      "run": 2,
+      "readinessEvidence": [
+        {
+          "responseBytes": 0,
+          "valid": false
+        },
+        {
+          "responseBytes": 0,
+          "valid": false
+        },
+        {
+          "responseBytes": 0,
+          "valid": false
+        },
+        {
+          "error": "[Errno 54] Connection reset by peer"
+        },
+        {
+          "responseBytes": 68,
+          "valid": true
+        }
+      ]
+    }
+  ],
+  "startedUTC": "2026-10-25T10:16:21.248538+00:00",
+  "bytesVerified": 6947698,
+  "artifactPathsRelativeTo": "repository root"
+}

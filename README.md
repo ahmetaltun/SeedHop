@@ -64,12 +64,23 @@ make ux-test
 cargo run -p seedhop-core --bin seedhop-lab -- fixture .build/fixture
 .build/SeedHop.app/Contents/MacOS/SeedHop --verify-engine "$PWD/.build/fixture"
 python3 scripts/interop.py
+make faults
 ```
 
 Tests need local socket access. The XPC smoke test uses an isolated library
-inside the supplied fixture directory. The interoperability test launches an
-isolated qBittorrent profile, verifies a deterministic fixture, and closes that
-test process afterward; it does not use your normal qBittorrent profile.
+inside the supplied fixture directory. The interoperability suite checks
+single-file and multi-file transfers in both directions plus magnet metadata
+and selective downloading. Each case launches a fresh qBittorrent profile and
+closes its test processes afterward; it does not use your normal profile.
+Use `python3 scripts/interop.py --repeat 2` to repeat all five scenarios, or
+`--direction download --case magnet` to target a case. Logs and hashes are
+retained under `.build/interop-*`. See [interoperability results](docs/INTEROPERABILITY.md).
+
+`make faults` tests unavailable destinations and interrupted peer/tracker connections,
+then fills a disposable 32 MiB HFS+ disk image to exercise real disk-full errors.
+It verifies transfer recovery, exact downloaded bytes, and durable settings retries,
+then detaches and deletes the image. Logs remain under `.build/faults-*`.
+See [recovery results and scope](docs/RECOVERY.md).
 
 `make ux-test` runs deterministic Swift presentation regressions with delayed
 engine replies. The XPC smoke test also exercises the actual import presentation

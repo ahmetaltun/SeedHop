@@ -282,7 +282,28 @@ impl Engine {
         let _operation = self.operations.write().await;
         self.ready()?;
         let handle = self.handle(&id)?;
-        if paused == handle.is_paused() {
+        let record = adapter::record(&handle);
+        if !paused {
+            let root = Path::new(&record.destination);
+            if !root.is_dir() {
+                return Err(CoreError::Storage(format!(
+                    "The saved destination is unavailable: {}. Reconnect the drive and retry.",
+                    record.destination
+                )));
+            }
+            storage::validate_destination(
+                root,
+                &record
+                    .files
+                    .iter()
+                    .map(|file| file.name.clone())
+                    .collect::<Vec<_>>(),
+            )?;
+        }
+        // A fatal storage error retains the previous running intent. Resume must
+        // restart and recheck it even when that intent already says "running".
+        let retry_error = !paused && record.state == "error";
+        if paused == handle.is_paused() && !retry_error {
             return self
                 .session
                 .try_update_persistence_metadata(&handle)

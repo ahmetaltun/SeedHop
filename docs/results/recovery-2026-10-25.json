@@ -1,0 +1,97 @@
+{
+  "started_at": "2026-10-25T10:30:26.528615+00:00",
+  "platform": "macOS-15.8.1-arm64-arm-64bit-Mach-O",
+  "volume_size_mib": 32,
+  "checks": [
+    {
+      "name": "controlled-recovery",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "seedhop-core",
+        "--test",
+        "faults",
+        "--locked",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 28.325,
+      "log": ".build/faults-kkvb13kg/controlled-recovery.log"
+    },
+    {
+      "name": "create-image",
+      "command": [
+        "hdiutil",
+        "create",
+        "-size",
+        "32m",
+        "-fs",
+        "HFS+",
+        "-volname",
+        "SeedHopFaults",
+        "/Users/ahmet/Rust/SeedHop/.build/faults-kkvb13kg/faults.dmg"
+      ],
+      "exit_code": 0,
+      "seconds": 1.036,
+      "log": ".build/faults-kkvb13kg/create-image.log"
+    },
+    {
+      "name": "attach-image",
+      "command": [
+        "hdiutil",
+        "attach",
+        "-nobrowse",
+        "-mountpoint",
+        "/Users/ahmet/Rust/SeedHop/.build/faults-kkvb13kg/volume",
+        "/Users/ahmet/Rust/SeedHop/.build/faults-kkvb13kg/faults.dmg"
+      ],
+      "exit_code": 0,
+      "seconds": 0.286,
+      "log": ".build/faults-kkvb13kg/attach-image.log"
+    },
+    {
+      "name": "real-disk-full",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "seedhop-core",
+        "--test",
+        "faults",
+        "--locked",
+        "real_disk_full_payload_and_state_writes_recover",
+        "--",
+        "--ignored",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 1.685,
+      "log": ".build/faults-kkvb13kg/real-disk-full.log"
+    },
+    {
+      "name": "detach-image",
+      "command": [
+        "hdiutil",
+        "detach",
+        "/Users/ahmet/Rust/SeedHop/.build/faults-kkvb13kg/volume"
+      ],
+      "exit_code": 0,
+      "seconds": 0.231,
+      "log": ".build/faults-kkvb13kg/detach-image.log"
+    }
+  ],
+  "passed": true,
+  "finished_at": "2026-10-25T10:30:58.114294+00:00",
+  "test_output": {
+    "controlled-recovery": "   Compiling seedhop-core v0.1.0 (/Users/ahmet/Rust/SeedHop/crates/seedhop-core)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.42s\n     Running tests/faults.rs (target/debug/deps/faults-7355be2e9dca92af)\n\nrunning 4 tests\ntest real_disk_full_payload_and_state_writes_recover ... ignored, requires a disposable mounted disk image; run python3 scripts/faults.py\ntest failed_add_to_missing_destination_is_retryable ... ok\nUnavailable destination: Resume and restore rejected; saved session bytes unchanged.\nReconnected destination: original transfer restored and 262144 bytes verified.\ntest unavailable_destination_preserves_library_and_recovers_after_reconnection ... ok\nConnections interrupted: stalled at 524288 bytes, 1 tracker requests rejected.\nConnections restored: automatic recovery and 4194304 bytes verified.\ntest interrupted_peer_and_tracker_connections_recover_without_user_resume ... ok\n\ntest result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 25.09s\n\n",
+    "real-disk-full": "    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.03s\n     Running tests/faults.rs (target/debug/deps/faults-7355be2e9dca92af)\n\nrunning 1 test\nReal payload ENOSPC reached snapshot: error writing to file 0 (\"\"payload.bin\"\")\n\nCaused by:\n    0: error calling pwritev\n    1: ENOSPC: No space left on device\nSpace freed: Resume recovered the original transfer and 2097152 bytes verified.\nReal state ENOSPC reached caller: No space left on device (os error 28); saved and active limits unchanged.\nSpace freed: state command retry succeeded and limits survived restart.\ntest real_disk_full_payload_and_state_writes_recover ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.48s\n\n"
+  },
+  "additional_validation": {
+    "cargo test --workspace --locked": "PASS: 13 regular tests; disk-image test ignored here and passed separately",
+    "cargo fmt --all -- --check": "PASS",
+    "cargo clippy --workspace --all-targets --locked -- -D warnings": "PASS"
+  }
+}

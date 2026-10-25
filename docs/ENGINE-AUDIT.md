@@ -34,6 +34,8 @@ the engine does not write into rqbit's separate application directories.
 - Limits are saved by atomic replacement and syncing before acknowledgment.
 - Unreadable JSON is retained in place; startup surfaces an actionable error.
 - Existing destinations and metadata paths are checked before restore.
+- Resume revalidates destinations before changing intent; an errored transfer
+  restarts and rechecks even if its previous intent already said running.
 - Explicit reuse is required for existing files; deletion enumerates torrent
   files and preserves unrelated files.
 
@@ -57,6 +59,26 @@ the engine does not write into rqbit's separate application directories.
 ## Remaining audit work
 
 Private-swarm discovery suppression, SOCKS/DNS coverage, interface loss,
-IPv6-only operation, arbitrary disk-full faults, and hybrid interoperability
+IPv6-only operation, broader disk/filesystem faults, and hybrid interoperability
 require dedicated fixtures before being advertised. Static review is not an
 interoperability result. See `VALIDATION.md` for executed checks.
+
+## Independent peer follow-up
+
+The local qBittorrent suite now verifies plain v1 TCP transfers in both directions,
+nested multi-file payloads, magnet metadata, and selective downloading. The five
+scenarios passed twice against the installed qBittorrent v5.3.0alpha1 / libtorrent
+2.1.0.0 build. Only the standalone lab runner and Python harness needed extension;
+the production engine adapter and pinned upstream patches were unchanged.
+See `INTEROPERABILITY.md` for the readiness finding, exact scope, and hashes.
+
+## Recovery follow-up
+
+The controlled recovery suite verifies missing destinations without recreating
+their paths or altering saved state, active TCP interruption plus failed HTTP
+tracker requests, and automatic reconnection with exact-byte completion.
+A disposable 32 MiB HFS+ volume supplies actual ENOSPC for payload writes and
+atomic limits persistence. Freeing space permits Resume and settings retry;
+updated settings survive restart. These checks required two application Resume
+fixes and no additional upstream patches. Physical drive removal, interface loss,
+APFS faults, and sleep/wake remain separate gates. See `RECOVERY.md`.

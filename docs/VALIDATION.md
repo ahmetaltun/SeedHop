@@ -16,7 +16,7 @@ validation exception is omitted from certificate-backed and release builds.
 |---|---|---|
 | App, foreground service, background agent build | PASS | `scripts/build.py` |
 | Nested code signature verification | PASS, ad-hoc | `codesign --verify --deep --strict` |
-| Rust tests | PASS | 10 tests across storage, recovery, and controlled swarm suites |
+| Rust tests | PASS | 13 regular tests across storage, recovery, faults, and controlled swarm suites; real disk-full test passed separately |
 | Rust formatting and Clippy | PASS | Workspace checks with warnings denied |
 | Authenticated foreground XPC | PASS, ad-hoc | In-app `--verify-engine` smoke test |
 | XPC metadata, paused add, limits, restart, restore, removal | PASS | Isolated smoke-test library |
@@ -28,9 +28,13 @@ validation exception is omitted from certificate-backed and release builds.
 | Corrupted JSON retained | PASS | Original malformed bytes preserved |
 | Existing files protected; unrelated files retained | PASS | Explicit-reuse and deletion tests |
 | Unsafe paths and symlink traversal preflight | PASS | Temporary-directory fixtures |
+| Unavailable destination and retry | PASS | Missing add folder; paused destination disappearance; rejected restore preserves session bytes; reconnect and exact-byte download |
+| Real disk-full payload and state recovery | PASS | Disposable 32 MiB HFS+ image; actual ENOSPC reaches snapshots/callers; Resume and settings retry verified |
+| Interrupted peer and tracker connections | PASS | Active TCP relay connections closed; tracker requests rejected; automatic reconnection and exact-byte completion |
 | Multi-file downloading | PASS | Controlled tracker swarm, nested paths, exact byte comparison |
 | Metadata cancellation | PASS | Genuinely pending tracker request cancelled explicitly |
-| Independent qBittorrent interoperability | PASS, seeding direction | SeedHop → qBittorrent v5.3.0alpha1, 1 MiB |
+| Independent qBittorrent interoperability | PASS, both directions | 5 scenarios repeated twice against qBittorrent v5.3.0alpha1; 6,947,698 bytes compared exactly |
+| Independent magnet metadata and file selection | PASS | qBittorrent supplied metadata; selected nested files verified; piece-aligned unselected file progress remained zero |
 | Visual rendering | PASS | 18 light/dark library, compact, empty, import, files, settings, multi-selection, filter, and recovery renders |
 
 Independent transfer SHA-256:
@@ -39,10 +43,19 @@ Independent transfer SHA-256:
 under `.build/interop-*`; the summary is `.build/interop-result.json`.
 The user's normal qBittorrent profile is not used.
 
-The reverse-direction qBittorrent seed attempt did not pass: the local test
-instance closed even a separate Python plain-v1 handshake probe. Its cause
-is not established. Downloading is verified by the controlled multi-file swarm;
-bidirectional qBittorrent interoperability must not be inferred from the seeding test.
+The initial reverse-direction attempt failed. The follow-up reproduced a startup
+interval where qBittorrent reported complete data but rejected plain handshakes.
+The harness now waits for a valid 68-byte handshake with the expected info hash.
+Both transfer directions, multi-file transfers, and magnet/selective downloading
+then passed in two complete repeated suites. This does not establish the internal
+cause of every historical reset; no production engine protocol patch was needed.
+See `INTEROPERABILITY.md` and `results/interop-2026-10-25.json` for evidence and scope.
+
+The recovery follow-up found and fixed two Resume issues: missing destinations
+were accepted, and running intent prevented errored transfers from restarting.
+`scripts/faults.py` now exercises both cases, real disk-full payload/state writes,
+and interrupted peer/tracker connections. See `RECOVERY.md` and
+`results/recovery-2026-10-25.json` for retained results and scope.
 
 The UX follow-up and manual walkthrough checklist are in `UX-REVIEW.md`.
 Cancellation and stale replies, action-target stability, removal confirmation,
@@ -61,8 +74,10 @@ VoiceOver completion remain unverified.
   run intent is implemented but not certified by the current tests.
 - Complete keyboard-only and VoiceOver walkthroughs, Increase Contrast,
   Reduce Motion, window reopening, and long-library scrolling checks.
-- Test actual disk-full faults, removable-drive disappearance, network interface
-  loss, and sleep/wake on the target system.
+- Test physical removable-drive disappearance, network interface loss, and
+  sleep/wake on the target system. Controlled missing paths, TCP/tracker outages,
+  and actual disk-full writes on a disposable HFS+ image now pass; these do not
+  certify physical unplugging, APFS behavior, or system sleep/wake.
 - Add private-swarm, v2/hybrid, IPv6-only, and encrypted-peer fixtures before
   advertising those capabilities.
 
@@ -77,6 +92,8 @@ make render
 cargo run -p seedhop-core --bin seedhop-lab -- fixture .build/fixture
 .build/SeedHop.app/Contents/MacOS/SeedHop --verify-engine "$PWD/.build/fixture"
 python3 scripts/interop.py
+python3 scripts/interop.py --repeat 2
+make faults
 ```
 
 Native rendering, local sockets, and macOS service access require execution

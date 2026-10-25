@@ -1,4 +1,4 @@
-.PHONY: build test lint render interop smoke ux-test
+.PHONY: build test lint render interop smoke ux-test faults
 build:
 	python3 scripts/build.py
 test:
@@ -10,6 +10,8 @@ render: build
 	.build/SeedHop.app/Contents/MacOS/SeedHop --render-designs --output .build/design
 interop:
 	python3 scripts/interop.py
+faults:
+	python3 scripts/faults.py
 smoke: build
 	cargo run -p seedhop-core --bin seedhop-lab -- fixture .build/fixture
 	.build/SeedHop.app/Contents/MacOS/SeedHop --verify-engine "$(CURDIR)/.build/fixture"
