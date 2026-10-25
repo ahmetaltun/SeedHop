@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-25",
+  "scope": "App-owned native fixture window, presentation models, and rendered fixture views",
+  "results": {
+    "native_menu_search_focus": "PASS: NSSearchField editor becomes first responder",
+    "native_menu_transfer_focus": "PASS: NSTableView becomes first responder",
+    "native_menu_reopen_library": "PASS: visible library returns after the last fixture window closes",
+    "presentation_regressions": {
+      "status": "PASS",
+      "count": 13
+    },
+    "design_rendering": {
+      "status": "PASS",
+      "count": 22,
+      "high_contrast_layouts_reviewed": 4
+    },
+    "native_toolbar_render": "PASS: rendered and visually reviewed app-owned window including toolbar",
+    "native_build_and_adhoc_signature": "PASS"
+  },
+  "artifacts": {
+    "native_menu_log": ".build/interface-test.log",
+    "native_window_render": ".build/interface-navigation.png",
+    "presentation_log": ".build/ux-test.log",
+    "render_log": ".build/ux-render.log",
+    "build_log": ".build/ux-build.log",
+    "design_renders": ".build/design/"
+  },
+  "remaining_manual_checks": [
+    "System keyboard event delivery and complete pointer/keyboard workflows",
+    "VoiceOver navigation and focus announcements",
+    "System Increase Contrast and Reduce Motion settings",
+    "Long-library scrolling during live updates",
+    "Window reopening while real transfers continue"
+  ],
+  "limitations": [
+    "Native menu actions are invoked inside the app, without synthesizing system input.",
+    "All navigation and rendering data are explicit fixtures; no real transfers are created.",
+    "SwiftUI accessibility-tree inspection exposed wrapper nodes only and was not accepted as a passing check."
+  ]
+}

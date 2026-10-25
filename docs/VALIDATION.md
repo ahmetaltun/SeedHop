@@ -22,6 +22,7 @@ validation exception is omitted from certificate-backed and release builds.
 | XPC metadata, paused add, limits, restart, restore, removal | PASS | Isolated smoke-test library |
 | Import presentation model against real XPC/Rust | PASS, ad-hoc | Off-main file reading, real metadata, and paused addition through `ImportSession` |
 | Swift UX presentation regressions | PASS | 13 controlled-transport scenarios; not a native input or accessibility certification |
+| Native menu actions and focus | PASS, fixture window | Find focuses NSSearchField; Focus Transfer List focuses NSTableView; Show Library reopens after the last window closes; system key events and real transfers excluded |
 | Exclusive ownership across processes | PASS | Competing startup rejected while child owns lease |
 | Abrupt process death and restoration | PASS | Child killed after durable commands; lock and state recovered |
 | Persistence failures reach callers | PASS | Read-only session directory fault |
@@ -35,7 +36,7 @@ validation exception is omitted from certificate-backed and release builds.
 | Metadata cancellation | PASS | Genuinely pending tracker request cancelled explicitly |
 | Independent qBittorrent interoperability | PASS, both directions | 5 scenarios repeated twice against qBittorrent v5.3.0alpha1; 6,947,698 bytes compared exactly |
 | Independent magnet metadata and file selection | PASS | qBittorrent supplied metadata; selected nested files verified; piece-aligned unselected file progress remained zero |
-| Visual rendering | PASS | 18 light/dark library, compact, empty, import, files, settings, multi-selection, filter, and recovery renders |
+| Visual rendering | PASS | 22 light/dark library, compact, empty, import, files, settings, multi-selection, filter, recovery, and high-contrast renders |
 
 Independent transfer SHA-256:
 `631b84027d6b9e52b539c4e8373622d23032dfadc64d60af87339c9037e4f769`.
@@ -63,7 +64,9 @@ overlapping file saves, duplicate adds, and file-read retries have executable
 Swift regression coverage. These checks use a controlled transport; the separate
 XPC smoke check exercises the real import model and Rust helper. Native UI
 automation is unavailable in the current environment, so pointer/keyboard and
-VoiceOver completion remain unverified.
+VoiceOver completion remain unverified. The subsequent app-owned native menu
+checks verify search/table focus and fixture-window reopening; they do not
+certify physical keyboard input, VoiceOver, or reopening with a real transfer.
 
 ## Remaining acceptance gates
 
@@ -73,7 +76,7 @@ VoiceOver completion remain unverified.
 - Exercise logout/login with automatic resume both off and on. Scoped boot/login
   run intent is implemented but not certified by the current tests.
 - Complete keyboard-only and VoiceOver walkthroughs, Increase Contrast,
-  Reduce Motion, window reopening, and long-library scrolling checks.
+  Reduce Motion, reopening during real transfers, and long-library scrolling checks.
 - Test physical removable-drive disappearance, network interface loss, and
   sleep/wake on the target system. Controlled missing paths, TCP/tracker outages,
   and actual disk-full writes on a disposable HFS+ image now pass; these do not
@@ -88,6 +91,7 @@ make build
 make test
 make lint
 make ux-test
+make interface-test
 make render
 cargo run -p seedhop-core --bin seedhop-lab -- fixture .build/fixture
 .build/SeedHop.app/Contents/MacOS/SeedHop --verify-engine "$PWD/.build/fixture"

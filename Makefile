@@ -1,4 +1,4 @@
-.PHONY: build test lint render interop smoke ux-test faults
+.PHONY: build test lint render interop smoke ux-test interface-test faults
 build:
 	python3 scripts/build.py
 test:
@@ -17,3 +17,5 @@ smoke: build
 	.build/SeedHop.app/Contents/MacOS/SeedHop --verify-engine "$(CURDIR)/.build/fixture"
 ux-test: build
 	.build/SeedHop.app/Contents/MacOS/SeedHop --verify-ux
+interface-test: build
+	.build/SeedHop.app/Contents/MacOS/SeedHop --verify-interface --output "$(CURDIR)/.build/interface-navigation.png"

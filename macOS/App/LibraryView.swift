@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct LibrarySearchAction { var focus: () -> Void }
+struct LibrarySearchAction { var focus: () -> Void; var focusTransfers: () -> Void }
 private struct LibrarySearchKey: FocusedValueKey { typealias Value = LibrarySearchAction }
 extension FocusedValues {
     var librarySearch: LibrarySearchAction? {
@@ -15,6 +15,7 @@ struct LibraryView: View {
     @State private var sortOrder = [KeyPathComparator(\TorrentItem.name)]
     @State private var inspectorTab = 0
     @FocusState private var searchFocused: Bool
+    @FocusState private var transfersFocused: Bool
     @State private var dropTargeted = false
     @AppStorage("transferColumns") private var columnCustomization = TableColumnCustomization<TorrentItem>()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -38,15 +39,12 @@ struct LibraryView: View {
                 Button { store.toggleSelected(paused:true) } label: { Label("Pause",systemImage:"pause.fill") }.disabled(!store.canPauseSelection).help("Pause selected transfers")
                 Button { store.requestRemoval() } label: { Label("Remove",systemImage:"trash") }.disabled(!store.canActOnSelection).help("Remove selected transfers")
                 Divider()
-                HStack(spacing:6) {
-                    Image(systemName:"magnifyingglass").foregroundStyle(.secondary)
-                    TextField("Search transfers",text:$store.search).textFieldStyle(.plain).frame(width:140).focused($searchFocused).accessibilityLabel("Search transfers")
-                        .onExitCommand { if store.search.isEmpty { searchFocused = false } else { store.search = "" } }
-                    if !store.search.isEmpty { Button { store.search = "" } label: { Image(systemName:"xmark.circle.fill") }.buttonStyle(.plain).accessibilityLabel("Clear search") }
-                }.padding(.horizontal,9).padding(.vertical,6).background(.quaternary.opacity(0.5),in:RoundedRectangle(cornerRadius:7))
                 Button { withAnimation(reduceMotion ? nil : .easeInOut(duration:0.18)) { store.showInspector.toggle() } } label: { Label("Toggle inspector",systemImage:"sidebar.right") }.help("Show or hide transfer details (⌥⌘I)")
             }
         }
+        .searchable(text:$store.search,placement:.toolbar,prompt:"Search transfers")
+        .searchFocused($searchFocused)
+        .onSubmit(of:.search) { focusTransfers() }
         .sheet(isPresented:$store.showImport) { ImportView().environmentObject(store) }
         .confirmationDialog("Remove \(store.removalTargets.count == 1 ? "this transfer" : "\(store.removalTargets.count) transfers")?",isPresented:$store.showRemoval,titleVisibility:.visible) {
             Button("Remove from Library") { store.removeConfirmed(deleteFiles:false) }
@@ -54,7 +52,7 @@ struct LibraryView: View {
         } message: {
             Text(store.removalTargets.count == 1 ? "“\(store.removalTargets.first?.name ?? "This transfer")” will be removed. Its files stay on your Mac unless you choose to delete them." : "These \(store.removalTargets.count) transfers will be removed. Their files stay on your Mac unless you choose to delete them.")
         }
-        .focusedSceneValue(\.librarySearch,LibrarySearchAction(focus:{ searchFocused = true }))
+        .focusedSceneValue(\.librarySearch,LibrarySearchAction(focus:{ searchFocused = true },focusTransfers:focusTransfers))
         .onDrop(of:[UTType.fileURL.identifier, UTType.url.identifier, UTType.plainText.identifier],isTargeted:$dropTargeted,perform:handleDrop)
         .overlay { if dropTargeted { RoundedRectangle(cornerRadius:8).strokeBorder(Design.green,lineWidth:2).padding(3).allowsHitTesting(false).accessibilityHidden(true) } }
     }
@@ -88,7 +86,7 @@ struct LibraryView: View {
                         Text("Default download folder").font(.system(size:10)).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button { NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:store.downloadDirectory) } label: { Image(systemName:"arrow.up.right") }.buttonStyle(.plain).foregroundStyle(.secondary).help("Show download folder in Finder")
+                    Button { NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:store.downloadDirectory) } label: { Image(systemName:"arrow.up.right") }.buttonStyle(.plain).foregroundStyle(.secondary).help("Show download folder in Finder").accessibilityLabel("Show download folder in Finder")
                 }
                 HStack(spacing:6) { Circle().fill(store.connected ? Design.green : Design.amber).frame(width:5,height:5); Text(store.switching ? "Switching engine…" : store.connected ? (store.backgroundEnabled ? "Running in background" : "Engine connected") : store.connecting ? "Connecting to engine…" : "Engine disconnected").font(.system(size:10)).foregroundStyle(.secondary) }.accessibilityElement(children:.combine)
             }.padding(18)
@@ -175,6 +173,8 @@ struct LibraryView: View {
             TableColumn("Size",value:\.totalBytes) { Text(SizeText.bytes($0.totalBytes)).font(.system(size:11)).monospacedDigit().foregroundStyle(.secondary) }.width(75).customizationID("size").defaultVisibility(.hidden)
         }
         .tableStyle(.inset(alternatesRowBackgrounds:false))
+        .focused($transfersFocused)
+        .accessibilityLabel("Transfers")
         .contextMenu(forSelectionType:String.self) { ids in
             Button("Resume") { store.selection = ids; store.toggleSelected(paused:false) }.disabled(!canAct(on:ids) || !store.torrents.contains { ids.contains($0.id) && ($0.isPaused || $0.state == "error") })
             Button("Pause") { store.selection = ids; store.toggleSelected(paused:true) }.disabled(!canAct(on:ids) || !store.torrents.contains { ids.contains($0.id) && !$0.isPaused })
@@ -233,7 +233,7 @@ struct LibraryView: View {
                 Divider()
                 HStack {
                     Button { store.toggleSelected(paused:!item.isPaused && item.state != "error") } label: { Label(item.isPaused || item.state == "error" ? "Resume" : "Pause",systemImage:item.isPaused || item.state == "error" ? "play" : "pause").frame(maxWidth:.infinity) }.buttonStyle(.bordered).controlSize(.large).disabled(!store.canActOnSelection)
-                    Button { NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:item.destination) } label: { Image(systemName:"folder") }.controlSize(.large).help("Show in Finder")
+                    Button { NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:item.destination) } label: { Image(systemName:"folder") }.controlSize(.large).help("Show in Finder").accessibilityLabel("Show transfer folder in Finder")
                 }.padding(16)
             } else {
                 Spacer()
@@ -282,6 +282,11 @@ struct LibraryView: View {
 
     private func canAct(on ids: Set<String>) -> Bool {
         store.canChangeTransfers && !ids.isEmpty && store.busyTransfers.isDisjoint(with:ids)
+    }
+
+    private func focusTransfers() {
+        searchFocused = false
+        transfersFocused = true
     }
 
     private var multipleSelectionInspector: some View {

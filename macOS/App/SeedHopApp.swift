@@ -2,8 +2,7 @@ import SwiftUI
 
 @main struct SeedHopApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @StateObject private var store = LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine") || ProcessInfo.processInfo.arguments.contains("--verify-ux"))
-    @FocusedValue(\.librarySearch) private var librarySearch
+    @StateObject private var store = LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine") || ProcessInfo.processInfo.arguments.contains("--verify-ux") || ProcessInfo.processInfo.arguments.contains("--verify-interface"))
     var body: some Scene {
         WindowGroup("SeedHop",id:"library") {
             LibraryView().environmentObject(store).onAppear { delegate.store = store }
@@ -18,9 +17,7 @@ import SwiftUI
                 Button("Open Torrent File…") { store.openFiles() }.keyboardShortcut("o")
                 Button("Paste Magnet Link…") { store.pasteMagnet() }.keyboardShortcut("v",modifiers:[.command,.shift])
             }
-            CommandGroup(after:.textEditing) {
-                Button("Find Transfer…") { librarySearch?.focus() }.keyboardShortcut("f").disabled(librarySearch == nil)
-            }
+            LibraryNavigationCommands()
             CommandMenu("Transfers") {
                 Button("Resume Selected") { store.toggleSelected(paused:false) }.keyboardShortcut("r").disabled(!store.canResumeSelection)
                 Button("Pause Selected") { store.toggleSelected(paused:true) }.keyboardShortcut(".").disabled(!store.canPauseSelection)
@@ -31,6 +28,20 @@ import SwiftUI
             CommandGroup(before:.appTermination) { Button("Quit and Stop Transfers") { delegate.stopEverything = true; NSApp.terminate(nil) }.keyboardShortcut("q",modifiers:[.command,.option]) }
         }
         Settings { SettingsView().environmentObject(store) }
+    }
+}
+
+struct LibraryNavigationCommands: Commands {
+    @FocusedValue(\.librarySearch) private var librarySearch
+    @Environment(\.openWindow) private var openWindow
+    var body: some Commands {
+        CommandGroup(after:.textEditing) {
+            Button("Find Transfer…") { librarySearch?.focus() }.keyboardShortcut("f").disabled(librarySearch == nil)
+            Button("Focus Transfer List") { librarySearch?.focusTransfers() }.keyboardShortcut("l").disabled(librarySearch == nil)
+        }
+        CommandGroup(after:.windowArrangement) {
+            Button("Show Library") { openWindow(id:"library") }.keyboardShortcut("0")
+        }
     }
 }
 
@@ -47,6 +58,10 @@ import SwiftUI
     }
     func applicationDidFinishLaunching(_ notification:Notification) {
         #if SEEDHOP_DEVELOPMENT
+        if ProcessInfo.processInfo.arguments.contains("--verify-interface") {
+            Task { do { try await InterfaceSelfTest.run(); exit(0) } catch { fputs("Interface verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--verify-ux") {
             Task { do { try await UXSelfTest.run(); exit(0) } catch { fputs("UX verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
             return

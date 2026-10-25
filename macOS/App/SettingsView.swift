@@ -37,8 +37,8 @@ struct SettingsView: View {
                         group("Bandwidth") {
                             VStack(alignment:.leading,spacing:16) {
                                 settingText("Leave room for everything else", "Set a transfer limit in KB/s. Use 0 for unlimited.")
-                                HStack { Label("Download",systemImage:"arrow.down"); Spacer(); TextField("Unlimited",text:$down).frame(width:90); Text("KB/s").foregroundStyle(.secondary) }.font(.system(size:12))
-                                HStack { Label("Upload",systemImage:"arrow.up"); Spacer(); TextField("Unlimited",text:$up).frame(width:90); Text("KB/s").foregroundStyle(.secondary) }.font(.system(size:12))
+                                HStack { Label("Download",systemImage:"arrow.down"); Spacer(); TextField("Unlimited",text:$down).frame(width:90).accessibilityLabel("Download limit in kilobytes per second").accessibilityHint("Enter 0 for unlimited"); Text("KB/s").foregroundStyle(.secondary) }.font(.system(size:12))
+                                HStack { Label("Upload",systemImage:"arrow.up"); Spacer(); TextField("Unlimited",text:$up).frame(width:90).accessibilityLabel("Upload limit in kilobytes per second").accessibilityHint("Enter 0 for unlimited"); Text("KB/s").foregroundStyle(.secondary) }.font(.system(size:12))
                                 HStack { if let limitError { Text(limitError).font(.system(size:10)).foregroundStyle(.orange) }; Spacer(); Button(saving ? "Saving…" : "Apply limits",action:saveLimits).disabled(saving) }
                             }.textFieldStyle(.roundedBorder)
                         }

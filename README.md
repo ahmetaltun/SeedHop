@@ -51,8 +51,8 @@ make render
 ```
 
 Design-preview mode uses labeled sample data and cannot issue transfer commands.
-The renderer writes 18 light/dark main-window, compact, empty, import, file-selection,
-settings, multi-selection, empty-filter, and recovery screenshots under `.build/design/`. It renders app-owned views,
+The renderer writes 22 light/dark main-window, compact, empty, import, file-selection,
+settings, multi-selection, empty-filter, recovery, and high-contrast screenshots under `.build/design/`. It renders app-owned views,
 not the user's screen. See [design system](docs/DESIGN.md).
 
 ## Verify
@@ -61,6 +61,7 @@ not the user's screen. See [design system](docs/DESIGN.md).
 make test
 make lint
 make ux-test
+make interface-test
 cargo run -p seedhop-core --bin seedhop-lab -- fixture .build/fixture
 .build/SeedHop.app/Contents/MacOS/SeedHop --verify-engine "$PWD/.build/fixture"
 python3 scripts/interop.py
@@ -84,7 +85,10 @@ See [recovery results and scope](docs/RECOVERY.md).
 
 `make ux-test` runs deterministic Swift presentation regressions with delayed
 engine replies. The XPC smoke test also exercises the actual import presentation
-model against the Rust helper. These checks do not replace a live keyboard,
+model against the Rust helper. `make interface-test` uses fixture data to invoke native menu actions and verify
+search/table first responders and library reopening after the last window closes.
+It does not synthesize system keyboard input or run real transfers.
+These checks do not replace a live keyboard,
 pointer, or VoiceOver walkthrough. See [UX review](docs/UX-REVIEW.md).
 
 ## Structure

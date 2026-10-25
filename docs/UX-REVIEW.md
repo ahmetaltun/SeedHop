@@ -22,15 +22,18 @@ the development self-test, never by a normal app session.
 | An operation fails while the engine is connected | Banner always suggested reconnecting | Operation errors are dismissible; connection recovery offers Retry only when disconnected |
 | Navigate to a filter with no matching state | Search-empty copy did not fit | The filter explains its state and offers Show all transfers |
 
-Keyboard search is implemented through the focused library scene: Command-F
-focuses the search field; Escape clears it and then releases focus. URL drops
+Keyboard search uses a native toolbar search field and the macOS 15 search-focus
+binding through the focused library scene: Command-F focuses search, Command-L
+focuses the native transfer table, and Return submits search to the table.
+Escape uses the native search control’s cancellation behavior. Command-0 opens
+a library window, including after the last window closes. URL drops
 accept magnet URLs as well as torrent file URLs, and highlight the drop target.
 
 ## Automated checks
 
 Executed on the development build: all 13 Swift regression scenarios passed;
 the real foreground-XPC import/restart smoke check passed; the app and both
-hosts built with verified ad-hoc signatures; 18 fixture screens rendered.
+hosts built with verified ad-hoc signatures; 22 fixture screens rendered.
 The revised multi-selection, filter-empty, import, and recovery layouts were
 visually reviewed in light and dark appearances.
 
@@ -50,6 +53,31 @@ recovery fixtures alongside the original library, compact, empty, import,
 file-selection, and settings screens. These are design fixtures, not claims
 about live transfer activity.
 
+## Native navigation and accessibility follow-up
+
+The app-owned native menu test reproduced a search-focus failure with the custom
+toolbar text field. Search now uses SwiftUI `searchable` and `searchFocused`.
+Focused commands live in a dedicated `Commands` container. The test runs native
+menu validation callbacks before invoking actions, then verifies actual AppKit
+first responders: an `NSSearchField` editor after Find and an `NSTableView` after
+Focus Transfer List. It also closes the fixture window and verifies Show Library
+reopens it. All three checks pass with `make interface-test`. These checks invoke
+menu actions within the test app; they do not deliver system key events.
+
+Finder icon buttons have explicit accessibility names; bandwidth fields identify
+direction and units. Status and progress expose one accessible element each.
+Separators adapt to high-contrast AppKit appearances, and rendering now includes
+expanded and compact high-contrast fixtures in light and dark mode (22 total).
+
+An attempted app-owned accessibility-tree inspection returned only wrapper
+elements for SwiftUI content in this environment, so it was not retained as a
+passing test. Source labels and visual fixtures do not certify VoiceOver.
+The 13 existing presentation regressions pass again. Local logs are retained in
+`.build/interface-test.log`, `.build/ux-test.log`, and `.build/ux-render.log`.
+The navigation target also renders the app-owned window, including its toolbar,
+to `.build/interface-navigation.png`; that render was visually reviewed.
+A portable summary is in [`results/ux-navigation-2026-10-25.json`](results/ux-navigation-2026-10-25.json).
+
 ## Live acceptance walkthrough still required
 
 1. Launch normally, add a magnet and a torrent file, and verify that cancelling
@@ -58,14 +86,15 @@ about live transfer activity.
    pause/resume, inspection, and removal using pointer and keyboard separately.
 3. Select mixed paused/running transfers. Confirm group action labels, status
    feedback, filter changes, and correct removal targets.
-4. Run Command-F, type a search, clear with Escape, navigate rows, open the
-   inspector, and reach file checkboxes without a pointer.
+4. Run Command-F, type a search, clear with Escape, use Return and Command-L,
+   navigate rows, open the inspector, and reach file checkboxes without a pointer.
 5. Use VoiceOver to check table row descriptions, search, progress, selection,
    notices, modal focus, cancellation, and error recovery.
 6. Review light/dark appearances, Increase Contrast, Reduce Motion, compact and
    expanded layouts, and large-library scrolling under actual live updates.
-7. Close and reopen the last window while a transfer runs; ensure the engine
-   continues and the library reconnects without losing selection or scroll.
+7. Close the last window while a transfer runs, then reopen with Command-0.
+   Ensure the engine continues and the library reconnects without losing
+   selection or scroll.
 
 The environment exposes no native UI automation surface. App-owned rendering
 and model assertions cannot substitute for these input and accessibility checks.

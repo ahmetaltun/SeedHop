@@ -46,13 +46,21 @@ enum PreviewFixtures {
             try capture(ImportView().environmentObject(store),size:NSSize(width:600,height:432),appearance:appearance,to:output.appendingPathComponent("add-\(name).png"))
             try capture(ImportView(preview:PreviewFixtures.importPreview).environmentObject(store),size:NSSize(width:600,height:680),appearance:appearance,to:output.appendingPathComponent("files-\(name).png"))
             try capture(SettingsView().environmentObject(store),size:NSSize(width:570,height:560),appearance:appearance,to:output.appendingPathComponent("settings-\(name).png"))
+            let contrastStore = LibraryStore(designPreview:true)
+            let contrastAppearance: NSAppearance.Name = name == "dark" ? .accessibilityHighContrastDarkAqua : .accessibilityHighContrastAqua
+            try capture(LibraryView().environmentObject(contrastStore),size:NSSize(width:1240,height:780),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-library-\(name).png"))
+            contrastStore.showInspector = false
+            try capture(LibraryView().environmentObject(contrastStore),size:NSSize(width:820,height:620),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-compact-\(name).png"))
         }
-        print("Rendered 18 fixture screens to \(output.path); library fixtures are explicitly labeled sample data")
+        print("Rendered 22 fixture screens to \(output.path); library fixtures are explicitly labeled sample data")
     }
     private static func capture<V:View>(_ view:V,size:NSSize,appearance:NSAppearance.Name,to url:URL) throws {
         let window = NSWindow(contentRect:NSRect(origin:.zero,size:size),styleMask:[.borderless],backing:.buffered,defer:false)
         window.appearance = NSAppearance(named:appearance)
-        let host = NSHostingView(rootView:view.preferredColorScheme(appearance == .darkAqua ? .dark : .light))
+        let dark = appearance == .darkAqua || appearance == .accessibilityHighContrastDarkAqua
+        let contrast = appearance == .accessibilityHighContrastAqua || appearance == .accessibilityHighContrastDarkAqua
+        let host = NSHostingView(rootView:view.preferredColorScheme(contrast ? nil : dark ? .dark : .light))
+        host.appearance = NSAppearance(named:appearance)
         host.frame = NSRect(origin:.zero,size:size); window.contentView = host
         host.layoutSubtreeIfNeeded()
         // SwiftUI task/layout updates are allowed to settle without capturing the user's screen.

@@ -59,18 +59,25 @@ Successful imports clear the previous search/filter and select the new transfer.
 Native buttons, fields, table selection, checkboxes, segmented controls, and
 switches provide keyboard and accessibility behavior. Status badges include
 text; custom progress includes an accessibility value. Inspector transitions
-respect Reduce Motion. Every icon-only control has a label or help text.
+respect Reduce Motion. Finder buttons have explicit accessibility labels.
+Download and upload limit fields
+include their direction and units in their accessible names. Custom progress and
+status badges expose a single accessible element. Borders use the semantic
+separator color in high-contrast appearances.
 
 Shortcuts: Command-N add, Command-O open, Shift-Command-V paste magnet,
-Command-F find transfer, Command-R resume, Command-period pause, Command-delete remove,
+Command-F find transfer, Command-L focus transfer list, Command-0 show library,
+Command-R resume, Command-period pause, Command-delete remove,
 Option-Command-I inspector, Option-Command-Q quit and stop transfers.
-Escape clears search, then releases its focus; Escape cancels metadata lookup
-while an import is resolving.
+Search uses the native toolbar search control and its macOS 15 focus binding.
+Return submits search and moves focus to the transfer list; Escape uses native
+search cancellation. Escape cancels metadata lookup while an import is resolving.
 
 ## Visual QA
 
-`make render` produces 18 light/dark fixture screens, including multi-selection,
-empty-filter, and connection-recovery states. Sample transfers are
+`make render` produces 22 light/dark fixture screens, including multi-selection,
+empty-filter, connection-recovery states, and four high-contrast library layouts.
+Sample transfers are
 available only through explicit design-preview mode. These renders verify
 layout and typography; they do not prove VoiceOver navigation, live keyboard
 interaction, or full system contrast behavior. Those remain manual acceptance
