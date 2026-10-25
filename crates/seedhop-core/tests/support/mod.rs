@@ -3,7 +3,7 @@ use std::{
     path::Path,
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -43,12 +43,18 @@ pub async fn wait_for(
 
 /// A real engine seed behind a switchable TCP relay and HTTP tracker.
 /// Dropping this guard also aborts accepted connections, including on test failure.
+#[allow(dead_code)]
 pub struct Swarm {
     pub seed: Arc<Engine>,
     pub metadata: Vec<u8>,
+    pub announce: String,
     pub content: Vec<u8>,
     pub online: watch::Sender<bool>,
     pub offline_tracker_requests: Arc<AtomicUsize>,
+    pub corrupt: Arc<AtomicBool>,
+    pub corrupt_blocks: Arc<AtomicUsize>,
+    pub corrupt_proofs: Arc<AtomicBool>,
+    pub corrupted_proofs: Arc<AtomicUsize>,
     tasks: Vec<JoinHandle<()>>,
     _state: tempfile::TempDir,
     _files: tempfile::TempDir,
@@ -56,6 +62,13 @@ pub struct Swarm {
 
 impl Swarm {
     pub async fn new(size: usize) -> Self {
+        Self::with_metadata(size, |content| {
+            adapter::create_fixture("payload.bin", content)
+        })
+        .await
+    }
+
+    pub async fn with_metadata(size: usize, make_metadata: impl FnOnce(&[u8]) -> Vec<u8>) -> Self {
         let state = tempfile::tempdir().unwrap();
         let files = tempfile::tempdir().unwrap();
         let content: Vec<u8> = (0..size).map(|i| (i % 251) as u8).collect();
@@ -69,9 +82,17 @@ impl Swarm {
         let tracker = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let announce = format!("http://{}/announce", tracker.local_addr().unwrap());
         let mut metadata = format!("d8:announce{}:{}", announce.len(), announce).into_bytes();
-        metadata.extend_from_slice(&adapter::create_fixture("payload.bin", &content)[1..]);
+        metadata.extend_from_slice(&make_metadata(&content)[1..]);
         let (online, receiver) = watch::channel(true);
         let relay_online = receiver.clone();
+        let corrupt = Arc::new(AtomicBool::new(false));
+        let corrupt_blocks = Arc::new(AtomicUsize::new(0));
+        let corrupt_proofs = Arc::new(AtomicBool::new(false));
+        let corrupted_proofs = Arc::new(AtomicUsize::new(0));
+        let relay_proofs = corrupt_proofs.clone();
+        let relay_proof_count = corrupted_proofs.clone();
+        let corrupt_relay = corrupt.clone();
+        let corrupt_count = corrupt_blocks.clone();
         let relay_task = tokio::spawn(async move {
             let mut connections = tokio::task::JoinSet::new();
             loop {
@@ -80,12 +101,40 @@ impl Swarm {
                         let (mut client, _) = accepted.unwrap();
                         let mut online = relay_online.clone();
                         if !*online.borrow_and_update() { continue; }
+                        let corrupt = corrupt_relay.clone();
+                        let count = corrupt_count.clone();
+                        let proofs = relay_proofs.clone();
+                        let proof_count = relay_proof_count.clone();
                         connections.spawn(async move {
                             tokio::select! {
                                 _ = online.changed() => {},
                                 _ = async {
                                     if let Ok(mut peer) = TcpStream::connect(("127.0.0.1", seed_port)).await {
-                                        let _ = tokio::io::copy_bidirectional(&mut client, &mut peer).await;
+                                        let (mut client_rx, mut client_tx) = client.split();
+                                        let (mut peer_rx, mut peer_tx) = peer.split();
+                                        let downstream = async {
+                                            let mut handshake = [0; 68];
+                                            peer_rx.read_exact(&mut handshake).await?;
+                                            client_tx.write_all(&handshake).await?;
+                                            loop {
+                                                let length = peer_rx.read_u32().await?;
+                                                if length > 1024 * 1024 { return Err::<(), _>(std::io::Error::other("oversized relay frame")); }
+                                                let mut frame = vec![0; length as usize];
+                                                peer_rx.read_exact(&mut frame).await?;
+                                                let damaged = frame.first() == Some(&7) && frame.len() > 9 && corrupt.load(Ordering::SeqCst);
+                                                let damaged_proof = frame.first() == Some(&22) && frame.len() > 49 && proofs.load(Ordering::SeqCst);
+                                                if damaged { frame[9] ^= 1; }
+                                                if damaged_proof { frame[49] ^= 1; }
+                                                client_tx.write_u32(length).await?;
+                                                client_tx.write_all(&frame).await?;
+                                                if damaged { count.fetch_add(1, Ordering::SeqCst); }
+                                                if damaged_proof { proof_count.fetch_add(1, Ordering::SeqCst); }
+                                            }
+                                        };
+                                        tokio::select! {
+                                            _ = tokio::io::copy(&mut client_rx, &mut peer_tx) => {},
+                                            _ = downstream => {},
+                                        }
                                     }
                                 } => {}
                             }
@@ -146,9 +195,14 @@ impl Swarm {
         Self {
             seed,
             metadata,
+            announce,
             content,
             online,
             offline_tracker_requests,
+            corrupt,
+            corrupt_blocks,
+            corrupt_proofs,
+            corrupted_proofs,
             tasks: vec![relay_task, tracker_task],
             _state: state,
             _files: files,

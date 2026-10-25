@@ -42,7 +42,7 @@ Symlinks and invalid UTF-8 names are rejected on this platform.
 
 ## Executed validation — October 25, 2026
 
-All 32 active Rust tests pass, including 19 dedicated v2 tests. The separately
+All 35 active Rust tests pass, including 22 dedicated v2 tests. The separately
 invoked disk-image fault test remains ignored in the ordinary Rust suite.
 Coverage includes short blocks, per-file boundaries, empty-only torrents,
 selection, full identity persistence, duplicate detection, corruption detected
@@ -81,10 +81,11 @@ cargo run -p seedhop-core --bin seedhop-lab -- verify-v2-piece FILE.torrent INDE
 
 ## Scope
 
-These are controlled TCP/HTTP-tracker interoperability results, not a claim that
-every tracker, DHT network, peer extension or public swarm has been certified.
-The existing DHT and UDP-tracker paths use the truncated v2 identity but have not
-received independent live-v2-swarm validation. Encrypted peers, experimental uTP,
-priorities, relocation and renaming remain separate work. Hybrid v1-only peers
-cannot exchange payload with the selected v2 swarm. UI accessibility and
-certificate-backed background lifecycle gates in `VALIDATION.md` remain open.
+The additional controlled discovery and hostile-peer results are documented in
+[V2 hardening](V2-HARDENING.md). UDP trackers, local DHT discovery, IPv6 transfers
+in both directions, and private torrents have dedicated fixtures. These do not
+certify a public DHT swarm, every tracker, or all peer extensions. Encrypted peers,
+experimental uTP, priorities, relocation and renaming remain separate work.
+Hybrid v1-only peers cannot exchange payload with the selected v2 swarm.
+UI accessibility, physical sleep/drive recovery, and certificate-backed
+background lifecycle gates in `VALIDATION.md` remain open.

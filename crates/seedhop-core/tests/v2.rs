@@ -726,3 +726,229 @@ async fn mismatched_saved_full_identity_is_rejected_without_overwriting_state() 
     ));
     assert_eq!(std::fs::read(path).unwrap(), bytes);
 }
+
+#[allow(dead_code)]
+mod support;
+
+async fn recovery_swarm(hybrid: bool) -> support::Swarm {
+    support::Swarm::with_metadata(4 * 1024 * 1024, |data| {
+        let mut meta = fixture(&[("payload.bin", data.to_vec())], 32768);
+        if hybrid {
+            let info = get(&mut meta, b"info");
+            put(info, b"name", bytes(b"payload.bin"));
+            put(info, b"length", B::Number(data.len() as u64));
+            put(
+                info,
+                b"pieces",
+                bytes(
+                    data.chunks(32768)
+                        .flat_map(sha1::Sha1::digest)
+                        .collect::<Vec<_>>(),
+                ),
+            );
+        }
+        encode(&meta)
+    })
+    .await
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn v2_and_hybrid_interruption_and_corrupt_wire_data_recover() {
+    use std::{sync::atomic::Ordering, time::Duration};
+    for hybrid in [false, true] {
+        let swarm = recovery_swarm(hybrid).await;
+        let state = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let engine = seedhop_core::Engine::open(engine_config(state.path(), downloads.path()))
+            .await
+            .unwrap();
+        engine.set_limits(512 * 1024, 0).await.unwrap();
+        swarm.corrupt.store(true, Ordering::SeqCst);
+        engine
+            .add(
+                swarm.metadata.clone(),
+                downloads.path().to_string_lossy().into(),
+                vec![0],
+                false,
+                false,
+            )
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(15), async {
+            // Two complete pieces must pass through the corrupting relay.
+            while swarm.corrupt_blocks.load(Ordering::SeqCst) < 4 {
+                tokio::time::sleep(Duration::from_millis(25)).await;
+            }
+        })
+        .await
+        .unwrap();
+        swarm.online.send(false).unwrap();
+        let stalled = support::wait_for(&engine, |t| t.peers == 0).await;
+        assert_eq!(
+            stalled.downloaded_bytes, 0,
+            "corrupt data must never advance verified progress"
+        );
+        assert_ne!(stalled.state, "seeding");
+        tokio::time::timeout(Duration::from_secs(15), async {
+            while swarm.offline_tracker_requests.load(Ordering::SeqCst) == 0 {
+                tokio::time::sleep(Duration::from_millis(25)).await;
+            }
+        })
+        .await
+        .unwrap();
+        swarm.corrupt.store(false, Ordering::SeqCst);
+        swarm.online.send(true).unwrap();
+        let partial = support::wait_for(&engine, |t| t.downloaded_bytes >= 65536).await;
+        assert!(partial.downloaded_bytes < partial.total_bytes);
+        swarm.online.send(false).unwrap();
+        support::wait_for(&engine, |t| t.peers == 0).await;
+        // Shutdown and restart from a genuinely partial, SHA-256 verified transfer.
+        engine.shutdown().await.unwrap();
+        drop(engine);
+        let engine = seedhop_core::Engine::open(engine_config(state.path(), downloads.path()))
+            .await
+            .unwrap();
+        let restored = support::wait_for(&engine, |t| t.state != "checking").await;
+        assert!(restored.downloaded_bytes > 0 && restored.downloaded_bytes < restored.total_bytes);
+        swarm.online.send(true).unwrap();
+        support::wait_for(&engine, |t| t.state == "seeding").await;
+        assert_eq!(
+            std::fs::read(downloads.path().join("payload.bin")).unwrap(),
+            swarm.content
+        );
+        engine.shutdown().await.unwrap();
+        swarm.seed.shutdown().await.unwrap();
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn v2_and_hybrid_missing_destination_preserve_state_and_recover() {
+    for hybrid in [false, true] {
+        let swarm = recovery_swarm(hybrid).await;
+        let state = tempfile::tempdir().unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let drive = root.path().join("drive");
+        let disconnected = root.path().join("disconnected");
+        std::fs::create_dir(&drive).unwrap();
+        let cfg = engine_config(state.path(), &drive);
+        let engine = seedhop_core::Engine::open(cfg.clone()).await.unwrap();
+        let id = engine
+            .add(
+                swarm.metadata.clone(),
+                cfg.download_directory.clone(),
+                vec![0],
+                true,
+                false,
+            )
+            .await
+            .unwrap();
+        support::wait_for(&engine, |t| t.state == "paused").await;
+        let session_path = state.path().join("session/session.json");
+        let saved = std::fs::read(&session_path).unwrap();
+        std::fs::rename(&drive, &disconnected).unwrap();
+        assert!(engine.set_paused(id.clone(), false).await.is_err());
+        assert_eq!(std::fs::read(&session_path).unwrap(), saved);
+        assert!(!drive.exists());
+        engine.shutdown().await.unwrap();
+        drop(engine);
+        let mut cfg = cfg;
+        cfg.download_directory = root.path().to_string_lossy().into();
+        assert!(matches!(
+            seedhop_core::Engine::open(cfg.clone()).await,
+            Err(CoreError::Storage(_))
+        ));
+        assert_eq!(std::fs::read(&session_path).unwrap(), saved);
+        assert!(!drive.exists());
+        std::fs::rename(&disconnected, &drive).unwrap();
+        let engine = seedhop_core::Engine::open(cfg).await.unwrap();
+        support::wait_for(&engine, |t| t.state == "paused").await;
+        engine.set_paused(id, false).await.unwrap();
+        support::wait_for(&engine, |t| t.state == "seeding").await;
+        assert_eq!(
+            std::fs::read(drive.join("payload.bin")).unwrap(),
+            swarm.content
+        );
+        engine.shutdown().await.unwrap();
+        swarm.seed.shutdown().await.unwrap();
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn malicious_magnet_hash_proof_never_creates_membership_and_retry_recovers() {
+    use std::{sync::atomic::Ordering, time::Duration};
+    for hybrid in [false, true] {
+        let swarm = recovery_swarm(hybrid).await;
+        let state = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let engine = seedhop_core::Engine::open(engine_config(state.path(), downloads.path()))
+            .await
+            .unwrap();
+        let meta = Metainfo::parse(&swarm.metadata).unwrap().unwrap();
+        let identity: String = meta
+            .info_hash()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        let tracker = swarm.announce.clone();
+        let mut magnet = url::Url::parse("magnet:?").unwrap();
+        magnet
+            .query_pairs_mut()
+            .append_pair("xt", &format!("urn:btmh:1220{identity}"))
+            .append_pair("tr", &tracker);
+        swarm.corrupt_proofs.store(true, Ordering::SeqCst);
+        let task = {
+            let engine = engine.clone();
+            let magnet = magnet.to_string();
+            tokio::spawn(async move {
+                engine
+                    .inspect("hostile-proof".into(), Some(magnet), vec![])
+                    .await
+            })
+        };
+        tokio::time::timeout(Duration::from_secs(15), async {
+            while swarm.corrupted_proofs.load(Ordering::SeqCst) == 0 {
+                tokio::time::sleep(Duration::from_millis(25)).await;
+            }
+        })
+        .await
+        .unwrap();
+        // Give the receiver time to reject the authenticated-root mismatch.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        engine.cancel("hostile-proof");
+        assert!(
+            tokio::time::timeout(Duration::from_secs(2), task)
+                .await
+                .unwrap()
+                .unwrap()
+                .is_err()
+        );
+        assert!(engine.snapshot().unwrap().torrents.is_empty());
+        assert_eq!(std::fs::read_dir(downloads.path()).unwrap().count(), 0);
+        swarm.corrupt_proofs.store(false, Ordering::SeqCst);
+        let preview = tokio::time::timeout(
+            Duration::from_secs(15),
+            engine.inspect("retry-proof".into(), Some(magnet.to_string()), vec![]),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(preview.id, identity);
+        engine
+            .add(
+                preview.torrent_bytes,
+                downloads.path().to_string_lossy().into(),
+                vec![0],
+                false,
+                false,
+            )
+            .await
+            .unwrap();
+        support::wait_for(&engine, |t| t.state == "seeding").await;
+        assert_eq!(
+            std::fs::read(downloads.path().join("payload.bin")).unwrap(),
+            swarm.content
+        );
+        engine.shutdown().await.unwrap();
+        swarm.seed.shutdown().await.unwrap();
+    }
+}

@@ -1,0 +1,241 @@
+{
+  "date": "2026-10-25",
+  "scope": "Controlled local v2/hybrid discovery and hostile peers; no public swarm or physical sleep/unplug certification",
+  "cases": [
+    {
+      "mode": "udp",
+      "format": "v2",
+      "result": "PASS",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-udp-ye9esaun"
+    },
+    {
+      "mode": "udp",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-udp-uoxelhce"
+    },
+    {
+      "mode": "ipv6",
+      "format": "v2",
+      "result": "PASS",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-ipv6-v0fkfeiy"
+    },
+    {
+      "mode": "ipv6",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-ipv6-nwdzvdj1"
+    },
+    {
+      "mode": "ipv6-upload",
+      "format": "v2",
+      "result": "PASS",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-ipv6-upload-k2c2xfko"
+    },
+    {
+      "mode": "ipv6-upload",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-ipv6-upload-8p53rr_j"
+    },
+    {
+      "mode": "private",
+      "format": "v2",
+      "result": "PASS",
+      "infoHashV2": "ae8e7007593b335a05ef474a804f5507c9333a895d9e50c034d5c9e143cb2956",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-private-s57qnlol"
+    },
+    {
+      "mode": "private",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-private-4k7y09s7"
+    },
+    {
+      "mode": "dht",
+      "format": "v2",
+      "result": "PASS",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-dht-44eqr2q3"
+    },
+    {
+      "mode": "dht",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-dht-c7zhq164"
+    },
+    {
+      "mode": "private-dht",
+      "format": "v2",
+      "result": "PASS",
+      "infoHashV2": "ae8e7007593b335a05ef474a804f5507c9333a895d9e50c034d5c9e143cb2956",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-private-dht-31u24gc9"
+    },
+    {
+      "mode": "private-dht",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-private-dht-i3js_ogx"
+    },
+    {
+      "mode": "duplicate-metadata",
+      "format": "v2",
+      "result": "PASS",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-duplicate-metadata-_lp6y33g"
+    },
+    {
+      "mode": "duplicate-metadata",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-duplicate-metadata-gai51cpx"
+    }
+  ],
+  "existingV2Interop": [
+    {
+      "format": "v2",
+      "direction": "download",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "v2",
+      "direction": "upload",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "v2",
+      "direction": "magnet",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "v2",
+      "direction": "selective",
+      "bytes": 10,
+      "result": "PASS",
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "hybrid",
+      "direction": "download",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "hybrid",
+      "direction": "upload",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "hybrid",
+      "direction": "selective",
+      "bytes": 10,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-v1",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0"
+    }
+  ],
+  "rust": {
+    "activePassed": 35,
+    "v2Passed": 22,
+    "ignored": 1,
+    "workspaceLog": ".build/v2-hardening-rust.log",
+    "wireLog": ".build/v2-hardening-wire.log"
+  },
+  "checks": {
+    "format": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "vendorPatchRoundtrip": "PASS",
+    "visibleSigningIdentities": 0
+  },
+  "notes": [
+    "One earlier concurrent v1 local-swarm run timed out; isolated rerun and final workspace run passed.",
+    "DHT uses a local independent KRPC fixture and vendored Session path; production public bootstrap is not certified.",
+    "Private DHT observation is four seconds with bootstrap confirmed; PEX/LSD suppression is source-reviewed."
+  ],
+  "remainingReleaseGates": [
+    "physical sleep/wake",
+    "physical drive removal during I/O",
+    "network interface loss",
+    "certificate-backed background handoffs",
+    "logout/login restoration",
+    "manual interaction and accessibility"
+  ]
+}

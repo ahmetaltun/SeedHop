@@ -84,6 +84,11 @@ It verifies transfer recovery, exact downloaded bytes, and durable settings retr
 then detaches and deletes the image. Logs remain under `.build/faults-*`.
 See [recovery results and scope](docs/RECOVERY.md).
 
+`make v2-hardening` runs controlled v2/hybrid UDP-tracker, DHT, IPv6, private
+discovery, and hostile-metadata cases against isolated qBittorrent profiles.
+Rust tests additionally cover corrupt wire blocks/proofs and partial restart.
+See [v2 hardening and remaining gates](docs/V2-HARDENING.md).
+
 `make ux-test` runs deterministic Swift presentation regressions with delayed
 engine replies. The XPC smoke test also exercises the actual import presentation
 model against the Rust helper. `make interface-test` uses fixture data to invoke native menu actions and verify

@@ -2,8 +2,9 @@
 
 Baseline: `a499d2f243d124e144aef137afe7cb304a6e3f36`.
 `vendor/SOURCE.json` records archive provenance. Local deltas are recorded in
-`vendor/patches/0001-seedhop-reliability.patch` and
-`vendor/patches/0002-seedhop-bep52.patch`; upstream's license is retained.
+`vendor/patches/0001-seedhop-reliability.patch`,
+`vendor/patches/0002-seedhop-bep52.patch`, and
+`vendor/patches/0003-seedhop-metadata-guard.patch`; upstream's license is retained.
 
 ## Reliability changes
 
@@ -59,9 +60,10 @@ the engine does not write into rqbit's separate application directories.
 
 ## Remaining audit work
 
-Private-swarm discovery suppression, SOCKS/DNS coverage, interface loss,
-IPv6-only operation, broader disk/filesystem faults, and hybrid interoperability
-require dedicated fixtures before being advertised. Static review is not an
+SOCKS/DNS coverage, interface loss, routed IPv6-only operation, and broader
+disk/filesystem faults require dedicated fixtures before being advertised.
+Controlled private-swarm suppression, loopback IPv6, UDP trackers, DHT discovery,
+and hybrid transfers are covered in `V2-HARDENING.md`. Static review is not an
 interoperability result. See `VALIDATION.md` for executed checks.
 
 ## Independent peer follow-up
@@ -92,3 +94,18 @@ layers, and persisted full hashes. Nine qBittorrent cases pass for pure v2 and
 hybrids through the v2 swarm, including uploads, downloads, selection and both
 magnet identities. Hybrids select v2 rather than simultaneous dual-swarm operation.
 See `BITTORRENT-V2.md` and `results/v2-wire-2026-10-25.json`.
+
+## V2 hardening review
+
+The app listener now uses the engine's dual-stack binding instead of explicitly
+restricting incoming peers to IPv4. Patch 0003 rejects repeated metadata data
+after the info dictionary has completed; the former unwrap could panic a peer
+task while v2 layer proofs were pending. The independent replay fixture requires
+the rejection diagnostic, no panic, and exact-byte completion from a healthy
+peer. The original BEP 52 patch remains intact and reviewable.
+
+Review covered full and truncated identities at discovery boundaries, private
+DHT/LSD/PEX suppression in source, correlated and root-authenticated magnet
+proofs, SHA-256 payload checks, and persisted identity/selection checks. This is
+a focused source review, not a complete security audit. Executed coverage and
+remaining release gates are recorded in `V2-HARDENING.md`.

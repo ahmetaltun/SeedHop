@@ -88,8 +88,9 @@ def two_ports():
 
 
 class Tracker:
-    def __init__(self, work):
+    def __init__(self, work, ipv6=False):
         self.peer = 0
+        self.ipv6 = ipv6
         self.info_hash = ""
         self.accepted_hashes = set()
         self.lock = threading.Lock()
@@ -104,8 +105,10 @@ class Tracker:
                 advertised = int(values.get(b"port", b"0"))
                 valid = query.path == "/announce" and (values.get(b"info_hash", b"").hex() == owner.info_hash or values.get(b"info_hash", b"").hex() in owner.accepted_hashes)
                 endpoint = owner.peer if valid and advertised != owner.peer else 0
-                peers = socket.inet_aton("127.0.0.1") + struct.pack("!H", endpoint) if endpoint else b""
-                body = bencode({b"interval": 1, b"peers": peers}) if valid else bencode({b"failure reason": b"Unknown fixture"})
+                peers = (socket.inet_pton(socket.AF_INET6, "::1") if ipv6 else socket.inet_aton("127.0.0.1")) + struct.pack("!H", endpoint) if endpoint else b""
+                reply = {b"interval": 1, b"peers": b""}
+                reply[b"peers6" if ipv6 else b"peers"] = peers
+                body = bencode(reply) if valid else bencode({b"failure reason": b"Unknown fixture"})
                 with owner.lock, (work / "tracker.jsonl").open("a") as log:
                     log.write(json.dumps({"time": time.monotonic(), "port": advertised,
                                           "validInfoHash": valid, "returnedPort": endpoint,
@@ -119,10 +122,11 @@ class Tracker:
             def log_message(self, *_):
                 pass
 
-        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        server_type = type("IPv6Tracker", (http.server.ThreadingHTTPServer,), {"address_family": socket.AF_INET6}) if ipv6 else http.server.ThreadingHTTPServer
+        self.server = server_type(("::1" if ipv6 else "127.0.0.1", 0), Handler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
-        self.url = f"http://127.0.0.1:{self.server.server_port}/announce"
+        self.url = f"http://{'[::1]' if ipv6 else '127.0.0.1'}:{self.server.server_port}/announce"
 
     def close(self):
         self.server.shutdown()
@@ -131,7 +135,7 @@ class Tracker:
 
 
 class QBittorrent:
-    def __init__(self, work, executable):
+    def __init__(self, work, executable, ipv6=False):
         self.work = work
         self.web, self.peer = two_ports()
         self.process = None
@@ -164,7 +168,7 @@ Session\\PeXEnabled=false
 Session\\Port={self.peer}
 Session\\Interface=lo0
 Session\\InterfaceName=lo0
-Session\\InterfaceAddress=127.0.0.1
+Session\\InterfaceAddress={"::1" if ipv6 else "127.0.0.1"}
 """)
         self.process = subprocess.Popen([str(executable), "--confirm-legal-notice", "--no-splash",
                                          f"--profile={profile}", f"--webui-port={self.web}",

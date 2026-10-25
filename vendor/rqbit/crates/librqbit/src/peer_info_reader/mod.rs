@@ -277,11 +277,14 @@ impl PeerConnectionHandler for Handler {
             anyhow::bail!("peer rejected required Merkle hashes");
         }
         if let Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Data(utdata))) = msg {
-            let piece_ready = self.locked.write().as_mut().unwrap().record_piece(
-                &utdata,
-                &self.info_hash,
-                self.v2_hash,
-            )?;
+            let piece_ready = self
+                .locked
+                .write()
+                .as_mut()
+                .ok_or_else(|| {
+                    anyhow::anyhow!("metadata data received after info dictionary completed")
+                })?
+                .record_piece(&utdata, &self.info_hash, self.v2_hash)?;
             if piece_ready {
                 let buf = Bytes::from(self.locked.write().take().unwrap().buffer);
                 let info = from_bytes::<TorrentMetaV1Info<ByteBuf>>(&buf)

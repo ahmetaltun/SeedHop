@@ -1,4 +1,4 @@
-.PHONY: build test lint render interop smoke ux-test interface-test faults v2-test
+.PHONY: build test lint render interop smoke ux-test interface-test faults v2-test v2-hardening
 build:
 	python3 scripts/build.py
 test:
@@ -22,3 +22,6 @@ interface-test: build
 
 v2-test:
 	python3 scripts/v2_interop.py
+
+v2-hardening:
+	python3 scripts/v2_hardening.py

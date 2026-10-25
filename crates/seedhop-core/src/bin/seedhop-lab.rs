@@ -33,6 +33,61 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("{}", serde_json::to_string_pretty(&meta)?);
             }
         }
+        // Controlled DHT bootstrap for the discovery harness. Uses the same vendored
+        // Session discovery path as Engine without changing the app's public config.
+        Some("probe-dht") => {
+            let torrent = std::fs::read(args.get(2).ok_or("missing torrent")?)?;
+            let downloads = PathBuf::from(args.get(3).ok_or("missing downloads")?);
+            let bootstrap = args.get(4).ok_or("missing local bootstrap")?.clone();
+            let private = args.get(5).is_some_and(|s| s == "private");
+            let session = librqbit::Session::new_with_opts(
+                downloads.clone(),
+                librqbit::SessionOptions {
+                    dht: Some(librqbit::DhtSessionConfig {
+                        bootstrap_addrs: Some(vec![bootstrap]),
+                        persistence: None,
+                        port: Some(0),
+                    }),
+                    disable_local_service_discovery: true,
+                    fastresume: false,
+                    listen: Some(Default::default()),
+                    ..Default::default()
+                },
+            )
+            .await?;
+            let handle = session
+                .add_torrent(
+                    librqbit::AddTorrent::from_bytes(torrent),
+                    Some(librqbit::AddTorrentOptions {
+                        output_folder: Some(downloads.to_string_lossy().into()),
+                        ..Default::default()
+                    }),
+                )
+                .await?
+                .into_handle()
+                .ok_or("missing handle")?;
+            let result: Result<(), Box<dyn std::error::Error>> = if private {
+                tokio::time::sleep(Duration::from_secs(4)).await;
+                let stats = handle.stats();
+                if stats.error.is_some() || serde_json::to_value(&stats)?["state"] != "live" {
+                    Err(format!("private torrent did not start: {stats:?}").into())
+                } else if stats.progress_bytes != 0 {
+                    Err("private torrent unexpectedly downloaded without a tracker".into())
+                } else {
+                    Ok(())
+                }
+            } else {
+                match tokio::time::timeout(Duration::from_secs(30), handle.wait_until_completed())
+                    .await
+                {
+                    Ok(Ok(())) => Ok(()),
+                    other => Err(format!("DHT transfer failed: {other:?}").into()),
+                }
+            };
+            println!("{}", serde_json::to_string(&handle.stats())?);
+            session.stop_and_wait().await?;
+            result?;
+        }
         Some("seed") => {
             use std::io::Write;
             let torrent = std::fs::read(args.get(2).ok_or("missing torrent")?)?;
@@ -156,7 +211,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => {
             return Err(
-                "Usage: seedhop-lab inspect-v2 TORRENT | verify-v2-piece TORRENT INDEX FILE | fixture DIRECTORY | seed TORRENT STATE FILES | download TORRENT STATE DOWNLOADS [INDICES] | download-magnet MAGNET STATE DOWNLOADS [INDICES] | hold STATE DOWNLOADS".into(),
+                "Usage: seedhop-lab probe-dht TORRENT DOWNLOADS BOOTSTRAP [private] | inspect-v2 TORRENT | verify-v2-piece TORRENT INDEX FILE | fixture DIRECTORY | seed TORRENT STATE FILES | download TORRENT STATE DOWNLOADS [INDICES] | download-magnet MAGNET STATE DOWNLOADS [INDICES] | hold STATE DOWNLOADS".into(),
             );
         }
     }

@@ -26,7 +26,7 @@ def tree_root(hashes):
     return hashes[0]
 
 
-def fixture(work, hybrid, announce=None):
+def fixture(work, hybrid, announce=None, private=False):
     piece_length = 32768
     # Three real pieces, a short block, an empty file and a shared pieces root.
     files = [("a.bin", bytes(i % 251 for i in range(70001))),
@@ -57,6 +57,8 @@ def fixture(work, hybrid, announce=None):
             content.extend(bytes(padding))
     info = {b"file tree": tree, b"meta version": 2, b"name": b"payload",
             b"piece length": piece_length}
+    if private:
+        info[b"private"] = 1
     if hybrid:
         info.update({b"files": v1_files, b"pieces": b"".join(
             hashlib.sha1(content[i:i + piece_length]).digest()

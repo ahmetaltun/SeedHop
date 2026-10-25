@@ -103,7 +103,7 @@ impl Engine {
             disable_local_service_discovery: true,
             fastresume: false, // Always recheck disk data in this preview; never trust stale piece maps.
             listen: Some(librqbit::ListenerOptions {
-                listen_addr: ([0, 0, 0, 0], config.listen_port).into(),
+                listen_addr: (std::net::Ipv6Addr::UNSPECIFIED, config.listen_port).into(),
                 ..Default::default()
             }),
             persistence: Some(SessionPersistenceConfig::Json {

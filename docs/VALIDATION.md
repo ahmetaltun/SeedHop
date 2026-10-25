@@ -82,11 +82,14 @@ certify physical keyboard input, VoiceOver, or reopening with a real transfer.
   sleep/wake on the target system. Controlled missing paths, TCP/tracker outages,
   and actual disk-full writes on a disposable HFS+ image now pass; these do not
   certify physical unplugging, APFS behavior, or system sleep/wake.
-- Add private-swarm, IPv6-only, and encrypted-peer fixtures before advertising
-  those capabilities. Pure-v2 and hybrid TCP transfers, seeding, magnets, and
-  selection now pass nine independent peer scenarios; v2 DHT/UDP public-swarm
-  coverage remains separate. See `BITTORRENT-V2.md` and
-  `results/v2-wire-2026-10-25.json`.
+- Validate routed IPv6-only networks and public-swarm discovery. Controlled
+  private DHT suppression, local DHT/UDP discovery, IPv6 transfers in both
+  directions, malicious proofs, corrupt peer data, and partial restart now have
+  dedicated v2/hybrid fixtures. See `V2-HARDENING.md`. Encryption and uTP remain
+  separate protocol projects.
+- Complete physical sleep/wake and removable-drive tests before declaring v2
+  hardening complete. Force Recheck is the next feature, followed by file
+  priorities, queueing, relocation, and renaming.
 
 ## Reproduce
 
