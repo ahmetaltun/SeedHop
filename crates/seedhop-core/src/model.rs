@@ -30,6 +30,7 @@ pub struct FileRecord {
     pub size: u64,
     pub downloaded: u64,
     pub selected: bool,
+    pub priority: u8,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -48,6 +49,8 @@ pub struct TorrentRecord {
     pub files: Vec<FileRecord>,
     pub trackers: Vec<String>,
     pub error: Option<String>,
+    pub queue_position: u32,
+    pub paused_intent: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -59,6 +62,7 @@ pub struct Snapshot {
     pub listen_port: u16,
     pub download_limit: u32,
     pub upload_limit: u32,
+    pub max_active_downloads: u32,
     pub torrents: Vec<TorrentRecord>,
 }
 

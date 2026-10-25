@@ -74,6 +74,50 @@ async fn multifile_download_verifies_bytes_and_respects_paused_start() {
         .await
         .unwrap();
     let seed_port = seed.snapshot().unwrap().listen_port;
+    let relay = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let relay_port = relay.local_addr().unwrap().port();
+    let requests = Arc::new(std::sync::Mutex::new(Vec::<u32>::new()));
+    let relay_task = tokio::spawn({
+        let requests = requests.clone();
+        async move {
+            loop {
+                let (socket, _) = relay.accept().await.unwrap();
+                let requests = requests.clone();
+                tokio::spawn(async move {
+                    let seed =
+                        tokio::net::TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, seed_port))
+                            .await
+                            .unwrap();
+                    let (mut down_read, mut down_write) = socket.into_split();
+                    let (mut seed_read, mut seed_write) = seed.into_split();
+                    let forward = async {
+                        let mut handshake = [0; 68];
+                        down_read.read_exact(&mut handshake).await?;
+                        seed_write.write_all(&handshake).await?;
+                        loop {
+                            let length = down_read.read_u32().await?;
+                            if length > 1024 * 1024 {
+                                return Err::<(), std::io::Error>(std::io::Error::other(
+                                    "Oversized fixture message",
+                                ));
+                            }
+                            let mut message = vec![0; length as usize];
+                            down_read.read_exact(&mut message).await?;
+                            if message.len() == 13 && message[0] == 6 {
+                                requests
+                                    .lock()
+                                    .unwrap()
+                                    .push(u32::from_be_bytes(message[1..5].try_into().unwrap()));
+                            }
+                            seed_write.write_u32(length).await?;
+                            seed_write.write_all(&message).await?;
+                        }
+                    };
+                    tokio::select! { _ = forward => {}, _ = tokio::io::copy(&mut seed_read,&mut down_write) => {} }
+                });
+            }
+        }
+    });
     let tracker_task = tokio::spawn(async move {
         loop {
             let (mut socket, _) = tracker.accept().await.unwrap();
@@ -81,7 +125,7 @@ async fn multifile_download_verifies_bytes_and_respects_paused_start() {
             let _ = socket.read(&mut request).await;
             let mut body = b"d8:intervali1e5:peers6:".to_vec();
             body.extend_from_slice(&[127, 0, 0, 1]);
-            body.extend_from_slice(&seed_port.to_be_bytes());
+            body.extend_from_slice(&relay_port.to_be_bytes());
             body.push(b'e');
             let header = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -116,8 +160,14 @@ async fn multifile_download_verifies_bytes_and_respects_paused_start() {
         .unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(down.snapshot().unwrap().torrents[0].downloaded_bytes, 0);
+    down.set_file_priorities(id.clone(), vec![2, 0])
+        .await
+        .unwrap();
     down.set_paused(id, false).await.unwrap();
     wait_finished(&down).await;
+    // The default alphabetical order starts docs/second.bin. High priority must
+    // instead cause the first wire Request to target first.bin (pieces 0..16).
+    assert!(*requests.lock().unwrap().first().unwrap() < 16);
     assert_eq!(
         std::fs::read(down_files.path().join("first.bin")).unwrap(),
         first
@@ -130,4 +180,5 @@ async fn multifile_download_verifies_bytes_and_respects_paused_start() {
     down.shutdown().await.unwrap();
     seed.shutdown().await.unwrap();
     tracker_task.abort();
+    relay_task.abort();
 }

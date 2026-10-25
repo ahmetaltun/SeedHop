@@ -41,6 +41,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     @Published private(set) var busyTransfers = Set<String>()
     @Published var downloadLimit: UInt32 = 0
     @Published var uploadLimit: UInt32 = 0
+    @Published var maxActiveDownloads: UInt32 = 0
+    @Published var savingQueue = false
     @Published var listenPort: UInt16 = 0
     @Published var backgroundEnabled = UserDefaults.standard.bool(forKey:"backgroundEnabled")
     @Published var resumeAtLogin = UserDefaults.standard.bool(forKey:"resumeAtLogin")
@@ -70,6 +72,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     var canActOnSelection: Bool { canChangeTransfers && !selected.isEmpty && selected.allSatisfy { !busyTransfers.contains($0.id) } }
     var canResumeSelection: Bool { canActOnSelection && selected.contains { $0.isPaused || $0.state == "error" } }
     var canPauseSelection: Bool { canActOnSelection && selected.contains { !$0.isPaused } }
+    var canRecheckSelection: Bool { canActOnSelection && selected.allSatisfy { $0.state != "checking" } }
     var canChangeTransfers: Bool { connected && !switching && !designPreview }
 
     private func reconcileVisibleSelection() {
@@ -132,6 +135,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         if downloadLimit != snapshot.downloadLimit { downloadLimit = snapshot.downloadLimit }
         if uploadLimit != snapshot.uploadLimit { uploadLimit = snapshot.uploadLimit }
         if listenPort != snapshot.listenPort { listenPort = snapshot.listenPort }
+        if maxActiveDownloads != snapshot.maxActiveDownloads { maxActiveDownloads = snapshot.maxActiveDownloads }
     }
     func perform(_ request: EngineRequest) async throws -> EngineReply {
         guard !designPreview else { throw UserFacingError(message:"This is a design preview with sample data. Launch the app normally for real transfers.") }
@@ -155,6 +159,18 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         guard canActOnSelection else { return }
         removalTargets = selected
         showRemoval = true
+    }
+    func recheckSelected() {
+        guard canRecheckSelection else { return }
+        let ids = selected.map(\.id)
+        error = nil
+        busyTransfers.formUnion(ids)
+        Task {
+            defer { busyTransfers.subtract(ids) }
+            do { for id in ids { var r = EngineRequest(command:"recheck"); r.id = id; _ = try await perform(r) } }
+            catch { self.error = error.localizedDescription }
+            await refresh()
+        }
     }
     func removeConfirmed(deleteFiles: Bool) {
         let items = removalTargets
@@ -186,6 +202,65 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     func setLimits(download: UInt32, upload: UInt32) async throws {
         var r = EngineRequest(command:"limits"); r.downloadLimit = download; r.uploadLimit = upload
         _ = try await perform(r); await refresh()
+    }
+    func updateTransfer(_ request: EngineRequest) {
+        guard let id = request.id, canChangeTransfers, !busyTransfers.contains(id), torrents.contains(where: { $0.id == id }) else { return }
+        busyTransfers.insert(id); error = nil
+        Task {
+            defer { busyTransfers.remove(id) }
+            do { _ = try await perform(request) }
+            catch { self.error = error.localizedDescription }
+            await refresh()
+        }
+    }
+    func setPriority(_ item: TorrentItem, file: FileItem, priority: UInt8) {
+        var request = EngineRequest(command:"priorities"); request.id = item.id
+        request.priorities = item.files.map { $0.index == file.index ? priority : $0.priority }
+        updateTransfer(request)
+    }
+    func setQueueLimit(_ value: UInt32) {
+        guard canChangeTransfers, !savingQueue else { return }
+        savingQueue = true; error = nil
+        Task {
+            defer { savingQueue = false }
+            do { var request = EngineRequest(command:"queue"); request.maxActiveDownloads = value; _ = try await perform(request) }
+            catch { self.error = error.localizedDescription }
+            await refresh()
+        }
+    }
+    func moveSelectedToFront() {
+        guard canActOnSelection, selected.count == 1 else { return }
+        var request = EngineRequest(command:"queueMove"); request.id = selected[0].id; request.queuePosition = 1
+        updateTransfer(request)
+    }
+    func chooseRelocation() {
+        guard canRecheckSelection, selected.count == 1 else { return }
+        let item = selected[0]
+        let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
+        panel.canCreateDirectories = true; panel.prompt = "Move Files"; panel.message = "Choose a folder for \(item.name). Files will be verified after moving."
+        panel.directoryURL = URL(fileURLWithPath:item.destination)
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            var request = EngineRequest(command:"relocate"); request.id = item.id; request.destination = url.path
+            self.updateTransfer(request)
+        }
+    }
+    func requestRename(_ item: TorrentItem, file: FileItem) {
+        guard canChangeTransfers, !busyTransfers.contains(item.id), item.state != "checking", let window = NSApp.keyWindow else { return }
+        let alert = NSAlert(); alert.messageText = "Rename File"; alert.informativeText = "Choose a new name for \(URL(fileURLWithPath:file.name).lastPathComponent)."
+        alert.addButton(withTitle:"Rename"); alert.addButton(withTitle:"Cancel")
+        let input = NSTextField(string:URL(fileURLWithPath:file.name).lastPathComponent)
+        input.frame = NSRect(x:0,y:0,width:320,height:24); input.setAccessibilityLabel("New file name"); alert.accessoryView = input
+        alert.window.initialFirstResponder = input
+        alert.beginSheetModal(for:window) { response in
+            guard response == .alertFirstButtonReturn else { return }
+            let name = input.stringValue.trimmingCharacters(in:.whitespacesAndNewlines)
+            guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains(":") else { self.error = "Enter a file name without slashes or colons."; return }
+            let parent = (file.name as NSString).deletingLastPathComponent
+            var request = EngineRequest(command:"rename"); request.id = item.id; request.fileIndex = file.index
+            request.fileName = parent.isEmpty ? name : parent + "/" + name
+            self.updateTransfer(request)
+        }
     }
     func setBackground(_ enabled: Bool) async {
         guard !designPreview, !switching else { return }

@@ -69,3 +69,13 @@ injected errors, but does not certify APFS, quota exhaustion, or sudden power
 loss. Network interface loss, routing/DNS changes, physical drive removal, and
 sleep/wake remain target-system acceptance work. UI interaction and XPC recovery
 are outside this engine test suite.
+
+
+## Transfer-control follow-up
+
+Force Recheck now has v1/v2/hybrid corruption and repair tests, plus selection
+and pause-intent preservation. Active partial v2 and hybrid downloads also
+complete with exact bytes after relocation and renaming. Queue and storage
+transactions have durable restart and failure coverage. See `FILE-MANAGEMENT.md`.
+Physical sleep/wake, unplugging, interface loss, actual logout/login, and further
+signing validation were deferred by the user, not passed. See `VALIDATION.md`.

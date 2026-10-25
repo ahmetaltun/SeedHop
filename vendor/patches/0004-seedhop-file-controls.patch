@@ -1,0 +1,574 @@
+diff --git a/crates/librqbit/src/api.rs b/crates/librqbit/src/api.rs
+index f795c1f..229d40d 100644
+--- a/crates/librqbit/src/api.rs
++++ b/crates/librqbit/src/api.rs
+@@ -221,6 +221,7 @@ impl Api {
+                             .shared()
+                             .options
+                             .output_folder
++                            .read()
+                             .to_string_lossy()
+                             .into_owned(),
+                         total_pieces,
+@@ -247,6 +248,7 @@ impl Api {
+             .shared()
+             .options
+             .output_folder
++            .read()
+             .to_string_lossy()
+             .into_owned()
+             .to_string();
+@@ -396,6 +398,7 @@ impl Api {
+                         .shared()
+                         .options
+                         .output_folder
++                        .read()
+                         .to_string_lossy()
+                         .into_owned(),
+                 )
+@@ -408,6 +411,7 @@ impl Api {
+                         .shared()
+                         .options
+                         .output_folder
++                        .read()
+                         .to_string_lossy()
+                         .into_owned(),
+                 }
+@@ -444,6 +448,7 @@ impl Api {
+                         .shared()
+                         .options
+                         .output_folder
++                        .read()
+                         .to_string_lossy()
+                         .into_owned(),
+                 )
+@@ -456,6 +461,7 @@ impl Api {
+                         .shared()
+                         .options
+                         .output_folder
++                        .read()
+                         .to_string_lossy()
+                         .into_owned(),
+                 }
+diff --git a/crates/librqbit/src/session.rs b/crates/librqbit/src/session.rs
+index e819e54..55fa8f0 100644
+--- a/crates/librqbit/src/session.rs
++++ b/crates/librqbit/src/session.rs
+@@ -247,6 +247,12 @@ pub struct AddTorrentOptions {
+     /// Start in paused state.
+     #[serde(default)]
+     pub paused: bool,
++    #[serde(default)]
++    pub queued: bool,
++    #[serde(default)]
++    pub file_names: std::collections::HashMap<usize, PathBuf>,
++    #[serde(default)]
++    pub file_priorities: Vec<u8>,
+     /// A regex to only download files matching it.
+     pub only_files_regex: Option<String>,
+     /// An explicit list of file IDs to download.
+@@ -418,6 +424,7 @@ impl Default for DhtSessionConfig {
+ }
+ 
+ pub struct SessionOptions {
++    pub restore_queued: bool,
+     /// DHT configuration. Set to None to disable DHT entirely.
+     /// Defaults to DHT enabled with persistence.
+     pub dht: Option<DhtSessionConfig>,
+@@ -486,6 +493,7 @@ pub struct SessionOptions {
+ impl Default for SessionOptions {
+     fn default() -> Self {
+         Self {
++            restore_queued: false,
+             dht: Some(DhtSessionConfig::default()),
+             bind_device_name: None,
+             disable_trackers: false,
+@@ -590,6 +598,7 @@ impl Session {
+         mut opts: SessionOptions,
+     ) -> BoxFuture<'static, anyhow::Result<Arc<Self>>> {
+         async move {
++            let restore_queued = opts.restore_queued;
+             let peer_id = opts
+                 .peer_id
+                 .unwrap_or_else(|| generate_azereus_style(*b"rQ", crate_version!()));
+@@ -904,6 +913,7 @@ impl Session {
+                                     let span = add_torrent_span(st.info_hash());
+                                     let (add_torrent, mut opts) = st.into_add_torrent()?;
+                                     opts.preferred_id = Some(id);
++                                    opts.queued = opts.queued || restore_queued;
+                                     let fut = session.add_torrent(add_torrent, Some(opts));
+                                     let fut = fut.instrument(span);
+                                     futs.push(fut);
+@@ -1418,8 +1428,10 @@ impl Session {
+                     force_tracker_interval: opts.force_tracker_interval,
+                     peer_connect_timeout: peer_opts.connect_timeout,
+                     peer_read_write_timeout: peer_opts.read_write_timeout,
+-                    allow_overwrite: opts.overwrite,
+-                    output_folder,
++                    allow_overwrite: std::sync::atomic::AtomicBool::new(opts.overwrite),
++                    output_folder: RwLock::new(output_folder),
++                    file_names: RwLock::new(opts.file_names.clone()),
++                    file_priorities: RwLock::new(opts.file_priorities.clone()),
+                     ratelimits: opts.ratelimits,
+                     initial_peers: opts.initial_peers.clone().unwrap_or_default(),
+                     peer_limit: opts.peer_limit.or(self.peer_limit),
+@@ -1443,6 +1455,7 @@ impl Session {
+             let handle = Arc::new(ManagedTorrent {
+                 locked: RwLock::new(ManagedTorrentLocked {
+                     paused: opts.paused,
++                    queued: opts.queued,
+                     state: ManagedTorrentState::Initializing(initializing),
+                     only_files,
+                 }),
+@@ -1463,6 +1476,11 @@ impl Session {
+         }
+ 
+         let _e = managed_torrent.shared.span.clone().entered();
++        managed_torrent
++            .shared
++            .options
++            .allow_overwrite
++            .store(true, std::sync::atomic::Ordering::Relaxed);
+ 
+         managed_torrent
+             .start(peer_rx, opts.paused)
+@@ -1553,7 +1571,13 @@ impl Session {
+             (Err(e), true) => return Err(e).context("torrent deleted, but could not delete files"),
+             (Ok(storage), true) => {
+                 debug!("will delete files");
+-                remove_files_and_dirs(&metadata.file_infos, &storage)?;
++                let mut infos = metadata.file_infos.clone();
++                for (index, name) in removed.file_names() {
++                    if let Some(info) = infos.get_mut(index) {
++                        info.relative_filename = name;
++                    }
++                }
++                remove_files_and_dirs(&infos, &storage)?;
+                 // SeedHop: explicit destinations belong to the user, not to the torrent.
+                 // Remove only empty directories inside the torrent, never the selected root.
+             }
+@@ -1667,6 +1691,61 @@ impl Session {
+         Ok(())
+     }
+ 
++    pub async fn force_recheck(
++        self: &Arc<Self>,
++        handle: &ManagedTorrentHandle,
++    ) -> anyhow::Result<()> {
++        // Verify persistence first. Rechecking never changes selection or pause
++        // intent and never removes/re-adds library membership.
++        self.try_update_persistence_metadata(handle).await?;
++        let paused = handle.prepare_recheck()?;
++        let peers = if paused {
++            None
++        } else {
++            self.make_peer_rx_managed_torrent(handle, true)
++        };
++        handle.start(peers, paused)
++    }
++
++    pub async fn set_queued(
++        self: &Arc<Self>,
++        handle: &ManagedTorrentHandle,
++        queued: bool,
++    ) -> anyhow::Result<()> {
++        let old = handle.is_queued();
++        handle.set_queued(queued)?;
++        if let Err(error) = self.try_update_persistence_metadata(handle).await {
++            handle.set_queued(old)?;
++            if !old && !handle.is_paused() {
++                handle.start(self.make_peer_rx_managed_torrent(handle, true), false)?;
++            }
++            return Err(error);
++        }
++        if !queued && !handle.is_paused() {
++            handle.start(self.make_peer_rx_managed_torrent(handle, true), false)?;
++        }
++        Ok(())
++    }
++
++    pub async fn update_file_priorities(
++        self: &Arc<Self>,
++        handle: &ManagedTorrentHandle,
++        priorities: Vec<u8>,
++    ) -> anyhow::Result<()> {
++        let old = handle.file_priorities();
++        handle.quiesce()?;
++        handle.replace_file_priorities(priorities)?;
++        let result = self.try_update_persistence_metadata(handle).await;
++        if result.is_err() {
++            *handle.shared.options.file_priorities.write() = old;
++        }
++        handle.start(
++            self.make_peer_rx_managed_torrent(handle, true),
++            handle.is_paused(),
++        )?;
++        result
++    }
++
+     pub async fn unpause(self: &Arc<Self>, handle: &ManagedTorrentHandle) -> anyhow::Result<()> {
+         let peer_rx = self.make_peer_rx_managed_torrent(handle, true);
+         handle.start(peer_rx, false)?;
+diff --git a/crates/librqbit/src/session_persistence/json.rs b/crates/librqbit/src/session_persistence/json.rs
+index 7d42200..7276331 100644
+--- a/crates/librqbit/src/session_persistence/json.rs
++++ b/crates/librqbit/src/session_persistence/json.rs
+@@ -164,7 +164,10 @@ impl JsonSessionPersistenceStore {
+             torrent_bytes: Default::default(),
+             only_files: torrent.only_files().clone(),
+             is_paused: torrent.is_paused(),
+-            output_folder: torrent.shared().options.output_folder.clone(),
++            is_queued: torrent.is_queued(),
++            file_names: torrent.file_names(),
++            file_priorities: torrent.file_priorities(),
++            output_folder: torrent.output_folder(),
+         };
+ 
+         let torrent_bytes = torrent
+diff --git a/crates/librqbit/src/session_persistence/mod.rs b/crates/librqbit/src/session_persistence/mod.rs
+index 5a958a8..dd75e16 100644
+--- a/crates/librqbit/src/session_persistence/mod.rs
++++ b/crates/librqbit/src/session_persistence/mod.rs
+@@ -32,6 +32,12 @@ pub struct SerializedTorrent {
+     output_folder: PathBuf,
+     only_files: Option<Vec<usize>>,
+     is_paused: bool,
++    #[serde(default)]
++    is_queued: bool,
++    #[serde(default)]
++    file_names: std::collections::HashMap<usize, PathBuf>,
++    #[serde(default)]
++    file_priorities: Vec<u8>,
+ }
+ 
+ impl SerializedTorrent {
+@@ -71,6 +77,9 @@ impl SerializedTorrent {
+ 
+         let opts = AddTorrentOptions {
+             paused: self.is_paused,
++            queued: self.is_queued,
++            file_names: self.file_names,
++            file_priorities: self.file_priorities,
+             output_folder: Some(
+                 self.output_folder
+                     .to_str()
+diff --git a/crates/librqbit/src/session_persistence/postgres.rs b/crates/librqbit/src/session_persistence/postgres.rs
+index 92e4ae0..aeb6f4e 100644
+--- a/crates/librqbit/src/session_persistence/postgres.rs
++++ b/crates/librqbit/src/session_persistence/postgres.rs
+@@ -42,6 +42,9 @@ impl TorrentsTableRecord {
+                     .only_files
+                     .map(|v| v.into_iter().map(|v| v as usize).collect()),
+                 is_paused: self.is_paused,
++                is_queued: false,
++                file_names: Default::default(),
++                file_priorities: Default::default(),
+             },
+         ))
+     }
+diff --git a/crates/librqbit/src/storage/filesystem/fs.rs b/crates/librqbit/src/storage/filesystem/fs.rs
+index 68b0731..56a7869 100644
+--- a/crates/librqbit/src/storage/filesystem/fs.rs
++++ b/crates/librqbit/src/storage/filesystem/fs.rs
+@@ -28,7 +28,7 @@ impl StorageFactory for FilesystemStorageFactory {
+         _metadata: &TorrentMetadata,
+     ) -> anyhow::Result<FilesystemStorage> {
+         Ok(FilesystemStorage {
+-            output_folder: shared.options.output_folder.clone(),
++            output_folder: shared.options.output_folder.read().clone(),
+             opened_files: Default::default(),
+         })
+     }
+@@ -131,9 +131,10 @@ impl TorrentStorage for FilesystemStorage {
+         metadata: &TorrentMetadata,
+     ) -> anyhow::Result<()> {
+         let mut files = Vec::<OpenedFile>::new();
+-        for file_details in metadata.file_infos.iter() {
++        let names = shared.options.file_names.read();
++        for (index, file_details) in metadata.file_infos.iter().enumerate() {
+             let mut full_path = self.output_folder.clone();
+-            let relative_path = &file_details.relative_filename;
++            let relative_path = names.get(&index).unwrap_or(&file_details.relative_filename);
+             full_path.push(relative_path);
+ 
+             if file_details.attrs.padding {
+@@ -144,12 +145,19 @@ impl TorrentStorage for FilesystemStorage {
+             let f = secure_open(
+                 &self.output_folder,
+                 relative_path,
+-                shared.options.allow_overwrite,
++                shared
++                    .options
++                    .allow_overwrite
++                    .load(std::sync::atomic::Ordering::Relaxed),
+             )?;
+             #[cfg(not(unix))]
+             std::fs::create_dir_all(full_path.parent().context("bug: no parent")?)?;
+             #[cfg(not(unix))]
+-            let f = if shared.options.allow_overwrite {
++            let f = if shared
++                .options
++                .allow_overwrite
++                .load(std::sync::atomic::Ordering::Relaxed)
++            {
+                 OpenOptions::new()
+                     .create(true)
+                     .truncate(false)
+diff --git a/crates/librqbit/src/torrent_state/live/mod.rs b/crates/librqbit/src/torrent_state/live/mod.rs
+index f0a384d..8e9eebb 100644
+--- a/crates/librqbit/src/torrent_state/live/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/mod.rs
+@@ -239,12 +239,16 @@ impl TorrentStateLive {
+         let file_priorities = {
+             let mut pri = (0..paused.metadata.file_infos.len()).collect::<Vec<usize>>();
+             // sort by filename, cause many torrents have random sort order.
++            let priorities = paused.shared.options.file_priorities.read();
+             pri.sort_unstable_by_key(|id| {
+-                paused
+-                    .metadata
+-                    .file_infos
+-                    .get(*id)
+-                    .map(|fi| fi.relative_filename.as_path())
++                (
++                    std::cmp::Reverse(priorities.get(*id).copied().unwrap_or(1)),
++                    paused
++                        .metadata
++                        .file_infos
++                        .get(*id)
++                        .map(|fi| fi.relative_filename.as_path()),
++                )
+             });
+             pri
+         };
+diff --git a/crates/librqbit/src/torrent_state/mod.rs b/crates/librqbit/src/torrent_state/mod.rs
+index 102801f..543ee98 100644
+--- a/crates/librqbit/src/torrent_state/mod.rs
++++ b/crates/librqbit/src/torrent_state/mod.rs
+@@ -5,12 +5,12 @@ pub mod stats;
+ mod streaming;
+ pub mod utils;
+ 
+-use std::collections::HashSet;
++use std::collections::{HashMap, HashSet};
+ use std::net::SocketAddr;
+-use std::path::{Path, PathBuf};
++use std::path::PathBuf;
+ use std::sync::Arc;
+ use std::sync::Weak;
+-use std::sync::atomic::Ordering;
++use std::sync::atomic::{AtomicBool, Ordering};
+ use std::time::Duration;
+ 
+ use anyhow::Context;
+@@ -103,6 +103,7 @@ pub(crate) struct ManagedTorrentLocked {
+     //
+     // This should change only on "unpause".
+     pub(crate) paused: bool,
++    pub(crate) queued: bool,
+     pub(crate) state: ManagedTorrentState,
+     pub(crate) only_files: Option<Vec<usize>>,
+ }
+@@ -112,8 +113,10 @@ pub(crate) struct ManagedTorrentOptions {
+     pub force_tracker_interval: Option<Duration>,
+     pub peer_connect_timeout: Option<Duration>,
+     pub peer_read_write_timeout: Option<Duration>,
+-    pub allow_overwrite: bool,
+-    pub output_folder: PathBuf,
++    pub allow_overwrite: AtomicBool,
++    pub output_folder: RwLock<PathBuf>,
++    pub file_names: RwLock<HashMap<usize, PathBuf>>,
++    pub file_priorities: RwLock<Vec<u8>>,
+     pub ratelimits: LimitsConfig,
+     pub initial_peers: Vec<SocketAddr>,
+     pub peer_limit: Option<usize>,
+@@ -238,8 +241,75 @@ impl ManagedTorrent {
+     }
+ 
+     /// The resolved on-disk folder this torrent's files are written under.
+-    pub fn output_folder(&self) -> &Path {
+-        &self.shared.options.output_folder
++    pub fn output_folder(&self) -> PathBuf {
++        self.shared.options.output_folder.read().clone()
++    }
++
++    pub fn file_names(&self) -> HashMap<usize, PathBuf> {
++        self.shared.options.file_names.read().clone()
++    }
++    pub fn file_priorities(&self) -> Vec<u8> {
++        self.shared.options.file_priorities.read().clone()
++    }
++    pub fn is_queued(&self) -> bool {
++        self.locked.read().queued
++    }
++
++    /// Stop peer I/O without changing durable user pause intent.
++    pub fn quiesce(&self) -> anyhow::Result<()> {
++        let mut g = self.locked.write();
++        match &g.state {
++            ManagedTorrentState::Live(live) => g.state = ManagedTorrentState::Paused(live.pause()?),
++            ManagedTorrentState::Initializing(_) => bail!("Wait for file verification to finish."),
++            ManagedTorrentState::None => bail!("torrent is unavailable"),
++            _ => {}
++        }
++        Ok(())
++    }
++
++    pub(crate) fn set_queued(&self, queued: bool) -> anyhow::Result<()> {
++        {
++            let mut g = self.locked.write();
++            if matches!(g.state, ManagedTorrentState::Initializing(_)) {
++                g.queued = queued;
++                return Ok(());
++            }
++        }
++        if queued {
++            self.quiesce()?;
++        }
++        self.locked.write().queued = queued;
++        Ok(())
++    }
++
++    pub fn replace_file_priorities(&self, priorities: Vec<u8>) -> anyhow::Result<()> {
++        let count = self
++            .metadata
++            .load()
++            .as_ref()
++            .context("metadata unavailable")?
++            .file_infos
++            .len();
++        anyhow::ensure!(
++            priorities.len() == count && priorities.iter().all(|p| *p <= 2),
++            "Invalid file priorities"
++        );
++        *self.shared.options.file_priorities.write() = priorities;
++        Ok(())
++    }
++
++    /// Commit persistence before deleting any source bytes. Reopen with a full hash.
++    pub fn replace_storage_layout(
++        &self,
++        root: PathBuf,
++        names: HashMap<usize, PathBuf>,
++    ) -> anyhow::Result<()> {
++        self.quiesce()?;
++        let mut g = self.locked.write();
++        *self.shared.options.output_folder.write() = root;
++        *self.shared.options.file_names.write() = names;
++        g.state = ManagedTorrentState::Error(anyhow::anyhow!("Verifying the new file location"));
++        Ok(())
+     }
+ 
+     pub fn with_metadata<R>(
+@@ -303,8 +373,14 @@ impl ManagedTorrent {
+         self.live()
+     }
+ 
+-    fn stop_with_error(&self, error: anyhow::Error) {
++    fn stop_with_error(&self, error: anyhow::Error, generation: &Weak<TorrentStateLive>) {
+         let mut g = self.locked.write();
++        // A queued error from a prior peer generation must not overwrite a
++        // subsequent recheck, queue suspension, or storage-layout transition.
++        if !matches!(&g.state, ManagedTorrentState::Live(live) if Weak::ptr_eq(&Arc::downgrade(live), generation))
++        {
++            return;
++        }
+ 
+         match g.state.take() {
+             ManagedTorrentState::Live(live) => {
+@@ -396,6 +472,7 @@ impl ManagedTorrent {
+                                         return Ok(());
+                                     }
+ 
++                                    let start_paused = g.paused;
+                                     g.state = ManagedTorrentState::Paused(paused);
+                                     t.state_change_notify.notify_waiters();
+                                     _start(&t, peer_rx, start_paused, session, Some(g), token)
+@@ -418,7 +495,7 @@ impl ManagedTorrent {
+                     Ok(())
+                 }
+                 ManagedTorrentState::Paused(_) => {
+-                    if start_paused {
++                    if start_paused || g.queued {
+                         return Ok(());
+                     }
+                     let paused = g.state.take().assert_paused();
+@@ -427,7 +504,7 @@ impl ManagedTorrent {
+                     g.state = ManagedTorrentState::Live(live.clone());
+                     t.state_change_notify.notify_waiters();
+ 
+-                    spawn_fatal_errors_receiver(t, rx, token);
++                    spawn_fatal_errors_receiver(t, Arc::downgrade(&live), rx, token);
+                     if let Some(peer_rx) = peer_rx {
+                         spawn_peer_adder(&live, peer_rx);
+                     }
+@@ -477,6 +554,38 @@ impl ManagedTorrent {
+         self.locked.read().paused
+     }
+ 
++    /// Discard the piece map and hash the current files, retaining user intent.
++    pub(crate) fn prepare_recheck(&self) -> anyhow::Result<bool> {
++        let mut g = self.locked.write();
++        if matches!(g.state, ManagedTorrentState::Initializing(_)) {
++            bail!("Files are already being verified. Wait for verification to finish.");
++        }
++        let metadata = self
++            .metadata
++            .load_full()
++            .context("metadata is unavailable")?;
++        // Acquire storage before changing state so a failed open leaves the old
++        // transfer intact. Live::pause takes its storage under the writer lock.
++        let files = match &g.state {
++            ManagedTorrentState::Live(live) => live.pause()?.files,
++            ManagedTorrentState::Paused(paused) => paused.files.take()?,
++            ManagedTorrentState::Error(_) => self
++                .shared
++                .storage_factory
++                .create_and_init(self.shared(), &metadata)?,
++            _ => bail!("torrent cannot be rechecked in its current state"),
++        };
++        g.state = ManagedTorrentState::Initializing(Arc::new(TorrentStateInitializing::new(
++            self.shared.clone(),
++            metadata,
++            g.only_files.clone(),
++            files,
++            true,
++        )));
++        self.state_change_notify.notify_waiters();
++        Ok(g.paused)
++    }
++
+     /// Pause the torrent if it's live.
+     pub(crate) fn pause(&self) -> anyhow::Result<()> {
+         let mut g = self.locked.write();
+@@ -495,11 +604,9 @@ impl ManagedTorrent {
+                 self.state_change_notify.notify_waiters();
+                 Ok(())
+             }
+-            ManagedTorrentState::Paused(_) => {
+-                bail!("torrent is already paused");
+-            }
+-            ManagedTorrentState::Error(_) => {
+-                bail!("can't pause torrent in error state")
++            ManagedTorrentState::Paused(_) | ManagedTorrentState::Error(_) => {
++                g.paused = true;
++                Ok(())
+             }
+             ManagedTorrentState::None => bail!("bug: torrent is in empty state"),
+         }
+@@ -656,6 +763,7 @@ pub type ManagedTorrentHandle = Arc<ManagedTorrent>;
+ 
+ fn spawn_fatal_errors_receiver(
+     state: &Arc<ManagedTorrent>,
++    generation: Weak<TorrentStateLive>,
+     rx: tokio::sync::oneshot::Receiver<anyhow::Error>,
+     token: CancellationToken,
+ ) {
+@@ -673,7 +781,7 @@ fn spawn_fatal_errors_receiver(
+                 Err(_) => return Ok(()),
+             };
+             if let Some(state) = state.upgrade() {
+-                state.stop_with_error(e);
++                state.stop_with_error(e, &generation);
+             } else {
+                 warn!(
+                     ?id,

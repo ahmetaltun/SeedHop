@@ -10,6 +10,60 @@ fn config(state: &std::path::Path, downloads: &std::path::Path) -> EngineConfig 
     }
 }
 
+#[allow(dead_code)]
+mod support;
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn force_recheck_detects_v1_corruption_and_preserves_intent() {
+    let state = tempfile::tempdir().unwrap();
+    let downloads = tempfile::tempdir().unwrap();
+    let cfg = config(state.path(), downloads.path());
+    let engine = Engine::open(cfg.clone()).await.unwrap();
+    let content = vec![42; 65536];
+    let path = downloads.path().join("data.bin");
+    std::fs::write(&path, &content).unwrap();
+    let id = engine
+        .add(
+            adapter::create_fixture("data.bin", &content),
+            cfg.download_directory.clone(),
+            vec![0],
+            true,
+            true,
+        )
+        .await
+        .unwrap();
+    support::wait_for(&engine, |t| t.state == "paused").await;
+    std::fs::write(&path, vec![43; content.len()]).unwrap();
+    engine.force_recheck(id.clone()).await.unwrap();
+    assert!(engine.snapshot().unwrap().torrents[0].paused_intent);
+    let checked = support::wait_for(&engine, |t| t.state == "paused").await;
+    assert_eq!(checked.id, id);
+    assert_eq!(checked.downloaded_bytes, 0);
+    assert!(checked.files[0].selected);
+    std::fs::write(&path, &content).unwrap();
+    engine.force_recheck(id.clone()).await.unwrap();
+    assert_eq!(
+        support::wait_for(&engine, |t| t.state == "paused")
+            .await
+            .downloaded_bytes,
+        content.len() as u64
+    );
+    engine.set_paused(id.clone(), false).await.unwrap();
+    engine.force_recheck(id.clone()).await.unwrap();
+    assert!(!engine.snapshot().unwrap().torrents[0].paused_intent);
+    support::wait_for(&engine, |t| t.state == "seeding").await;
+    engine.shutdown().await.unwrap();
+    drop(engine);
+    let engine = Engine::open(cfg).await.unwrap();
+    assert_eq!(
+        support::wait_for(&engine, |t| t.state == "seeding")
+            .await
+            .id,
+        id
+    );
+    engine.shutdown().await.unwrap();
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn pause_selection_limits_and_removal_survive_restart() {
     let state = tempfile::tempdir().unwrap();
@@ -217,10 +271,12 @@ async fn persistence_failure_is_reported_and_unrelated_files_are_retained() {
         .await
         .unwrap();
     std::fs::write(downloads.path().join("unrelated.txt"), b"keep this").unwrap();
+    support::wait_for(&engine, |t| t.state == "paused").await;
     let directory = state.path().join("session");
     std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o500)).unwrap();
     let result = engine.select_files(id.clone(), vec![0]).await;
     let paused_retry = engine.set_paused(id.clone(), true).await;
+    let recheck_retry = engine.force_recheck(id.clone()).await;
     std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700)).unwrap();
     assert!(
         result.is_err(),
@@ -230,6 +286,11 @@ async fn persistence_failure_is_reported_and_unrelated_files_are_retained() {
         paused_retry.is_err(),
         "an already-paused retry must persist before success"
     );
+    assert!(
+        recheck_retry.is_err(),
+        "recheck must report a failed persistence write"
+    );
+    assert_eq!(engine.snapshot().unwrap().torrents[0].state, "paused");
     engine.remove(id, true).await.unwrap();
     assert_eq!(
         std::fs::read(downloads.path().join("unrelated.txt")).unwrap(),

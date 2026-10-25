@@ -36,7 +36,9 @@ import ServiceManagement
         return try await withCheckedThrowingContinuation { continuation in
             let box = ReplyOnce(continuation)
             let timeout: TimeInterval = request.command == "inspect" ? 130 : (request.command == "shutdown" ? 40 : 15)
-            DispatchQueue.global().asyncAfter(deadline:.now() + timeout) { box.fail(UserFacingError(message:"The engine took too long to respond. Your library has been preserved.")) }
+            if !["relocate", "rename"].contains(request.command) {
+                DispatchQueue.global().asyncAfter(deadline:.now() + timeout) { box.fail(UserFacingError(message:"The engine took too long to respond. Your library has been preserved.")) }
+            }
             let proxy = connection.remoteObjectProxyWithErrorHandler { error in box.fail(error) } as? EngineServiceProtocol
             guard let proxy else { box.fail(UserFacingError(message:"Could not reach the torrent engine.")); return }
             proxy.send(data) { response in

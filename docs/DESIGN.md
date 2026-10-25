@@ -75,8 +75,9 @@ search cancellation. Escape cancels metadata lookup while an import is resolving
 
 ## Visual QA
 
-`make render` produces 22 light/dark fixture screens, including multi-selection,
-empty-filter, connection-recovery states, and four high-contrast library layouts.
+`make render` produces 26 light/dark fixture screens, including multi-selection,
+empty-filter, connection-recovery states, the file-priority/rename inspector,
+queue settings, and four high-contrast library layouts.
 Sample transfers are
 available only through explicit design-preview mode. These renders verify
 layout and typography; they do not prove VoiceOver navigation, live keyboard

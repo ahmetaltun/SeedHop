@@ -221,6 +221,7 @@ impl Api {
                             .shared()
                             .options
                             .output_folder
+                            .read()
                             .to_string_lossy()
                             .into_owned(),
                         total_pieces,
@@ -247,6 +248,7 @@ impl Api {
             .shared()
             .options
             .output_folder
+            .read()
             .to_string_lossy()
             .into_owned()
             .to_string();
@@ -396,6 +398,7 @@ impl Api {
                         .shared()
                         .options
                         .output_folder
+                        .read()
                         .to_string_lossy()
                         .into_owned(),
                 )
@@ -408,6 +411,7 @@ impl Api {
                         .shared()
                         .options
                         .output_folder
+                        .read()
                         .to_string_lossy()
                         .into_owned(),
                 }
@@ -444,6 +448,7 @@ impl Api {
                         .shared()
                         .options
                         .output_folder
+                        .read()
                         .to_string_lossy()
                         .into_owned(),
                 )
@@ -456,6 +461,7 @@ impl Api {
                         .shared()
                         .options
                         .output_folder
+                        .read()
                         .to_string_lossy()
                         .into_owned(),
                 }

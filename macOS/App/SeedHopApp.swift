@@ -2,7 +2,7 @@ import SwiftUI
 
 @main struct SeedHopApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @StateObject private var store = LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine") || ProcessInfo.processInfo.arguments.contains("--verify-ux") || ProcessInfo.processInfo.arguments.contains("--verify-interface"))
+    @StateObject private var store = LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine") || ProcessInfo.processInfo.arguments.contains("--verify-ux") || ProcessInfo.processInfo.arguments.contains("--verify-interface") || ProcessInfo.processInfo.arguments.contains("--verify-lifecycle"))
     var body: some Scene {
         WindowGroup("SeedHop",id:"library") {
             LibraryView().environmentObject(store).onAppear { delegate.store = store }
@@ -22,6 +22,9 @@ import SwiftUI
                 Button("Resume Selected") { store.toggleSelected(paused:false) }.keyboardShortcut("r").disabled(!store.canResumeSelection)
                 Button("Pause Selected") { store.toggleSelected(paused:true) }.keyboardShortcut(".").disabled(!store.canPauseSelection)
                 Divider()
+                Button("Force Recheck") { store.recheckSelected() }.disabled(!store.canRecheckSelection)
+                Button("Move to Front of Queue") { store.moveSelectedToFront() }.disabled(!store.canActOnSelection || store.selected.count != 1)
+                Button("Move Files…") { store.chooseRelocation() }.disabled(!store.canRecheckSelection || store.selected.count != 1)
                 Button("Remove Selected…") { store.requestRemoval() }.keyboardShortcut(.delete).disabled(!store.canActOnSelection)
                 Button("Show Inspector") { store.showInspector.toggle() }.keyboardShortcut("i",modifiers:[.command,.option])
             }
@@ -57,6 +60,12 @@ struct LibraryNavigationCommands: Commands {
         return .terminateLater
     }
     func applicationDidFinishLaunching(_ notification:Notification) {
+        #if SEEDHOP_VALIDATION
+        if ProcessInfo.processInfo.arguments.contains("--verify-lifecycle") {
+            Task { do { try await LifecycleSelfTest.run(); exit(0) } catch { fputs("Lifecycle verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
+            return
+        }
+        #endif
         #if SEEDHOP_DEVELOPMENT
         if ProcessInfo.processInfo.arguments.contains("--verify-interface") {
             Task { do { try await InterfaceSelfTest.run(); exit(0) } catch { fputs("Interface verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }

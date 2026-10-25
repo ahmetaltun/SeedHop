@@ -3,6 +3,31 @@
 Status: **implemented development foundation; full milestone acceptance pending**.
 No public distribution or notarization was performed.
 
+## Transfer-control follow-up — 2026-10-25
+
+Force Recheck, file priorities, basic queueing, relocation, and local renaming
+are implemented across engine, FFI, protocol-v2 XPC, and native UI. The workspace
+suite passed 41 tests (one opt-in disk-image test excluded), Clippy with warnings
+denied, 17 Swift presentation scenarios, native menu/focus checks, and the expanded
+XPC smoke test with exact moved/renamed bytes and restart. See
+[`FILE-MANAGEMENT.md`](FILE-MANAGEMENT.md) for behavior, tests, and transaction limits.
+
+The unrestricted keychain exposed an existing Apple Development identity that
+was hidden from the sandbox. Before the user's request to skip signing arrived,
+a separate certificate-backed fixture passed three foreground/background handoff
+cycles with exact bytes and running/paused transfers. Simulated changed-login
+scope correctly kept the engine idle with resume off and restored running intent
+with resume on, while preserving paused transfers; same-session crash scope also
+restored with login resume off. The fixture uses separate service/library IDs and
+unregisters its agent afterward. This was an earlier build, before the subsequent
+file-control additions; it does not certify the final build or actual logout/login.
+
+**User-deferred checks:** further certificate-backed validation, actual
+logout/login, sleep/wake, physical removable-drive loss, and interface loss.
+No external physical drive was attached. Local signing configuration was reset
+to ad-hoc, and the final normal app is ad-hoc signed. Encryption and uTP remain
+independent protocol projects. The deferred gates remain open.
+
 ## Environment
 
 Apple Silicon; macOS 15.8.1; Xcode 26.3; Swift 6.2.4 compiler in Swift 5 mode;
@@ -16,12 +41,12 @@ validation exception is omitted from certificate-backed and release builds.
 |---|---|---|
 | App, foreground service, background agent build | PASS | `scripts/build.py` |
 | Nested code signature verification | PASS, ad-hoc | `codesign --verify --deep --strict` |
-| Rust tests | PASS | 13 regular tests across storage, recovery, faults, and controlled swarm suites; real disk-full test passed separately |
+| Rust tests | PASS | 41 active tests across storage, recovery, faults, queue/file management, swarm, and v2 suites; opt-in disk-image test excluded from this follow-up |
 | Rust formatting and Clippy | PASS | Workspace checks with warnings denied |
 | Authenticated foreground XPC | PASS, ad-hoc | In-app `--verify-engine` smoke test |
 | XPC metadata, paused add, limits, restart, restore, removal | PASS | Isolated smoke-test library |
 | Import presentation model against real XPC/Rust | PASS, ad-hoc | Off-main file reading, real metadata, and paused addition through `ImportSession` |
-| Swift UX presentation regressions | PASS | 13 controlled-transport scenarios; not a native input or accessibility certification |
+| Swift UX presentation regressions | PASS | 17 controlled-transport scenarios; not a native input or accessibility certification |
 | Native menu actions and focus | PASS, fixture window | Find focuses NSSearchField; Focus Transfer List focuses NSTableView; Show Library reopens after the last window closes; system key events and real transfers excluded |
 | Exclusive ownership across processes | PASS | Competing startup rejected while child owns lease |
 | Abrupt process death and restoration | PASS | Child killed after durable commands; lock and state recovered |
@@ -37,7 +62,7 @@ validation exception is omitted from certificate-backed and release builds.
 | Independent qBittorrent interoperability | PASS, both directions | 5 scenarios repeated twice against qBittorrent v5.3.0alpha1; 6,947,698 bytes compared exactly |
 | Independent magnet metadata and file selection | PASS | qBittorrent supplied metadata; selected nested files verified; piece-aligned unselected file progress remained zero |
 | v2/hybrid TCP, seeding, magnets and selection | PASS | Nine isolated qBittorrent scenarios; full identity, proofs, alignment and restart regression coverage |
-| Visual rendering | PASS | 22 light/dark library, compact, empty, import, files, settings, multi-selection, filter, recovery, and high-contrast renders |
+| Visual rendering | PASS | 26 light/dark library, compact, import, files, priorities/rename inspector, queue settings, recovery, selection, and high-contrast renders |
 
 Independent transfer SHA-256:
 `631b84027d6b9e52b539c4e8373622d23032dfadc64d60af87339c9037e4f769`.
@@ -71,9 +96,9 @@ certify physical keyboard input, VoiceOver, or reopening with a real transfer.
 
 ## Remaining acceptance gates
 
-- Configure an Apple Development identity and validate background registration,
-  repeated host handoffs, revoked permission, and helper updates with certificate
-  signatures. No valid identity was visible during setup.
+- Validate the final build's certificate-backed lifecycle, revoked permission,
+  and helper updates. Further signing work was deferred by the user; earlier
+  isolated handoff results are recorded above.
 - Exercise logout/login with automatic resume both off and on. Scoped boot/login
   run intent is implemented but not certified by the current tests.
 - Complete keyboard-only and VoiceOver walkthroughs, Increase Contrast,
@@ -87,9 +112,9 @@ certify physical keyboard input, VoiceOver, or reopening with a real transfer.
   directions, malicious proofs, corrupt peer data, and partial restart now have
   dedicated v2/hybrid fixtures. See `V2-HARDENING.md`. Encryption and uTP remain
   separate protocol projects.
-- Complete physical sleep/wake and removable-drive tests before declaring v2
-  hardening complete. Force Recheck is the next feature, followed by file
-  priorities, queueing, relocation, and renaming.
+- Complete the user-deferred physical and actual login checks before declaring
+  recovery acceptance complete. Force Recheck, priorities, basic queueing,
+  relocation, and renaming are implemented; see `FILE-MANAGEMENT.md`.
 
 ## Reproduce
 

@@ -28,7 +28,7 @@ impl StorageFactory for FilesystemStorageFactory {
         _metadata: &TorrentMetadata,
     ) -> anyhow::Result<FilesystemStorage> {
         Ok(FilesystemStorage {
-            output_folder: shared.options.output_folder.clone(),
+            output_folder: shared.options.output_folder.read().clone(),
             opened_files: Default::default(),
         })
     }
@@ -131,9 +131,10 @@ impl TorrentStorage for FilesystemStorage {
         metadata: &TorrentMetadata,
     ) -> anyhow::Result<()> {
         let mut files = Vec::<OpenedFile>::new();
-        for file_details in metadata.file_infos.iter() {
+        let names = shared.options.file_names.read();
+        for (index, file_details) in metadata.file_infos.iter().enumerate() {
             let mut full_path = self.output_folder.clone();
-            let relative_path = &file_details.relative_filename;
+            let relative_path = names.get(&index).unwrap_or(&file_details.relative_filename);
             full_path.push(relative_path);
 
             if file_details.attrs.padding {
@@ -144,12 +145,19 @@ impl TorrentStorage for FilesystemStorage {
             let f = secure_open(
                 &self.output_folder,
                 relative_path,
-                shared.options.allow_overwrite,
+                shared
+                    .options
+                    .allow_overwrite
+                    .load(std::sync::atomic::Ordering::Relaxed),
             )?;
             #[cfg(not(unix))]
             std::fs::create_dir_all(full_path.parent().context("bug: no parent")?)?;
             #[cfg(not(unix))]
-            let f = if shared.options.allow_overwrite {
+            let f = if shared
+                .options
+                .allow_overwrite
+                .load(std::sync::atomic::Ordering::Relaxed)
+            {
                 OpenOptions::new()
                     .create(true)
                     .truncate(false)

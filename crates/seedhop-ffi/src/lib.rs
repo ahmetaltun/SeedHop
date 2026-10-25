@@ -20,6 +20,7 @@ pub struct TransferFile {
     pub size: u64,
     pub downloaded: u64,
     pub selected: bool,
+    pub priority: u8,
 }
 impl From<seedhop_core::FileRecord> for TransferFile {
     fn from(f: seedhop_core::FileRecord) -> Self {
@@ -29,6 +30,7 @@ impl From<seedhop_core::FileRecord> for TransferFile {
             size: f.size,
             downloaded: f.downloaded,
             selected: f.selected,
+            priority: f.priority,
         }
     }
 }
@@ -47,6 +49,8 @@ pub struct Transfer {
     pub files: Vec<TransferFile>,
     pub trackers: Vec<String>,
     pub error: Option<String>,
+    pub queue_position: u32,
+    pub paused_intent: bool,
 }
 impl From<seedhop_core::TorrentRecord> for Transfer {
     fn from(t: seedhop_core::TorrentRecord) -> Self {
@@ -64,6 +68,8 @@ impl From<seedhop_core::TorrentRecord> for Transfer {
             files: t.files.into_iter().map(Into::into).collect(),
             trackers: t.trackers,
             error: t.error,
+            queue_position: t.queue_position,
+            paused_intent: t.paused_intent,
         }
     }
 }
@@ -75,6 +81,7 @@ pub struct EngineSnapshot {
     pub listen_port: u16,
     pub download_limit: u32,
     pub upload_limit: u32,
+    pub max_active_downloads: u32,
     pub torrents: Vec<Transfer>,
 }
 #[derive(uniffi::Record)]
@@ -151,6 +158,7 @@ impl EngineBridge {
             download_limit: s.download_limit,
             upload_limit: s.upload_limit,
             torrents: s.torrents.into_iter().map(Into::into).collect(),
+            max_active_downloads: s.max_active_downloads,
         })
     }
     pub fn inspect(
@@ -194,6 +202,32 @@ impl EngineBridge {
     pub fn select_files(&self, id: String, indices: Vec<u32>) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;
         rt.block_on(core.select_files(id, indices)).map_err(error)
+    }
+    pub fn force_recheck(&self, id: String) -> Result<(), BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.force_recheck(id)).map_err(error)
+    }
+    pub fn set_file_priorities(&self, id: String, priorities: Vec<u8>) -> Result<(), BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.set_file_priorities(id, priorities))
+            .map_err(error)
+    }
+    pub fn set_queue(&self, max_active: u32) -> Result<(), BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.set_queue(max_active)).map_err(error)
+    }
+    pub fn move_in_queue(&self, id: String, position: u32) -> Result<(), BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.move_in_queue(id, position)).map_err(error)
+    }
+    pub fn relocate(&self, id: String, destination: String) -> Result<(), BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.relocate(id, destination)).map_err(error)
+    }
+    pub fn rename_file(&self, id: String, index: u32, name: String) -> Result<(), BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.rename_file(id, index, name))
+            .map_err(error)
     }
     pub fn remove(&self, id: String, delete_files: bool) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;

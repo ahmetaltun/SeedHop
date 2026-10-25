@@ -247,6 +247,12 @@ pub struct AddTorrentOptions {
     /// Start in paused state.
     #[serde(default)]
     pub paused: bool,
+    #[serde(default)]
+    pub queued: bool,
+    #[serde(default)]
+    pub file_names: std::collections::HashMap<usize, PathBuf>,
+    #[serde(default)]
+    pub file_priorities: Vec<u8>,
     /// A regex to only download files matching it.
     pub only_files_regex: Option<String>,
     /// An explicit list of file IDs to download.
@@ -418,6 +424,7 @@ impl Default for DhtSessionConfig {
 }
 
 pub struct SessionOptions {
+    pub restore_queued: bool,
     /// DHT configuration. Set to None to disable DHT entirely.
     /// Defaults to DHT enabled with persistence.
     pub dht: Option<DhtSessionConfig>,
@@ -486,6 +493,7 @@ pub struct SessionOptions {
 impl Default for SessionOptions {
     fn default() -> Self {
         Self {
+            restore_queued: false,
             dht: Some(DhtSessionConfig::default()),
             bind_device_name: None,
             disable_trackers: false,
@@ -590,6 +598,7 @@ impl Session {
         mut opts: SessionOptions,
     ) -> BoxFuture<'static, anyhow::Result<Arc<Self>>> {
         async move {
+            let restore_queued = opts.restore_queued;
             let peer_id = opts
                 .peer_id
                 .unwrap_or_else(|| generate_azereus_style(*b"rQ", crate_version!()));
@@ -904,6 +913,7 @@ impl Session {
                                     let span = add_torrent_span(st.info_hash());
                                     let (add_torrent, mut opts) = st.into_add_torrent()?;
                                     opts.preferred_id = Some(id);
+                                    opts.queued = opts.queued || restore_queued;
                                     let fut = session.add_torrent(add_torrent, Some(opts));
                                     let fut = fut.instrument(span);
                                     futs.push(fut);
@@ -1418,8 +1428,10 @@ impl Session {
                     force_tracker_interval: opts.force_tracker_interval,
                     peer_connect_timeout: peer_opts.connect_timeout,
                     peer_read_write_timeout: peer_opts.read_write_timeout,
-                    allow_overwrite: opts.overwrite,
-                    output_folder,
+                    allow_overwrite: std::sync::atomic::AtomicBool::new(opts.overwrite),
+                    output_folder: RwLock::new(output_folder),
+                    file_names: RwLock::new(opts.file_names.clone()),
+                    file_priorities: RwLock::new(opts.file_priorities.clone()),
                     ratelimits: opts.ratelimits,
                     initial_peers: opts.initial_peers.clone().unwrap_or_default(),
                     peer_limit: opts.peer_limit.or(self.peer_limit),
@@ -1443,6 +1455,7 @@ impl Session {
             let handle = Arc::new(ManagedTorrent {
                 locked: RwLock::new(ManagedTorrentLocked {
                     paused: opts.paused,
+                    queued: opts.queued,
                     state: ManagedTorrentState::Initializing(initializing),
                     only_files,
                 }),
@@ -1463,6 +1476,11 @@ impl Session {
         }
 
         let _e = managed_torrent.shared.span.clone().entered();
+        managed_torrent
+            .shared
+            .options
+            .allow_overwrite
+            .store(true, std::sync::atomic::Ordering::Relaxed);
 
         managed_torrent
             .start(peer_rx, opts.paused)
@@ -1553,7 +1571,13 @@ impl Session {
             (Err(e), true) => return Err(e).context("torrent deleted, but could not delete files"),
             (Ok(storage), true) => {
                 debug!("will delete files");
-                remove_files_and_dirs(&metadata.file_infos, &storage)?;
+                let mut infos = metadata.file_infos.clone();
+                for (index, name) in removed.file_names() {
+                    if let Some(info) = infos.get_mut(index) {
+                        info.relative_filename = name;
+                    }
+                }
+                remove_files_and_dirs(&infos, &storage)?;
                 // SeedHop: explicit destinations belong to the user, not to the torrent.
                 // Remove only empty directories inside the torrent, never the selected root.
             }
@@ -1665,6 +1689,61 @@ impl Session {
         handle.pause()?;
         self.try_update_persistence_metadata(handle).await?;
         Ok(())
+    }
+
+    pub async fn force_recheck(
+        self: &Arc<Self>,
+        handle: &ManagedTorrentHandle,
+    ) -> anyhow::Result<()> {
+        // Verify persistence first. Rechecking never changes selection or pause
+        // intent and never removes/re-adds library membership.
+        self.try_update_persistence_metadata(handle).await?;
+        let paused = handle.prepare_recheck()?;
+        let peers = if paused {
+            None
+        } else {
+            self.make_peer_rx_managed_torrent(handle, true)
+        };
+        handle.start(peers, paused)
+    }
+
+    pub async fn set_queued(
+        self: &Arc<Self>,
+        handle: &ManagedTorrentHandle,
+        queued: bool,
+    ) -> anyhow::Result<()> {
+        let old = handle.is_queued();
+        handle.set_queued(queued)?;
+        if let Err(error) = self.try_update_persistence_metadata(handle).await {
+            handle.set_queued(old)?;
+            if !old && !handle.is_paused() {
+                handle.start(self.make_peer_rx_managed_torrent(handle, true), false)?;
+            }
+            return Err(error);
+        }
+        if !queued && !handle.is_paused() {
+            handle.start(self.make_peer_rx_managed_torrent(handle, true), false)?;
+        }
+        Ok(())
+    }
+
+    pub async fn update_file_priorities(
+        self: &Arc<Self>,
+        handle: &ManagedTorrentHandle,
+        priorities: Vec<u8>,
+    ) -> anyhow::Result<()> {
+        let old = handle.file_priorities();
+        handle.quiesce()?;
+        handle.replace_file_priorities(priorities)?;
+        let result = self.try_update_persistence_metadata(handle).await;
+        if result.is_err() {
+            *handle.shared.options.file_priorities.write() = old;
+        }
+        handle.start(
+            self.make_peer_rx_managed_torrent(handle, true),
+            handle.is_paused(),
+        )?;
+        result
     }
 
     pub async fn unpause(self: &Arc<Self>, handle: &ManagedTorrentHandle) -> anyhow::Result<()> {

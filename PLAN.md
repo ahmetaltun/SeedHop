@@ -86,7 +86,21 @@ The milestone passes only when transfer integrity, exclusive ownership, persiste
 
 - Hardened Runtime is enabled; App Sandbox is disabled.
 - The first public preview supports v1, with explicit protocol gaps. Full protocol coverage remains required later.
-- Configure an Apple Development identity before signed helper validation; none was visible to the current tool session.
+- Use an existing Apple Development identity for signed helper validation when that gate resumes. Further signing and physical recovery checks were deferred by the user on 2026-10-25.
 - Deliver the design foundation, screen designs, polished working main window and add flow, reproducible builds, fixtures, lifecycle results, and engine capability report.
 - RSS, search, media playback, remote Web UI, and qBittorrent API compatibility remain subsequent milestones.
 - **Every subsequent milestone includes design, implementation, and UX verification together. Visual quality is part of feature completion.**
+
+## Transfer-control follow-up — 2026-10-25
+
+Force Recheck → file priorities → basic queueing → relocation → local renaming
+are implemented with engine, XPC, and native UI coverage. Rechecks and storage
+changes preserve selection and user pause intent; queue suspension is separate
+from user pause. See `docs/FILE-MANAGEMENT.md` for verification and remaining limits.
+
+Physical sleep/wake, drive removal, interface loss, actual logout/login, and
+further signing validation remain open, deferred at the user's request. Preliminary
+certificate-backed handoff and simulated login-policy results are recorded in
+`docs/VALIDATION.md`. Final local builds use ad-hoc signing. These deferrals do
+not constitute milestone acceptance. Encryption and uTP remain separate protocol
+projects and were not included in the file-management work.

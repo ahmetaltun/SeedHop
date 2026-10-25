@@ -31,6 +31,7 @@ pub fn preview(bytes: Vec<u8>) -> Result<TorrentPreview> {
             size: f.len,
             downloaded: 0,
             selected: true,
+            priority: 1,
         })
         .collect();
     if files.is_empty() {
@@ -62,6 +63,7 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
         .unwrap_or(0);
     let state = match stats.state {
         TorrentStatsState::Initializing { .. } => "checking",
+        TorrentStatsState::Paused if torrent.is_queued() && !torrent.is_paused() => "queued",
         TorrentStatsState::Paused => "paused",
         TorrentStatsState::Error => "error",
         TorrentStatsState::Live if stats.finished => "seeding",
@@ -69,6 +71,8 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
         TorrentStatsState::Live => "downloading",
     };
     let selected = torrent.only_files();
+    let names = torrent.file_names();
+    let priorities = torrent.file_priorities();
     let files = torrent
         .with_metadata(|meta| {
             meta.info
@@ -76,10 +80,14 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
                 .enumerate()
                 .map(|(i, file)| FileRecord {
                     index: i as u32,
-                    name: file.filename.to_string(),
+                    name: names
+                        .get(&i)
+                        .map(|p| p.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| file.filename.to_string()),
                     size: file.len,
                     downloaded: stats.file_progress.get(i).copied().unwrap_or(0),
                     selected: selected.as_ref().is_none_or(|s| s.contains(&i)),
+                    priority: priorities.get(i).copied().unwrap_or(1),
                 })
                 .collect()
         })
@@ -110,6 +118,8 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
             .map(|u| u.to_string())
             .collect(),
         error: stats.error,
+        queue_position: 0,
+        paused_intent: torrent.is_paused(),
     }
 }
 

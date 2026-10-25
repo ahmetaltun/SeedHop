@@ -239,12 +239,16 @@ impl TorrentStateLive {
         let file_priorities = {
             let mut pri = (0..paused.metadata.file_infos.len()).collect::<Vec<usize>>();
             // sort by filename, cause many torrents have random sort order.
+            let priorities = paused.shared.options.file_priorities.read();
             pri.sort_unstable_by_key(|id| {
-                paused
-                    .metadata
-                    .file_infos
-                    .get(*id)
-                    .map(|fi| fi.relative_filename.as_path())
+                (
+                    std::cmp::Reverse(priorities.get(*id).copied().unwrap_or(1)),
+                    paused
+                        .metadata
+                        .file_infos
+                        .get(*id)
+                        .map(|fi| fi.relative_filename.as_path()),
+                )
             });
             pri
         };

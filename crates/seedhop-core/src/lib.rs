@@ -1,4 +1,5 @@
 pub mod adapter;
+mod management;
 mod model;
 pub mod storage;
 pub mod v2;
@@ -16,7 +17,7 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 
 /// Owns library state. The FFI host retains this lease until its runtime has stopped.
 pub struct Engine {
@@ -27,6 +28,7 @@ pub struct Engine {
     operations: RwLock<()>,
     resolving: Mutex<HashMap<String, tokio::sync::watch::Sender<bool>>>,
     stopping: AtomicBool,
+    queue: Mutex<management::QueueConfig>,
 }
 
 impl Engine {
@@ -68,19 +70,31 @@ impl Engine {
                                 "Saved v2 identity does not match torrent metadata.".into(),
                             ));
                         }
-                        storage::validate_destination(
-                            Path::new(folder),
-                            &preview
-                                .files
-                                .iter()
-                                .map(|f| f.name.clone())
-                                .collect::<Vec<_>>(),
-                        )?;
+                        let mut paths: Vec<_> =
+                            preview.files.iter().map(|f| f.name.clone()).collect();
+                        if let Some(names) = saved["file_names"].as_object() {
+                            for (index, name) in names {
+                                let index: usize = index.parse().map_err(|_| {
+                                    CoreError::CorruptState("Invalid renamed file index".into())
+                                })?;
+                                let path = paths.get_mut(index).ok_or_else(|| {
+                                    CoreError::CorruptState("Invalid renamed file index".into())
+                                })?;
+                                *path = name
+                                    .as_str()
+                                    .ok_or_else(|| {
+                                        CoreError::CorruptState("Invalid renamed file path".into())
+                                    })?
+                                    .into();
+                            }
+                        }
+                        storage::validate_destination(Path::new(folder), &paths)?;
                     }
                 }
             }
         }
         let limits_path = dir.join("limits.json");
+        let queue = management::QueueConfig::load(&dir)?;
         let limits: [u32; 2] = if limits_path.exists() {
             serde_json::from_slice(&std::fs::read(limits_path).map_err(storage::io_error)?)
                 .map_err(|e| CoreError::CorruptState(e.to_string()))?
@@ -88,6 +102,7 @@ impl Engine {
             [0, 0]
         };
         let options = SessionOptions {
+            restore_queued: queue.max_active > 0,
             ratelimits: librqbit::limits::LimitsConfig {
                 download_bps: NonZeroU32::new(limits[0]),
                 upload_bps: NonZeroU32::new(limits[1]),
@@ -115,7 +130,7 @@ impl Engine {
         let session = Session::new_with_opts(downloads, options)
             .await
             .map_err(adapter::engine_error)?;
-        Ok(Arc::new(Self {
+        let engine = Arc::new(Self {
             session,
             lease,
             state_directory: dir,
@@ -123,7 +138,23 @@ impl Engine {
             operations: RwLock::new(()),
             resolving: Mutex::new(HashMap::new()),
             stopping: AtomicBool::new(false),
-        }))
+            queue: Mutex::new(queue),
+        });
+        let weak = Arc::downgrade(&engine);
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_millis(250)).await;
+                let Some(engine) = weak.upgrade() else { break };
+                if engine.stopping.load(Ordering::SeqCst) {
+                    break;
+                }
+                let _operation = engine.operations.write().await;
+                // Retry failed persistence on the next tick. Commands still
+                // report their own persistence errors directly to the caller.
+                let _ = engine.reconcile_queue().await;
+            }
+        });
+        Ok(engine)
     }
 
     fn ready(&self) -> Result<()> {
@@ -140,6 +171,15 @@ impl Engine {
             .session
             .with_torrents(|ts| ts.map(|(_, t)| adapter::record(t)).collect::<Vec<_>>());
         torrents.sort_by_key(|a| a.name.to_lowercase());
+        let queue = self.queue.lock().unwrap();
+        for torrent in &mut torrents {
+            torrent.queue_position = queue
+                .order
+                .iter()
+                .position(|id| id == &torrent.id)
+                .map(|i| i as u32 + 1)
+                .unwrap_or(0);
+        }
         Ok(Snapshot {
             protocol_version: PROTOCOL_VERSION,
             engine_version: "librqbit 9.0.1 + SeedHop patches".into(),
@@ -158,6 +198,7 @@ impl Engine {
                 .map(|v| v.get())
                 .unwrap_or(0),
             torrents,
+            max_active_downloads: queue.max_active,
         })
     }
 
@@ -258,6 +299,7 @@ impl Engine {
         if !reuse && metadata.files.iter().any(|f| root.join(&f.name).exists()) {
             return Err(CoreError::InvalidInput("Files already exist here. Enable verification of existing files or choose another folder.".into()));
         }
+        let queued = self.queue.lock().unwrap().max_active > 0;
         self.session
             .add_torrent(
                 AddTorrent::TorrentFileBytes(bytes.into()),
@@ -265,6 +307,7 @@ impl Engine {
                     output_folder: Some(root.to_string_lossy().into()),
                     only_files: Some(selected.into_iter().map(|i| i as usize).collect()),
                     paused,
+                    queued,
                     overwrite: reuse,
                     ..Default::default()
                 }),
@@ -324,9 +367,17 @@ impl Engine {
         if paused {
             self.session.pause(&handle).await
         } else {
+            let queued = self.queue.lock().unwrap().max_active > 0;
+            if queued {
+                self.session
+                    .set_queued(&handle, true)
+                    .await
+                    .map_err(adapter::engine_error)?;
+            }
             self.session.unpause(&handle).await
         }
-        .map_err(adapter::engine_error)
+        .map_err(adapter::engine_error)?;
+        self.reconcile_queue().await
     }
 
     pub async fn select_files(&self, id: String, indices: Vec<u32>) -> Result<()> {
@@ -339,6 +390,32 @@ impl Engine {
         }
         self.session
             .update_only_files(&handle, &indices.into_iter().map(|i| i as usize).collect())
+            .await
+            .map_err(adapter::engine_error)
+    }
+
+    pub async fn force_recheck(&self, id: String) -> Result<()> {
+        let _operation = self.operations.write().await;
+        self.ready()?;
+        let handle = self.handle(&id)?;
+        let record = adapter::record(&handle);
+        let root = Path::new(&record.destination);
+        if !root.is_dir() {
+            return Err(CoreError::Storage(format!(
+                "The saved destination is unavailable: {}. Reconnect the drive and retry.",
+                record.destination
+            )));
+        }
+        storage::validate_destination(
+            root,
+            &record
+                .files
+                .iter()
+                .map(|f| f.name.clone())
+                .collect::<Vec<_>>(),
+        )?;
+        self.session
+            .force_recheck(&handle)
             .await
             .map_err(adapter::engine_error)
     }

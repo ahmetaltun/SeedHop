@@ -98,6 +98,126 @@ pub fn validate_destination(root: &Path, relative_paths: &[String]) -> Result<()
     Ok(())
 }
 
+// Descriptor-relative traversal keeps a concurrent symlink replacement from
+// redirecting file-management writes or cleanup outside the chosen folders.
+fn relative_parent(
+    root: &Path,
+    name: &str,
+    create: bool,
+) -> std::io::Result<(File, std::ffi::CString)> {
+    use std::os::{fd::FromRawFd, unix::ffi::OsStrExt};
+    let mut directory = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+        .open(root)?;
+    let parts: Vec<_> = Path::new(name).components().collect();
+    if parts.is_empty() {
+        return Err(std::io::Error::other("Empty file name"));
+    }
+    for (index, part) in parts.iter().enumerate() {
+        let Component::Normal(part) = part else {
+            return Err(std::io::Error::other("Unsafe file name"));
+        };
+        let part = std::ffi::CString::new(part.as_bytes())?;
+        if index + 1 == parts.len() {
+            return Ok((directory, part));
+        }
+        if create {
+            // SAFETY: valid owned parent descriptor and terminated component.
+            let result = unsafe { libc::mkdirat(directory.as_raw_fd(), part.as_ptr(), 0o755) };
+            if result != 0
+                && std::io::Error::last_os_error().kind() != std::io::ErrorKind::AlreadyExists
+            {
+                return Err(std::io::Error::last_os_error());
+            }
+            directory.sync_all()?;
+        }
+        let fd = unsafe {
+            libc::openat(
+                directory.as_raw_fd(),
+                part.as_ptr(),
+                libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            )
+        };
+        if fd < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        directory = unsafe { File::from_raw_fd(fd) };
+    }
+    unreachable!()
+}
+
+pub(crate) fn copy_exclusive(
+    source_root: &Path,
+    source: &str,
+    target_root: &Path,
+    target: &str,
+) -> Result<bool> {
+    use std::os::fd::FromRawFd;
+    let result = (|| -> std::io::Result<bool> {
+        let (parent, source) = match relative_parent(source_root, source, false) {
+            Ok(value) => value,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(e) => return Err(e),
+        };
+        let fd = unsafe {
+            libc::openat(
+                parent.as_raw_fd(),
+                source.as_ptr(),
+                libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            )
+        };
+        if fd < 0 {
+            let error = std::io::Error::last_os_error();
+            if error.kind() == std::io::ErrorKind::NotFound {
+                return Ok(false);
+            }
+            return Err(error);
+        }
+        let mut input = unsafe { File::from_raw_fd(fd) };
+        if !input.metadata()?.is_file() {
+            return Err(std::io::Error::other("Source is not a regular file"));
+        }
+        input.sync_all()?;
+        let (parent, target) = relative_parent(target_root, target, true)?;
+        let fd = unsafe {
+            libc::openat(
+                parent.as_raw_fd(),
+                target.as_ptr(),
+                libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+                0o644,
+            )
+        };
+        if fd < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        let mut output = unsafe { File::from_raw_fd(fd) };
+        let result = std::io::copy(&mut input, &mut output)
+            .and_then(|_| output.sync_all())
+            .and_then(|_| parent.sync_all());
+        if let Err(error) = result {
+            unsafe {
+                libc::unlinkat(parent.as_raw_fd(), target.as_ptr(), 0);
+            }
+            return Err(error);
+        }
+        Ok(true)
+    })();
+    result.map_err(io_error)
+}
+
+pub(crate) fn remove_relative(root: &Path, name: &str) -> Result<()> {
+    let (parent, name) = relative_parent(root, name, false).map_err(io_error)?;
+    let result = unsafe { libc::unlinkat(parent.as_raw_fd(), name.as_ptr(), 0) };
+    if result != 0 {
+        let error = std::io::Error::last_os_error();
+        if error.kind() != std::io::ErrorKind::NotFound {
+            return Err(io_error(error));
+        }
+    }
+    parent.sync_all().map_err(io_error)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

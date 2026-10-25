@@ -55,6 +55,26 @@ import Foundation
             try expect(peer.commands("pause").count == 1 && store.selection == [other],"Duplicate command or unrelated selection loss")
         }
 
+        try await check("Recheck captures targets, preserves choices, and allows retry after failure") {
+            let (store, peer) = library(); peer.hold = ["recheck"]
+            let first = store.torrents[0], other = store.torrents[1].id
+            store.selection = [first.id]; store.recheckSelected(); store.recheckSelected()
+            store.selection = [other]
+            try await eventually { peer.pending.count == 1 }
+            try expect(peer.pending[0].request.id == first.id,"Recheck followed a later selection")
+            peer.releaseFirst(error:UserFacingError(message:"Reconnect the drive and retry."))
+            try await eventually { store.busyTransfers.isEmpty }
+            try expect(store.error != nil && store.selection == [other],"Recheck failure was hidden or changed selection")
+            store.selection = [first.id]; store.recheckSelected()
+            try await eventually { peer.pending.count == 1 }
+            peer.releaseFirst()
+            try await eventually { store.busyTransfers.isEmpty }
+            try expect(store.torrents[0].files == first.files && store.torrents[0].state == first.state && store.error == nil,"Recheck changed choices or pause state")
+            peer.torrents[0].state = "checking"; await store.refresh()
+            store.recheckSelected()
+            try expect(peer.commands("recheck").count == 2,"A verifying transfer accepted a duplicate recheck")
+        }
+
         try await check("Removal confirmation retains original targets and keeps files by default") {
             let (store, peer) = library(); peer.hold = ["remove"]
             let first = store.torrents[0].id, other = store.torrents[1].id
@@ -92,6 +112,55 @@ import Foundation
             try await eventually { store.busyTransfers.isEmpty }
             try expect(store.torrents[0].files.filter(\.selected).map(\.index) == [0,2],"Retry did not persist the new choices")
             try expect(store.error == nil,"A successful retry retained the old failure notice")
+        }
+
+        try await check("Priorities preserve choices and serialize per transfer") {
+            let (store, peer) = library(); peer.hold = ["priorities"]
+            let item = store.torrents[0], file = store.torrents[0].files[0]
+            store.setPriority(item,file:file,priority:2); store.setPriority(item,file:file,priority:0)
+            try await eventually { peer.pending.count == 1 }
+            try expect(peer.pending[0].request.priorities?.first == 2,"Priority choices were overtaken")
+            peer.releaseFirst(error:UserFacingError(message:"Could not save priorities"))
+            try await eventually { store.busyTransfers.isEmpty }
+            try expect(store.torrents[0].files == item.files && store.error != nil,"Failed priority save changed file choices")
+            store.setPriority(item,file:file,priority:2)
+            try await eventually { peer.pending.count == 1 }; peer.releaseFirst()
+            try await eventually { store.busyTransfers.isEmpty }
+            try expect(store.torrents[0].files[0].priority == 2 && store.torrents[0].files.map(\.selected) == item.files.map(\.selected),"Priority changed selection")
+        }
+        try await check("Queue limits report failure, retry, and capture reorder targets") {
+            let (store, peer) = library(); peer.hold = ["queue", "queueMove"]
+            store.setQueueLimit(1); store.setQueueLimit(2)
+            try await eventually { peer.pending.count == 1 }
+            peer.releaseFirst(error:UserFacingError(message:"Could not save queue"))
+            try await eventually { !store.savingQueue }
+            try expect(store.maxActiveDownloads == 0 && store.error != nil,"Queue failure was hidden")
+            store.setQueueLimit(2); try await eventually { peer.pending.count == 1 }; peer.releaseFirst()
+            try await eventually { !store.savingQueue }
+            try expect(store.maxActiveDownloads == 2,"Queue retry failed")
+            let first = store.torrents[0].id, other = store.torrents[1].id
+            store.selection = [first]; store.moveSelectedToFront(); store.selection = [other]
+            try await eventually { peer.pending.count == 1 }
+            try expect(peer.pending[0].request.id == first && peer.pending[0].request.queuePosition == 1,"Queue action followed changed selection")
+            peer.releaseFirst(); try await eventually { store.busyTransfers.isEmpty }
+            try expect(store.selection == [other],"Queue action lost another selection")
+        }
+        try await check("File move and rename failures preserve state and remain retryable") {
+            let (store, peer) = library(); peer.hold = ["rename", "relocate"]
+            let item = store.torrents[0], other = store.torrents[1].id
+            var rename = EngineRequest(command:"rename"); rename.id = item.id; rename.fileIndex = item.files[0].index; rename.fileName = "renamed.bin"
+            store.updateTransfer(rename); store.updateTransfer(rename); store.selection = [other]
+            try await eventually { peer.pending.count == 1 }
+            peer.releaseFirst(error:UserFacingError(message:"A file already exists"))
+            try await eventually { store.busyTransfers.isEmpty }
+            try expect(store.torrents[0].files == item.files && store.error != nil,"Rename failure altered paths")
+            store.updateTransfer(rename); try await eventually { peer.pending.count == 1 }; peer.releaseFirst()
+            try await eventually { store.busyTransfers.isEmpty }
+            var move = EngineRequest(command:"relocate"); move.id = item.id; move.destination = "/Volumes/Test/Transfers"
+            store.updateTransfer(move); try await eventually { peer.pending.count == 1 }; peer.releaseFirst()
+            try await eventually { store.busyTransfers.isEmpty }
+            try expect(store.selection == [other] && store.torrents[0].destination == move.destination && store.torrents[0].files[0].name == "renamed.bin","Storage action targeted changed selection or failed to refresh")
+            try expect(store.torrents[0].state == item.state && store.torrents[0].files.map(\.selected) == item.files.map(\.selected),"Storage action changed pause intent or file choices")
         }
 
         try await check("Cancelled metadata cannot change a new attempt") {
@@ -206,6 +275,7 @@ import Foundation
     var hold = Set<String>()
     var torrents: [TorrentItem] = []
     var metadata: ImportPreview?
+    var maxActiveDownloads: UInt32 = 0
     func connect(background: Bool) throws {}
     func invalidate() {}
     func commands(_ name: String) -> [EngineRequest] { requests.filter { $0.command == name } }
@@ -224,13 +294,24 @@ import Foundation
     private func reply(to request: EngineRequest) -> EngineReply {
         switch request.command {
         case "snapshot":
-            return EngineReply(snapshot:LibrarySnapshot(protocolVersion:1,engineVersion:"test",instanceId:"fixture",listenPort:0,downloadLimit:0,uploadLimit:0,torrents:torrents))
+            return EngineReply(snapshot:LibrarySnapshot(protocolVersion:UInt32(SeedHopIdentity.protocolVersion),engineVersion:"test",instanceId:"fixture",listenPort:0,downloadLimit:0,uploadLimit:0,maxActiveDownloads:maxActiveDownloads,torrents:torrents))
         case "inspect": return EngineReply(preview:metadata)
         case "remove": torrents.removeAll { $0.id == request.id }
         case "select":
             if let at = torrents.firstIndex(where: { $0.id == request.id }) {
                 for index in torrents[at].files.indices { torrents[at].files[index].selected = request.selected?.contains(torrents[at].files[index].index) == true }
             }
+        case "priorities":
+            if let at = torrents.firstIndex(where: { $0.id == request.id }), let priorities = request.priorities {
+                for index in torrents[at].files.indices { torrents[at].files[index].priority = priorities[index] }
+            }
+        case "queue": maxActiveDownloads = request.maxActiveDownloads ?? 0
+        case "queueMove":
+            if let at = torrents.firstIndex(where: { $0.id == request.id }) { torrents[at].queuePosition = request.queuePosition ?? 1 }
+        case "relocate":
+            if let at = torrents.firstIndex(where: { $0.id == request.id }), let destination = request.destination { torrents[at].destination = destination }
+        case "rename":
+            if let at = torrents.firstIndex(where: { $0.id == request.id }), let file = torrents[at].files.firstIndex(where: { $0.index == request.fileIndex }), let name = request.fileName { torrents[at].files[file].name = name }
         case "pause":
             if let at = torrents.firstIndex(where: { $0.id == request.id }) { torrents[at].state = request.paused == true ? "paused" : "downloading" }
         default: break

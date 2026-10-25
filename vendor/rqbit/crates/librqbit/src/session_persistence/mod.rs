@@ -32,6 +32,12 @@ pub struct SerializedTorrent {
     output_folder: PathBuf,
     only_files: Option<Vec<usize>>,
     is_paused: bool,
+    #[serde(default)]
+    is_queued: bool,
+    #[serde(default)]
+    file_names: std::collections::HashMap<usize, PathBuf>,
+    #[serde(default)]
+    file_priorities: Vec<u8>,
 }
 
 impl SerializedTorrent {
@@ -71,6 +77,9 @@ impl SerializedTorrent {
 
         let opts = AddTorrentOptions {
             paused: self.is_paused,
+            queued: self.is_queued,
+            file_names: self.file_names,
+            file_priorities: self.file_priorities,
             output_folder: Some(
                 self.output_folder
                     .to_str()

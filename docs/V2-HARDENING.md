@@ -1,8 +1,9 @@
 # V2 hardening checkpoint — October 25, 2026
 
-The next feature is explicit Force Recheck. Keep file priorities, queueing,
-relocation, and renaming behind the remaining hardening checks. Encryption and
-uTP are separate protocol projects. This checkpoint does not declare release
+Follow-up: Force Recheck, priorities, basic queueing, relocation, and renaming
+are implemented; see `FILE-MANAGEMENT.md`. Physical recovery and further signing
+checks were deferred by the user. They remain open acceptance gates. Encryption
+and uTP remain separate protocol projects. This checkpoint does not declare release
 readiness.
 
 ## Changes
@@ -68,10 +69,10 @@ settings, fixture files, downloaded bytes, and diagnostics remain at the listed
   check reports zero valid identities visible to this session.
 - Accessibility and manual native interaction acceptance in `VALIDATION.md`.
 
-Force Recheck has not been added in this checkpoint. After hardening, implement
-it across engine, FFI/XPC, and UI with progress, cancellation/error handling,
-selection and user-pause preservation. Then take file priorities, queueing,
-relocation, and renaming in that order.
+The later transfer-control follow-up implements Force Recheck, priorities,
+basic queueing, relocation, and local renaming across engine, FFI/XPC, and UI.
+See `FILE-MANAGEMENT.md` and `VALIDATION.md` for executed checks and user-deferred
+physical and signing acceptance work.
 
 ## Reproduce
 

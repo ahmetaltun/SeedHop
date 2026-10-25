@@ -753,6 +753,231 @@ async fn recovery_swarm(hybrid: bool) -> support::Swarm {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn v2_and_hybrid_layout_changes_keep_identity_bytes_and_running_intent() {
+    for hybrid in [false, true] {
+        let swarm = recovery_swarm(hybrid).await;
+        for paused in [false, true] {
+            let state = tempfile::tempdir().unwrap();
+            let downloads = tempfile::tempdir().unwrap();
+            let target = tempfile::tempdir().unwrap();
+            let cfg = engine_config(state.path(), downloads.path());
+            std::fs::write(downloads.path().join("payload.bin"), &swarm.content).unwrap();
+            let engine = seedhop_core::Engine::open(cfg.clone()).await.unwrap();
+            let id = engine
+                .add(
+                    swarm.metadata.clone(),
+                    cfg.download_directory.clone(),
+                    vec![0],
+                    paused,
+                    true,
+                )
+                .await
+                .unwrap();
+            settled(&engine).await;
+            engine
+                .set_file_priorities(id.clone(), vec![2])
+                .await
+                .unwrap();
+            engine
+                .rename_file(id.clone(), 0, "nested/renamed.bin".into())
+                .await
+                .unwrap();
+            settled(&engine).await;
+            engine
+                .relocate(id.clone(), target.path().to_string_lossy().into())
+                .await
+                .unwrap();
+            let item = settled(&engine).await;
+            assert_eq!(item.id, id);
+            assert_eq!(item.state, if paused { "paused" } else { "seeding" });
+            assert_eq!(item.files[0].priority, 2);
+            assert!(item.files[0].selected);
+            assert_eq!(
+                std::fs::read(target.path().join("nested/renamed.bin")).unwrap(),
+                swarm.content
+            );
+            assert!(!downloads.path().join("nested/renamed.bin").exists());
+            engine.shutdown().await.unwrap();
+            drop(engine);
+            let engine = seedhop_core::Engine::open(cfg).await.unwrap();
+            let item = settled(&engine).await;
+            assert_eq!(item.id, id);
+            assert_eq!(item.state, if paused { "paused" } else { "seeding" });
+            assert_eq!(item.files[0].name, "nested/renamed.bin");
+            assert_eq!(item.files[0].priority, 2);
+            engine.remove(id, true).await.unwrap();
+            assert!(!target.path().join("nested/renamed.bin").exists());
+            engine.shutdown().await.unwrap();
+        }
+        swarm.seed.shutdown().await.unwrap();
+    }
+    let state = tempfile::tempdir().unwrap();
+    let downloads = tempfile::tempdir().unwrap();
+    let target = tempfile::tempdir().unwrap();
+    let cfg = engine_config(state.path(), downloads.path());
+    let engine = seedhop_core::Engine::open(cfg.clone()).await.unwrap();
+    let a = vec![2; 65536];
+    let b = vec![3; 65536];
+    std::fs::write(downloads.path().join("a"), &a).unwrap();
+    std::fs::write(downloads.path().join("b"), &b).unwrap();
+    let id = engine
+        .add(
+            encode(&fixture(&[("a", a), ("b", b.clone())], 32768)),
+            cfg.download_directory.clone(),
+            vec![1],
+            true,
+            true,
+        )
+        .await
+        .unwrap();
+    settled(&engine).await;
+    engine
+        .set_file_priorities(id.clone(), vec![0, 2])
+        .await
+        .unwrap();
+    engine
+        .rename_file(id.clone(), 1, "new-b".into())
+        .await
+        .unwrap();
+    settled(&engine).await;
+    engine
+        .relocate(id.clone(), target.path().to_string_lossy().into())
+        .await
+        .unwrap();
+    settled(&engine).await;
+    engine.shutdown().await.unwrap();
+    drop(engine);
+    let engine = seedhop_core::Engine::open(cfg).await.unwrap();
+    let item = settled(&engine).await;
+    assert!(!item.files[0].selected && item.files[1].selected);
+    assert_eq!(item.files[0].priority, 0);
+    assert_eq!(item.files[1].priority, 2);
+    assert_eq!(item.state, "paused");
+    assert_eq!(std::fs::read(target.path().join("new-b")).unwrap(), b);
+    engine.shutdown().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn partial_v2_and_hybrid_downloads_continue_after_relocation_and_rename() {
+    for hybrid in [false, true] {
+        let swarm = recovery_swarm(hybrid).await;
+        let state = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let target = tempfile::tempdir().unwrap();
+        let cfg = engine_config(state.path(), downloads.path());
+        let engine = seedhop_core::Engine::open(cfg.clone()).await.unwrap();
+        engine.set_limits(256 * 1024, 0).await.unwrap();
+        let id = engine
+            .add(
+                swarm.metadata.clone(),
+                cfg.download_directory,
+                vec![0],
+                false,
+                false,
+            )
+            .await
+            .unwrap();
+        let partial = support::wait_for(&engine, |t| {
+            t.downloaded_bytes >= 65536 && t.state != "checking"
+        })
+        .await;
+        assert!(partial.downloaded_bytes < partial.total_bytes);
+        engine
+            .relocate(id.clone(), target.path().to_string_lossy().into())
+            .await
+            .unwrap();
+        settled(&engine).await;
+        engine
+            .rename_file(id.clone(), 0, "moved.bin".into())
+            .await
+            .unwrap();
+        settled(&engine).await;
+        engine.set_limits(0, 0).await.unwrap();
+        let finished = support::wait_for(&engine, |t| t.state == "seeding").await;
+        assert_eq!(finished.id, id);
+        assert!(finished.files[0].selected);
+        assert_eq!(
+            std::fs::read(target.path().join("moved.bin")).unwrap(),
+            swarm.content
+        );
+        assert!(!downloads.path().join("payload.bin").exists());
+        engine.shutdown().await.unwrap();
+        swarm.seed.shutdown().await.unwrap();
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn force_recheck_v2_and_hybrid_repair_live_corruption_and_keep_paused_selection() {
+    for hybrid in [false, true] {
+        let swarm = recovery_swarm(hybrid).await;
+        let state = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let cfg = engine_config(state.path(), downloads.path());
+        let path = downloads.path().join("payload.bin");
+        std::fs::write(&path, &swarm.content).unwrap();
+        let engine = seedhop_core::Engine::open(cfg.clone()).await.unwrap();
+        let id = engine
+            .add(
+                swarm.metadata.clone(),
+                cfg.download_directory,
+                vec![0],
+                true,
+                true,
+            )
+            .await
+            .unwrap();
+        support::wait_for(&engine, |t| t.state == "paused").await;
+        std::fs::write(&path, vec![0; swarm.content.len()]).unwrap();
+        engine.force_recheck(id.clone()).await.unwrap();
+        let checked = support::wait_for(&engine, |t| t.state == "paused").await;
+        assert_eq!(checked.downloaded_bytes, 0);
+        assert_eq!(checked.id, id);
+        engine.set_paused(id.clone(), false).await.unwrap();
+        support::wait_for(&engine, |t| t.state == "seeding").await;
+        assert_eq!(std::fs::read(&path).unwrap(), swarm.content);
+        // A live recheck must stop peers, discard the old verified map, and
+        // automatically repair bytes without an extra Resume command.
+        std::fs::write(&path, vec![1; swarm.content.len()]).unwrap();
+        engine.force_recheck(id.clone()).await.unwrap();
+        support::wait_for(&engine, |t| t.state == "seeding").await;
+        assert_eq!(std::fs::read(&path).unwrap(), swarm.content);
+        engine.shutdown().await.unwrap();
+        swarm.seed.shutdown().await.unwrap();
+    }
+    // A multi-file selection remains unchanged after hashing and restart.
+    let state = tempfile::tempdir().unwrap();
+    let downloads = tempfile::tempdir().unwrap();
+    let cfg = engine_config(state.path(), downloads.path());
+    let engine = seedhop_core::Engine::open(cfg.clone()).await.unwrap();
+    let id = engine
+        .add(
+            encode(&fixture(
+                &[("a", vec![2; 65536]), ("b", vec![3; 65536])],
+                32768,
+            )),
+            cfg.download_directory.clone(),
+            vec![1],
+            true,
+            false,
+        )
+        .await
+        .unwrap();
+    settled(&engine).await;
+    engine.force_recheck(id.clone()).await.unwrap();
+    let item = settled(&engine).await;
+    assert!(!item.files[0].selected && item.files[1].selected);
+    assert_eq!(item.state, "paused");
+    engine.shutdown().await.unwrap();
+    drop(engine);
+    let engine = seedhop_core::Engine::open(cfg).await.unwrap();
+    let item = settled(&engine).await;
+    assert_eq!(item.id, id);
+    assert_eq!(item.state, "paused");
+    assert!(!item.files[0].selected && item.files[1].selected);
+    engine.shutdown().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn v2_and_hybrid_interruption_and_corrupt_wire_data_recover() {
     use std::{sync::atomic::Ordering, time::Duration};
     for hybrid in [false, true] {
@@ -846,6 +1071,7 @@ async fn v2_and_hybrid_missing_destination_preserve_state_and_recover() {
         let session_path = state.path().join("session/session.json");
         let saved = std::fs::read(&session_path).unwrap();
         std::fs::rename(&drive, &disconnected).unwrap();
+        assert!(engine.force_recheck(id.clone()).await.is_err());
         assert!(engine.set_paused(id.clone(), false).await.is_err());
         assert_eq!(std::fs::read(&session_path).unwrap(), saved);
         assert!(!drive.exists());

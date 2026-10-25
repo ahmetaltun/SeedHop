@@ -26,12 +26,17 @@ nested code from the inside out. No XcodeGen, Node.js, Homebrew, or web runtime
 is required. Swift uses the Swift 6.2 compiler in Swift 5 language mode for the
 Foundation XPC interfaces.
 
-Local builds use ad-hoc signing and a development-only library-validation
+Local builds default to ad-hoc signing and a development-only library-validation
 exception. For certificate-backed validation:
 
 ```sh
 python3 scripts/build.py --identity 'Apple Development: Your Name (TEAMID)'
 ```
+
+Add `--save-identity` to save an existing identity in ignored
+`.build/signing-identity`. `SEEDHOP_SIGNING_IDENTITY` overrides that setting.
+Use `--identity - --save-identity` to return to ad-hoc builds. The script never
+imports or creates signing material.
 
 Release builds omit development flags and the validation exception:
 
@@ -51,7 +56,7 @@ make render
 ```
 
 Design-preview mode uses labeled sample data and cannot issue transfer commands.
-The renderer writes 22 light/dark main-window, compact, empty, import, file-selection,
+The renderer writes 26 light/dark main-window, compact, empty, import, file-selection,
 settings, multi-selection, empty-filter, recovery, and high-contrast screenshots under `.build/design/`. It renders app-owned views,
 not the user's screen. See [design system](docs/DESIGN.md).
 
@@ -116,7 +121,9 @@ under `~/Library/Application Support/SeedHop`. The app does not enable a local
 HTTP control server. [BitTorrent v2 support](docs/BITTORRENT-V2.md) includes pure-v2
 and hybrid transfers, seeding, magnets, file selection, and SHA-256 restart checks.
 Encrypted peers, RSS, search, remote control,
-and advanced queueing remain roadmap work.
+and advanced scheduling remain roadmap work. Force Recheck, file priorities,
+download queue limits/order, relocation, and local renaming are implemented;
+see [file controls and verification](docs/FILE-MANAGEMENT.md).
 
 ## License
 

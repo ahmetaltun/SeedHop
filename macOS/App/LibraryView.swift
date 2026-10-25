@@ -20,6 +20,8 @@ struct LibraryView: View {
     @AppStorage("transferColumns") private var columnCustomization = TableColumnCustomization<TorrentItem>()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    init(inspectorTab: Int = 0) { _inspectorTab = State(initialValue:inspectorTab) }
+
     var body: some View {
         HSplitView {
             sidebar.frame(minWidth:190,idealWidth:210,maxWidth:260)
@@ -176,6 +178,9 @@ struct LibraryView: View {
         .focused($transfersFocused)
         .accessibilityLabel("Transfers")
         .contextMenu(forSelectionType:String.self) { ids in
+            Button("Move to Front of Queue") { store.selection = ids; store.moveSelectedToFront() }.disabled(!canAct(on:ids) || ids.count != 1)
+            Button("Move Files…") { store.selection = ids; store.chooseRelocation() }.disabled(!canAct(on:ids) || ids.count != 1 || store.torrents.contains { ids.contains($0.id) && $0.state == "checking" })
+            Button("Force Recheck") { store.selection = ids; store.recheckSelected() }.disabled(!canAct(on:ids) || store.torrents.contains { ids.contains($0.id) && $0.state == "checking" })
             Button("Resume") { store.selection = ids; store.toggleSelected(paused:false) }.disabled(!canAct(on:ids) || !store.torrents.contains { ids.contains($0.id) && ($0.isPaused || $0.state == "error") })
             Button("Pause") { store.selection = ids; store.toggleSelected(paused:true) }.disabled(!canAct(on:ids) || !store.torrents.contains { ids.contains($0.id) && !$0.isPaused })
             Divider()
@@ -260,11 +265,24 @@ struct LibraryView: View {
     private func files(_ t: TorrentItem) -> some View {
         LazyVStack(alignment:.leading,spacing:12) {
             SectionEyebrow(title:"\(t.files.count) files")
-            if store.busyTransfers.contains(t.id) { HStack { ProgressView().controlSize(.small); Text("Saving file choices…").font(.system(size:11)).foregroundStyle(.secondary) } }
+            if store.busyTransfers.contains(t.id) { HStack { ProgressView().controlSize(.small); Text("Updating transfer…").font(.system(size:11)).foregroundStyle(.secondary) } }
             ForEach(t.files) { file in
+                VStack(alignment:.leading,spacing:6) {
                 Toggle(isOn:Binding(get:{file.selected},set:{ selected in var indices = Set(t.files.filter(\.selected).map(\.index)); if selected { indices.insert(file.index) } else { indices.remove(file.index) }; store.setFileSelection(t,indices:Array(indices)) })) {
                     VStack(alignment:.leading,spacing:4) { Text(file.name).font(.system(size:11)).lineLimit(2); Text(SizeText.bytes(file.size)).font(.system(size:10)).foregroundStyle(.secondary) }
-                }.toggleStyle(.checkbox).disabled(!store.canChangeTransfers || store.busyTransfers.contains(t.id) || (t.files.filter(\.selected).count == 1 && file.selected))
+                }.toggleStyle(.checkbox).disabled(!store.canChangeTransfers || store.busyTransfers.contains(t.id) || t.state == "checking" || (t.files.filter(\.selected).count == 1 && file.selected))
+                HStack {
+                    Menu {
+                        Button("Low") { store.setPriority(t,file:file,priority:0) }
+                        Button("Normal") { store.setPriority(t,file:file,priority:1) }
+                        Button("High") { store.setPriority(t,file:file,priority:2) }
+                    } label: {
+                        Text(file.priority == 0 ? "Low" : file.priority == 2 ? "High" : "Normal").font(.system(size:11))
+                    }.menuStyle(.borderlessButton).accessibilityLabel("Priority for \(file.name)").frame(width:95)
+                    Spacer()
+                    Button("Rename…") { store.requestRename(t,file:file) }.buttonStyle(.borderless).font(.system(size:10))
+                }.padding(.leading,18).disabled(!store.canChangeTransfers || store.busyTransfers.contains(t.id) || t.state == "checking")
+                }
             }
         }
     }

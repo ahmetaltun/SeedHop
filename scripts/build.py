@@ -7,8 +7,10 @@ import plistlib
 import json
 import shutil
 import subprocess
+import hashlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+SIGNING_CONFIG = ROOT / '.build/signing-identity'
 
 def run(*args):
     print("+", " ".join(map(str,args)),flush=True)
@@ -21,9 +23,20 @@ def write_plist(path,value):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--release",action="store_true")
-    parser.add_argument("--identity",default="-",help="Apple Development/Developer ID identity, or - for local ad-hoc builds")
+    parser.add_argument("--identity", default=os.environ.get('SEEDHOP_SIGNING_IDENTITY') or (SIGNING_CONFIG.read_text().strip() if SIGNING_CONFIG.exists() else '-'), help="Signing identity; defaults to SEEDHOP_SIGNING_IDENTITY, saved local identity, then ad-hoc")
+    parser.add_argument("--save-identity", action="store_true", help="Save the validated identity locally for subsequent builds")
+    parser.add_argument("--validation-root", type=pathlib.Path, help="Build an isolated development lifecycle fixture with a distinct service namespace and library")
     parser.add_argument("--skip-rust",action="store_true")
     args = parser.parse_args()
+    if args.identity != '-':
+        identities = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'], text=True)
+        if args.identity not in identities:
+            parser.error('The requested signing identity is not valid or its private key is unavailable in this keychain.')
+    if args.validation_root and (args.release or args.identity == '-'):
+        parser.error('Lifecycle fixtures require a certificate-backed development build.')
+    if args.save_identity:
+        SIGNING_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+        SIGNING_CONFIG.write_text(args.identity + '\n')
     profile = "release" if args.release else "debug"
     target = ROOT/"target"/profile
     generated = ROOT/"macOS/Generated"
@@ -34,7 +47,9 @@ def main():
         if args.release: cargo.append("--release")
         run(*cargo)
         run(target/"uniffi-bindgen","generate","--library",target/"libseedhop_ffi.dylib","--language","swift","--out-dir",generated)
-    app = ROOT/".build/SeedHop.app"
+    validation_root = args.validation_root.resolve() if args.validation_root else None
+    app_id = 'app.seedhop.validation.' + hashlib.sha256(str(validation_root).encode()).hexdigest()[:12] if validation_root else 'app.seedhop.mac'
+    app = (validation_root or ROOT/'.build') / 'SeedHop.app'
     contents = app/"Contents"
     for folder in ["MacOS","Frameworks","Resources","XPCServices/SeedHopEngine.xpc/Contents/MacOS","Library/LaunchAgents"]:
         (contents/folder).mkdir(parents=True,exist_ok=True)
@@ -52,15 +67,21 @@ def main():
     run("swift","-module-cache-path",ROOT/".cache/swift",ROOT/"scripts/Icon.swift",iconset,ROOT/"macOS/Resources/AppIcon.png")
     run("iconutil","-c","icns",iconset,"-o",contents/"Resources/AppIcon.icns")
     base = {"CFBundleVersion":"1","CFBundleShortVersionString":"0.1.0","LSMinimumSystemVersion":"15.0","CFBundleDevelopmentRegion":"en","NSLocalNetworkUsageDescription":"SeedHop connects to torrent peers and trackers on networks you use."}
-    write_plist(contents/"Info.plist",dict(base,CFBundleIdentifier="app.seedhop.mac",CFBundleName="SeedHop",CFBundleDisplayName="SeedHop",CFBundleExecutable="SeedHop",CFBundlePackageType="APPL",NSPrincipalClass="NSApplication",LSApplicationCategoryType="public.app-category.utilities",NSHighResolutionCapable=True,CFBundleIconFile="AppIcon",CFBundleURLTypes=[{"CFBundleURLName":"BitTorrent magnet link","CFBundleURLSchemes":["magnet"]}],CFBundleDocumentTypes=[{"CFBundleTypeName":"BitTorrent torrent","CFBundleTypeRole":"Viewer","LSHandlerRank":"Alternate","LSItemContentTypes":["org.bittorrent.torrent"],"CFBundleTypeExtensions":["torrent"]}],UTImportedTypeDeclarations=[{"UTTypeIdentifier":"org.bittorrent.torrent","UTTypeConformsTo":["public.data"],"UTTypeTagSpecification":{"public.filename-extension":["torrent"],"public.mime-type":"application/x-bittorrent"}}]))
+    write_plist(contents/"Info.plist",dict(base,CFBundleIdentifier=app_id,CFBundleName="SeedHop",CFBundleDisplayName="SeedHop",CFBundleExecutable="SeedHop",CFBundlePackageType="APPL",NSPrincipalClass="NSApplication",LSApplicationCategoryType="public.app-category.utilities",NSHighResolutionCapable=True,CFBundleIconFile="AppIcon",CFBundleURLTypes=[{"CFBundleURLName":"BitTorrent magnet link","CFBundleURLSchemes":["magnet"]}],CFBundleDocumentTypes=[{"CFBundleTypeName":"BitTorrent torrent","CFBundleTypeRole":"Viewer","LSHandlerRank":"Alternate","LSItemContentTypes":["org.bittorrent.torrent"],"CFBundleTypeExtensions":["torrent"]}],UTImportedTypeDeclarations=[{"UTTypeIdentifier":"org.bittorrent.torrent","UTTypeConformsTo":["public.data"],"UTTypeTagSpecification":{"public.filename-extension":["torrent"],"public.mime-type":"application/x-bittorrent"}}]))
     xpc = contents/"XPCServices/SeedHopEngine.xpc"
-    write_plist(xpc/"Contents/Info.plist",dict(base,CFBundleIdentifier="app.seedhop.mac.engine",CFBundleExecutable="SeedHopEngine",CFBundlePackageType="XPC!",XPCService={"ServiceType":"Application","RunLoopType":"NSRunLoop","JoinExistingSession":True}))
-    write_plist(contents/"Library/LaunchAgents/app.seedhop.mac.agent.plist",{"Label":"app.seedhop.mac.agent","BundleProgram":"Contents/MacOS/SeedHopAgent","ProgramArguments":["SeedHopAgent","--agent"],"MachServices":{"app.seedhop.mac.agent":True},"RunAtLoad":True,"KeepAlive":{"SuccessfulExit":False},"ThrottleInterval":5,"ProcessType":"Background","AssociatedBundleIdentifiers":["app.seedhop.mac"]})
+    write_plist(xpc/"Contents/Info.plist",dict(base,CFBundleIdentifier=app_id+".engine",CFBundleExecutable="SeedHopEngine",CFBundlePackageType="XPC!",XPCService={"ServiceType":"Application","RunLoopType":"NSRunLoop","JoinExistingSession":True}))
+    write_plist(contents/f"Library/LaunchAgents/{app_id}.agent.plist",{"Label":app_id+".agent","BundleProgram":"Contents/MacOS/SeedHopAgent","ProgramArguments":["SeedHopAgent","--agent"],"MachServices":{app_id+".agent":True},"RunAtLoad":True,"KeepAlive":{"SuccessfulExit":False},"ThrottleInterval":5,"ProcessType":"Background","AssociatedBundleIdentifiers":[app_id]})
     shutil.copy2(target/"libseedhop_ffi.dylib",contents/"Frameworks/libseedhop_ffi.dylib")
     run("install_name_tool","-id","@rpath/libseedhop_ffi.dylib",contents/"Frameworks/libseedhop_ffi.dylib")
     common = ["swiftc","-target","arm64-apple-macosx15.0","-swift-version","5","-parse-as-library","-module-cache-path",ROOT/".cache/swift"]
     common += ["-O"] if args.release else ["-g"]
     if not args.release: common += ["-D","SEEDHOP_DEVELOPMENT"]
+    if validation_root:
+        configuration = validation_root / 'ValidationConfiguration.swift'
+        configuration.write_text('import Foundation\nenum ValidationConfiguration {\n' +
+            'static let app = ' + json.dumps(app_id) + '\n' +
+            'static let root = ' + json.dumps(str(validation_root), ensure_ascii=False) + '\n}\n')
+        common += ['-D', 'SEEDHOP_VALIDATION', configuration]
     shared = sorted((ROOT/"macOS/Shared").glob("*.swift"))
     host = sorted((ROOT/"macOS/Host").glob("*.swift"))
     # Both executable locations find the single bundled, signed Rust dynamic library.
@@ -70,7 +91,7 @@ def main():
     run(*common,"-module-name","SeedHop",*shared,*sorted((ROOT/"macOS/App").glob("*.swift")),"-framework","SwiftUI","-framework","AppKit","-framework","ServiceManagement","-framework","Security","-framework","UserNotifications","-o",contents/"MacOS/SeedHop")
     debug_entitlements = ROOT/".build/debug.entitlements"
     write_plist(debug_entitlements,{"com.apple.security.cs.disable-library-validation":True})
-    for name,path in [("app.seedhop.mac.rust",contents/"Frameworks/libseedhop_ffi.dylib"),("app.seedhop.mac.agent",contents/"MacOS/SeedHopAgent"),("app.seedhop.mac.engine",xpc),("app.seedhop.mac",app)]:
+    for name,path in [(app_id+".rust",contents/"Frameworks/libseedhop_ffi.dylib"),(app_id+".agent",contents/"MacOS/SeedHopAgent"),(app_id+".engine",xpc),(app_id,app)]:
         sign=["codesign","--force","--options","runtime","--sign",args.identity,"--identifier",name]
         if not args.release and args.identity=="-" and path!=contents/"Frameworks/libseedhop_ffi.dylib": sign += ["--entitlements",debug_entitlements]
         run(*sign,path)

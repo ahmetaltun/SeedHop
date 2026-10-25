@@ -9,6 +9,7 @@ struct SettingsView: View {
     @State private var up = ""
     @State private var limitError: String?
     @State private var saving = false
+    init(tab: Int = 0) { _tab = State(initialValue:tab) }
     var body: some View {
         VStack(alignment:.leading,spacing:0) {
             HStack(spacing:12) { BrandMark(size:38); VStack(alignment:.leading,spacing:4) { Text("Make yourself at home.").font(.system(size:21,weight:.semibold,design:.rounded)); Text("A few thoughtful defaults. Your way from here.").font(.system(size:11)).foregroundStyle(.secondary) }; Spacer() }.padding(26)
@@ -34,6 +35,15 @@ struct SettingsView: View {
                             })) { settingText("Let me know when a download finishes", "A quiet notification when your files are ready.") }.toggleStyle(.switch).controlSize(.small)
                         }
                     } else if tab == 1 {
+                        group("Download queue") {
+                            VStack(alignment:.leading,spacing:12) {
+                                settingText("Active downloads", "Completed transfers keep seeding. Paused transfers stay paused.")
+                                Picker("Download at once",selection:Binding(get:{store.maxActiveDownloads},set:{store.setQueueLimit($0)})) {
+                                    Text("Unlimited").tag(UInt32(0))
+                                    ForEach([1,2,3,4,5,8,10],id:\.self) { value in Text("\(value)").tag(UInt32(value)) }
+                                }.disabled(!store.canChangeTransfers || store.savingQueue)
+                            }
+                        }
                         group("Bandwidth") {
                             VStack(alignment:.leading,spacing:16) {
                                 settingText("Leave room for everything else", "Set a transfer limit in KB/s. Use 0 for unlimited.")

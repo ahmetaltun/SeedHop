@@ -51,7 +51,11 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         #if SEEDHOP_DEVELOPMENT
         if let stateDirectory { libraryDirectory = URL(fileURLWithPath:stateDirectory) }
         #endif
+        #if SEEDHOP_VALIDATION
+        let downloads = URL(fileURLWithPath:ValidationConfiguration.root).appendingPathComponent("downloads").path
+        #else
         let downloads = destination ?? UserDefaults.standard.string(forKey: "downloadDirectory") ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0].path
+        #endif
         let core = try EngineBridge(stateDirectory: libraryDirectory.path, downloadDirectory: downloads, discovery: true)
         engine = core
         runIntent.session = RunIntent.currentSession; runIntent.running = true
@@ -82,10 +86,17 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
                 response = try self.handle(request)
             } catch let BridgeError.Operation(message) { response = EngineReply(error:message) }
             catch { response = EngineReply(error: error.localizedDescription) }
-            reply((try? JSONEncoder().encode(response)) ?? Data("{\"version\":1,\"error\":\"Could not encode engine response.\"}".utf8))
+            reply((try? JSONEncoder().encode(response)) ?? Data("{\"version\":2,\"error\":\"Could not encode engine response.\"}".utf8))
         }
     }
     private func handle(_ r: EngineRequest) throws -> EngineReply {
+        #if SEEDHOP_VALIDATION
+        // Observe restoration without the usual lazy start on an explicit Connect.
+        if r.command == "validationStatus" {
+            lifecycle.lock(); defer { lifecycle.unlock() }
+            return EngineReply(snapshot:try engine.map { Self.snapshot(try $0.snapshot()) })
+        }
+        #endif
         if r.command == "shutdown" {
             lifecycle.lock(); stopping = true; let current = engine; lifecycle.unlock()
             if r.explicitStop == true, let current {
@@ -112,6 +123,12 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             return EngineReply(id:id)
         case "pause": try core.setPaused(id:r.id ?? "", paused:r.paused ?? true)
         case "select": try core.selectFiles(id:r.id ?? "", indices:r.selected ?? [])
+        case "recheck": try core.forceRecheck(id:r.id ?? "")
+        case "priorities": try core.setFilePriorities(id:r.id ?? "", priorities:Data(r.priorities ?? []))
+        case "queue": try core.setQueue(maxActive:r.maxActiveDownloads ?? 0)
+        case "queueMove": try core.moveInQueue(id:r.id ?? "", position:r.queuePosition ?? 1)
+        case "relocate": try core.relocate(id:r.id ?? "", destination:r.destination ?? "")
+        case "rename": try core.renameFile(id:r.id ?? "", index:r.fileIndex ?? UInt32.max, name:r.fileName ?? "")
         case "remove": try core.remove(id:r.id ?? "", deleteFiles:r.deleteFiles ?? false)
         case "limits": try core.setLimits(download:r.downloadLimit ?? 0, upload:r.uploadLimit ?? 0)
         case "login":
@@ -126,13 +143,13 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         do { _ = try handle(EngineRequest(command:"shutdown")) }
         catch { NSLog("SeedHop: shutdown failed: %@", error.localizedDescription) }
     }
-    static func file(_ f: TransferFile) -> FileItem { FileItem(index:f.index,name:f.name,size:f.size,downloaded:f.downloaded,selected:f.selected) }
+    static func file(_ f: TransferFile) -> FileItem { FileItem(index:f.index,name:f.name,size:f.size,downloaded:f.downloaded,selected:f.selected,priority:f.priority) }
     static func snapshot(_ s: EngineSnapshot) -> LibrarySnapshot {
         LibrarySnapshot(protocolVersion:s.protocolVersion, engineVersion:s.engineVersion, instanceId:s.instanceId,
-            listenPort:s.listenPort,downloadLimit:s.downloadLimit,uploadLimit:s.uploadLimit,torrents:s.torrents.map { t in
+            listenPort:s.listenPort,downloadLimit:s.downloadLimit,uploadLimit:s.uploadLimit,maxActiveDownloads:s.maxActiveDownloads,torrents:s.torrents.map { t in
                 TorrentItem(id:t.id,name:t.name,state:t.state,totalBytes:t.totalBytes,downloadedBytes:t.downloadedBytes,
                     uploadedBytes:t.uploadedBytes,downloadRate:t.downloadRate,uploadRate:t.uploadRate,peers:t.peers,
-                    destination:t.destination,files:t.files.map(file),trackers:t.trackers,error:t.error)
+                    destination:t.destination,files:t.files.map(file),trackers:t.trackers,error:t.error,queuePosition:t.queuePosition,pausedIntent:t.pausedIntent)
             })
     }
 }

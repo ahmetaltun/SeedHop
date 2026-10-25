@@ -84,8 +84,9 @@ cargo run -p seedhop-core --bin seedhop-lab -- verify-v2-piece FILE.torrent INDE
 The additional controlled discovery and hostile-peer results are documented in
 [V2 hardening](V2-HARDENING.md). UDP trackers, local DHT discovery, IPv6 transfers
 in both directions, and private torrents have dedicated fixtures. These do not
-certify a public DHT swarm, every tracker, or all peer extensions. Encrypted peers,
-experimental uTP, priorities, relocation and renaming remain separate work.
+certify a public DHT swarm, every tracker, or all peer extensions. Encrypted peers
+and experimental uTP remain separate protocol work. Priorities, queueing,
+Force Recheck, relocation, and renaming are covered in `FILE-MANAGEMENT.md`.
 Hybrid v1-only peers cannot exchange payload with the selected v2 swarm.
 UI accessibility, physical sleep/drive recovery, and certificate-backed
 background lifecycle gates in `VALIDATION.md` remain open.

@@ -1,0 +1,94 @@
+{
+  "date": "2026-10-25",
+  "protocolVersion": 2,
+  "finalSigning": "ad-hoc",
+  "features": [
+    "forceRecheck",
+    "filePriorities",
+    "downloadQueue",
+    "relocation",
+    "localFileRenaming"
+  ],
+  "checks": {
+    "rustWorkspace": {
+      "result": "PASS",
+      "activeTests": 41,
+      "ignoredTests": 1,
+      "note": "Opt-in disk-image case excluded; recovery and management tests rerun after explicit pause-intent snapshot addition."
+    },
+    "rustClippy": {
+      "result": "PASS",
+      "warningsDenied": true
+    },
+    "rustFormatting": {
+      "result": "PASS"
+    },
+    "ffiAndNativeBuild": {
+      "result": "PASS",
+      "signing": "ad-hoc"
+    },
+    "xpc": {
+      "result": "PASS",
+      "commands": [
+        "inspect",
+        "add",
+        "limits",
+        "recheck",
+        "priorities",
+        "queue",
+        "queueMove",
+        "rename",
+        "relocate",
+        "snapshot",
+        "shutdown",
+        "remove"
+      ],
+      "exactBytes": true,
+      "restart": true,
+      "pausedSelectionPreserved": true
+    },
+    "swiftPresentation": {
+      "result": "PASS",
+      "scenarios": 17
+    },
+    "nativeMenuFocus": {
+      "result": "PASS",
+      "scope": "fixture menu actions and reopening; no system input or VoiceOver certification"
+    },
+    "visuals": {
+      "result": "PASS",
+      "renders": 26,
+      "scope": "app-owned fixture images; light/dark file inspector and queue settings inspected"
+    },
+    "earlierSignedLifecycle": {
+      "result": "PASS",
+      "handoffCycles": 3,
+      "loginScope": "simulated",
+      "autoResumeOff": true,
+      "autoResumeOn": true,
+      "sameSessionCrashRestore": true,
+      "exactBytes": true,
+      "scope": "Earlier certificate-backed fixture before subsequent file-control changes; final build not certificate-certified"
+    }
+  },
+  "deferredByUser": [
+    "furtherCertificateSigningValidation",
+    "physicalSleepWake",
+    "physicalDriveRemovalReconnection",
+    "networkInterfaceLoss",
+    "actualLogoutLogin"
+  ],
+  "separateProtocolProjects": [
+    "encryption",
+    "uTP"
+  ],
+  "limits": [
+    "Copy-before-commit moves and renames require additional free space.",
+    "An interrupted storage operation can leave extra copies; existing targets are not overwritten.",
+    "Native keyboard, pointer, VoiceOver and very large-library checks remain manual."
+  ],
+  "xpcFixture": {
+    "bytes": 1048576,
+    "sha256": "631b84027d6b9e52b539c4e8373622d23032dfadc64d60af87339c9037e4f769"
+  }
+}

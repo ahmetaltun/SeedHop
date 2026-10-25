@@ -5,12 +5,12 @@ pub mod stats;
 mod streaming;
 pub mod utils;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Weak;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use anyhow::Context;
@@ -103,6 +103,7 @@ pub(crate) struct ManagedTorrentLocked {
     //
     // This should change only on "unpause".
     pub(crate) paused: bool,
+    pub(crate) queued: bool,
     pub(crate) state: ManagedTorrentState,
     pub(crate) only_files: Option<Vec<usize>>,
 }
@@ -112,8 +113,10 @@ pub(crate) struct ManagedTorrentOptions {
     pub force_tracker_interval: Option<Duration>,
     pub peer_connect_timeout: Option<Duration>,
     pub peer_read_write_timeout: Option<Duration>,
-    pub allow_overwrite: bool,
-    pub output_folder: PathBuf,
+    pub allow_overwrite: AtomicBool,
+    pub output_folder: RwLock<PathBuf>,
+    pub file_names: RwLock<HashMap<usize, PathBuf>>,
+    pub file_priorities: RwLock<Vec<u8>>,
     pub ratelimits: LimitsConfig,
     pub initial_peers: Vec<SocketAddr>,
     pub peer_limit: Option<usize>,
@@ -238,8 +241,75 @@ impl ManagedTorrent {
     }
 
     /// The resolved on-disk folder this torrent's files are written under.
-    pub fn output_folder(&self) -> &Path {
-        &self.shared.options.output_folder
+    pub fn output_folder(&self) -> PathBuf {
+        self.shared.options.output_folder.read().clone()
+    }
+
+    pub fn file_names(&self) -> HashMap<usize, PathBuf> {
+        self.shared.options.file_names.read().clone()
+    }
+    pub fn file_priorities(&self) -> Vec<u8> {
+        self.shared.options.file_priorities.read().clone()
+    }
+    pub fn is_queued(&self) -> bool {
+        self.locked.read().queued
+    }
+
+    /// Stop peer I/O without changing durable user pause intent.
+    pub fn quiesce(&self) -> anyhow::Result<()> {
+        let mut g = self.locked.write();
+        match &g.state {
+            ManagedTorrentState::Live(live) => g.state = ManagedTorrentState::Paused(live.pause()?),
+            ManagedTorrentState::Initializing(_) => bail!("Wait for file verification to finish."),
+            ManagedTorrentState::None => bail!("torrent is unavailable"),
+            _ => {}
+        }
+        Ok(())
+    }
+
+    pub(crate) fn set_queued(&self, queued: bool) -> anyhow::Result<()> {
+        {
+            let mut g = self.locked.write();
+            if matches!(g.state, ManagedTorrentState::Initializing(_)) {
+                g.queued = queued;
+                return Ok(());
+            }
+        }
+        if queued {
+            self.quiesce()?;
+        }
+        self.locked.write().queued = queued;
+        Ok(())
+    }
+
+    pub fn replace_file_priorities(&self, priorities: Vec<u8>) -> anyhow::Result<()> {
+        let count = self
+            .metadata
+            .load()
+            .as_ref()
+            .context("metadata unavailable")?
+            .file_infos
+            .len();
+        anyhow::ensure!(
+            priorities.len() == count && priorities.iter().all(|p| *p <= 2),
+            "Invalid file priorities"
+        );
+        *self.shared.options.file_priorities.write() = priorities;
+        Ok(())
+    }
+
+    /// Commit persistence before deleting any source bytes. Reopen with a full hash.
+    pub fn replace_storage_layout(
+        &self,
+        root: PathBuf,
+        names: HashMap<usize, PathBuf>,
+    ) -> anyhow::Result<()> {
+        self.quiesce()?;
+        let mut g = self.locked.write();
+        *self.shared.options.output_folder.write() = root;
+        *self.shared.options.file_names.write() = names;
+        g.state = ManagedTorrentState::Error(anyhow::anyhow!("Verifying the new file location"));
+        Ok(())
     }
 
     pub fn with_metadata<R>(
@@ -303,8 +373,14 @@ impl ManagedTorrent {
         self.live()
     }
 
-    fn stop_with_error(&self, error: anyhow::Error) {
+    fn stop_with_error(&self, error: anyhow::Error, generation: &Weak<TorrentStateLive>) {
         let mut g = self.locked.write();
+        // A queued error from a prior peer generation must not overwrite a
+        // subsequent recheck, queue suspension, or storage-layout transition.
+        if !matches!(&g.state, ManagedTorrentState::Live(live) if Weak::ptr_eq(&Arc::downgrade(live), generation))
+        {
+            return;
+        }
 
         match g.state.take() {
             ManagedTorrentState::Live(live) => {
@@ -396,6 +472,7 @@ impl ManagedTorrent {
                                         return Ok(());
                                     }
 
+                                    let start_paused = g.paused;
                                     g.state = ManagedTorrentState::Paused(paused);
                                     t.state_change_notify.notify_waiters();
                                     _start(&t, peer_rx, start_paused, session, Some(g), token)
@@ -418,7 +495,7 @@ impl ManagedTorrent {
                     Ok(())
                 }
                 ManagedTorrentState::Paused(_) => {
-                    if start_paused {
+                    if start_paused || g.queued {
                         return Ok(());
                     }
                     let paused = g.state.take().assert_paused();
@@ -427,7 +504,7 @@ impl ManagedTorrent {
                     g.state = ManagedTorrentState::Live(live.clone());
                     t.state_change_notify.notify_waiters();
 
-                    spawn_fatal_errors_receiver(t, rx, token);
+                    spawn_fatal_errors_receiver(t, Arc::downgrade(&live), rx, token);
                     if let Some(peer_rx) = peer_rx {
                         spawn_peer_adder(&live, peer_rx);
                     }
@@ -477,6 +554,38 @@ impl ManagedTorrent {
         self.locked.read().paused
     }
 
+    /// Discard the piece map and hash the current files, retaining user intent.
+    pub(crate) fn prepare_recheck(&self) -> anyhow::Result<bool> {
+        let mut g = self.locked.write();
+        if matches!(g.state, ManagedTorrentState::Initializing(_)) {
+            bail!("Files are already being verified. Wait for verification to finish.");
+        }
+        let metadata = self
+            .metadata
+            .load_full()
+            .context("metadata is unavailable")?;
+        // Acquire storage before changing state so a failed open leaves the old
+        // transfer intact. Live::pause takes its storage under the writer lock.
+        let files = match &g.state {
+            ManagedTorrentState::Live(live) => live.pause()?.files,
+            ManagedTorrentState::Paused(paused) => paused.files.take()?,
+            ManagedTorrentState::Error(_) => self
+                .shared
+                .storage_factory
+                .create_and_init(self.shared(), &metadata)?,
+            _ => bail!("torrent cannot be rechecked in its current state"),
+        };
+        g.state = ManagedTorrentState::Initializing(Arc::new(TorrentStateInitializing::new(
+            self.shared.clone(),
+            metadata,
+            g.only_files.clone(),
+            files,
+            true,
+        )));
+        self.state_change_notify.notify_waiters();
+        Ok(g.paused)
+    }
+
     /// Pause the torrent if it's live.
     pub(crate) fn pause(&self) -> anyhow::Result<()> {
         let mut g = self.locked.write();
@@ -495,11 +604,9 @@ impl ManagedTorrent {
                 self.state_change_notify.notify_waiters();
                 Ok(())
             }
-            ManagedTorrentState::Paused(_) => {
-                bail!("torrent is already paused");
-            }
-            ManagedTorrentState::Error(_) => {
-                bail!("can't pause torrent in error state")
+            ManagedTorrentState::Paused(_) | ManagedTorrentState::Error(_) => {
+                g.paused = true;
+                Ok(())
             }
             ManagedTorrentState::None => bail!("bug: torrent is in empty state"),
         }
@@ -656,6 +763,7 @@ pub type ManagedTorrentHandle = Arc<ManagedTorrent>;
 
 fn spawn_fatal_errors_receiver(
     state: &Arc<ManagedTorrent>,
+    generation: Weak<TorrentStateLive>,
     rx: tokio::sync::oneshot::Receiver<anyhow::Error>,
     token: CancellationToken,
 ) {
@@ -673,7 +781,7 @@ fn spawn_fatal_errors_receiver(
                 Err(_) => return Ok(()),
             };
             if let Some(state) = state.upgrade() {
-                state.stop_with_error(e);
+                state.stop_with_error(e, &generation);
             } else {
                 warn!(
                     ?id,

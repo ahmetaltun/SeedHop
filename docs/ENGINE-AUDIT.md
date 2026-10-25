@@ -3,8 +3,9 @@
 Baseline: `a499d2f243d124e144aef137afe7cb304a6e3f36`.
 `vendor/SOURCE.json` records archive provenance. Local deltas are recorded in
 `vendor/patches/0001-seedhop-reliability.patch`,
-`vendor/patches/0002-seedhop-bep52.patch`, and
-`vendor/patches/0003-seedhop-metadata-guard.patch`; upstream's license is retained.
+`vendor/patches/0002-seedhop-bep52.patch`,
+`vendor/patches/0003-seedhop-metadata-guard.patch`, and
+`vendor/patches/0004-seedhop-file-controls.patch`; upstream's license is retained.
 
 ## Reliability changes
 
@@ -54,8 +55,8 @@ the engine does not write into rqbit's separate application directories.
 | v2/hybrid | Shared BEP 52 metadata, SHA-256 verification, aligned storage, hash wire messages and magnet layers | Enabled through the v2 swarm; nine independent transfer/magnet/selection cases pass. See `BITTORRENT-V2.md` |
 | Encryption | No MSE/RC4 handshake implementation found in reviewed protocol/connection sources | Roadmap gap |
 | uTP | `listen.rs`, `librqbit-utp` | Experimental upstream; disabled here |
-| Rarest-first and priorities | Upstream README documents sequential-only selection | Roadmap gap |
-| Recheck, relocation, renaming | No corresponding public Session operation in pinned revision | Restart verification only; explicit operations deferred |
+| File priorities; rarest-first | Patch 0004 orders requests by persistent file priority | Low/Normal/High exposed; rarest-first remains separate work |
+| Recheck, queueing, relocation, renaming | Patch 0004 and application storage transactions | Exposed across core, FFI/XPC, and native UI; see `FILE-MANAGEMENT.md` |
 | NAT-PMP | No implementation established by audit | Not exposed |
 
 ## Remaining audit work
@@ -109,3 +110,23 @@ DHT/LSD/PEX suppression in source, correlated and root-authenticated magnet
 proofs, SHA-256 payload checks, and persisted identity/selection checks. This is
 a focused source review, not a complete security audit. Executed coverage and
 remaining release gates are recorded in `V2-HARDENING.md`.
+
+
+## Transfer and file controls
+
+Patch 0004 adds in-place full rechecking, persistent file-priority order, queue
+suspension separate from user pause, and local storage layouts. Hash completion
+uses current pause intent, and fatal errors from old peer generations cannot
+overwrite a later check, queue suspension, or layout change. Rechecks retain the
+same managed torrent, full identity, selection, and persistent membership.
+
+The native JSON store retains queue state, priorities, and local names. Storage
+opens use mapped names; removal also uses the mapped paths. Original metainfo
+and peer piece offsets remain unchanged. File-priority changes rebuild live
+request order; a recorded wire Request verifies priority ordering. The native
+app does not use the optional PostgreSQL store.
+
+Application storage transactions quiesce peers, exclusively copy and flush new
+files, persist the new layout, and only then remove originals. Descriptor-relative
+opens and cleanup reject symlink traversal. Copy/save failure retains source
+bytes; interrupted cleanup may leave duplicates. See `FILE-MANAGEMENT.md`.
