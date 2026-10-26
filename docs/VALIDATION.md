@@ -3,6 +3,16 @@
 Status: **implemented development foundation; full milestone acceptance pending**.
 No public distribution or notarization was performed.
 
+## Release gates resumed — 2026-10-26
+
+The user requested a Git checkpoint, accessibility validation, resumed signing
+and actual lifecycle/recovery gates, then a release candidate after those gates
+pass. Protocol implementation and evidence are committed at `56ffc38`.
+The current attempt and concrete manual acceptance steps are recorded in
+[`RELEASE-VALIDATION.md`](RELEASE-VALIDATION.md). Earlier references to user
+deferral below describe the historical checkpoints, not the current request.
+The release candidate remains gated on the outstanding acceptance results.
+
 ## Protocol completion checkpoint — 2026-10-26
 
 The requested BEP 52, simultaneous hybrid v1/v2, MSE/PE encryption and TCP/uTP

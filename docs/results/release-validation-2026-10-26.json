@@ -1,0 +1,81 @@
+{
+  "date": "2026-10-26",
+  "protocolCommit": "56ffc38662864eb8a97126bfe360aea2dcbd4b3d",
+  "status": "release gates open; no release candidate built",
+  "protocolEvidenceReuse": {
+    "path": "docs/results/v2-final-2026-10-26.json",
+    "sha256": "d77cdb24d5ef5cf95a4044400957866033c6b1b5f165316ff9c5ac82602da997",
+    "verifiedSourceDigests": 84,
+    "verifiedBinaryDigests": 5,
+    "matrixRerun": false
+  },
+  "accessibility": {
+    "nativeMenuFocusChecks": {
+      "status": "PASS",
+      "count": 3,
+      "log": ".build/release-interface-2026-10-26.log"
+    },
+    "presentationRegressions": {
+      "status": "PASS",
+      "count": 17,
+      "log": ".build/release-ux-2026-10-26.log"
+    },
+    "sourceLabelReview": "Labels present for import/search, progress/status, Finder, close inspector, priorities and bandwidth; spoken output not verified",
+    "keyboardWalkthrough": "NOT RUN: requires target-system input",
+    "voiceOver": "NOT RUN: native computer automation unavailable",
+    "errorAnnouncements": "UNVERIFIED: InlineNotice and bandwidth errors have no explicit announcement/live-region wiring; spoken-output acceptance required"
+  },
+  "certificateFixture": {
+    "status": "PASS",
+    "app": ".build/release-validation-2026-10-26/SeedHop.app",
+    "namespace": "app.seedhop.validation.2fbd941e2d2a",
+    "identityType": "Apple Development",
+    "teamIdentifier": "4LZ6P7W9H2",
+    "hardenedRuntime": true,
+    "debugLibraryValidationException": false,
+    "deepStrictSignature": "PASS",
+    "handoffCyclesPassed": 3,
+    "simulatedLoginPoliciesPassed": 3,
+    "exactBytes": "PASS",
+    "agentCleanup": "Test unregisters isolated agent after each cycle",
+    "log": ".build/release-lifecycle-2026-10-26.log",
+    "certifiesDistributionNamespace": false
+  },
+  "notarization": {
+    "status": "BLOCKED",
+    "reason": "No valid Developer ID Application identity available; only Apple Development found",
+    "credentials": "Need local notarytool authentication/profile; not inspected or exported",
+    "submitted": false,
+    "reference": "https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution"
+  },
+  "actualRecovery": {
+    "loginResumeOff": "NOT RUN: requires target-system participation",
+    "loginResumeOn": "NOT RUN: requires target-system participation",
+    "sleepWake": "NOT RUN: requires target-system participation",
+    "driveLoss": "NOT RUN: requires target-system participation and an attached removable drive",
+    "networkInterfaceLoss": "NOT RUN: requires target-system participation"
+  },
+  "distributionServiceIdentity": "NOT RUN: isolated development namespace only; distribution signing, permission revocation and helper updates remain open",
+  "releaseCandidate": {
+    "built": false,
+    "reason": "User requires preceding gates to pass first"
+  },
+  "logSha256": {
+    ".build/release-interface-2026-10-26.log": "4c788854a8294e617e9e3dac11bfaca1063de0365575c4c469fd0cc564a6251a",
+    ".build/release-ux-2026-10-26.log": "d732c9f5558032f2392b65412e169b5f36154afbabd9623ba4562bab81596801",
+    ".build/release-signing-2026-10-26.log": "81c610f9605be94b1aea599a4bfb0e538fffee1d3bc1240dad80a716fb186b4d",
+    ".build/release-lifecycle-2026-10-26.log": "b71d161a31d0137284958287ab45993393f3b375e7ceecf0eaed0f5e8b4b7f40"
+  },
+  "binarySha256": {
+    ".build/release-validation-2026-10-26/SeedHop.app/Contents/MacOS/SeedHop": "8468da6d3e727f9dd52739abdc045ae34c38bab55879fb746acc0af44bd5540d",
+    ".build/release-validation-2026-10-26/SeedHop.app/Contents/MacOS/SeedHopAgent": "d528db6d75e0d2ae57e6949552daa6cb5193ec15df91a86cc900d1168422fa4b",
+    ".build/release-validation-2026-10-26/SeedHop.app/Contents/XPCServices/SeedHopEngine.xpc/Contents/MacOS/SeedHopEngine": "4b06b605d1bab0e5591422fcc43b98950fc20ce468bc59043042991051d5fe80",
+    ".build/release-validation-2026-10-26/SeedHop.app/Contents/Frameworks/libseedhop_ffi.dylib": "b657a091a9b7c4747d3fda94e5bf5a62572e6dd433d22f0bff758863bf60f96e"
+  },
+  "output": {
+    "interfaceLog": "Native fixture state: active=true, key=true, main=true, responder=Optional(<SwiftUI.AppKitWindow: 0x120858e00>)\nPASS: Command-F menu action focuses the native search field.\nPASS: Command-L menu action focuses the native transfer table.\nPASS: Command-0 menu action reopens the library after the last window closes.\nNative key-event delivery, VoiceOver, live-transfer reopening, and scrolling remain manual acceptance checks.\n",
+    "uxLog": "PASS: New import clears old input and preserves an open draft\nPASS: Explicit filters clear hidden selection; snapshots preserve identity\nPASS: Newly added transfer is revealed outside the previous filter\nPASS: Pause captures its targets and suppresses duplicate in-flight commands\nPASS: Recheck captures targets, preserves choices, and allows retry after failure\nPASS: Removal confirmation retains original targets and keeps files by default\nPASS: File choices save once, surface errors, and remain retryable\nPASS: Priorities preserve choices and serialize per transfer\nPASS: Queue limits report failure, retry, and capture reorder targets\nPASS: File move and rename failures preserve state and remain retryable\nPASS: Cancelled metadata cannot change a new attempt\nPASS: Cancelled successful metadata is discarded\nPASS: Invalid links fail locally with recovery guidance\nPASS: Missing metadata is an explicit retryable error\nPASS: Add captures selected files and paused intent; duplicate adds are blocked\nPASS: Add failure preserves choices for recovery\nPASS: Torrent-file failures retain source and reject oversized metadata before XPC\nPASS: 17 UX presentation regressions using a controlled transport. Native pointer, keyboard, and VoiceOver walkthroughs remain manual.\n",
+    "lifecycleLog": "PASS: certificate-backed host handoff cycle 1; running and paused intent retained\nPASS: certificate-backed host handoff cycle 2; running and paused intent retained\nPASS: certificate-backed host handoff cycle 3; running and paused intent retained\nPASS: simulated login scope, automatic resume=false, same session=false, restored=false\nPASS: simulated login scope, automatic resume=true, same session=false, restored=true\nPASS: simulated login scope, automatic resume=false, same session=true, restored=true\nPASS: exact bytes retained. Actual logout/login, helper updates, and revoked permission remain separate acceptance checks.\n"
+  },
+  "walkthrough": "docs/RELEASE-VALIDATION.md"
+}

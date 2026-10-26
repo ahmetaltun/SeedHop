@@ -739,13 +739,16 @@ and binary hashes, commands, detailed cases and log hashes.
 | Reproducible vendor source | All twenty-two patches reconstruct current vendor source and reverse/reapply byte-identically. Final source, patch, source-tree, binary and log hashes are retained. |
 
 All requested protocol implementation work is complete within the documented
-client bounds. The work remains uncommitted; no commit or pull request was
-requested. Further feature expansion is outside this completion checkpoint.
+client bounds. Implementation and evidence were committed at `56ffc38` on
+October 26, 2026. Further feature expansion is outside this completion checkpoint.
 
-The remaining release gates, in order, are:
+The user has resumed release validation, starting with accessibility, followed
+by distribution signing/notarization and actual lifecycle/recovery acceptance.
+See [`RELEASE-VALIDATION.md`](RELEASE-VALIDATION.md) for current evidence and
+the target-system walkthrough. Remaining gates are:
 
-1. Certificate-backed package signing/notarization and final background-service identity validation when the user resumes that gate.
+1. Certificate-backed package signing/notarization and final background-service identity validation.
 2. Physical sleep/wake, login, removable-drive and network-interface loss/recovery validation.
 3. UI accessibility acceptance and the remaining release checklist in `VALIDATION.md`.
 
-Those deferred gates remain open and do not change the completed protocol scope.
+Those release gates remain open and do not change the completed protocol scope.
