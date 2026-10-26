@@ -34,7 +34,18 @@ impl Limit {
     async fn acquire(&self, size: NonZeroU32) -> crate::Result<()> {
         let lim = self.limiter.load().clone();
         if let Some(rl) = lim.as_ref() {
-            rl.until_n_ready(size).await?;
+            let mut remaining = size.get();
+            let mut max_batch = size;
+            while let Some(batch) = NonZeroU32::new(remaining.min(max_batch.get())) {
+                match rl.until_n_ready(batch).await {
+                    Ok(()) => remaining -= batch.get(),
+                    Err(capacity) => {
+                        // A valid wire block can exceed a low configured burst.
+                        // Charge it in batches instead of disconnecting the peer.
+                        max_batch = NonZeroU32::new(capacity.0).ok_or(capacity)?;
+                    }
+                }
+            }
         }
         Ok(())
     }

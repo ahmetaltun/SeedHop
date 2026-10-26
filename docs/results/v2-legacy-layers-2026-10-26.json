@@ -1,0 +1,1115 @@
+{
+  "date": "2026-10-26",
+  "status": "in_progress",
+  "scope": "Payload-derived Merkle layers for btih hybrid magnets in exclusively legacy swarms; full protocol objective remains active",
+  "rust": {
+    "passed": 62,
+    "failed": 0,
+    "ignored": 1,
+    "v2TargetPassed": 41,
+    "command": "cargo test --workspace --locked -- --test-threads=1",
+    "log": ".build/v2-legacy-layers-rust.log"
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "format": "PASS",
+    "pythonCompile": "PASS",
+    "vendorForwardReconstruction": "PASS: HEAD plus patches 0005-0010 byte-identical",
+    "vendorReverseReapply": "PASS: all ten ordered patches byte-identical"
+  },
+  "legacyOnlyCases": [
+    {
+      "mode": "complete",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-complete-jlu1u5iz",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 3,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 6,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        }
+      ],
+      "v2ProviderCount": 0,
+      "layerAuthenticationObserved": true
+    },
+    {
+      "mode": "partial",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-partial-jh2ee3y8",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            2,
+            4,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 6,
+              "begin": 0,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        },
+        {
+          "available": [
+            1,
+            3,
+            5
+          ],
+          "requests": [
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 3,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        }
+      ],
+      "v2ProviderCount": 0,
+      "layerAuthenticationObserved": true
+    },
+    {
+      "mode": "corrupt",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-corrupt-gy3_20d5",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": true
+        },
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 3,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 6,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [],
+          "declinedV2": 0,
+          "corrupted": false
+        }
+      ],
+      "v2ProviderCount": 0,
+      "layerAuthenticationObserved": true
+    },
+    {
+      "mode": "padding",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-padding-olqwsvc8",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": true
+        },
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 3,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 6,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [],
+          "declinedV2": 0,
+          "corrupted": false
+        }
+      ],
+      "v2ProviderCount": 0,
+      "layerAuthenticationObserved": true
+    },
+    {
+      "mode": "private",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "45a6b345d79b6e49eb826420b9fb3b742a3215ba",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "evidence": ".build/legacy-layers-private-mq65e0w9",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 3,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 6,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        }
+      ],
+      "v2ProviderCount": 0,
+      "layerAuthenticationObserved": true
+    },
+    {
+      "mode": "inconsistent",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "463da230a19ec0571fe00a59a0381e759cba3b2d",
+      "infoHashV2": "53753123a19c814d096f6c84f2e7704ec2fa98391cfdbd5a6347fc10cad61665",
+      "evidence": ".build/legacy-layers-inconsistent-_msxt6xz",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        }
+      ],
+      "v2ProviderCount": 0,
+      "layerAuthenticationObserved": false
+    },
+    {
+      "mode": "inspect-only",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-inspect-only-ryep94lf",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        }
+      ],
+      "v2ProviderCount": 0,
+      "layerAuthenticationObserved": true,
+      "preview": {
+        "id": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "membershipCount": 0,
+        "payloadFiles": 0,
+        "metainfoSha256": "7bbb31433b47ec364d54afc648ed260f97d468f812334f07d18030334e8cb283"
+      }
+    },
+    {
+      "mode": "inspect-unpadded",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "3bb8fc4a855ab7fae75912250ce18e51e64526d2",
+      "infoHashV2": "4a71b73ba65d423cc88ab43d56e3464966fcafae6c04a4a6ae98bf8cabee91c9",
+      "evidence": ".build/legacy-layers-inspect-unpadded-a7ydm3a3",
+      "legacyPeers": [
+        {
+          "available": [
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 4,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 6,
+              "begin": 0,
+              "length": 4465
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        }
+      ],
+      "v2ProviderCount": 0,
+      "layerAuthenticationObserved": true,
+      "preview": {
+        "id": "4a71b73ba65d423cc88ab43d56e3464966fcafae6c04a4a6ae98bf8cabee91c9",
+        "membershipCount": 0,
+        "payloadFiles": 0,
+        "metainfoSha256": "21d6655a39900e8b1115bd29f1b34344a785d7eeb9c879233349a3d6f19e30ea"
+      }
+    }
+  ],
+  "transportMagnetRegressions": [
+    {
+      "format": "hybrid",
+      "direction": "magnet-v1",
+      "transport": "tcp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-off-magnet-v1-hybrid-cwx911q3",
+      "verifiedPeerSettings": {
+        "encryption": 2,
+        "bittorrent_protocol": 1,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "rc4Observed": false,
+      "source": "healthy v2 proof provider"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-v1",
+      "transport": "tcp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-required-magnet-v1-hybrid-p8tfp_q0",
+      "verifiedPeerSettings": {
+        "encryption": 1,
+        "bittorrent_protocol": 1,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "rc4Observed": true,
+      "source": "healthy v2 proof provider"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-v1",
+      "transport": "utp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-off-magnet-v1-hybrid-vhfg52vm",
+      "verifiedPeerSettings": {
+        "encryption": 2,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "rc4Observed": false,
+      "source": "healthy v2 proof provider"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-v1",
+      "transport": "utp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-required-magnet-v1-hybrid-3zwt8zjc",
+      "verifiedPeerSettings": {
+        "encryption": 1,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "rc4Observed": true,
+      "source": "healthy v2 proof provider"
+    }
+  ],
+  "hybridIndependentRegressions": [
+    {
+      "direction": "download-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-v1-keqqefh1"
+    },
+    {
+      "direction": "download-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-mixed-7alv6z0n"
+    },
+    {
+      "direction": "magnet-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-mixed-5hg7ojcl"
+    },
+    {
+      "direction": "magnet-v1-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-v1-mixed-oznf2nyz"
+    },
+    {
+      "direction": "upload-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-upload-v1-stebvhmy"
+    }
+  ],
+  "hybridHardeningRegressions": [
+    {
+      "mode": "udp",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-udp-p9djilu3"
+    },
+    {
+      "mode": "ipv6",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-ipv6-s8207neu"
+    },
+    {
+      "mode": "ipv6-upload",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-ipv6-upload-3jun2u86"
+    },
+    {
+      "mode": "private",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-private-r4_8zkv6"
+    },
+    {
+      "mode": "dht",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-dht-umiumpm1"
+    },
+    {
+      "mode": "private-dht",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-private-dht-6j65lpxx"
+    },
+    {
+      "mode": "duplicate-metadata",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-duplicate-metadata-6lofw69s"
+    }
+  ],
+  "algorithm": {
+    "proofPreferenceDelaySeconds": 2,
+    "maximumPayloadWorkers": 8,
+    "maximumPeerAttempts": 3,
+    "maximumRequestBytes": 16384,
+    "maximumPendingEndpoints": 1024,
+    "maximumRememberedEndpoints": 4096,
+    "payloadProgressTimeoutSeconds": 20,
+    "hashCommitments": [
+      "SHA-1 per full legacy wire piece including validated zero padding",
+      "SHA-256 Merkle root per completed real-file layer"
+    ],
+    "filesCreatedDuringInspection": false,
+    "sharing": "Identical file roots share derived layers; peers can supply equivalent data through different piece indices."
+  },
+  "coreBuilderCoverage": [
+    "16/32/64 KiB pieces, padded and unpadded final files",
+    "Out-of-order completion and identical-file alternate indices",
+    "Incomplete, duplicate and wrong-sized block sets rejected",
+    "Corrupt roots produce typed HybridHashMismatch and cannot be finished even if the caller ignores the first error"
+  ],
+  "limitations": [
+    "Fallback currently applies to btih hybrid metadata resolution. Dual btih/btmh magnets still need cross-swarm metadata discovery while preserving both commitments.",
+    "Payload streamed for layer acquisition is discarded; adding after preview currently downloads those bytes again.",
+    "The four TCP/uTP/RC4 regression cases use healthy v2 proof providers. They do not directly certify forced legacy payload-derived fallback over every transport/cipher combination.",
+    "The complete interest/choke/request/resource audit, including the new metadata fetcher, remains open.",
+    "Native XPC integration remains unresolved."
+  ],
+  "logs": [
+    ".build/v2-legacy-layers-rust.log",
+    ".build/v2-legacy-layers-unit.log",
+    ".build/v2-legacy-layers-check.log",
+    ".build/v2-legacy-layers-clippy.log",
+    ".build/v2-legacy-layers-interop.log",
+    ".build/v2-legacy-layers-hybrid.log",
+    ".build/v2-legacy-layers-hardening.log",
+    ".build/v2-legacy-layers-tcp.log",
+    ".build/v2-legacy-layers-tcp-encrypted.log",
+    ".build/v2-legacy-layers-utp.log",
+    ".build/v2-legacy-layers-utp-encrypted.log",
+    ".build/v2-legacy-layers-patches.log"
+  ],
+  "sourceSha256": {
+    "vendor/rqbit/crates/librqbit_core/src/v2.rs": "f2b47f7472585ff77308c105d6e044cc8cbf508ac3e4335beff3324f186c90af",
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/legacy_layers.rs": "c8df5cd32376f75f8c1f59675b5d8075d370468f07790696c498e7598b2d04c9",
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/mod.rs": "1a74ee4e8eef3d2408cf6476457aea6dda4970c4c4aa18398fad03d5b05d7a71",
+    "vendor/rqbit/crates/librqbit/src/session.rs": "49b06cd834ac0549a5a5f70cdb09b4836fad57180383f7ef4c5f1cf8a58cd760",
+    "vendor/rqbit/crates/librqbit/src/dht_utils.rs": "061367f273f72fc1aa97d61b20c96745cf29e31050ecace31d84b78395d8b5c1",
+    "crates/seedhop-core/src/bin/seedhop-lab.rs": "4120e2ea11ee1c61ae6a3c798b7ec17479fbcf229728c920ef83a8479382ebcb",
+    "crates/seedhop-core/tests/v2.rs": "354188991e6c481d3f89847398978136d75fe65f9de44aa6d521a7f5c78500c1",
+    "scripts/v2_legacy_layers.py": "d9e3ed5781f8db3127687a629281814ae17ca4ac91af7fae08be7ec1b5f812b4",
+    "scripts/v2_hybrid_interop.py": "356ef1e14aca7e9e7b7c26a6369a54535bf94547f13af9d7d7ec7601b4d7945a",
+    "scripts/interop.py": "38d38ebcd71a8feec213e5768761dd59a6fdbb9bab0433a08600e064e3ac649e",
+    "vendor/patches/0010-seedhop-legacy-payload-layers.patch": "9334cf08f9b1b81b9452541b6601d0289ab29fddd87cb197d7d8433440ee71dd"
+  }
+}

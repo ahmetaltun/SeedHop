@@ -1,0 +1,1868 @@
+{
+  "date": "2026-10-26",
+  "status": "complete",
+  "scope": [
+    "BEP 52",
+    "simultaneous hybrid v1/v2 swarms",
+    "MSE/PE encryption",
+    "TCP and uTP"
+  ],
+  "rust": {
+    "passed": 94,
+    "v2TargetPassed": 72,
+    "failed": 0,
+    "ignored": 1,
+    "ignoredReason": "Opt-in disk-image fault test; physical release gate remains deferred",
+    "command": "cargo test --workspace --locked -- --test-threads=1",
+    "log": ".build/v2-final-rust.log"
+  },
+  "isolatedLsd": {
+    "passed": 3,
+    "failed": 0,
+    "command": "python3 scripts/test_lsd.py",
+    "log": ".build/v2-final-lsd.log"
+  },
+  "independentCaseCount": 95,
+  "independentCases": {
+    "simultaneousHybrid": [
+      {
+        "direction": "download-v1",
+        "result": "PASS",
+        "bytes": 140012,
+        "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/hybrid-dual-download-v1-_m75z_uc"
+      },
+      {
+        "direction": "download-mixed",
+        "result": "PASS",
+        "bytes": 140012,
+        "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/hybrid-dual-download-mixed-p4hz118_"
+      },
+      {
+        "direction": "magnet-mixed",
+        "result": "PASS",
+        "bytes": 140012,
+        "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/hybrid-dual-magnet-mixed-e4bvjp_h"
+      },
+      {
+        "direction": "magnet-v1-mixed",
+        "result": "PASS",
+        "bytes": 140012,
+        "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/hybrid-dual-magnet-v1-mixed-sr3pecdn"
+      },
+      {
+        "direction": "magnet-dual-mixed",
+        "result": "PASS",
+        "bytes": 140012,
+        "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/hybrid-dual-magnet-dual-mixed-b6r6nm58"
+      },
+      {
+        "direction": "upload-v1",
+        "result": "PASS",
+        "bytes": 140012,
+        "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/hybrid-dual-upload-v1-2d_p_s58"
+      }
+    ],
+    "tcpPlaintext": [
+      {
+        "format": "v2",
+        "direction": "download",
+        "transport": "tcp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-off-download-pure-1h_14w68"
+      },
+      {
+        "format": "v2",
+        "direction": "upload",
+        "transport": "tcp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-off-upload-pure-os_5pxiq"
+      },
+      {
+        "format": "v2",
+        "direction": "magnet",
+        "transport": "tcp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-off-magnet-pure-jgrj688n"
+      },
+      {
+        "format": "v2",
+        "direction": "selective",
+        "transport": "tcp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 10,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-off-selective-pure-2rdgxufg"
+      },
+      {
+        "format": "hybrid",
+        "direction": "download",
+        "transport": "tcp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-off-download-hybrid-xt1mzdld"
+      },
+      {
+        "format": "hybrid",
+        "direction": "upload",
+        "transport": "tcp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-off-upload-hybrid-2q9v9xqi"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet",
+        "transport": "tcp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-off-magnet-hybrid-k0wcoynx"
+      },
+      {
+        "format": "hybrid",
+        "direction": "selective",
+        "transport": "tcp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 10,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-off-selective-hybrid-bwehzvpj"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet-v1",
+        "transport": "tcp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-off-magnet-v1-hybrid-fgkyb20z"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet-dual",
+        "transport": "tcp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-off-magnet-dual-hybrid-rt48b6o3"
+      }
+    ],
+    "tcpRequiredRc4": [
+      {
+        "format": "v2",
+        "direction": "download",
+        "transport": "tcp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-required-download-pure-2zut20wl"
+      },
+      {
+        "format": "v2",
+        "direction": "upload",
+        "transport": "tcp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-required-upload-pure-n4vs2is8"
+      },
+      {
+        "format": "v2",
+        "direction": "magnet",
+        "transport": "tcp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-required-magnet-pure-2lr3tfkn"
+      },
+      {
+        "format": "v2",
+        "direction": "selective",
+        "transport": "tcp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 10,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-required-selective-pure-w2h3x0o9"
+      },
+      {
+        "format": "hybrid",
+        "direction": "download",
+        "transport": "tcp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-required-download-hybrid-0uffkhbg"
+      },
+      {
+        "format": "hybrid",
+        "direction": "upload",
+        "transport": "tcp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-required-upload-hybrid-i4bwx4j6"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet",
+        "transport": "tcp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-required-magnet-hybrid-1l9x2c4m"
+      },
+      {
+        "format": "hybrid",
+        "direction": "selective",
+        "transport": "tcp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 10,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-required-selective-hybrid-w12xctfv"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet-v1",
+        "transport": "tcp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-required-magnet-v1-hybrid-04n8r_80"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet-dual",
+        "transport": "tcp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-required-magnet-dual-hybrid-q4ldbv32"
+      }
+    ],
+    "utpPlaintext": [
+      {
+        "format": "v2",
+        "direction": "download",
+        "transport": "utp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-off-download-pure-lmbxjmmz"
+      },
+      {
+        "format": "v2",
+        "direction": "upload",
+        "transport": "utp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-off-upload-pure-ku7v35n3"
+      },
+      {
+        "format": "v2",
+        "direction": "magnet",
+        "transport": "utp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-off-magnet-pure-1gmqd6j6"
+      },
+      {
+        "format": "v2",
+        "direction": "selective",
+        "transport": "utp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 10,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-off-selective-pure-l8gtow6a"
+      },
+      {
+        "format": "hybrid",
+        "direction": "download",
+        "transport": "utp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-off-download-hybrid-vg4ofnu7"
+      },
+      {
+        "format": "hybrid",
+        "direction": "upload",
+        "transport": "utp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-off-upload-hybrid-rq3wwzmm"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet",
+        "transport": "utp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-off-magnet-hybrid-11p8gwku"
+      },
+      {
+        "format": "hybrid",
+        "direction": "selective",
+        "transport": "utp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 10,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-off-selective-hybrid-4u0axu3k"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet-v1",
+        "transport": "utp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-off-magnet-v1-hybrid-iqcgbguv"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet-dual",
+        "transport": "utp",
+        "encryption": "off",
+        "enginePolicy": "allow",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-off-magnet-dual-hybrid-cadgo_5w"
+      }
+    ],
+    "utpRequiredRc4": [
+      {
+        "format": "v2",
+        "direction": "download",
+        "transport": "utp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-required-download-pure-1_gku9py"
+      },
+      {
+        "format": "v2",
+        "direction": "upload",
+        "transport": "utp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-required-upload-pure-yutluf1m"
+      },
+      {
+        "format": "v2",
+        "direction": "magnet",
+        "transport": "utp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-required-magnet-pure-oxnvnaj6"
+      },
+      {
+        "format": "v2",
+        "direction": "selective",
+        "transport": "utp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 10,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-required-selective-pure-dbheb7d8"
+      },
+      {
+        "format": "hybrid",
+        "direction": "download",
+        "transport": "utp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-required-download-hybrid-si0mnpps"
+      },
+      {
+        "format": "hybrid",
+        "direction": "upload",
+        "transport": "utp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-required-upload-hybrid-wbu9nn59"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet",
+        "transport": "utp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-required-magnet-hybrid-su4ynats"
+      },
+      {
+        "format": "hybrid",
+        "direction": "selective",
+        "transport": "utp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 10,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-required-selective-hybrid-uh8cp1mw"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet-v1",
+        "transport": "utp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-required-magnet-v1-hybrid-ikcmp34_"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet-dual",
+        "transport": "utp",
+        "encryption": "required",
+        "enginePolicy": "require",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-required-magnet-dual-hybrid-tvcytyy4"
+      }
+    ],
+    "impairedLegacyUtp": [
+      {
+        "direction": "download",
+        "format": "hybrid",
+        "encryption": "off",
+        "transport": "utp",
+        "bytes": 2097343,
+        "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+        "result": "PASS",
+        "relay": {
+          "forwarded": 3652,
+          "dropped": 53,
+          "delayed": 176,
+          "reordered": 169,
+          "blackoutDropped": 9,
+          "forwardedAfterBlackout": 3524,
+          "repeatedDataSequences": 212
+        },
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/utp-impaired-download-legacy-plain-4z9u1f9z",
+        "forcedLegacyWire": true,
+        "wireHandshakes": [
+          {
+            "direction": "toTarget",
+            "infoHash": "fd0be900f032f01de506c94cc1a895b2c5b6db56",
+            "v2UpgradeBit": false
+          },
+          {
+            "direction": "fromTarget",
+            "infoHash": "fd0be900f032f01de506c94cc1a895b2c5b6db56",
+            "v2UpgradeBit": false
+          }
+        ]
+      },
+      {
+        "direction": "upload",
+        "format": "hybrid",
+        "encryption": "off",
+        "transport": "utp",
+        "bytes": 2097343,
+        "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+        "result": "PASS",
+        "relay": {
+          "forwarded": 2701,
+          "dropped": 49,
+          "delayed": 163,
+          "reordered": 127,
+          "blackoutDropped": 2,
+          "forwardedAfterBlackout": 2583,
+          "repeatedDataSequences": 141
+        },
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/utp-impaired-upload-legacy-plain-93n3hib1",
+        "forcedLegacyWire": true,
+        "wireHandshakes": [
+          {
+            "direction": "toTarget",
+            "infoHash": "fd0be900f032f01de506c94cc1a895b2c5b6db56",
+            "v2UpgradeBit": false
+          },
+          {
+            "direction": "fromTarget",
+            "infoHash": "fd0be900f032f01de506c94cc1a895b2c5b6db56",
+            "v2UpgradeBit": false
+          }
+        ]
+      }
+    ],
+    "impairedEncryptedUtp": [
+      {
+        "direction": "download",
+        "format": "hybrid",
+        "encryption": "required",
+        "transport": "utp",
+        "bytes": 2097343,
+        "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+        "result": "PASS",
+        "relay": {
+          "forwarded": 4712,
+          "dropped": 67,
+          "delayed": 218,
+          "reordered": 200,
+          "blackoutDropped": 22,
+          "forwardedAfterBlackout": 4577,
+          "repeatedDataSequences": 254
+        },
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/utp-impaired-download-hybrid-rc4-1yee7jgx",
+        "forcedLegacyWire": false,
+        "wireHandshakes": []
+      },
+      {
+        "direction": "upload",
+        "format": "hybrid",
+        "encryption": "required",
+        "transport": "utp",
+        "bytes": 2097343,
+        "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+        "result": "PASS",
+        "relay": {
+          "forwarded": 2692,
+          "dropped": 49,
+          "delayed": 163,
+          "reordered": 133,
+          "blackoutDropped": 5,
+          "forwardedAfterBlackout": 2573,
+          "repeatedDataSequences": 140
+        },
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/utp-impaired-upload-hybrid-rc4-pbwku9qv",
+        "forcedLegacyWire": false,
+        "wireHandshakes": []
+      }
+    ],
+    "discoveryAndHostilePeers": [
+      {
+        "mode": "udp",
+        "format": "v2",
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-udp-wnpy4aui"
+      },
+      {
+        "mode": "udp",
+        "format": "hybrid",
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-udp-6gi6_jlz"
+      },
+      {
+        "mode": "ipv6",
+        "format": "v2",
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-ipv6-9x7z9ev5"
+      },
+      {
+        "mode": "ipv6",
+        "format": "hybrid",
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-ipv6-51tc_usi"
+      },
+      {
+        "mode": "ipv6-upload",
+        "format": "v2",
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-ipv6-upload-4hww6ybo"
+      },
+      {
+        "mode": "ipv6-upload",
+        "format": "hybrid",
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-ipv6-upload-i_9rr5uw"
+      },
+      {
+        "mode": "private",
+        "format": "v2",
+        "result": "PASS",
+        "infoHashV2": "ae8e7007593b335a05ef474a804f5507c9333a895d9e50c034d5c9e143cb2956",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-private-c6crlum1"
+      },
+      {
+        "mode": "private",
+        "format": "hybrid",
+        "result": "PASS",
+        "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-private-cthzaxhm"
+      },
+      {
+        "mode": "dht",
+        "format": "v2",
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-dht-754cqgp0"
+      },
+      {
+        "mode": "dht",
+        "format": "hybrid",
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-dht-wgcjo5i7"
+      },
+      {
+        "mode": "private-dht",
+        "format": "v2",
+        "result": "PASS",
+        "infoHashV2": "ae8e7007593b335a05ef474a804f5507c9333a895d9e50c034d5c9e143cb2956",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-private-dht-uwzz2s_h"
+      },
+      {
+        "mode": "private-dht",
+        "format": "hybrid",
+        "result": "PASS",
+        "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-private-dht-pv7ze456"
+      },
+      {
+        "mode": "duplicate-metadata",
+        "format": "v2",
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-duplicate-metadata-7nuecjb6"
+      },
+      {
+        "mode": "duplicate-metadata",
+        "format": "hybrid",
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-hardening-duplicate-metadata-d0ef29i5"
+      }
+    ],
+    "privateMetadata": [
+      {
+        "mode": "public-control",
+        "result": "PASS",
+        "publicControl": true,
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "bytes": 140012,
+        "unrelatedConnections": 2,
+        "closedConnections": 2,
+        "acceptedBeforeProofRelease": 1,
+        "closedBeforeProofRelease": 0,
+        "lateDhtReplies": 1,
+        "gatedHashes": 1,
+        "descendantQueries": 1,
+        "lateAnnounces": 1,
+        "extraTrackerQueriesAfterBarrier": 8,
+        "barrierTime": 41119.368541041,
+        "hashRequests": [
+          {
+            "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+            "base": 1,
+            "index": 0,
+            "length": 4,
+            "proof": 1
+          }
+        ],
+        "extensionHandshakes": [
+          {
+            "metadataId": 3,
+            "pexId": null
+          },
+          {
+            "metadataId": 3,
+            "pexId": 1
+          }
+        ],
+        "evidence": ".build/private-metadata-public-control-7qef2mqj"
+      },
+      {
+        "mode": "pure",
+        "result": "PASS",
+        "publicControl": false,
+        "infoHashV2": "ae8e7007593b335a05ef474a804f5507c9333a895d9e50c034d5c9e143cb2956",
+        "bytes": 140012,
+        "unrelatedConnections": 1,
+        "closedConnections": 1,
+        "acceptedBeforeProofRelease": 1,
+        "closedBeforeProofRelease": 1,
+        "lateDhtReplies": 1,
+        "gatedHashes": 1,
+        "descendantQueries": 0,
+        "lateAnnounces": 0,
+        "extraTrackerQueriesAfterBarrier": 0,
+        "barrierTime": 41122.343623875,
+        "hashRequests": [
+          {
+            "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+            "base": 1,
+            "index": 0,
+            "length": 4,
+            "proof": 1
+          }
+        ],
+        "extensionHandshakes": [
+          {
+            "metadataId": 3,
+            "pexId": null
+          },
+          {
+            "metadataId": null,
+            "pexId": null
+          }
+        ],
+        "evidence": ".build/private-metadata-pure-5_k8_xjy"
+      },
+      {
+        "mode": "hybrid",
+        "result": "PASS",
+        "publicControl": false,
+        "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+        "bytes": 140012,
+        "unrelatedConnections": 1,
+        "closedConnections": 1,
+        "acceptedBeforeProofRelease": 1,
+        "closedBeforeProofRelease": 1,
+        "lateDhtReplies": 1,
+        "gatedHashes": 1,
+        "descendantQueries": 0,
+        "lateAnnounces": 0,
+        "extraTrackerQueriesAfterBarrier": 0,
+        "barrierTime": 41125.363787708,
+        "hashRequests": [
+          {
+            "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+            "base": 1,
+            "index": 0,
+            "length": 4,
+            "proof": 1
+          }
+        ],
+        "extensionHandshakes": [
+          {
+            "metadataId": 3,
+            "pexId": null
+          },
+          {
+            "metadataId": null,
+            "pexId": null
+          }
+        ],
+        "evidence": ".build/private-metadata-hybrid-n5dwg9gw"
+      },
+      {
+        "mode": "dual",
+        "result": "PASS",
+        "publicControl": false,
+        "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+        "bytes": 140012,
+        "unrelatedConnections": 2,
+        "closedConnections": 2,
+        "acceptedBeforeProofRelease": 2,
+        "closedBeforeProofRelease": 2,
+        "lateDhtReplies": 2,
+        "gatedHashes": 2,
+        "descendantQueries": 0,
+        "lateAnnounces": 0,
+        "extraTrackerQueriesAfterBarrier": 0,
+        "barrierTime": 41127.963275416,
+        "hashRequests": [
+          {
+            "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+            "base": 1,
+            "index": 0,
+            "length": 4,
+            "proof": 1
+          },
+          {
+            "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+            "base": 1,
+            "index": 0,
+            "length": 4,
+            "proof": 1
+          }
+        ],
+        "extensionHandshakes": [
+          {
+            "metadataId": 3,
+            "pexId": null
+          },
+          {
+            "metadataId": 3,
+            "pexId": null
+          },
+          {
+            "metadataId": 3,
+            "pexId": null
+          },
+          {
+            "metadataId": null,
+            "pexId": null
+          }
+        ],
+        "evidence": ".build/private-metadata-dual-2xmgk3r9"
+      },
+      {
+        "mode": "btih",
+        "result": "PASS",
+        "publicControl": false,
+        "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+        "bytes": 140012,
+        "unrelatedConnections": 1,
+        "closedConnections": 1,
+        "acceptedBeforeProofRelease": 1,
+        "closedBeforeProofRelease": 1,
+        "lateDhtReplies": 1,
+        "gatedHashes": 1,
+        "descendantQueries": 0,
+        "lateAnnounces": 0,
+        "extraTrackerQueriesAfterBarrier": 0,
+        "barrierTime": 41130.488430916,
+        "hashRequests": [
+          {
+            "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+            "base": 1,
+            "index": 0,
+            "length": 4,
+            "proof": 1
+          }
+        ],
+        "extensionHandshakes": [
+          {
+            "metadataId": 3,
+            "pexId": null
+          },
+          {
+            "metadataId": 3,
+            "pexId": null
+          },
+          {
+            "metadataId": null,
+            "pexId": null
+          }
+        ],
+        "evidence": ".build/private-metadata-btih-0umadgbe"
+      }
+    ],
+    "metadataWire": [
+      {
+        "mode": "healthy",
+        "result": "PASS",
+        "healthyRequests": [
+          0,
+          1
+        ],
+        "metadataRejects": [
+          7
+        ],
+        "badRequests": [],
+        "evidence": ".build/metadata-wire-healthy-i7lquqj9"
+      },
+      {
+        "mode": "changed",
+        "result": "PASS",
+        "healthyRequests": [
+          0,
+          1
+        ],
+        "metadataRejects": [
+          7
+        ],
+        "badRequests": [
+          0,
+          1
+        ],
+        "evidence": ".build/metadata-wire-changed-o5er_j1l"
+      },
+      {
+        "mode": "zero",
+        "result": "PASS",
+        "healthyRequests": [
+          0,
+          1
+        ],
+        "metadataRejects": [
+          7
+        ],
+        "badRequests": [],
+        "evidence": ".build/metadata-wire-zero-a6a7_b17"
+      },
+      {
+        "mode": "reject",
+        "result": "PASS",
+        "healthyRequests": [
+          0,
+          1
+        ],
+        "metadataRejects": [
+          7
+        ],
+        "badRequests": [
+          0,
+          1
+        ],
+        "evidence": ".build/metadata-wire-reject-bei2y9qr"
+      },
+      {
+        "mode": "progress",
+        "result": "PASS",
+        "healthyRequests": [
+          0,
+          1
+        ],
+        "metadataRejects": [
+          7
+        ],
+        "badRequests": [],
+        "evidence": ".build/metadata-wire-progress-j0v4m7e_"
+      }
+    ],
+    "legacyBtih": [
+      {
+        "mode": "complete",
+        "identity": "btih",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/legacy-layers-btih-complete-ngtzudqk"
+      },
+      {
+        "mode": "partial",
+        "identity": "btih",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/legacy-layers-btih-partial-aouyu_ta"
+      },
+      {
+        "mode": "corrupt",
+        "identity": "btih",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/legacy-layers-btih-corrupt-w0pn3m6y"
+      },
+      {
+        "mode": "padding",
+        "identity": "btih",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/legacy-layers-btih-padding-g58gjddy"
+      },
+      {
+        "mode": "private",
+        "identity": "btih",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "45a6b345d79b6e49eb826420b9fb3b742a3215ba",
+        "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+        "evidence": ".build/legacy-layers-btih-private-4huk82em"
+      },
+      {
+        "mode": "inconsistent",
+        "identity": "btih",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "463da230a19ec0571fe00a59a0381e759cba3b2d",
+        "infoHashV2": "53753123a19c814d096f6c84f2e7704ec2fa98391cfdbd5a6347fc10cad61665",
+        "evidence": ".build/legacy-layers-btih-inconsistent-yhwfelnk"
+      },
+      {
+        "mode": "inspect-only",
+        "identity": "btih",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/legacy-layers-btih-inspect-only-cjduhzfb"
+      },
+      {
+        "mode": "inspect-unpadded",
+        "identity": "btih",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "3bb8fc4a855ab7fae75912250ce18e51e64526d2",
+        "infoHashV2": "4a71b73ba65d423cc88ab43d56e3464966fcafae6c04a4a6ae98bf8cabee91c9",
+        "evidence": ".build/legacy-layers-btih-inspect-unpadded-uk1b126b"
+      }
+    ],
+    "legacyDual": [
+      {
+        "mode": "complete",
+        "identity": "dual",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/legacy-layers-dual-complete-mk4p06un"
+      },
+      {
+        "mode": "partial",
+        "identity": "dual",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/legacy-layers-dual-partial-pd0opqem"
+      },
+      {
+        "mode": "corrupt",
+        "identity": "dual",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/legacy-layers-dual-corrupt-0w8zk_p5"
+      },
+      {
+        "mode": "padding",
+        "identity": "dual",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/legacy-layers-dual-padding-6gq7lk37"
+      },
+      {
+        "mode": "private",
+        "identity": "dual",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "45a6b345d79b6e49eb826420b9fb3b742a3215ba",
+        "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+        "evidence": ".build/legacy-layers-dual-private-rytsmogh"
+      },
+      {
+        "mode": "inconsistent",
+        "identity": "dual",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "463da230a19ec0571fe00a59a0381e759cba3b2d",
+        "infoHashV2": "53753123a19c814d096f6c84f2e7704ec2fa98391cfdbd5a6347fc10cad61665",
+        "evidence": ".build/legacy-layers-dual-inconsistent-ne4pqeen"
+      },
+      {
+        "mode": "inspect-only",
+        "identity": "dual",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "evidence": ".build/legacy-layers-dual-inspect-only-9up2tisa"
+      },
+      {
+        "mode": "inspect-unpadded",
+        "identity": "dual",
+        "result": "PASS",
+        "bytes": 140012,
+        "infoHashV1": "3bb8fc4a855ab7fae75912250ce18e51e64526d2",
+        "infoHashV2": "4a71b73ba65d423cc88ab43d56e3464966fcafae6c04a4a6ae98bf8cabee91c9",
+        "evidence": ".build/legacy-layers-dual-inspect-unpadded-3h9u3vy7"
+      }
+    ],
+    "legacyFlow": [
+      {
+        "mode": "interest",
+        "identity": "btih",
+        "result": "PASS",
+        "states": [
+          "interested",
+          "not-interested",
+          "interested"
+        ],
+        "sourceRequests": [
+          {
+            "index": 1,
+            "begin": 0,
+            "length": 16384
+          },
+          {
+            "index": 1,
+            "begin": 16384,
+            "length": 16384
+          }
+        ],
+        "observerRequests": [
+          {
+            "index": 2,
+            "begin": 0,
+            "length": 16384
+          },
+          {
+            "index": 2,
+            "begin": 16384,
+            "length": 16384
+          }
+        ],
+        "evidence": ".build/legacy-interest-btih-_dfox7_j"
+      },
+      {
+        "mode": "choke",
+        "identity": "btih",
+        "result": "PASS",
+        "chokedRequests": [
+          {
+            "index": 1,
+            "begin": 0,
+            "length": 16384
+          }
+        ],
+        "closedConnections": 1,
+        "healthyRequests": [
+          {
+            "index": 2,
+            "begin": 0,
+            "length": 16384
+          },
+          {
+            "index": 2,
+            "begin": 16384,
+            "length": 16384
+          },
+          {
+            "index": 1,
+            "begin": 0,
+            "length": 16384
+          },
+          {
+            "index": 1,
+            "begin": 16384,
+            "length": 16384
+          }
+        ],
+        "evidence": ".build/legacy-choke-btih-p9g7uoir"
+      },
+      {
+        "mode": "interest",
+        "identity": "dual",
+        "result": "PASS",
+        "states": [
+          "interested",
+          "not-interested",
+          "interested"
+        ],
+        "sourceRequests": [
+          {
+            "index": 1,
+            "begin": 0,
+            "length": 16384
+          },
+          {
+            "index": 1,
+            "begin": 16384,
+            "length": 16384
+          }
+        ],
+        "observerRequests": [
+          {
+            "index": 2,
+            "begin": 0,
+            "length": 16384
+          },
+          {
+            "index": 2,
+            "begin": 16384,
+            "length": 16384
+          }
+        ],
+        "evidence": ".build/legacy-interest-dual-58teovlu"
+      },
+      {
+        "mode": "choke",
+        "identity": "dual",
+        "result": "PASS",
+        "chokedRequests": [
+          {
+            "index": 1,
+            "begin": 0,
+            "length": 16384
+          }
+        ],
+        "closedConnections": 1,
+        "healthyRequests": [
+          {
+            "index": 2,
+            "begin": 0,
+            "length": 16384
+          },
+          {
+            "index": 2,
+            "begin": 16384,
+            "length": 16384
+          },
+          {
+            "index": 1,
+            "begin": 0,
+            "length": 16384
+          },
+          {
+            "index": 1,
+            "begin": 16384,
+            "length": 16384
+          }
+        ],
+        "evidence": ".build/legacy-choke-dual-u4093y0p"
+      },
+      {
+        "mode": "progress",
+        "identity": "btih",
+        "result": "PASS",
+        "elapsedSeconds": 24.163270290999208,
+        "requests": [
+          {
+            "index": 1,
+            "begin": 0,
+            "length": 16384
+          },
+          {
+            "index": 1,
+            "begin": 16384,
+            "length": 16384
+          },
+          {
+            "index": 2,
+            "begin": 0,
+            "length": 16384
+          },
+          {
+            "index": 2,
+            "begin": 16384,
+            "length": 16384
+          }
+        ],
+        "evidence": ".build/legacy-progress-4odx3z5o"
+      }
+    ]
+  },
+  "gates": [
+    {
+      "name": "interop-tcp-off",
+      "command": [
+        "python3",
+        "scripts/v2_interop.py",
+        "--transport",
+        "tcp",
+        "--encryption",
+        "off"
+      ],
+      "exitCode": 0,
+      "seconds": 50.01,
+      "log": ".build/v2-final-interop-tcp-off.log"
+    },
+    {
+      "name": "interop-tcp-required",
+      "command": [
+        "python3",
+        "scripts/v2_interop.py",
+        "--transport",
+        "tcp",
+        "--encryption",
+        "required"
+      ],
+      "exitCode": 0,
+      "seconds": 118.04,
+      "log": ".build/v2-final-interop-tcp-required.log"
+    },
+    {
+      "name": "interop-utp-off",
+      "command": [
+        "python3",
+        "scripts/v2_interop.py",
+        "--transport",
+        "utp",
+        "--encryption",
+        "off"
+      ],
+      "exitCode": 0,
+      "seconds": 122.87,
+      "log": ".build/v2-final-interop-utp-off.log"
+    },
+    {
+      "name": "interop-utp-required",
+      "command": [
+        "python3",
+        "scripts/v2_interop.py",
+        "--transport",
+        "utp",
+        "--encryption",
+        "required"
+      ],
+      "exitCode": 0,
+      "seconds": 125.18,
+      "log": ".build/v2-final-interop-utp-required.log"
+    },
+    {
+      "name": "impairment-v1",
+      "command": [
+        "python3",
+        "scripts/v2_utp_impairment.py",
+        "--format",
+        "hybrid",
+        "--encryption",
+        "off",
+        "--wire",
+        "v1"
+      ],
+      "exitCode": 0,
+      "seconds": 22.33,
+      "log": ".build/v2-final-impairment-v1.log"
+    },
+    {
+      "name": "impairment-encrypted",
+      "command": [
+        "python3",
+        "scripts/v2_utp_impairment.py",
+        "--format",
+        "hybrid",
+        "--encryption",
+        "required"
+      ],
+      "exitCode": 0,
+      "seconds": 20.13,
+      "log": ".build/v2-final-impairment-encrypted.log"
+    },
+    {
+      "name": "hardening",
+      "command": [
+        "python3",
+        "scripts/v2_hardening.py",
+        "--format",
+        "both"
+      ],
+      "exitCode": 0,
+      "seconds": 114.5,
+      "log": ".build/v2-final-hardening.log"
+    },
+    {
+      "name": "private",
+      "command": [
+        "python3",
+        "scripts/v2_private_metadata.py"
+      ],
+      "exitCode": 0,
+      "seconds": 15.53,
+      "log": ".build/v2-final-private.log"
+    },
+    {
+      "name": "metadata",
+      "command": [
+        "python3",
+        "scripts/v2_metadata_wire.py"
+      ],
+      "exitCode": 0,
+      "seconds": 31.49,
+      "log": ".build/v2-final-metadata.log"
+    },
+    {
+      "name": "legacy-btih",
+      "command": [
+        "python3",
+        "scripts/v2_legacy_layers.py",
+        "--identity",
+        "btih"
+      ],
+      "exitCode": 0,
+      "seconds": 26.24,
+      "log": ".build/v2-final-legacy-btih.log"
+    },
+    {
+      "name": "legacy-dual",
+      "command": [
+        "python3",
+        "scripts/v2_legacy_layers.py",
+        "--identity",
+        "dual"
+      ],
+      "exitCode": 0,
+      "seconds": 26.03,
+      "log": ".build/v2-final-legacy-dual.log"
+    },
+    {
+      "name": "legacy-flow",
+      "command": [
+        "python3",
+        "scripts/v2_legacy_interest.py"
+      ],
+      "exitCode": 0,
+      "seconds": 38.57,
+      "log": ".build/v2-final-legacy-flow.log"
+    },
+    {
+      "name": "lsd",
+      "command": [
+        "python3",
+        "scripts/test_lsd.py"
+      ],
+      "exitCode": 0,
+      "seconds": 6.12,
+      "log": ".build/v2-final-lsd.log"
+    },
+    {
+      "name": "hybrid-mixed",
+      "command": [
+        "python3",
+        "scripts/v2_hybrid_interop.py"
+      ],
+      "exitCode": 0,
+      "log": ".build/v2-final-hybrid-mixed.log"
+    }
+  ],
+  "native": {
+    "buildCommand": "python3 scripts/build.py --identity -",
+    "signing": "ad-hoc",
+    "cases": [
+      {
+        "fixture": "mse-native-fixture-v2",
+        "command": [
+          "/Users/ahmet/Rust/SeedHop/.build/SeedHop.app/Contents/MacOS/SeedHop",
+          "--verify-engine",
+          "/Users/ahmet/Rust/SeedHop/.build/mse-native-fixture-v2"
+        ],
+        "exitCode": 0,
+        "seconds": 11.64,
+        "log": ".build/v2-final-native-mse-native-fixture-v2.log"
+      },
+      {
+        "fixture": "mse-native-fixture-hybrid",
+        "command": [
+          "/Users/ahmet/Rust/SeedHop/.build/SeedHop.app/Contents/MacOS/SeedHop",
+          "--verify-engine",
+          "/Users/ahmet/Rust/SeedHop/.build/mse-native-fixture-hybrid"
+        ],
+        "exitCode": 0,
+        "seconds": 10.73,
+        "log": ".build/v2-final-native-mse-native-fixture-hybrid.log"
+      },
+      {
+        "fixture": "v2-filenames-native-fixture-v2",
+        "command": [
+          "/Users/ahmet/Rust/SeedHop/.build/SeedHop.app/Contents/MacOS/SeedHop",
+          "--verify-engine",
+          "/Users/ahmet/Rust/SeedHop/.build/v2-filenames-native-fixture-v2"
+        ],
+        "exitCode": 0,
+        "seconds": 10.76,
+        "log": ".build/v2-final-native-v2-filenames-native-fixture-v2.log"
+      },
+      {
+        "fixture": "v2-filenames-native-fixture-hybrid",
+        "command": [
+          "/Users/ahmet/Rust/SeedHop/.build/SeedHop.app/Contents/MacOS/SeedHop",
+          "--verify-engine",
+          "/Users/ahmet/Rust/SeedHop/.build/v2-filenames-native-fixture-hybrid"
+        ],
+        "exitCode": 0,
+        "seconds": 10.91,
+        "log": ".build/v2-final-native-v2-filenames-native-fixture-hybrid.log"
+      }
+    ],
+    "deepStrictCodesign": "PASS",
+    "licenseBytes": {
+      "vendor/UNICODE-LICENSE.txt": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+      "vendor/licenses/unicode-casefold-0.2.0/NOTICE": "ff3f93b241e8e979852aa93df52d6dc95a8b7887e2fe293780bfd9b159b52d73",
+      "vendor/licenses/unicode-casefold-0.2.0/LICENSE-APACHE": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+    }
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "workspaceFormat": "PASS",
+    "vendorFormatEdition2024": "PASS",
+    "pythonCompile": "PASS",
+    "gitDiffCheck": "PASS",
+    "twentyTwoPatchReconstruction": "PASS",
+    "twentyTwoPatchReverseReapply": "PASS"
+  },
+  "finalCorrections": [
+    "Structurally valid unsupported hash requests receive exact correlated rejects; malformed frames and invalid hash data remain errors",
+    "File imports and authenticated acquired info dictionaries check meta version before current-layout serde validation"
+  ],
+  "negativeControls": [
+    {
+      "log": ".build/v2-final-hash-boundary-before.log",
+      "observed": "Unsupported semantic hash parameters disconnected the peer with UnexpectedEof"
+    },
+    {
+      "log": ".build/v2-final-version-priority.log",
+      "observed": "Future version dictionary reported missing field piece length before the fix"
+    }
+  ],
+  "clientBounds": {
+    "metadataBytes": 33554432,
+    "pieceLengthBytes": [
+      16384,
+      2147483648
+    ],
+    "hashBaseCount": 512,
+    "maxHashesPerFrame": 544,
+    "replyJobsPerPeer": 32,
+    "metadataAttemptsPerLookup": 8,
+    "sharedMetadataAcquisitions": 4,
+    "endpointHistory": 4096,
+    "pendingEndpointQueue": 1024,
+    "usefulProgressSeconds": 20,
+    "metadataAttemptSeconds": 120,
+    "legacyLayerWorkers": 8,
+    "legacyOutstandingBlocksPerWorker": 1,
+    "legacyBlockBytes": 16384
+  },
+  "limitations": [
+    "Private torrents use one stable first tracker; tracker failover is not claimed. Caller-supplied initial peers are an explicit manual override.",
+    "Required leaf and piece hash layers are supported; optional intermediate layers may be rejected.",
+    "Symlink storage is unsupported. Unsafe filenames are sanitized while original metainfo bytes remain authoritative.",
+    "Controlled loopback interoperability does not certify every public tracker, routed network, physical interface or filesystem."
+  ],
+  "separateReleaseGates": [
+    "Certificate-backed signing and notarization",
+    "Actual login, sleep/wake and physical drive/interface-loss recovery",
+    "UI accessibility certification"
+  ],
+  "sourceSha256": {
+    "crates/seedhop-core/Cargo.toml": "74abdb49210961696ab1ea394f2815ff6376a11d7c99b8d5746f8921f66e6981",
+    "crates/seedhop-core/src/bin/seedhop-lab.rs": "19bca1538af23c88949b83f24293979f79474999436bd790723a04a459d522a8",
+    "crates/seedhop-core/src/lib.rs": "8e87db7a0585fc3235ef3b41b35bb0c612a275f64262300726ec152d807dbf9c",
+    "crates/seedhop-core/tests/mse.rs": "f6f53d9814b0b0326a10b0b9e03296b55b89ccec5218a64e905d26bd4ef6a27c",
+    "crates/seedhop-core/tests/support/gated_storage.rs": "7da68cf896709f4928c2e70012de930fbb75a928cbb03d67b43ed683d89cc6be",
+    "crates/seedhop-core/tests/support/mod.rs": "c1440158a18f6ef0cd704eb79433801d52ddf532ca9ea4d552c25488a91bdb01",
+    "crates/seedhop-core/tests/v2.rs": "a4a13ace53a796969566c84848c59f68737a09c26fb7c7c0a3c2873a4af6fc34",
+    "crates/seedhop-ffi/Cargo.toml": "9f3db3b519015d7d9e422af29a3d2b5387a5db2bccd19e6fd3e0418c9309372a",
+    "crates/seedhop-ffi/src/lib.rs": "877981145d9bca790b3ec8728e450eb9839c5e9621c49bfb7a6cd43b80542591",
+    "macOS/App/EngineSelfTest.swift": "aab7e7fa6a2b68701380a83a985173fd335eeb1903a6a9267d8f12e7b4549ac1",
+    "scripts/build.py": "e4a620cf4075761ecfef235dd2084a686b6ea622d3cee922e89f451de7ccef56",
+    "scripts/interop.py": "38d38ebcd71a8feec213e5768761dd59a6fdbb9bab0433a08600e064e3ac649e",
+    "scripts/test_lsd.py": "031bf3e1751c088f28e71b37fcc3302886f8528f59cd97c9194cc37d25d16199",
+    "scripts/v2_filenames.py": "fcde7c69f2cdf28f6a497c7d7cc79c8bc19d7c6c3393ad0ef4a838c727245026",
+    "scripts/v2_hardening.py": "4b79c62c5306ed8fe79cc8f1bb0cd7d06fe5361848cac4b90a47bbbe87d3bbf5",
+    "scripts/v2_hybrid_interop.py": "9058a4a149d9f219c04b22882005a8da9da51f1253122144f0efeee8c4cf0925",
+    "scripts/v2_interest.py": "164c2d176017f876e5344f6737332f4a34c036e7fab58d42979d23bad53f4611",
+    "scripts/v2_interop.py": "59b9bb114559500d2318700503b542362ae6ccbeb188e356bb3bc7db30e16b67",
+    "scripts/v2_legacy_interest.py": "61735fae18df3fcde8404939b9a8ec8a85d3078d7228783b6a49c7c4ee0670db",
+    "scripts/v2_legacy_layers.py": "3f9cf7f7f29d35bb08c41f19ab1651a74b7d8461010b4e1a9d6738d0f8c4245a",
+    "scripts/v2_metadata_wire.py": "77cf93da2c9de006059a60a18d676e9435a3a98b402a4a3116e47fe19b3ddf4c",
+    "scripts/v2_private_metadata.py": "f21b18c1f5fa371d4ed1974fd7b46323221929843d263dea346fb902b0e3571d",
+    "scripts/v2_utp_impairment.py": "e3b7f84e91a91600b1a209eb37c6ea7f72613075b2f1e9b1787db780b841d94c",
+    "scripts/v2_validation.py": "5e1644c75fda5960ecfa6e47eb80670d6a3e1d8ed4f781b5c2d6ed2592adfaa8",
+    "vendor/README.md": "f5feb0ba6f5ab24936120985a3f1181aec6542529e2abf1070eca78960da928a",
+    "vendor/UNICODE-LICENSE.txt": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+    "vendor/licenses/unicode-casefold-0.2.0/LICENSE-APACHE": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+    "vendor/licenses/unicode-casefold-0.2.0/NOTICE": "ff3f93b241e8e979852aa93df52d6dc95a8b7887e2fe293780bfd9b159b52d73",
+    "vendor/patches/0005-seedhop-v2-wire-completion.patch": "b47d9ff96b3e33043da9e80bcfa5021beba2a087c0f3b46e2285e6ff7a4ebeeb",
+    "vendor/patches/0006-seedhop-utp-fallback.patch": "0c1f4c2c79905a41e724b27b3b5f695af1adfbb83409f5ca5278994c6a544458",
+    "vendor/patches/0007-seedhop-hybrid-swarms.patch": "4914f411fdeb7f5a8f53de804598debd8b086d1357507d5e50ab45d7cdfc0622",
+    "vendor/patches/0008-seedhop-peer-encryption.patch": "8283f3c197e16c889265c7d954d50aa507ae4be55291bc654cc46e97d2c86264",
+    "vendor/patches/0009-seedhop-magnet-proof-discovery.patch": "810ef6204973500c7ae1290bc89db42066c9fb6960e20931263da7dd2a0852ec",
+    "vendor/patches/0010-seedhop-legacy-payload-layers.patch": "9334cf08f9b1b81b9452541b6601d0289ab29fddd87cb197d7d8433440ee71dd",
+    "vendor/patches/0011-seedhop-dual-hash-magnets.patch": "245baeb842d936428bc46b60b0363bb4fa05ac53111493fae0eae8036facbe3b",
+    "vendor/patches/0012-seedhop-private-metadata-teardown.patch": "ce3de821d57c1fc43fbb78da6f26c5c82c1009b30d6f688133e8d2c0633a6e29",
+    "vendor/patches/0013-seedhop-metadata-wire-conformance.patch": "46e88fcab2ca935eea298e522a498b29950cfa1760081be482aecc9bd1eda01a",
+    "vendor/patches/0014-seedhop-metadata-resource-bounds.patch": "e1a2188e2ce1a526a9745b3d65ba67e5bfdbf363058bf8cf10e32e9cb06a7672",
+    "vendor/patches/0015-seedhop-v2-filename-mapping.patch": "87ba1ca4d7bb5d0675785c67d19b156f3a0192ae19bc7eaa79ec9443a11e50a0",
+    "vendor/patches/0016-seedhop-peer-interest-state.patch": "1b3c4666ec554ca57fbf7eea19161e12472a74783d1461f90032238f01713bd4",
+    "vendor/patches/0017-seedhop-authenticated-serving.patch": "3ea3f5e029cc21fbe15ea686ead5a5d97b10a4d7e9b29a509631ae5c6dedaf20",
+    "vendor/patches/0018-seedhop-hash-rate-policy.patch": "97e2095447564dcde61d9d5ddadc3c7df6dc34ccd37c1d8a741c5587ee121308",
+    "vendor/patches/0019-seedhop-extension-discovery-policy.patch": "3f545b1f991a7738e5922cb478bf49fec6459fef7b3c3c466c48a75b49e71b1c",
+    "vendor/patches/0020-seedhop-lsd-subscription-lifetime.patch": "3428977d4f4d353f2118a7482863f492558f6c3b1e2088dcb88b21637fa27aba",
+    "vendor/patches/0021-seedhop-legacy-layer-peer-state.patch": "3dd89dd997b49f2859f46d10788b3118a1a4ba1655116e385b216a3624f1f02f",
+    "vendor/patches/0022-seedhop-final-wire-boundaries.patch": "f612351416e65305f1fd6e08355724f5a772a308073a5ae74a0389f11d12e5b0",
+    "vendor/rqbit/crates/dht/src/dht.rs": "42b39c2da46c9e29fd3c54ced1778c479880c35283da112a9bd4e18aa2c068b2",
+    "vendor/rqbit/crates/librqbit/Cargo.toml": "3daf2239dc5d4feb0b676fd0b464193fbb45b0ba0b92592c050550d75f92718e",
+    "vendor/rqbit/crates/librqbit/src/chunk_tracker.rs": "4fd4e3e61678deb09fe7ff61ac042dc680a2ed6d76befc349a66dd751f754dee",
+    "vendor/rqbit/crates/librqbit/src/dht_utils.rs": "5f9820f512ca95fbd6bf2958de019c2ab1e1214a46f2cb34c84608d19b42d6ce",
+    "vendor/rqbit/crates/librqbit/src/error.rs": "c5d9c80590ee32df4fb3848d1fe3941273e7109b971c9abc2e7bee978c581b82",
+    "vendor/rqbit/crates/librqbit/src/file_ops.rs": "aef45adcf8e3bff2ffb14ec7d1ae9fd3cf0f2e1834d6e9e247c4af398307d92f",
+    "vendor/rqbit/crates/librqbit/src/lib.rs": "dbb6333ba181e07e37383cf45058bc0f4a07a6167c6db25816db6570f5a013eb",
+    "vendor/rqbit/crates/librqbit/src/limits.rs": "2385f292eaf9a82a48a65fa49a39ff4c24c240c5c1f1467517cd7f07ae937eb6",
+    "vendor/rqbit/crates/librqbit/src/mse.rs": "39ed36c46b8033df5ebeb33f31ff91f3d54823adc43207fad793b1ba00b696aa",
+    "vendor/rqbit/crates/librqbit/src/peer_connection.rs": "cb7d75eab35f31556bd0fb2befd7f9a833e5f9a89ad608b51b6283aece36156d",
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/legacy_layers.rs": "25f0e562a91c6a48506268a418795b3221b230be8d5f768389523567e7617a43",
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/mod.rs": "954ed48df85eb0da3021812f7442c4572ad21d6c4582f6f5c6ae5a837bd141eb",
+    "vendor/rqbit/crates/librqbit/src/piece_tracker.rs": "492ae7a355c49fb6d82f681d1321518f88316519d99bc3718489f19ededc0994",
+    "vendor/rqbit/crates/librqbit/src/read_buf.rs": "9d2cb4e4e4e716cb235fbc3869058343ec63c3f098372fbada8176e7392faf45",
+    "vendor/rqbit/crates/librqbit/src/session.rs": "867eadc89910a33a18d83e6a4ae62e1b9ccbb1d2f20b6aa98bcdaa58d703e305",
+    "vendor/rqbit/crates/librqbit/src/session_persistence/json.rs": "1a85524a8ba689736f773f47bb0a0bfe217133d50e65461e55cf1df43cd588fe",
+    "vendor/rqbit/crates/librqbit/src/session_persistence/mod.rs": "6ac5032206410039f2bbe32b5ea4501914c257b2535b72cd8e91c42a350dfe60",
+    "vendor/rqbit/crates/librqbit/src/session_persistence/postgres.rs": "c96d1c4d22101c38cb96cb1eca3b83367e341594e803a272ff1336254fa230a9",
+    "vendor/rqbit/crates/librqbit/src/stream_connect.rs": "c56f02dba067395a6999226b29daa164e0639412b3a71dbaaed9a76bd7784c6b",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/live/mod.rs": "7c9f66597dcd982acb1fdc2303c04771ba0358aca9492b14f9d27781b69ab817",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/live/peer/cancelled_requests.rs": "3317d9d8050f8c6fecfa59e0d16ef445539154b4904311de628b58fb3359da28",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/live/peer/mod.rs": "c853b15a02f3419424a02d6b4ec67df1404d085ab865cd49662c4ef3e0eb6201",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/live/peers/mod.rs": "59d97b60c48f918101b5cc165c05121a49673e220c9ea8fe9fc96f2703b1d64e",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/mod.rs": "ab9e666cc6a796d169cc5ee52a70e22396ffbe602ed72cec288073fd03cd1416",
+    "vendor/rqbit/crates/librqbit/src/type_aliases.rs": "dbeb30534e582aa7086acb2a6302d42e85fc48433aac76383598a0e33fa4599d",
+    "vendor/rqbit/crates/librqbit_core/Cargo.toml": "da489a0753795e8a6d06202cd90343eca5f7e9e22686dfd436a03e9580528d7f",
+    "vendor/rqbit/crates/librqbit_core/src/magnet.rs": "b2828ac6b4a074cd2ad2cecaa0da09dcc5a84a82abc19a780e428721351bfcae",
+    "vendor/rqbit/crates/librqbit_core/src/torrent_metainfo.rs": "b211b38b6198e699d9f4abafc5072883cec725638c2c8539de7332fa9d8cc5e9",
+    "vendor/rqbit/crates/librqbit_core/src/v2.rs": "d873b6e41a6d8b19ca3ccef32930d85aef8bb9a1149121e16946fbee51b2aafa",
+    "vendor/rqbit/crates/librqbit_core/src/v2/paths.rs": "faa495df5ec41dd8e9dad95ff0ad4920ef7f6c5a912e5af2142d6053c588c7a5",
+    "vendor/rqbit/crates/librqbit_lsd/src/lib.rs": "287a62f9e63c73ecc194eb952001b3006f4abb5b3f37ac467dfa8256200c07a2",
+    "vendor/rqbit/crates/peer_binary_protocol/src/extended/handshake.rs": "9187761f442004bcc4789de029deb3997e74ec431489e47f25c3b6f475725d91",
+    "vendor/rqbit/crates/peer_binary_protocol/src/extended/mod.rs": "be2d8e9f6f6b6d3709af36899000fde8a6bd244f5f7970632269392bf9718464",
+    "vendor/rqbit/crates/peer_binary_protocol/src/extended/ut_metadata.rs": "e8391d4de4a02da2bd114c60c99fb45e7a59fd5a55274f39497042a40f350619",
+    "vendor/rqbit/crates/peer_binary_protocol/src/lib.rs": "2fdef7916741eb04824a426ebb3bb51f9f3f5582c55c1c363f066089a7943cf6",
+    "Cargo.toml": "b65673dc67b27523d9ee946f573a788cdb66d27ed2beb1b835c6fca446f60cd4",
+    "Cargo.lock": "6f056c6547d3d71bcefa44c9df4bd4e954fd2f6c9b223cefbd41792158255e4d",
+    "THIRD_PARTY_NOTICES.md": "3482e8cd7a97cc9f77df6dbdf29d55fa81bd2821fb2cd8190f8505cdb541ff8b"
+  },
+  "sourceTrees": {
+    "vendor/rqbit": {
+      "sha256": "1258a454146c169edcd36c91a51c120326ef7a49ecca5e180c0493034f9894b4",
+      "files": 360,
+      "algorithm": "SHA-256 of sorted relative UTF-8 path + NUL + raw SHA-256(file), concatenated"
+    },
+    "crates": {
+      "sha256": "2f7966d319e0809d35eb539422519c8590595fb2cbb51ff3064083556172bca1",
+      "files": 23,
+      "algorithm": "SHA-256 of sorted relative UTF-8 path + NUL + raw SHA-256(file), concatenated"
+    }
+  },
+  "binarySha256": {
+    "target/debug/seedhop-lab": "0d604e3358d6c1705ebf32c6d3a61d5f47e6929bb7e88062a632450f7ee3d432",
+    ".build/SeedHop.app/Contents/MacOS/SeedHop": "5390e6b3f9d9f295ddab081e4097d94039cfc430a6e47069eb6ecff5b5e20e7a",
+    ".build/SeedHop.app/Contents/MacOS/SeedHopAgent": "e7e2989f829f3174b24529aa0ac3e628e401ef037427d03d5fc1fb3ef7b0ad74",
+    ".build/SeedHop.app/Contents/XPCServices/SeedHopEngine.xpc/Contents/MacOS/SeedHopEngine": "d554f07e45bd611d0267f9e29fcc0d83f64eeb354fd5222229c4ed20666c8deb",
+    ".build/SeedHop.app/Contents/Frameworks/libseedhop_ffi.dylib": "1c55040f8807a6f0687cbb8e0fcc4613b58a6c5fa374f052b73fd68a68f9e819"
+  },
+  "logs": {
+    ".build/v2-final-check.log": "0bd1e318dd6c997f4b6bed202470e274a8785ebbceae563be7cbb33dcec57c26",
+    ".build/v2-final-clippy.log": "3c683da25815c9e2955a9125ded53b0b30fde7411840df3c80457d58420ecdaa",
+    ".build/v2-final-hardening.log": "dfaf95c770084df13e2addf2ff120cfd550004505d3cf97fac56068a45ed01b9",
+    ".build/v2-final-hybrid-mixed.log": "24c86bc047d79e432f1777cb6a638c77b3a7ec4b8e99fa474c47352054cbda4d",
+    ".build/v2-final-impairment-encrypted.log": "f240680a522924900b2e5a8ffe18f16ac68cb5a30ef5dbe5d05c6cf89aa9b268",
+    ".build/v2-final-impairment-v1.log": "8437887efdf51c5f95c8bcbb4fcd17b66891ba5edcf681fb57375222fb446e62",
+    ".build/v2-final-interop-tcp-off.log": "23f553492ce1c5b6aeec50730cbb4abe098e902d5210d3886413d3f96282124a",
+    ".build/v2-final-interop-tcp-required.log": "73cac1ac5883bed401e3206c2700ee2d661db310fcebaaaf68a81adac0de05fd",
+    ".build/v2-final-interop-utp-off.log": "bc775ec160143f15f689623bb5d2a1c2877b5bfdda6bc2788df90e95871613e0",
+    ".build/v2-final-interop-utp-required.log": "e69a7787e89103824a3a165a7e9925a4b5ef24d076d76fd234c2088fdda7a31b",
+    ".build/v2-final-legacy-btih.log": "31becfc8dd97d27f6bc10f55c1b0e10f4fd140cb8178bb824cee200974b59392",
+    ".build/v2-final-legacy-dual.log": "c32a8ade621d39aca5b0c6649fa0c3e4e5759900445ae2bcb9b1afa7a0ee0474",
+    ".build/v2-final-legacy-flow.log": "95146517e518bc539aff73911764c5c57c0243b28c74f96b4505f22d2cd96d29",
+    ".build/v2-final-lsd.log": "719b320ff9016d31901b4703989de0003d3dd59b945c15ec07a6ae73c96bcc15",
+    ".build/v2-final-metadata.log": "2a64f13643e2e0db0165b96ce980e198bcfd430c806324e1a9660a35d218c895",
+    ".build/v2-final-native-build.log": "efea1ce258d432c299f53dde91b67dcaf9318327b98f5bd0565232b8113ecfab",
+    ".build/v2-final-native-mse-native-fixture-hybrid.log": "8c65b433ce56d54f01a4c713fcd17a137a9eaaa5f87e00d73a7155edad46687f",
+    ".build/v2-final-native-mse-native-fixture-v2.log": "8c65b433ce56d54f01a4c713fcd17a137a9eaaa5f87e00d73a7155edad46687f",
+    ".build/v2-final-native-v2-filenames-native-fixture-hybrid.log": "8c65b433ce56d54f01a4c713fcd17a137a9eaaa5f87e00d73a7155edad46687f",
+    ".build/v2-final-native-v2-filenames-native-fixture-v2.log": "8c65b433ce56d54f01a4c713fcd17a137a9eaaa5f87e00d73a7155edad46687f",
+    ".build/v2-final-patches.log": "05bb704d8d2c86018846567aebc59a4c9932eaf0fe5eeccbba9febf147419830",
+    ".build/v2-final-private.log": "8f50531616c73a303981ac1ca5f165edf89511701a7f24550481ddfad2789acf",
+    ".build/v2-final-rust.log": "54d7186b329cb20c96b6a7d9a740c21e63b0eae35e7e8be2d92a7cb4bc94f68c",
+    ".build/v2-final-signature.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "gitHead": "195115a3c04bdced52bb68401d4aad63b26a1539",
+  "gitState": "Implementation remains uncommitted; no commit or pull request was requested"
+}

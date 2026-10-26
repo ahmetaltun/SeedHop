@@ -14,7 +14,7 @@ use futures::Stream;
 use librqbit_core::{Id20, spawn_utils::spawn_with_cancel};
 use librqbit_dualstack_sockets::{BindDevice, MulticastUdpSocket};
 use parking_lot::RwLock;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tokio::sync::mpsc::{Receiver, Sender, channel};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, debug_span, trace};
 
@@ -55,9 +55,15 @@ impl RateLimiter {
     }
 }
 
-struct Announce {
-    tx: UnboundedSender<SocketAddr>,
+struct Subscriber {
+    tx: Sender<SocketAddr>,
     port: Option<u16>,
+}
+
+#[derive(Default)]
+struct Announce {
+    subscribers: HashMap<u64, Subscriber>,
+    announcers: HashMap<u16, CancellationToken>,
     last_reply_ipv4: RateLimiter,
     last_reply_ipv6: RateLimiter,
 }
@@ -67,6 +73,7 @@ struct LocalServiceDiscoveryInner {
     cookie: u32,
     cancel_token: CancellationToken,
     receivers: RwLock<HashMap<Id20, Announce>>,
+    next_subscription: AtomicU64,
 }
 
 #[derive(Clone)]
@@ -99,6 +106,7 @@ impl LocalServiceDiscovery {
                 cookie,
                 cancel_token: opts.cancel_token.clone(),
                 receivers: Default::default(),
+                next_subscription: AtomicU64::new(0),
             }),
         };
 
@@ -166,15 +174,24 @@ cookie: {cookie}\r
             return Ok(());
         }
 
-        let announce_port = {
+        let (announce_port, announce_cancel) = {
             let g = self.inner.receivers.read();
             let announce = return_if_none!(g.get(&bts.hash));
             let mut addr = addr;
             addr.set_port(bts.port);
 
-            return_if_none!(announce.tx.send(addr).ok());
+            // Discovery must not grow an unbounded queue behind a resolver
+            // whose connection slots are occupied. A later announcement may
+            // offer the endpoint again once the consumer has capacity.
+            for subscriber in announce.subscribers.values() {
+                match subscriber.tx.try_send(addr) {
+                    Ok(()) | Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {}
+                    Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {}
+                }
+            }
 
-            let announce_port = return_if_none!(announce.port);
+            let (announce_port, announce_cancel) =
+                return_if_none!(announce.announcers.iter().next());
 
             let rl = if addr.is_ipv4() {
                 &announce.last_reply_ipv4
@@ -184,7 +201,7 @@ cookie: {cookie}\r
 
             return_if_none!(rl.check(), trace!(?addr, ?bts, "replying rate-limited"));
 
-            announce_port
+            (*announce_port, announce_cancel.clone())
         };
 
         let mopts = return_if_none!(
@@ -193,13 +210,12 @@ cookie: {cookie}\r
         );
 
         let reply = self.gen_announce_msg(bts.hash, announce_port, addr.is_ipv6());
-
-        if let Err(e) = self
-            .inner
-            .socket
-            .send_multicast_msg(reply.as_bytes(), &mopts)
-            .await
-        {
+        let result = tokio::select! {
+            biased;
+            _ = announce_cancel.cancelled() => return Ok(()),
+            result = self.inner.socket.send_multicast_msg(reply.as_bytes(), &mopts) => result,
+        };
+        if let Err(e) = result {
             trace!(?addr, ?reply, ?mopts, "error sending reply: {e:#}");
         } else {
             trace!(?addr, ?reply, ?mopts, "sent reply");
@@ -215,15 +231,25 @@ cookie: {cookie}\r
         }
     }
 
-    async fn task_announce_periodically(self, info_hash: Id20, port: u16) -> anyhow::Result<()> {
+    async fn task_announce_periodically(
+        self,
+        info_hash: Id20,
+        port: u16,
+        cancel: CancellationToken,
+    ) -> anyhow::Result<()> {
         let mut interval = tokio::time::interval(Duration::from_secs(60 * 5));
         loop {
             interval.tick().await;
+            if cancel.is_cancelled() {
+                return Ok(());
+            }
 
             self.inner
                 .socket
                 .try_send_mcast_everywhere(&|mopts| {
-                    Some(self.gen_announce_msg(info_hash, port, mopts.mcast_addr().is_ipv6()))
+                    (!cancel.is_cancelled()).then(|| {
+                        self.gen_announce_msg(info_hash, port, mopts.mcast_addr().is_ipv6())
+                    })
                 })
                 .await;
         }
@@ -237,11 +263,12 @@ cookie: {cookie}\r
         // 1. Periodically announce the torrent.
         // 2. Stream back the results from received messages.
 
-        let (tx, rx) = unbounded_channel::<SocketAddr>();
+        let (tx, rx) = channel::<SocketAddr>(1024);
 
         struct AddrStream {
             info_hash: Id20,
-            rx: UnboundedReceiver<SocketAddr>,
+            subscription: u64,
+            rx: Receiver<SocketAddr>,
             lsd: LocalServiceDiscovery,
         }
 
@@ -258,33 +285,63 @@ cookie: {cookie}\r
 
         impl Drop for AddrStream {
             fn drop(&mut self) {
-                let _ = self.lsd.inner.receivers.write().remove(&self.info_hash);
+                let mut receivers = self.lsd.inner.receivers.write();
+                if let Some(announce) = receivers.get_mut(&self.info_hash) {
+                    if let Some(Subscriber {
+                        port: Some(port), ..
+                    }) = announce.subscribers.remove(&self.subscription)
+                        && !announce
+                            .subscribers
+                            .values()
+                            .any(|subscriber| subscriber.port == Some(port))
+                        && let Some(cancel) = announce.announcers.remove(&port)
+                    {
+                        cancel.cancel();
+                    }
+                    if announce.subscribers.is_empty() {
+                        receivers.remove(&self.info_hash);
+                    }
+                }
             }
         }
 
-        self.inner.receivers.write().insert(
-            info_hash,
-            Announce {
-                tx,
-                port: announce_port,
-                last_reply_ipv4: Default::default(),
-                last_reply_ipv6: Default::default(),
-            },
-        );
+        let subscription = self.inner.next_subscription.fetch_add(1, Ordering::Relaxed);
+        let new_worker = {
+            let mut receivers = self.inner.receivers.write();
+            let announce = receivers.entry(info_hash).or_default();
+            announce.subscribers.insert(
+                subscription,
+                Subscriber {
+                    tx,
+                    port: announce_port,
+                },
+            );
+            announce_port.and_then(|port| {
+                if let std::collections::hash_map::Entry::Vacant(entry) =
+                    announce.announcers.entry(port)
+                {
+                    let cancel = self.inner.cancel_token.child_token();
+                    entry.insert(cancel.clone());
+                    Some((port, cancel))
+                } else {
+                    None
+                }
+            })
+        };
 
-        if let Some(announce_port) = announce_port {
-            let cancel_token = self.inner.cancel_token.child_token();
+        if let Some((port, cancel)) = new_worker {
             spawn_with_cancel(
-                debug_span!(parent: None, "lsd-announce", ?info_hash, port=announce_port),
+                debug_span!(parent: None, "lsd-announce", ?info_hash, port),
                 "lsd-announce",
-                cancel_token,
+                cancel.clone(),
                 self.clone()
-                    .task_announce_periodically(info_hash, announce_port),
+                    .task_announce_periodically(info_hash, port, cancel),
             );
         }
 
         AddrStream {
             info_hash,
+            subscription,
             rx,
             lsd: self.clone(),
         }
@@ -345,5 +402,113 @@ fn try_parse_bt_search<'a: 'h, 'h>(
             }
         }
         _ => anyhow::bail!("expecting BT-SEARCH"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures::StreamExt;
+
+    async fn discovery() -> (LocalServiceDiscovery, CancellationToken) {
+        let stop = CancellationToken::new();
+        let lsd = LocalServiceDiscovery::new(LocalServiceDiscoveryOptions {
+            cancel_token: stop.clone(),
+            cookie: Some(12345),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        (lsd, stop)
+    }
+
+    async fn offer(socket: &tokio::net::UdpSocket, hash: Id20, port: u16) {
+        let message = format!(
+            "BT-SEARCH * HTTP/1.1\r\nHost: [ff15::efc0:988f]:6771\r\nPort: {port}\r\nInfohash: {}\r\ncookie: 54321\r\n\r\n\r\n",
+            hash.as_string()
+        );
+        socket
+            .send_to(message.as_bytes(), "[::1]:6771")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn subscribers_share_announcements_and_drop_only_their_own_registration() {
+        let (lsd, stop) = discovery().await;
+        let hash = Id20::new([7; 20]);
+        let mut first = lsd.announce(hash, None);
+        let mut second = lsd.announce(hash, None);
+        let sender = tokio::net::UdpSocket::bind("[::1]:0").await.unwrap();
+        offer(&sender, hash, 32123).await;
+        let expected: SocketAddr = "[::1]:32123".parse().unwrap();
+        for stream in [&mut first, &mut second] {
+            assert_eq!(
+                tokio::time::timeout(Duration::from_secs(1), stream.next())
+                    .await
+                    .unwrap(),
+                Some(expected)
+            );
+        }
+        drop(first);
+        offer(&sender, hash, 32124).await;
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(1), second.next())
+                .await
+                .unwrap(),
+            Some("[::1]:32124".parse().unwrap())
+        );
+        drop(second);
+        assert!(lsd.inner.receivers.read().is_empty());
+        stop.cancel();
+    }
+
+    #[tokio::test]
+    async fn last_announcing_subscriber_drop_stops_its_periodic_task() {
+        let (lsd, stop) = discovery().await;
+        let baseline = Arc::strong_count(&lsd.inner);
+        let hash = Id20::new([8; 20]);
+        let listener = lsd.announce(hash, None);
+        let first = lsd.announce(hash, Some(32125));
+        let second = lsd.announce(hash, Some(32125));
+        // One worker for the shared port, plus the three subscriber streams.
+        assert_eq!(Arc::strong_count(&lsd.inner), baseline + 4);
+        drop(first);
+        // The surviving announcing subscriber still owns that worker.
+        assert_eq!(Arc::strong_count(&lsd.inner), baseline + 3);
+        drop(second);
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while Arc::strong_count(&lsd.inner) != baseline + 1 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("periodic announcement task outlived its last owner");
+        drop(listener);
+        assert!(lsd.inner.receivers.read().is_empty());
+        stop.cancel();
+    }
+
+    #[tokio::test]
+    async fn a_full_subscriber_queue_does_not_block_another_subscriber() {
+        let (lsd, stop) = discovery().await;
+        let hash = Id20::new([9; 20]);
+        let slow = lsd.announce(hash, None);
+        let mut fast = lsd.announce(hash, None);
+        let sender = tokio::net::UdpSocket::bind("[::1]:0").await.unwrap();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            for port in 32000..33100 {
+                offer(&sender, hash, port).await;
+                assert_eq!(
+                    fast.next().await,
+                    Some(SocketAddr::new(Ipv6Addr::LOCALHOST.into(), port))
+                );
+            }
+        })
+        .await
+        .expect("one full discovery queue blocked another subscriber");
+        drop(slow);
+        drop(fast);
+        stop.cancel();
     }
 }

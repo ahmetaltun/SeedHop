@@ -1,0 +1,478 @@
+{
+  "date": "2026-10-26",
+  "status": "in_progress",
+  "scope": "Local forced-uTP packet loss, reordering, blackout and retransmission recovery; full protocol objective remains active",
+  "result": "PASS: eight pure-v2/hybrid plaintext/required-RC4 cases plus two forced-v1-wire hybrid cases",
+  "impairment": {
+    "dropEveryDataPacket": 37,
+    "delayEveryDataPacket": 11,
+    "delaySeconds": 0.025,
+    "blackoutAfterDataPackets": 80,
+    "blackoutSeconds": 0.35,
+    "relayTransport": "UDP only",
+    "payloadBytes": 2097343,
+    "transferDeadlineSeconds": 120
+  },
+  "cases": [
+    {
+      "direction": "download",
+      "format": "v2",
+      "encryption": "off",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 3729,
+        "dropped": 53,
+        "delayed": 173,
+        "reordered": 155,
+        "blackoutDropped": 20,
+        "forwardedAfterBlackout": 3596,
+        "repeatedDataSequences": 201
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-download-pure-plain-dfx40gwf",
+      "forcedLegacyWire": false,
+      "wireHandshakes": [],
+      "verifiedPeerSettings": {
+        "encryption": 2,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "mseRc4Observed": false,
+      "engineRecoveryDiagnostics": [
+        "stream_connect: connected over uTP addr=127.0.0.1:60063"
+      ]
+    },
+    {
+      "direction": "download",
+      "format": "v2",
+      "encryption": "required",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 4379,
+        "dropped": 63,
+        "delayed": 207,
+        "reordered": 190,
+        "blackoutDropped": 16,
+        "forwardedAfterBlackout": 4246,
+        "repeatedDataSequences": 234
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-download-pure-rc4-8csnb5qe",
+      "forcedLegacyWire": false,
+      "wireHandshakes": [],
+      "verifiedPeerSettings": {
+        "encryption": 1,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "mseRc4Observed": true,
+      "engineRecoveryDiagnostics": [
+        "torrent_state::live: error managing peer: timeout connecting",
+        "stream_connect: connected over uTP addr=127.0.0.1:49612",
+        "torrent_state::live: error managing peer: timeout reading",
+        "stream_connect: connected over uTP addr=127.0.0.1:49612"
+      ]
+    },
+    {
+      "direction": "download",
+      "format": "hybrid",
+      "encryption": "off",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 4408,
+        "dropped": 62,
+        "delayed": 204,
+        "reordered": 190,
+        "blackoutDropped": 10,
+        "forwardedAfterBlackout": 4269,
+        "repeatedDataSequences": 223
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-download-hybrid-plain-calta1qp",
+      "forcedLegacyWire": false,
+      "wireHandshakes": [],
+      "verifiedPeerSettings": {
+        "encryption": 2,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "mseRc4Observed": false,
+      "engineRecoveryDiagnostics": [
+        "torrent_state::live: error managing peer: timeout connecting",
+        "stream_connect: connected over uTP addr=127.0.0.1:61822"
+      ]
+    },
+    {
+      "direction": "download",
+      "format": "hybrid",
+      "encryption": "required",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 4099,
+        "dropped": 58,
+        "delayed": 191,
+        "reordered": 174,
+        "blackoutDropped": 13,
+        "forwardedAfterBlackout": 3972,
+        "repeatedDataSequences": 225
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-download-hybrid-rc4-ueas3qmk",
+      "forcedLegacyWire": false,
+      "wireHandshakes": [],
+      "verifiedPeerSettings": {
+        "encryption": 1,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "mseRc4Observed": true,
+      "engineRecoveryDiagnostics": [
+        "torrent_state::live: error managing peer: timeout connecting",
+        "stream_connect: connected over uTP addr=127.0.0.1:60836"
+      ]
+    },
+    {
+      "direction": "upload",
+      "format": "v2",
+      "encryption": "off",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 2715,
+        "dropped": 49,
+        "delayed": 160,
+        "reordered": 136,
+        "blackoutDropped": 4,
+        "forwardedAfterBlackout": 2598,
+        "repeatedDataSequences": 144
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-upload-pure-plain-i_ut9lz2",
+      "forcedLegacyWire": false,
+      "wireHandshakes": [],
+      "verifiedPeerSettings": {
+        "encryption": 2,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "mseRc4Observed": false,
+      "engineRecoveryDiagnostics": []
+    },
+    {
+      "direction": "upload",
+      "format": "v2",
+      "encryption": "required",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 2645,
+        "dropped": 49,
+        "delayed": 161,
+        "reordered": 132,
+        "blackoutDropped": 5,
+        "forwardedAfterBlackout": 2523,
+        "repeatedDataSequences": 135
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-upload-pure-rc4-8vz7che_",
+      "forcedLegacyWire": false,
+      "wireHandshakes": [],
+      "verifiedPeerSettings": {
+        "encryption": 1,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "mseRc4Observed": true,
+      "engineRecoveryDiagnostics": []
+    },
+    {
+      "direction": "upload",
+      "format": "hybrid",
+      "encryption": "off",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 2800,
+        "dropped": 49,
+        "delayed": 164,
+        "reordered": 133,
+        "blackoutDropped": 4,
+        "forwardedAfterBlackout": 2681,
+        "repeatedDataSequences": 143
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-upload-hybrid-plain-84c0loty",
+      "forcedLegacyWire": false,
+      "wireHandshakes": [],
+      "verifiedPeerSettings": {
+        "encryption": 2,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "mseRc4Observed": false,
+      "engineRecoveryDiagnostics": []
+    },
+    {
+      "direction": "upload",
+      "format": "hybrid",
+      "encryption": "required",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 2727,
+        "dropped": 49,
+        "delayed": 164,
+        "reordered": 134,
+        "blackoutDropped": 5,
+        "forwardedAfterBlackout": 2607,
+        "repeatedDataSequences": 145
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-upload-hybrid-rc4-i9uunx6k",
+      "forcedLegacyWire": false,
+      "wireHandshakes": [],
+      "verifiedPeerSettings": {
+        "encryption": 1,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "mseRc4Observed": true,
+      "engineRecoveryDiagnostics": []
+    }
+  ],
+  "legacyCases": [
+    {
+      "direction": "download",
+      "format": "hybrid",
+      "encryption": "off",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 3527,
+        "dropped": 50,
+        "delayed": 165,
+        "reordered": 147,
+        "blackoutDropped": 18,
+        "forwardedAfterBlackout": 3395,
+        "repeatedDataSequences": 190
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-download-legacy-plain-pxchwnja",
+      "forcedLegacyWire": true,
+      "wireHandshakes": [
+        {
+          "direction": "toTarget",
+          "infoHash": "fd0be900f032f01de506c94cc1a895b2c5b6db56",
+          "v2UpgradeBit": false
+        },
+        {
+          "direction": "fromTarget",
+          "infoHash": "fd0be900f032f01de506c94cc1a895b2c5b6db56",
+          "v2UpgradeBit": false
+        }
+      ],
+      "verifiedPeerSettings": {
+        "encryption": 2,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "mseRc4Observed": false,
+      "engineRecoveryDiagnostics": [
+        "stream_connect: connected over uTP addr=127.0.0.1:56335"
+      ]
+    },
+    {
+      "direction": "upload",
+      "format": "hybrid",
+      "encryption": "off",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 2697,
+        "dropped": 49,
+        "delayed": 163,
+        "reordered": 132,
+        "blackoutDropped": 2,
+        "forwardedAfterBlackout": 2579,
+        "repeatedDataSequences": 145
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-upload-legacy-plain-20ih39r1",
+      "forcedLegacyWire": true,
+      "wireHandshakes": [
+        {
+          "direction": "toTarget",
+          "infoHash": "fd0be900f032f01de506c94cc1a895b2c5b6db56",
+          "v2UpgradeBit": false
+        },
+        {
+          "direction": "fromTarget",
+          "infoHash": "fd0be900f032f01de506c94cc1a895b2c5b6db56",
+          "v2UpgradeBit": false
+        }
+      ],
+      "verifiedPeerSettings": {
+        "encryption": 2,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "mseRc4Observed": false,
+      "engineRecoveryDiagnostics": [
+        "stream_connect: connected over uTP addr=127.0.0.1:62733"
+      ]
+    }
+  ],
+  "checks": {
+    "pythonCompile": "PASS",
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "format": "PASS",
+    "diffWhitespace": "PASS"
+  },
+  "commands": [
+    "python3 scripts/v2_utp_impairment.py",
+    "python3 scripts/v2_utp_impairment.py --wire v1 --format hybrid --encryption off"
+  ],
+  "logs": [
+    ".build/utp-impairment-final.log",
+    ".build/utp-impairment-legacy.log"
+  ],
+  "observations": [
+    "The relay records uTP type, connection ID, sequence, packet length, drop/delay/outage action and actual reordering/repeated data sequences. Both clients verify exact real-file bytes.",
+    "Forced legacy cases advertise only the SHA-1 swarm endpoint and clear the v2 upgrade bit in both plaintext wire handshakes. Both hashes are checked against the expected SHA-1 identity.",
+    "An earlier eight-case run passed at the old 45-second lab deadline. A repeat encrypted download reached that deadline while waiting for reconnect after a dropped stream. The lab now accepts a bounded test-only timeout override; the final eight-case matrix passes with 120 seconds, without changing production backoff/timeouts.",
+    "An initial singleton fixture used qBittorrent's alternate single-file layout and stalled its seed recheck. The final fixture has two real files and verifies both at their actual paths."
+  ],
+  "limitations": [
+    "Loopback relay validation does not certify routed IPv6, interface loss, sleep/wake or physical network changes.",
+    "The forced legacy wire relay supports a complete plaintext handshake in one uTP data packet; these cases do not claim encrypted v1-wire interception.",
+    "Native rebuilt app XPC integration remains unresolved; see v2-mse-2026-10-26.json."
+  ],
+  "remaining": [
+    "Legacy-only btih magnet layer acquisition",
+    "Remaining BEP 52 conformance and discovery/privacy audit",
+    "Native XPC failure and final app integration"
+  ],
+  "sourceSha256": {
+    "scripts/v2_utp_impairment.py": "e3b7f84e91a91600b1a209eb37c6ea7f72613075b2f1e9b1787db780b841d94c",
+    "scripts/v2_validation.py": "5e1644c75fda5960ecfa6e47eb80670d6a3e1d8ed4f781b5c2d6ed2592adfaa8",
+    "scripts/interop.py": "cb7990f5f684745c84f3d9c2e0c52e7d85a3e7c61889b3f02c3a649f6e2bea81",
+    "crates/seedhop-core/src/bin/seedhop-lab.rs": "da638ad396fea135dc3be61b64feb1b693d638ca615022d52cc44fd7174790af",
+    "vendor/rqbit/crates/librqbit/src/peer_connection.rs": "150a87ec257edda113b879380a09641468f3437e29774f1ce3d177513834ec26",
+    "vendor/rqbit/crates/librqbit/src/mse.rs": "39ed36c46b8033df5ebeb33f31ff91f3d54823adc43207fad793b1ba00b696aa"
+  }
+}

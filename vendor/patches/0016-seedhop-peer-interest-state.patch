@@ -1,0 +1,372 @@
+diff --git a/crates/librqbit/src/chunk_tracker.rs b/crates/librqbit/src/chunk_tracker.rs
+--- a/crates/librqbit/src/chunk_tracker.rs
++++ b/crates/librqbit/src/chunk_tracker.rs
+@@ -248,6 +248,15 @@
+             .filter_map(|id| self.lengths.validate_piece_index(id))
+     }
+ 
++    pub(crate) fn needs_any_from(&self, peer: &[u8]) -> bool {
++        self.selected
++            .as_raw_slice()
++            .iter()
++            .zip(self.have.as_bytes())
++            .zip(peer)
++            .any(|((selected, have), peer)| selected & !have & peer != 0)
++    }
++
+     pub(crate) fn is_piece_have(&self, id: ValidPieceIndex) -> bool {
+         self.have.as_slice()[id.get() as usize]
+     }
+@@ -263,7 +272,8 @@
+             return;
+         }
+         debug!("marking piece={} as broken", index);
+-        self.queue_pieces.set(index.get() as usize, true);
++        self.queue_pieces
++            .set(index.get() as usize, self.selected[index.get_usize()]);
+         if let Some(s) = self.chunk_status.get_mut(self.lengths.chunk_range(index)) {
+             s.fill(false);
+         }
+diff --git a/crates/librqbit/src/piece_tracker.rs b/crates/librqbit/src/piece_tracker.rs
+--- a/crates/librqbit/src/piece_tracker.rs
++++ b/crates/librqbit/src/piece_tracker.rs
+@@ -239,6 +239,19 @@
+         self.chunks.mark_piece_broken_if_not_have(piece);
+     }
+ 
++    pub(crate) fn owns_piece(&self, piece: ValidPieceIndex, peer: PeerHandle) -> bool {
++        self.inflight
++            .get(&piece)
++            .is_some_and(|owner| owner.peer == peer)
++    }
++
++    pub(crate) fn pieces_owned_by(&self, peer: PeerHandle) -> Vec<ValidPieceIndex> {
++        self.inflight
++            .iter()
++            .filter_map(|(piece, owner)| (owner.peer == peer).then_some(*piece))
++            .collect()
++    }
++
+     /// Requeue a rejected piece only if it still belongs to this connection.
+     pub fn release_piece_owned_by(&mut self, piece: ValidPieceIndex, peer: PeerHandle) {
+         if self
+diff --git a/crates/librqbit/src/torrent_state/live/mod.rs b/crates/librqbit/src/torrent_state/live/mod.rs
+--- a/crates/librqbit/src/torrent_state/live/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/mod.rs
+@@ -507,9 +507,11 @@
+             self.shared.connector.clone(),
+         );
+         let requester = handler.task_peer_chunk_requester();
++        let interest = handler.task_interest();
+ 
+         let res = tokio::select! {
+             r = requester => {r}
++            r = interest => {r}
+             r = peer_connection.manage_peer_incoming(
+                 rx,
+                 checked_peer,
+@@ -585,6 +587,7 @@
+                 .task_peer_chunk_requester()
+                 .instrument(debug_span!("chunk_requester"))
+         );
++        let interest = aframe!(handler.task_interest());
+         let conn_manager = aframe!(
+             peer_connection
+                 .manage_peer_outgoing(rx, state.have_broadcast_tx.subscribe())
+@@ -597,6 +600,7 @@
+             .fetch_add(1, Ordering::Relaxed);
+         let res = tokio::select! {
+             r = requester => {r}
++            r = interest => {r}
+             r = conn_manager => {r}
+         };
+ 
+@@ -826,6 +830,8 @@
+         let mut g = self.lock_write("update_only_files");
+         let pt = g.get_pieces_mut()?;
+         let hns = pt.update_only_files(&self.metadata.file_infos, only_files)?;
++        drop(g);
++        self.new_pieces_notify.notify_waiters();
+         if !hns.finished() {
+             self.reconnect_all_not_needed_peers();
+         }
+@@ -1026,6 +1032,7 @@
+ struct PeerFlowControl {
+     i_am_choked: bool,
+     request_window: usize,
++    am_interested: bool,
+ }
+ 
+ impl Default for PeerFlowControl {
+@@ -1033,6 +1040,7 @@
+         Self {
+             i_am_choked: true,
+             request_window: DEFAULT_PEER_REQUEST_WINDOW,
++            am_interested: false,
+         }
+     }
+ }
+@@ -1044,7 +1052,7 @@
+     state: Arc<TorrentStateLive>,
+     counters: Arc<AtomicPeerCounters>,
+     // Semantically, we don't need a lock here, as this is only requested from
+-    // one future (requester + manage_peer).
++    // the requester, connection reader and independent interest monitor.
+     //
+     // However as PeerConnectionHandler takes &self everywhere, we need shared mutability.
+     // RefCell would do, but tokio is unhappy when we use it.
+@@ -1255,6 +1263,7 @@
+                     request_window, "updated peer request window from extended handshake"
+                 );
+                 flow.request_window = request_window;
++                drop(flow);
+                 self.notify_request_slots_changed();
+             }
+         }
+@@ -1861,34 +1870,99 @@
+         }
+     }
+ 
++    fn piece_is_wanted(
++        &self,
++        chunks: &crate::chunk_tracker::ChunkTracker,
++        piece: ValidPieceIndex,
++    ) -> bool {
++        !chunks.is_piece_have(piece)
++            && (chunks.get_selected_pieces()[piece.get_usize()]
++                || self
++                    .state
++                    .streams
++                    .iter_next_pieces(&self.state.lengths)
++                    .any(|target| target == piece))
++    }
++
++    fn set_interest(&self, interested: bool) -> crate::Result<()> {
++        let mut flow = self.lock_flow_control("update payload interest");
++        self.write_interest(&mut flow, interested)
++    }
++
++    fn write_interest(&self, flow: &mut PeerFlowControl, interested: bool) -> crate::Result<()> {
++        if flow.am_interested != interested {
++            self.tx
++                .send(WriterRequest::Message(if interested {
++                    Message::Interested
++                } else {
++                    Message::NotInterested
++                }))
++                .map_err(|_| Error::PeerTaskDead)?;
++            flow.am_interested = interested;
++        }
++        Ok(())
++    }
++
++    fn refresh_interest(&self) -> crate::Result<bool> {
++        self.state
++            .peers
++            .with_live_mut(
++                self.addr,
++                "refresh peer interest",
++                |live| -> crate::Result<bool> {
++                    let mut state = self.state.lock_write("refresh peer interest");
++                    let pieces = state.get_pieces_mut()?;
++                    for piece in pieces.pieces_owned_by(self.addr) {
++                        if !self.piece_is_wanted(pieces.chunks(), piece) {
++                            live.cancel_inflight_requests_for_piece(piece);
++                            pieces.release_piece_owned_by(piece, self.addr);
++                        }
++                    }
++                    let chunks = pieces.chunks();
++                    let interested = chunks.needs_any_from(live.bitfield.as_raw_slice())
++                        || self
++                            .state
++                            .streams
++                            .iter_next_pieces(&self.state.lengths)
++                            .any(|piece| {
++                                !chunks.is_piece_have(piece)
++                                    && live
++                                        .bitfield
++                                        .get(piece.get_usize())
++                                        .is_some_and(|value| *value)
++                            });
++                    self.set_interest(interested)?;
++                    Ok(interested)
++                },
++            )
++            .unwrap_or(Ok(false))
++    }
++
++    async fn task_interest(&self) -> crate::Result<()> {
++        loop {
++            let changed = self.state.new_pieces_notify.notified();
++            self.refresh_interest()?;
++            // Streaming demand/seek changes do not currently have a shared
++            // piece notification. Keep those updates bounded and independent
++            // of the payload requester waiting for an unchoke or rate limit.
++            tokio::select! {
++                _ = changed => {},
++                _ = tokio::time::sleep(Duration::from_millis(250)) => {},
++            }
++        }
++    }
++
+     // The job of this is to request chunks and also to keep peer alive.
+     // The moment this ends, the peer is disconnected.
+     async fn task_peer_chunk_requester(&self) -> crate::Result<()> {
+         let handle = self.addr;
+         self.wait_for_bitfield().await;
+ 
+-        let mut update_interest = {
+-            let mut current = false;
+-            move |h: &PeerHandler, new_value: bool| -> crate::Result<()> {
+-                if new_value != current {
+-                    h.tx.send(if new_value {
+-                        WriterRequest::Message(Message::Interested)
+-                    } else {
+-                        WriterRequest::Message(Message::NotInterested)
+-                    })
+-                    .ok()
+-                    .ok_or(Error::PeerTaskDead)?;
+-                    current = new_value;
+-                }
+-                Ok(())
+-            }
+-        };
+-
+         loop {
+             // If we have full torrent, we don't need to request more pieces.
+             // However we might still need to seed them to the peer.
+             if self.state.is_finished_and_no_active_streams() {
+-                update_interest(self, false)?;
++                self.refresh_interest()?;
+                 if self
+                     .state
+                     .peers
+@@ -1913,7 +1987,13 @@
+                 }
+             }
+ 
+-            update_interest(self, true)?;
++            if !self.refresh_interest()? {
++                tokio::select! {
++                    _ = self.state.new_pieces_notify.notified() => {},
++                    _ = tokio::time::sleep(Duration::from_millis(250)) => {},
++                }
++                continue;
++            }
+             aframe!(self.wait_for_request_slot()).await;
+ 
+             // Acquire a piece using the strategy: try steal (10x) → reserve → steal (3x).
+@@ -1959,43 +2039,57 @@
+ 
+                 aframe!(self.wait_for_request_slot()).await;
+ 
+-                match self
+-                    .state
+-                    .peers
+-                    .with_live_mut(handle, "add chunk request", |live| {
+-                        if live.bitfield.get(next.get_usize()).is_some_and(|v| *v) {
+-                            live.add_inflight_request(chunk, request.length)
+-                        } else {
+-                            false
++                let queued = self.state.peers.with_live_mut(
++                    handle,
++                    "add chunk request",
++                    |live| -> crate::Result<bool> {
++                        let state = self.state.lock_read("check requested piece ownership");
++                        let pieces = state.pieces.as_ref().ok_or(Error::ChunkTrackerEmpty)?;
++                        if !pieces.owns_piece(next, self.addr)
++                            || !self.piece_is_wanted(pieces.chunks(), next)
++                            || !live
++                                .bitfield
++                                .get(next.get_usize())
++                                .is_some_and(|value| *value)
++                        {
++                            return Ok(false);
+                         }
+-                    }) {
+-                    Some(true) => {}
+-                    Some(false) => {
+-                        // This request was already in-flight for this peer for this chunk.
+-                        // This might happen in theory, but not very likely.
+-                        //
+-                        // Example:
+-                        // someone stole a piece from us, and then died, the piece became "needed" again, and we reserved it
+-                        // all before the piece request was processed by us.
+-                        warn!(
+-                            id = self.state.shared.id,
+-                            info_hash = ?self.state.shared.info_hash,
+-                            addr = ?self.addr,
+-                            "we already requested {:?} previously",
+-                            chunk
++                        // Interest and request enter the same ordered writer queue
++                        // while selection/ownership and this peer are locked.
++                        let mut flow = self.lock_flow_control("queue payload request");
++                        if flow.i_am_choked
++                            || live.requested_inflight_count() >= flow.request_window
++                        {
++                            return Ok(false);
++                        }
++                        self.write_interest(&mut flow, true)?;
++                        if live.add_inflight_request(chunk, request.length) {
++                            self.tx
++                                .send(WriterRequest::Message(Message::Request(request)))
++                                .map_err(|_| Error::PeerTaskDead)?;
++                        }
++                        Ok(true)
++                    },
++                );
++                match queued {
++                    Some(Ok(true)) => {}
++                    Some(Ok(false)) => {
++                        self.state.peers.with_live_mut(
++                            handle,
++                            "release stale request piece",
++                            |live| {
++                                let mut state =
++                                    self.state.lock_write("release stale request piece");
++                                if let Ok(pieces) = state.get_pieces_mut() {
++                                    live.cancel_inflight_requests_for_piece(next);
++                                    pieces.release_piece_owned_by(next, self.addr);
++                                }
++                            },
+                         );
+-                        continue;
++                        break;
+                     }
+-                    // peer died
++                    Some(Err(error)) => return Err(error),
+                     None => return Ok(()),
+-                };
+-
+-                if self
+-                    .tx
+-                    .send(WriterRequest::Message(Message::Request(request)))
+-                    .is_err()
+-                {
+-                    return Ok(());
+                 }
+             }
+         }
+@@ -2003,6 +2097,22 @@
+ 
+     fn on_i_am_choked(&self) {
+         self.lock_flow_control("i_am_choked = true").i_am_choked = true;
++        if !self.is_v2() {
++            // Legacy choking implicitly drops outstanding requests. V2 keeps
++            // them pending until the peer explicitly sends piece or reject.
++            self.state
++                .peers
++                .with_live_mut(self.addr, "legacy choke cancellation", |live| {
++                    let mut state = self.state.lock_write("legacy choke cancellation");
++                    if let Ok(pieces) = state.get_pieces_mut() {
++                        for piece in pieces.pieces_owned_by(self.addr) {
++                            live.cancel_inflight_requests_for_piece(piece);
++                            pieces.release_piece_owned_by(piece, self.addr);
++                        }
++                    }
++                });
++            self.state.new_pieces_notify.notify_waiters();
++        }
+         self.notify_request_slots_changed();
+     }
+ 

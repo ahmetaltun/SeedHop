@@ -488,6 +488,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cipher"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "773f3b9af64447d2ce9850330c473515014aa235e6a783b02db81ff39e4a3dad"
+dependencies = [
+ "crypto-common",
+ "inout",
+ "zeroize",
+]
+
+[[package]]
 name = "clap"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -625,6 +636,16 @@ name = "crossbeam-utils"
 version = "0.8.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
+
+[[package]]
+name = "crypto-bigint"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0dc92fb57ca44df6db8059111ab3af99a63d5d0f8375d9972e319a379c6bab76"
+dependencies = [
+ "subtle",
+ "zeroize",
+]
 
 [[package]]
 name = "crypto-common"
@@ -1401,6 +1422,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "inout"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "879f10e63c20629ecabbb64a8010319738c66a5cd0c29b02d63d272b03751d01"
+dependencies = [
+ "generic-array 0.14.7",
+]
+
+[[package]]
 name = "intervaltree"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1601,6 +1631,7 @@ dependencies = [
  "bitvec",
  "byteorder",
  "bytes",
+ "crypto-bigint",
  "dashmap",
  "futures",
  "governor",
@@ -1625,6 +1656,7 @@ dependencies = [
  "nix",
  "parking_lot",
  "rand 0.10.3",
+ "rc4",
  "regex",
  "reqwest",
  "rlimit",
@@ -1646,6 +1678,7 @@ dependencies = [
  "uuid",
  "walkdir",
  "windows",
+ "zeroize",
 ]
 
 [[package]]
@@ -1706,6 +1739,8 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "unicode-casefold",
+ "unicode-normalization",
  "url",
 ]
 
@@ -2405,6 +2440,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rc4"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f1256e23efe6097f27aa82d6ca6889361c001586ae0f6917cbad072f05eb275"
+dependencies = [
+ "cipher",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2756,9 +2800,12 @@ dependencies = [
 name = "seedhop-core"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "crypto-bigint",
  "libc",
  "librqbit",
  "librqbit-peer-protocol",
+ "rc4",
  "serde",
  "serde_json",
  "sha1",
@@ -2777,6 +2824,7 @@ version = "0.1.0"
 dependencies = [
  "seedhop-core",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.21",
  "tokio",
  "uniffi",
@@ -3458,10 +3506,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "357cc3acc6a036009fd6c973ed009037c732d60d0b4f6c673e9041497482a28f"
 
 [[package]]
+name = "unicode-casefold"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7f66b1c8f8caa2ab31dc6d3f35386f16efdab89668f93411e565ac368908e8f"
+
+[[package]]
 name = "unicode-ident"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
+
+[[package]]
+name = "unicode-normalization"
+version = "0.1.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75cd3fb03d5288b3ba9a1ee103ac7e9cbb59f0b03d64f8ddfcc04dd42758a85d"
+dependencies = [
+ "tinyvec",
+]
 
 [[package]]
 name = "unicode-width"

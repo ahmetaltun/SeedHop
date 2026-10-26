@@ -1,0 +1,1140 @@
+diff --git a/crates/librqbit/src/file_ops.rs b/crates/librqbit/src/file_ops.rs
+--- a/crates/librqbit/src/file_ops.rs
++++ b/crates/librqbit/src/file_ops.rs
+@@ -83,7 +83,16 @@
+                 if pause_requested.load(Ordering::Relaxed) {
+                     bail!("initial check paused");
+                 }
+-                if self.check_piece(piece.piece_index).unwrap_or(false) {
++                let checked = self.check_piece(piece.piece_index);
++                if let Err(error) = &checked
++                    && matches!(
++                        error.downcast_ref::<librqbit_core::v2::V2Error>(),
++                        Some(librqbit_core::v2::V2Error::HybridHashMismatch)
++                    )
++                {
++                    return Err(checked.unwrap_err());
++                }
++                if checked.unwrap_or(false) {
+                     have.set(piece.piece_index.get() as usize, true);
+                 }
+                 progress.fetch_add(piece.len as u64, Ordering::Relaxed);
+@@ -211,15 +220,40 @@
+                 .find(|(_, fi)| fi.piece_range.contains(&piece_index.get()))
+                 .context("piece has no file")?;
+             let start = self.torrent.lengths().piece_offset(piece_index) - fi.offset_in_torrent;
+-            return match v2.verify_piece_reader(piece_index.get() as u64, |offset, buf| {
++            let mut sha1 = Sha1::new();
++            let verified = v2.verify_piece_reader(piece_index.get() as u64, |offset, buf| {
+                 self.files
+                     .pread_exact(file_idx, start + offset, buf)
+-                    .map_err(std::io::Error::other)
+-            }) {
+-                Ok(()) => Ok(true),
+-                Err(librqbit_core::v2::V2Error::HashMismatch) => Ok(false),
+-                Err(error) => Err(error.into()),
+-            };
++                    .map_err(std::io::Error::other)?;
++                if v2.is_hybrid() {
++                    sha1.update(buf);
++                }
++                Ok(())
++            });
++            match verified {
++                Ok(()) => {}
++                Err(librqbit_core::v2::V2Error::HashMismatch) => return Ok(false),
++                Err(error) => return Err(error.into()),
++            }
++            if let Some(wire_length) = v2.hybrid_piece_size(piece_index.get() as u64) {
++                let real_length = self.torrent.lengths().piece_length(piece_index);
++                let mut padding = wire_length - real_length;
++                let zeroes = [0u8; 16384];
++                while padding > 0 {
++                    let count = padding.min(zeroes.len() as u32);
++                    sha1.update(&zeroes[..count as usize]);
++                    padding -= count;
++                }
++                if self
++                    .torrent
++                    .info()
++                    .compare_hash(piece_index.get(), sha1.finish())
++                    != Some(true)
++                {
++                    return Err(librqbit_core::v2::V2Error::HybridHashMismatch.into());
++                }
++            }
++            return Ok(true);
+         }
+         let mut h = Sha1::new();
+         let piece_length = self.torrent.lengths().piece_length(piece_index);
+diff --git a/crates/librqbit/src/peer_connection.rs b/crates/librqbit/src/peer_connection.rs
+--- a/crates/librqbit/src/peer_connection.rs
++++ b/crates/librqbit/src/peer_connection.rs
+@@ -40,6 +40,9 @@
+     fn is_v2(&self) -> bool {
+         false
+     }
++    fn supports_v2(&self) -> bool {
++        self.is_v2()
++    }
+     fn on_connected(&self, _connection_time: Duration) {}
+     fn should_send_bitfield(&self) -> bool;
+     fn serialize_bitfield_message_to_buf(&self, buf: &mut [u8]) -> anyhow::Result<usize>;
+@@ -176,7 +179,8 @@
+         );
+ 
+         let mut write_buf = Box::new([0u8; MAX_MSG_LEN]);
+-        let handshake = Handshake::new(self.info_hash, self.peer_id).with_v2(self.handler.is_v2());
++        let handshake =
++            Handshake::new(self.info_hash, self.peer_id).with_v2(self.handler.supports_v2());
+         let hlen = handshake.serialize_unchecked_len(&mut *write_buf);
+         with_timeout(
+             "writing handshake",
+@@ -188,7 +192,7 @@
+         )
+         .await?;
+ 
+-        let handshake_supports_extended = handshake.supports_extended();
++        let handshake_supports_extended = incoming.handshake.supports_extended();
+ 
+         self.handler
+             .on_handshake(handshake, incoming.kind)
+@@ -214,7 +218,8 @@
+         rwtimeout: Duration,
+     ) -> Result<(ReadBuf, Handshake)> {
+         use tokio::io::AsyncWriteExt;
+-        let handshake = Handshake::new(self.info_hash, self.peer_id).with_v2(self.handler.is_v2());
++        let handshake =
++            Handshake::new(self.info_hash, self.peer_id).with_v2(self.handler.supports_v2());
+         let hsz = handshake.serialize_unchecked_len(write_buf);
+         with_timeout(
+             "writing handshake",
+diff --git a/crates/librqbit/src/session.rs b/crates/librqbit/src/session.rs
+--- a/crates/librqbit/src/session.rs
++++ b/crates/librqbit/src/session.rs
+@@ -38,7 +38,9 @@
+         ManagedTorrentHandle, ManagedTorrentLocked, ManagedTorrentOptions, ManagedTorrentState,
+         TorrentMetadata, TorrentStateLive, initializing::TorrentStateInitializing,
+     },
+-    type_aliases::{BoxAsyncReadVectored, BoxAsyncWrite, PeerStream},
++    type_aliases::{
++        BoxAsyncReadVectored, BoxAsyncWrite, PeerStream, TorrentPeer, TorrentPeerStream,
++    },
+ };
+ use anyhow::{Context, bail};
+ use arc_swap::ArcSwapOption;
+@@ -978,19 +980,20 @@
+             .iter()
+             .find(|(_, t)| {
+                 t.info_hash() == h.info_hash
+-                    || (h.reserved & 0x10 != 0
+-                        && t.with_metadata(|m| {
+-                            m.info.info().v2.as_ref().is_some_and(|v| v.is_hybrid())
+-                                && m.v1_info_hash == h.info_hash
+-                        })
+-                        .unwrap_or(false))
++                    || t.with_metadata(|m| {
++                        m.info.info().v2.as_ref().is_some_and(|v| v.is_hybrid())
++                            && m.v1_info_hash == h.info_hash
++                    })
++                    .unwrap_or(false)
+             })
+             .map(|(id, t)| (*id, t.clone()))
+             .with_context(|| format!("didn't find a matching torrent {:?}", h.info_hash))?;
+ 
+         // A v1 hybrid handshake may explicitly offer a BEP 52 upgrade.
+         // Normalize only after matching both the v1 identity and the upgrade bit.
+-        h.info_hash = torrent.info_hash();
++        if h.reserved & 0x10 != 0 {
++            h.info_hash = torrent.info_hash();
++        }
+         let live = torrent
+             .live_wait_initializing(Duration::from_secs(5))
+             .await
+@@ -1293,6 +1296,7 @@
+             name,
+         } = add_res;
+ 
++        let was_magnet = metadata.is_none();
+         let private = metadata.as_ref().is_some_and(|m| m.info.info().private);
+ 
+         let make_peer_rx = || {
+@@ -1308,7 +1312,7 @@
+ 
+         let mut seen_peers = Vec::new();
+ 
+-        let (metadata, peer_rx) = {
++        let (metadata, mut peer_rx) = {
+             match metadata {
+                 Some(metadata) => {
+                     let mut peer_rx = None;
+@@ -1340,6 +1344,22 @@
+             }
+         };
+ 
++        // A private flag learned from magnet metadata must also stop the
++        // pre-metadata public discovery stream before live transfer begins.
++        if was_magnet && metadata.info.info().private {
++            peer_rx = None;
++            if !opts.paused && !opts.list_only {
++                peer_rx = self.make_peer_rx(
++                    info_hash,
++                    trackers.clone(),
++                    true,
++                    opts.force_tracker_interval,
++                    opts.initial_peers.clone().unwrap_or_default(),
++                    true,
++                );
++            }
++        }
++        let discovery_hash = info_hash;
+         if let Some(v2) = &metadata.info.info().v2 {
+             info_hash = librqbit_core::Id32::new(v2.info_hash()).truncate_for_dht();
+         }
+@@ -1482,6 +1502,51 @@
+             .allow_overwrite
+             .store(true, std::sync::atomic::Ordering::Relaxed);
+ 
++        let v1_hash = metadata.v1_info_hash;
++        let hybrid = metadata
++            .info
++            .info()
++            .v2
++            .as_ref()
++            .is_some_and(|v| v.is_hybrid());
++        let initial_peers = managed_torrent.shared.options.initial_peers.clone();
++        let mut peer_rx: Option<TorrentPeerStream> = peer_rx.map(|peers| {
++            peers
++                .map(move |addr| TorrentPeer {
++                    addr,
++                    info_hash: if hybrid && initial_peers.contains(&addr) {
++                        v1_hash
++                    } else {
++                        discovery_hash
++                    },
++                })
++                .boxed()
++        });
++        if hybrid && !opts.paused {
++            let other_hash = if discovery_hash == info_hash {
++                v1_hash
++            } else {
++                info_hash
++            };
++            let other = self
++                .make_peer_rx(
++                    other_hash,
++                    managed_torrent.shared.trackers.iter().cloned().collect(),
++                    true,
++                    managed_torrent.shared.options.force_tracker_interval,
++                    vec![],
++                    metadata.info.info().private,
++                )
++                .map(|peers| {
++                    peers
++                        .map(move |addr| TorrentPeer {
++                            addr,
++                            info_hash: other_hash,
++                        })
++                        .boxed()
++                });
++            peer_rx = merge_two_optional_streams(peer_rx, other).map(|peers| peers.boxed());
++        }
+         managed_torrent
+             .start(peer_rx, opts.paused)
+             .context("error starting torrent")?;
+@@ -1590,20 +1655,61 @@
+         Ok(())
+     }
+ 
+-    pub fn make_peer_rx_managed_torrent(
++    pub(crate) fn make_peer_rx_managed_torrent(
+         self: &Arc<Self>,
+         t: &Arc<ManagedTorrent>,
+         announce: bool,
+-    ) -> Option<PeerStream> {
++    ) -> Option<TorrentPeerStream> {
+         let is_private = t.with_metadata(|m| m.info.info().private).unwrap_or(false);
+-        self.make_peer_rx(
+-            t.info_hash(),
+-            t.shared().trackers.iter().cloned().collect(),
+-            announce,
+-            t.shared().options.force_tracker_interval,
+-            t.shared().options.initial_peers.clone(),
+-            is_private,
+-        )
++        let hybrid_hash = t
++            .with_metadata(|m| {
++                m.info
++                    .info()
++                    .v2
++                    .as_ref()
++                    .filter(|v| v.is_hybrid())
++                    .map(|_| m.v1_info_hash)
++            })
++            .ok()
++            .flatten();
++        let canonical_hash = t.info_hash();
++        let canonical = self
++            .make_peer_rx(
++                t.info_hash(),
++                t.shared().trackers.iter().cloned().collect(),
++                announce,
++                t.shared().options.force_tracker_interval,
++                if hybrid_hash.is_some() {
++                    vec![]
++                } else {
++                    t.shared().options.initial_peers.clone()
++                },
++                is_private,
++            )
++            .map(|peers| {
++                peers
++                    .map(move |addr| TorrentPeer {
++                        addr,
++                        info_hash: canonical_hash,
++                    })
++                    .boxed()
++            });
++        let legacy = hybrid_hash.and_then(|info_hash| {
++            self.make_peer_rx(
++                info_hash,
++                t.shared().trackers.iter().cloned().collect(),
++                announce,
++                t.shared().options.force_tracker_interval,
++                t.shared().options.initial_peers.clone(),
++                is_private,
++            )
++            .map(|peers| {
++                peers
++                    .map(move |addr| TorrentPeer { addr, info_hash })
++                    .boxed()
++            })
++        });
++        merge_two_optional_streams(canonical, legacy).map(|peers| peers.boxed())
+     }
+ 
+     // Get a peer stream from both DHT and trackers.
+@@ -1920,7 +2026,14 @@
+     fn get(&self) -> tracker_comms::TrackerCommsStats {
+         let mt = self.session.with_torrents(|torrents| {
+             for (_, mt) in torrents {
+-                if mt.info_hash() == self.info_hash {
++                if mt.info_hash() == self.info_hash
++                    || mt
++                        .with_metadata(|m| {
++                            m.v1_info_hash == self.info_hash
++                                && m.info.info().v2.as_ref().is_some_and(|v| v.is_hybrid())
++                        })
++                        .unwrap_or(false)
++                {
+                     return Some(mt.clone());
+                 }
+             }
+@@ -1934,13 +2047,44 @@
+             }
+         };
+         let stats = mt.stats();
++        let legacy_bytes = mt
++            .with_metadata(|metadata| {
++                if metadata.v1_info_hash != self.info_hash {
++                    return None;
++                }
++                let v2 = metadata.info.info().v2.as_ref()?;
++                let total = v2.hybrid_total_bytes()?;
++                let count = |chunks: &crate::chunk_tracker::ChunkTracker| {
++                    metadata
++                        .lengths()
++                        .iter_piece_infos()
++                        .filter(|p| chunks.get_have_pieces().as_slice()[p.piece_index.get_usize()])
++                        .map(|p| {
++                            v2.hybrid_piece_size(p.piece_index.get() as u64)
++                                .unwrap_or(0) as u64
++                        })
++                        .sum::<u64>()
++                };
++                let downloaded = match &mt.locked.read().state {
++                    ManagedTorrentState::Live(live) => live
++                        .lock_read("legacy tracker stats")
++                        .get_chunks()
++                        .map(count)
++                        .unwrap_or(0),
++                    ManagedTorrentState::Paused(paused) => count(&paused.chunk_tracker),
++                    _ => 0,
++                };
++                Some((downloaded, total))
++            })
++            .ok()
++            .flatten();
+ 
+         use crate::torrent_state::stats::TorrentStatsState as TS;
+         use tracker_comms::TrackerCommsStatsState as S;
+ 
+         tracker_comms::TrackerCommsStats {
+-            downloaded_bytes: stats.progress_bytes,
+-            total_bytes: stats.total_bytes,
++            downloaded_bytes: legacy_bytes.map(|v| v.0).unwrap_or(stats.progress_bytes),
++            total_bytes: legacy_bytes.map(|v| v.1).unwrap_or(stats.total_bytes),
+             uploaded_bytes: stats.uploaded_bytes,
+             torrent_state: match stats.state {
+                 TS::Initializing { .. } => S::Initializing,
+diff --git a/crates/librqbit/src/torrent_state/live/mod.rs b/crates/librqbit/src/torrent_state/live/mod.rs
+--- a/crates/librqbit/src/torrent_state/live/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/mod.rs
+@@ -477,6 +477,10 @@
+     ) -> crate::Result<()> {
+         let handler = PeerHandler {
+             addr: checked_peer.addr,
++            wire_v2: AtomicBool::new(
++                checked_peer.handshake.info_hash == self.shared.info_hash
++                    && self.metadata.info.info().v2.is_some(),
++            ),
+             incoming: true,
+             on_bitfield_notify: Default::default(),
+             flow_control: Mutex::new(PeerFlowControl::default()),
+@@ -495,7 +499,7 @@
+         };
+         let peer_connection = PeerConnection::new(
+             checked_peer.addr,
+-            self.shared.info_hash,
++            checked_peer.handshake.info_hash,
+             self.shared.peer_id,
+             &handler,
+             Some(options),
+@@ -539,8 +543,17 @@
+             .with_peer(addr, |p| p.stats.counters.clone())
+             .ok_or(Error::BugPeerNotFound)?;
+ 
++        let wire_hash = state
++            .peers
++            .with_peer(addr, |peer| peer.outgoing_info_hash)
++            .flatten()
++            .unwrap_or(state.shared.info_hash);
++
+         let handler = PeerHandler {
+             addr,
++            wire_v2: AtomicBool::new(
++                wire_hash == state.shared.info_hash && state.metadata.info.info().v2.is_some(),
++            ),
+             incoming: false,
+             on_bitfield_notify: Default::default(),
+             flow_control: Mutex::new(PeerFlowControl::default()),
+@@ -560,7 +573,7 @@
+         };
+         let peer_connection = PeerConnection::new(
+             addr,
+-            state.shared.info_hash,
++            wire_hash,
+             state.shared.peer_id,
+             &handler,
+             Some(options),
+@@ -723,8 +736,12 @@
+         let _ = self.have_broadcast_tx.send(index);
+     }
+ 
+-    pub(crate) fn add_peer_if_not_seen(&self, addr: SocketAddr) -> crate::Result<bool> {
+-        match self.peers.add_if_not_seen(addr) {
++    pub(crate) fn add_peer_with_info_hash(
++        &self,
++        addr: SocketAddr,
++        info_hash: Id20,
++    ) -> crate::Result<bool> {
++        match self.peers.add_if_not_seen(addr, info_hash) {
+             Some(handle) => handle,
+             None => return Ok(false),
+         };
+@@ -915,6 +932,7 @@
+         self: Arc<Self>,
+         this_peer_addr: SocketAddr,
+         tx: PeerTx,
++        wire_hash: Id20,
+     ) -> anyhow::Result<()> {
+         // As per BEP 11 we should not send more than 50 peers at once
+         // (here it also applies to fist message, should be OK as we anyhow really have more)
+@@ -947,6 +965,11 @@
+                 connected.extend(
+                     live_peers
+                         .difference(&peer_view_of_live_peers)
++                        .filter(|addr| {
++                            self.peers
++                                .with_peer(**addr, |p| p.outgoing_info_hash == Some(wire_hash))
++                                .unwrap_or(false)
++                        })
+                         .take(MAX_SENT_PEERS)
+                         .copied(),
+                 );
+@@ -973,6 +996,8 @@
+             };
+ 
+             let filter = |addr: &SocketAddr| !(peer_ip_non_local && other_ip_is_local(&addr.ip()));
++            connected.retain(filter);
++            dropped.retain(filter);
+ 
+             // BEP 11 - Dont send closed if they are now in live
+             // it's assured by mutual exclusion of two  above sets  if in sent_peers_live, it cannot be in addrs_live_to_sent,
+@@ -1015,6 +1040,7 @@
+ // All peer state that would never be used by other actors should pe put here.
+ // This state tracks a live peer.
+ struct PeerHandler {
++    wire_v2: AtomicBool,
+     state: Arc<TorrentStateLive>,
+     counters: Arc<AtomicPeerCounters>,
+     // Semantically, we don't need a lock here, as this is only requested from
+@@ -1041,7 +1067,21 @@
+ 
+ impl PeerConnectionHandler for &'_ PeerHandler {
+     fn is_v2(&self) -> bool {
++        self.wire_v2.load(Ordering::Relaxed)
++    }
++    fn supports_v2(&self) -> bool {
+         self.state.metadata.info.info().v2.is_some()
++    }
++    fn accepts_metadata_hash_upgrade(&self, hash: Id20) -> bool {
++        hash == self.state.shared.info_hash
++            && self
++                .state
++                .metadata
++                .info
++                .info()
++                .v2
++                .as_ref()
++                .is_some_and(|v| v.is_hybrid())
+     }
+     fn on_connected(&self, connection_time: Duration) {
+         self.counters
+@@ -1161,7 +1201,18 @@
+     }
+ 
+     fn on_handshake(&self, handshake: Handshake, ckind: ConnectionKind) -> anyhow::Result<()> {
++        self.wire_v2.store(
++            handshake.info_hash == self.state.shared.info_hash
++                && self.state.metadata.info.info().v2.is_some(),
++            Ordering::Relaxed,
++        );
++        let wire_hash = handshake.info_hash;
+         self.state.set_peer_live(self.addr, handshake, ckind);
++        self.state
++            .peers
++            .with_peer_mut(self.addr, "record negotiated wire identity", |peer| {
++                peer.outgoing_info_hash = Some(wire_hash);
++            });
+         Ok(())
+     }
+ 
+@@ -1220,9 +1271,15 @@
+                     self.state.shared.id, self.addr
+                 ),
+                 self.cancel_token.clone(),
+-                self.state
+-                    .clone()
+-                    .task_send_pex_to_peer(self.addr, self.tx.clone()),
++                self.state.clone().task_send_pex_to_peer(
++                    self.addr,
++                    self.tx.clone(),
++                    if self.is_v2() {
++                        self.state.shared.info_hash
++                    } else {
++                        self.state.metadata.v1_info_hash
++                    },
++                ),
+             );
+         }
+         // Lets update outgoing Socket address for incoming connection
+@@ -1234,7 +1291,12 @@
+             self.state
+                 .peers
+                 .with_peer_mut(self.addr, "update outgoing addr", |peer| {
+-                    peer.outgoing_address = Some(outgoing_addr)
++                    peer.outgoing_address = Some(outgoing_addr);
++                    peer.outgoing_info_hash = Some(if self.is_v2() {
++                        self.state.shared.info_hash
++                    } else {
++                        self.state.metadata.v1_info_hash
++                    });
+                 });
+         }
+ 
+@@ -1283,6 +1345,36 @@
+ }
+ 
+ impl PeerHandler {
++    fn wire_request_length(&self, piece: ValidPieceIndex, begin: u32, real: u32) -> u32 {
++        if !self.is_v2()
++            && let Some(length) = self
++                .state
++                .metadata
++                .info
++                .info()
++                .v2
++                .as_ref()
++                .and_then(|v| v.hybrid_piece_size(piece.get() as u64))
++        {
++            return length.saturating_sub(begin).min(CHUNK_SIZE);
++        }
++        real
++    }
++
++    fn real_request_length(&self, piece: ValidPieceIndex, begin: u32, wire: u32) -> u32 {
++        let real = self
++            .state
++            .lengths
++            .piece_length(piece)
++            .saturating_sub(begin)
++            .min(CHUNK_SIZE);
++        if wire == self.wire_request_length(piece, begin, real) {
++            real
++        } else {
++            wire
++        }
++    }
++
+     fn on_peer_died(self, error: Option<crate::Error>) -> crate::Result<()> {
+         let peers = &self.state.peers;
+         let handle = self.addr;
+@@ -1299,9 +1391,35 @@
+             }
+         };
+         let prev = pe.value_mut().take_state(peers);
++        let mut try_other_hash = false;
+ 
+         match prev {
+-            PeerState::Connecting(_) => {}
++            PeerState::Connecting(_) => {
++                // Initial/PEX endpoints may support only one hybrid identity.
++                // Try the other authenticated identity once before backoff.
++                if !self.incoming
++                    && !pe.value().tried_alternate_hash
++                    && self
++                        .state
++                        .metadata
++                        .info
++                        .info()
++                        .v2
++                        .as_ref()
++                        .is_some_and(|v| v.is_hybrid())
++                {
++                    let peer = pe.value_mut();
++                    peer.outgoing_info_hash = Some(
++                        if peer.outgoing_info_hash == Some(self.state.shared.info_hash) {
++                            self.state.metadata.v1_info_hash
++                        } else {
++                            self.state.shared.info_hash
++                        },
++                    );
++                    peer.tried_alternate_hash = true;
++                    try_other_hash = true;
++                }
++            }
+             PeerState::Live(live) => {
+                 let mut g = self.state.lock_write("mark_chunk_requests_canceled");
+ 
+@@ -1360,7 +1478,7 @@
+ 
+         self.counters.errors.fetch_add(1, Ordering::Relaxed);
+ 
+-        if self.state.is_finished_and_no_active_streams() {
++        if self.state.is_finished_and_no_active_streams() && !try_other_hash {
+             debug!("torrent finished, not re-queueing");
+             pe.value_mut().set_state(PeerState::NotNeeded, peers);
+             return Ok(());
+@@ -1377,7 +1495,11 @@
+             return Ok(());
+         }
+ 
+-        let backoff = pe.value_mut().stats.backoff.next();
++        let backoff = if try_other_hash {
++            Some(Duration::ZERO)
++        } else {
++            pe.value_mut().stats.backoff.next()
++        };
+ 
+         // Prevent deadlocks.
+         drop(pe);
+@@ -1507,7 +1629,7 @@
+ 
+     fn on_download_request(&self, request: Request) -> anyhow::Result<()> {
+         let result = self.queue_upload_request(request);
+-        if self.state.metadata.info.info().v2.is_some() {
++        if self.is_v2() {
+             if let Err(error) = result {
+                 // BEP 52 requires every payload request to receive a piece or
+                 // reject, including requests we cannot currently service.
+@@ -1529,8 +1651,16 @@
+         let chunk = self
+             .state
+             .lengths
+-            .chunk_info_from_received_data(piece, request.begin, request.length)
++            .chunk_info_from_received_data(
++                piece,
++                request.begin,
++                self.real_request_length(piece, request.begin, request.length),
++            )
+             .context("reject contains an invalid chunk range")?;
++        anyhow::ensure!(
++            request.length == self.wire_request_length(piece, request.begin, chunk.size),
++            "reject does not match requested wire length"
++        );
+         self.state
+             .peers
+             .with_live_mut(self.addr, "reject request", |live| -> anyhow::Result<()> {
+@@ -1579,29 +1709,34 @@
+             .lengths
+             .chunk_info_from_received_data(piece_index, request.begin, request.length)
+             .or_else(|| {
+-                // Hybrid peers may request a whole 16 KiB block across a padding gap.
+-                // Return zeros for the gap without reading into the following file.
+-                if self
++                let v2 = self
+                     .state
+                     .metadata
+                     .info
+                     .info()
+                     .v2
+                     .as_ref()
+-                    .is_some_and(|v| v.is_hybrid())
+-                    && request.length == 16384
++                    .filter(|v| v.is_hybrid())?;
++                let wire_length = if self.is_v2() {
++                    v2.piece_length() as u32
++                } else {
++                    v2.hybrid_piece_size(request.index as u64)?
++                };
++                let remaining = wire_length.checked_sub(request.begin)?;
++                if request.length == 0
++                    || !request.begin.is_multiple_of(CHUNK_SIZE)
++                    || request.length != remaining.min(CHUNK_SIZE)
+                 {
+-                    self.state
+-                        .lengths
+-                        .iter_chunk_infos(piece_index)
+-                        .find(|c| c.offset == request.begin && c.size < request.length)
+-                        .map(|mut c| {
+-                            c.size = request.length;
+-                            c
+-                        })
+-                } else {
+-                    None
+-                }
++                    return None;
++                }
++                Some(ChunkInfo {
++                    piece_index,
++                    chunk_index: request.begin / CHUNK_SIZE,
++                    absolute_index: self.state.lengths.default_chunks_per_piece() * request.index
++                        + request.begin / CHUNK_SIZE,
++                    offset: request.begin,
++                    size: request.length,
++                })
+             }) {
+             Some(d) => d,
+             None => {
+@@ -1805,7 +1940,7 @@
+                 let request = Request {
+                     index: next.get(),
+                     begin: chunk.offset,
+-                    length: chunk.size,
++                    length: self.wire_request_length(next, chunk.offset, chunk.size),
+                 };
+ 
+                 aframe!(self.wait_for_request_slot()).await;
+@@ -1829,7 +1964,7 @@
+                     .peers
+                     .with_live_mut(handle, "add chunk request", |live| {
+                         if live.bitfield.get(next.get_usize()).is_some_and(|v| *v) {
+-                            live.add_inflight_request(chunk)
++                            live.add_inflight_request(chunk, request.length)
+                         } else {
+                             false
+                         }
+@@ -1888,6 +2023,23 @@
+             .lengths
+             .validate_piece_index(piece.index)
+             .with_context(|| format!("peer sent an invalid piece {}", piece.index))?;
++        let actual_length: u32 = piece.len().try_into().context("oversized piece")?;
++        let real_length = self.real_request_length(piece_index, piece.begin, actual_length);
++        if real_length < actual_length {
++            anyhow::ensure!(
++                piece
++                    .data()
++                    .0
++                    .iter()
++                    .chain(piece.data().1)
++                    .skip(real_length as usize)
++                    .all(|b| *b == 0),
++                "hybrid peer sent nonzero padding"
++            );
++        }
++        let piece = piece
++            .prefix(real_length as usize)
++            .context("invalid hybrid piece prefix")?;
+         let chunk_info = match self.state.lengths.chunk_info_from_received_data(
+             piece_index,
+             piece.begin,
+@@ -1900,6 +2052,10 @@
+         };
+ 
+         // Peer chunk/byte counters.
++        anyhow::ensure!(
++            actual_length == self.wire_request_length(piece_index, piece.begin, chunk_info.size),
++            "piece does not match requested wire length"
++        );
+         self.counters
+             .fetched_bytes
+             .fetch_add(piece.len() as u64, Ordering::Relaxed);
+@@ -2036,11 +2192,16 @@
+                 None => return Ok(()),
+             };
+ 
+-            match state
+-                .file_ops()
+-                .check_piece(chunk_info.piece_index)
+-                .with_context(|| format!("error checking piece={index}"))?
++            let checked = state.file_ops().check_piece(chunk_info.piece_index);
++            if let Err(error) = &checked
++                && matches!(
++                    error.downcast_ref::<librqbit_core::v2::V2Error>(),
++                    Some(librqbit_core::v2::V2Error::HybridHashMismatch)
++                )
+             {
++                return state.on_fatal_error(checked.unwrap_err());
++            }
++            match checked.with_context(|| format!("error checking piece={index}"))? {
+                 true => {
+                     {
+                         let mut g = state.lock_write("mark_piece_downloaded");
+@@ -2143,22 +2304,27 @@
+     }
+ 
+     fn on_pex_message(&self, msg: UtPex<ByteBuf<'_>>) {
+-        msg.dropped_peers()
+-            .chain(msg.added_peers())
+-            .for_each(|peer| {
+-                self.state
+-                    .add_peer_if_not_seen(peer.addr)
+-                    .map_err(|error| {
+-                        warn!(
+-                            id = self.state.shared.id,
+-                            info_hash = ?self.state.shared.info_hash,
+-                            ?peer,
+-                            "failed to add peer: {error:#}"
+-                        );
+-                        error
+-                    })
+-                    .ok();
+-            });
++        msg.added_peers().for_each(|peer| {
++            self.state
++                .add_peer_with_info_hash(
++                    peer.addr,
++                    if self.is_v2() {
++                        self.state.shared.info_hash
++                    } else {
++                        self.state.metadata.v1_info_hash
++                    },
++                )
++                .map_err(|error| {
++                    warn!(
++                        id = self.state.shared.id,
++                        info_hash = ?self.state.shared.info_hash,
++                        ?peer,
++                        "failed to add peer: {error:#}"
++                    );
++                    error
++                })
++                .ok();
++        });
+     }
+ 
+     fn is_choked(&self) -> bool {
+diff --git a/crates/librqbit/src/torrent_state/live/peer/mod.rs b/crates/librqbit/src/torrent_state/live/peer/mod.rs
+--- a/crates/librqbit/src/torrent_state/live/peer/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/peer/mod.rs
+@@ -2,7 +2,7 @@
+ pub mod stats;
+ 
+ use cancelled_requests::CancelledRequests;
+-use std::collections::HashSet;
++use std::collections::{HashMap, hash_map::Entry};
+ use std::net::SocketAddr;
+ use std::sync::{Arc, atomic::Ordering};
+ 
+@@ -32,6 +32,8 @@
+     state: PeerState,
+     pub stats: stats::atomic::PeerStats,
+     pub outgoing_address: Option<SocketAddr>,
++    pub outgoing_info_hash: Option<Id20>,
++    pub tried_alternate_hash: bool,
+ }
+ 
+ impl Peer {
+@@ -51,13 +53,17 @@
+             state,
+             stats: Default::default(),
+             outgoing_address: None,
+-        }
+-    }
+-
+-    pub fn new_with_outgoing_address(addr: SocketAddr) -> Self {
++            outgoing_info_hash: None,
++            tried_alternate_hash: false,
++        }
++    }
++
++    pub fn new_with_outgoing_address(addr: SocketAddr, info_hash: Id20) -> Self {
+         Self {
+             addr,
+             outgoing_address: Some(addr),
++            outgoing_info_hash: Some(info_hash),
++            tried_alternate_hash: false,
+             stats: Default::default(),
+             state: Default::default(),
+         }
+@@ -263,7 +269,7 @@
+     pub bitfield: BF,
+ 
+     // When the peer sends us data this is used to track if we asked for it.
+-    inflight_requests: HashSet<InflightRequest>,
++    inflight_requests: HashMap<InflightRequest, u32>,
+ 
+     // Cancel does not remove the remote's obligation to answer. Track exact
+     // requests (including repeated cancels), never a tolerance for arbitrary data.
+@@ -309,12 +315,18 @@
+         self.inflight_requests.len()
+     }
+ 
+-    pub fn add_inflight_request(&mut self, chunk: ChunkInfo) -> bool {
+-        self.inflight_requests.insert(chunk)
++    pub fn add_inflight_request(&mut self, chunk: ChunkInfo, wire_length: u32) -> bool {
++        match self.inflight_requests.entry(chunk) {
++            Entry::Occupied(_) => false,
++            Entry::Vacant(entry) => {
++                entry.insert(wire_length);
++                true
++            }
++        }
+     }
+ 
+     pub fn remove_inflight_request(&mut self, chunk: &ChunkInfo) -> RemoveInflightRequestResult {
+-        if self.inflight_requests.remove(chunk) {
++        if self.inflight_requests.remove(chunk).is_some() {
+             self.request_slots_changed.notify_waiters();
+             return RemoveInflightRequestResult::Expected;
+         }
+@@ -330,12 +342,12 @@
+         let tx = &self.tx;
+         let cancelled = &mut self.late_cancelled_requests;
+         let before = self.inflight_requests.len();
+-        self.inflight_requests.retain(|req| {
++        self.inflight_requests.retain(|req, wire_length| {
+             if req.piece_index == piece {
+                 let _ = tx.send(WriterRequest::Message(Message::Cancel(Request {
+                     index: piece.get(),
+                     begin: req.offset,
+-                    length: req.size,
++                    length: *wire_length,
+                 })));
+                 if !cancelled.insert(*req) {
+                     // An unresponsive peer must not grow this ledger forever.
+@@ -355,10 +367,10 @@
+     }
+ 
+     pub fn inflight_requests(&self) -> impl Iterator<Item = &InflightRequest> {
+-        self.inflight_requests.iter()
+-    }
+-
+-    pub fn inflight_requests_debug(&self) -> &HashSet<InflightRequest> {
++        self.inflight_requests.keys()
++    }
++
++    pub fn inflight_requests_debug(&self) -> &HashMap<InflightRequest, u32> {
+         &self.inflight_requests
+     }
+ }
+diff --git a/crates/librqbit/src/torrent_state/live/peers/mod.rs b/crates/librqbit/src/torrent_state/live/peers/mod.rs
+--- a/crates/librqbit/src/torrent_state/live/peers/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/peers/mod.rs
+@@ -38,12 +38,16 @@
+         self.stats.snapshot()
+     }
+ 
+-    pub fn add_if_not_seen(&self, addr: SocketAddr) -> Option<PeerHandle> {
++    pub fn add_if_not_seen(
++        &self,
++        addr: SocketAddr,
++        info_hash: librqbit_core::hash_id::Id20,
++    ) -> Option<PeerHandle> {
+         use dashmap::mapref::entry::Entry;
+         match self.states.entry(addr) {
+             Entry::Occupied(_) => None,
+             Entry::Vacant(vac) => {
+-                vac.insert(Peer::new_with_outgoing_address(addr));
++                vac.insert(Peer::new_with_outgoing_address(addr, info_hash));
+                 atomic_inc(&self.stats.queued);
+                 atomic_inc(&self.session_stats.queued);
+ 
+diff --git a/crates/librqbit/src/torrent_state/mod.rs b/crates/librqbit/src/torrent_state/mod.rs
+--- a/crates/librqbit/src/torrent_state/mod.rs
++++ b/crates/librqbit/src/torrent_state/mod.rs
+@@ -47,7 +47,7 @@
+ use crate::stream_connect::StreamConnector;
+ use crate::torrent_state::stats::LiveStats;
+ use crate::type_aliases::FileInfos;
+-use crate::type_aliases::PeerStream;
++use crate::type_aliases::TorrentPeerStream;
+ 
+ use initializing::TorrentStateInitializing;
+ 
+@@ -418,12 +418,12 @@
+     /// start_paused: if set, the torrent will initialize (check file integrity), but will not start
+     pub(crate) fn start(
+         self: &Arc<Self>,
+-        peer_rx: Option<PeerStream>,
++        peer_rx: Option<TorrentPeerStream>,
+         start_paused: bool,
+     ) -> anyhow::Result<()> {
+         fn _start<'a>(
+             t: &'a Arc<ManagedTorrent>,
+-            peer_rx: Option<PeerStream>,
++            peer_rx: Option<TorrentPeerStream>,
+             start_paused: bool,
+             session: Arc<Session>,
+             g: Option<parking_lot::RwLockWriteGuard<'a, ManagedTorrentLocked>>,
+@@ -794,7 +794,7 @@
+     );
+ }
+ 
+-fn spawn_peer_adder(live: &Arc<TorrentStateLive>, mut peer_rx: PeerStream) {
++fn spawn_peer_adder(live: &Arc<TorrentStateLive>, mut peer_rx: TorrentPeerStream) {
+     live.spawn(
+         debug_span!(parent: live.torrent().span.clone(), "external_peer_adder"),
+         format!("[{}]external_peer_adder", live.shared.id),
+@@ -815,7 +815,7 @@
+                                 Some(live) => live,
+                                 None => return Ok(()),
+                             };
+-                            live.add_peer_if_not_seen(peer)?;
++                            live.add_peer_with_info_hash(peer.addr, peer.info_hash)?;
+                         }
+                         Ok(None) => {
+                             debug!("peer_rx closed, closing peer adder");
+diff --git a/crates/librqbit/src/type_aliases.rs b/crates/librqbit/src/type_aliases.rs
+--- a/crates/librqbit/src/type_aliases.rs
++++ b/crates/librqbit/src/type_aliases.rs
+@@ -12,6 +12,12 @@
+ 
+ pub type PeerHandle = SocketAddr;
+ pub type PeerStream = BoxStream<'static, SocketAddr>;
++#[derive(Debug, Clone, Copy)]
++pub(crate) struct TorrentPeer {
++    pub addr: SocketAddr,
++    pub info_hash: librqbit_core::hash_id::Id20,
++}
++pub(crate) type TorrentPeerStream = BoxStream<'static, TorrentPeer>;
+ pub type FileInfos = Vec<FileInfo>;
+ pub(crate) type FileStorage = Box<dyn TorrentStorage>;
+ pub(crate) type FilePriorities = Vec<usize>;
+diff --git a/crates/librqbit_core/src/v2.rs b/crates/librqbit_core/src/v2.rs
+--- a/crates/librqbit_core/src/v2.rs
++++ b/crates/librqbit_core/src/v2.rs
+@@ -19,6 +19,8 @@
+     Version(u64),
+     #[error("The piece data does not match its SHA-256 hash.")]
+     HashMismatch,
++    #[error("Hybrid SHA-1 and SHA-256 payload commitments are inconsistent.")]
++    HybridHashMismatch,
+     #[error("Could not read piece data: {0}")]
+     Read(String),
+ }
+@@ -30,6 +32,7 @@
+     name: String,
+     piece_length: u64,
+     hybrid: bool,
++    hybrid_length: Option<u64>,
+     total_bytes: u64,
+     piece_count: u64,
+     files: Vec<File>,
+@@ -165,11 +168,13 @@
+             return Err(V2Error::Invalid("unreferenced piece layer"));
+         }
+         let hybrid = info.get(b"pieces")?.is_some();
+-        if hybrid {
+-            validate_hybrid(info, &files, piece_length)?;
++        let hybrid_length = if hybrid {
++            Some(validate_hybrid(info, &files, piece_length)?)
+         } else if info.get(b"files")?.is_some() || info.get(b"length")?.is_some() {
+             return Err(V2Error::Invalid("v1 file layout without v1 piece hashes"));
+-        }
++        } else {
++            None
++        };
+         let name = info
+             .get(b"name")?
+             .map(Value::bytes)
+@@ -181,6 +186,7 @@
+             name,
+             piece_length,
+             hybrid,
++            hybrid_length,
+             total_bytes,
+             piece_count,
+             files,
+@@ -204,6 +210,19 @@
+     }
+     pub fn is_hybrid(&self) -> bool {
+         self.hybrid
++    }
++    pub fn hybrid_total_bytes(&self) -> Option<u64> {
++        self.hybrid_length
++    }
++    pub fn hybrid_piece_size(&self, index: u64) -> Option<u32> {
++        if index >= self.piece_count {
++            return None;
++        }
++        Some(
++            self.hybrid_length?
++                .checked_sub(index.checked_mul(self.piece_length)?)?
++                .min(self.piece_length) as u32,
++        )
+     }
+     pub fn files(&self) -> &[File] {
+         &self.files
+@@ -510,7 +529,7 @@
+     Ok(())
+ }
+ 
+-fn validate_hybrid(info: &Value<'_>, files: &[File], piece_length: u64) -> Result<()> {
++fn validate_hybrid(info: &Value<'_>, files: &[File], piece_length: u64) -> Result<u64> {
+     let pieces = info.required(b"pieces")?.bytes()?;
+     let mut offset = 0u64;
+     if let Some(length) = info.get(b"length")? {
+@@ -597,7 +616,7 @@
+     if pieces.len() % 20 != 0 || pieces.len() as u64 / 20 != offset.div_ceil(piece_length) {
+         return Err(V2Error::Invalid("incorrect v1 piece hash count in hybrid"));
+     }
+-    Ok(())
++    Ok(offset)
+ }
+ 
+ // Borrow raw spans for hashing, retain dictionary order and reject duplicates.
+diff --git a/crates/peer_binary_protocol/src/lib.rs b/crates/peer_binary_protocol/src/lib.rs
+--- a/crates/peer_binary_protocol/src/lib.rs
++++ b/crates/peer_binary_protocol/src/lib.rs
+@@ -204,6 +204,18 @@
+     pub fn data(&self) -> (&'a [u8], &'a [u8]) {
+         (self.block_0.0, self.block_1.0)
+     }
++    pub fn prefix(&self, length: usize) -> Option<Self> {
++        if length > self.len() {
++            return None;
++        }
++        let first = length.min(self.block_0.0.len());
++        Some(Self {
++            index: self.index,
++            begin: self.begin,
++            block_0: ByteBuf(&self.block_0.0[..first]),
++            block_1: ByteBuf(&self.block_1.0[..length - first]),
++        })
++    }
+ 
+     pub fn from_data(index: u32, begin: u32, block: &'a [u8]) -> Self {
+         Piece {

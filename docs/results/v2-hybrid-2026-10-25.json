@@ -1,0 +1,468 @@
+{
+  "date": "2026-10-25",
+  "status": "in_progress",
+  "scope": "Simultaneous hybrid v1/v2 payload swarms, dual verification and protocol-specific accounting; full goal remains unfinished",
+  "rust": {
+    "passed": 54,
+    "failed": 0,
+    "ignored": 1,
+    "v2TargetPassed": 38,
+    "command": "cargo test --workspace --locked -- --test-threads=1",
+    "log": ".build/v2-hybrid-rust.log"
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "format": "PASS",
+    "pythonCompile": "PASS",
+    "vendorReverseReapply": "PASS: seven patches, byte-identical tree"
+  },
+  "hybridIndependentCases": [
+    {
+      "direction": "download-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-v1-naf2nz2j",
+      "seedhopAnnounces": [
+        {
+          "time": 26407.986814791,
+          "port": 51059,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 140012,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 26407.987672,
+          "port": 51059,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 229376,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 51057,
+          "userAgent": "SeedHop/0.1.0"
+        }
+      ],
+      "payloadRequestCounts": {
+        "v1": 11,
+        "v2": 0
+      }
+    },
+    {
+      "direction": "download-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-mixed-u_on0u_l",
+      "seedhopAnnounces": [
+        {
+          "time": 26411.885003041,
+          "port": 51099,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 140012,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 51098,
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 26411.886864625,
+          "port": 51099,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 229376,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 51064,
+          "userAgent": "SeedHop/0.1.0"
+        }
+      ],
+      "payloadRequestCounts": {
+        "v1": 2,
+        "v2": 9
+      }
+    },
+    {
+      "direction": "magnet-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-mixed-wp9nbm43",
+      "seedhopAnnounces": [
+        {
+          "time": 26415.927044875,
+          "port": 51145,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 51144,
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 26415.961142291,
+          "port": 51145,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 140012,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 51144,
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 26415.961435833,
+          "port": 51145,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 229376,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 51109,
+          "userAgent": "SeedHop/0.1.0"
+        }
+      ],
+      "payloadRequestCounts": {
+        "v1": 2,
+        "v2": 9
+      }
+    },
+    {
+      "direction": "upload-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-upload-v1-51oygqh6",
+      "seedhopAnnounces": [
+        {
+          "time": 26417.000244791,
+          "port": 51157,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 26417.001069333,
+          "port": 51157,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "userAgent": "SeedHop/0.1.0"
+        }
+      ]
+    }
+  ],
+  "regressionMatrices": {
+    "tcp": [
+      {
+        "format": "v2",
+        "direction": "download",
+        "transport": "tcp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-download-pure-7dcf95j6"
+      },
+      {
+        "format": "v2",
+        "direction": "upload",
+        "transport": "tcp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-upload-pure-s9w3rglm"
+      },
+      {
+        "format": "v2",
+        "direction": "magnet",
+        "transport": "tcp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-magnet-pure-suoa55yv"
+      },
+      {
+        "format": "v2",
+        "direction": "selective",
+        "transport": "tcp",
+        "bytes": 10,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-selective-pure-vw2f228n"
+      },
+      {
+        "format": "hybrid",
+        "direction": "download",
+        "transport": "tcp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-download-hybrid-r1pxii5z"
+      },
+      {
+        "format": "hybrid",
+        "direction": "upload",
+        "transport": "tcp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-upload-hybrid-7dyyal__"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet",
+        "transport": "tcp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-magnet-hybrid-s1jipkwj"
+      },
+      {
+        "format": "hybrid",
+        "direction": "selective",
+        "transport": "tcp",
+        "bytes": 10,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-selective-hybrid-nl0vhgia"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet-v1",
+        "transport": "tcp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-tcp-magnet-v1-hybrid-xvx6c048"
+      }
+    ],
+    "utp": [
+      {
+        "format": "v2",
+        "direction": "download",
+        "transport": "utp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-download-pure-2mtwy3ej"
+      },
+      {
+        "format": "v2",
+        "direction": "upload",
+        "transport": "utp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-upload-pure-oyshf9m0"
+      },
+      {
+        "format": "v2",
+        "direction": "magnet",
+        "transport": "utp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-magnet-pure-wmm3y2x2"
+      },
+      {
+        "format": "v2",
+        "direction": "selective",
+        "transport": "utp",
+        "bytes": 10,
+        "result": "PASS",
+        "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-selective-pure-y__z3jp6"
+      },
+      {
+        "format": "hybrid",
+        "direction": "download",
+        "transport": "utp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-download-hybrid-ikrahda3"
+      },
+      {
+        "format": "hybrid",
+        "direction": "upload",
+        "transport": "utp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-upload-hybrid-m5h7e85f"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet",
+        "transport": "utp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-magnet-hybrid-nhkbp_yv"
+      },
+      {
+        "format": "hybrid",
+        "direction": "selective",
+        "transport": "utp",
+        "bytes": 10,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-selective-hybrid-fzq26oer"
+      },
+      {
+        "format": "hybrid",
+        "direction": "magnet-v1",
+        "transport": "utp",
+        "bytes": 140012,
+        "result": "PASS",
+        "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+        "qBittorrent": "v5.3.0alpha1",
+        "libtorrent": "2.1.0.0",
+        "evidence": ".build/v2-utp-magnet-v1-hybrid-rv4ojhs5"
+      }
+    ]
+  },
+  "hybridHardening": [
+    {
+      "mode": "udp",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-udp-2lda5g9w",
+      "verifiedDiscoveryHashes": [
+        "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+        "8c74ca89495aea3efb1572e433a4d48f0989dae7"
+      ]
+    },
+    {
+      "mode": "ipv6",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-ipv6-j4wacwj9"
+    },
+    {
+      "mode": "ipv6-upload",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-ipv6-upload-qb0ex9b5"
+    },
+    {
+      "mode": "private",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-private-tqqf5qsr"
+    },
+    {
+      "mode": "dht",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-dht-0cy14izt",
+      "verifiedDiscoveryHashes": [
+        "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+        "8c74ca89495aea3efb1572e433a4d48f0989dae7"
+      ]
+    },
+    {
+      "mode": "private-dht",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-private-dht-apvfw1lx"
+    },
+    {
+      "mode": "duplicate-metadata",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-duplicate-metadata-juyujuhi"
+    }
+  ],
+  "sourceSha256": {
+    "vendor/rqbit/crates/librqbit/src/dht_utils.rs": "fd40bb39e3fdd9c09baf2332ec2ec0c572344db0445f2868ce1c55c0210b5478",
+    "vendor/rqbit/crates/librqbit/src/file_ops.rs": "8c1a7486a26e4478d8f3ee5beaaf116ca2a67ca9738080f7c904f5673e5b3e44",
+    "vendor/rqbit/crates/librqbit/src/peer_connection.rs": "035521a74a72b4a23468f01b718528d04ae98fb626276c3e156e0d0224fe634c",
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/mod.rs": "c8f0266b85071a0c1c3be7552c52195eade3bf17c4af8dec7dde6e975b28f19e",
+    "vendor/rqbit/crates/librqbit/src/piece_tracker.rs": "f4347a326897e989c642c9ffc602816efaf8b003066a1d150583292a37e2c243",
+    "vendor/rqbit/crates/librqbit/src/session.rs": "74c8a9953d10227f7992fdc80985fab613b05812055e84202040a634f8983369",
+    "vendor/rqbit/crates/librqbit/src/stream_connect.rs": "347b19dfa39e654ffe4c58c2ac848dea3a721c204d65882d2159d0e00eff59cc",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/live/mod.rs": "12c04c81fc1dc351acad429aa0d0ce27e0f37cee2af044c43b48766658b4e6de",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/live/peer/mod.rs": "c853b15a02f3419424a02d6b4ec67df1404d085ab865cd49662c4ef3e0eb6201",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/live/peers/mod.rs": "59d97b60c48f918101b5cc165c05121a49673e220c9ea8fe9fc96f2703b1d64e",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/mod.rs": "ab9e666cc6a796d169cc5ee52a70e22396ffbe602ed72cec288073fd03cd1416",
+    "vendor/rqbit/crates/librqbit/src/type_aliases.rs": "dbeb30534e582aa7086acb2a6302d42e85fc48433aac76383598a0e33fa4599d",
+    "vendor/rqbit/crates/librqbit_core/src/v2.rs": "c7db2db354192005e1b1f32d61542473ff8add7ecbd821f09bc308af8eb3e8b7",
+    "vendor/rqbit/crates/peer_binary_protocol/src/lib.rs": "e3c6707fb277cc0de37054ba4227e6e69ca296d63d12bdaab495f0a752af8075",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/live/peer/cancelled_requests.rs": "3317d9d8050f8c6fecfa59e0d16ef445539154b4904311de628b58fb3359da28",
+    "crates/seedhop-core/tests/v2.rs": "c27bab6959044a9daae517e746d9105c03f62a39099fcd177ba66d2efdefd8be",
+    "crates/seedhop-core/src/lib.rs": "f70fcd6e9b997d4b93847870ae5de738767717a48f4c0cacd52dd66a4a82cd55"
+  },
+  "remaining": [
+    "MSE/PE encryption including uTP",
+    "legacy-only btih magnet piece-layer acquisition",
+    "remaining BEP 52 conformance and resource audit",
+    "forced-v1-wire uTP and broader cancellation coverage",
+    "uTP loss/reordering and interruption tests",
+    "remaining discovery/privacy audit and native app integration validation"
+  ]
+}

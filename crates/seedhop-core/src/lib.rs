@@ -33,6 +33,13 @@ pub struct Engine {
 
 impl Engine {
     pub async fn open(config: EngineConfig) -> Result<Arc<Self>> {
+        Self::open_with_peer_encryption(config, librqbit::EncryptionPolicy::default()).await
+    }
+
+    pub async fn open_with_peer_encryption(
+        config: EngineConfig,
+        peer_encryption: librqbit::EncryptionPolicy,
+    ) -> Result<Arc<Self>> {
         let dir = PathBuf::from(&config.state_directory);
         let lease = storage::LibraryLease::acquire(&dir)?;
         let downloads = PathBuf::from(&config.download_directory);
@@ -72,6 +79,52 @@ impl Engine {
                         }
                         let mut paths: Vec<_> =
                             preview.files.iter().map(|f| f.name.clone()).collect();
+                        if saved["info_hash_v2"].is_string() {
+                            let version = match saved.get("file_name_mapping_version") {
+                                None => 0,
+                                Some(value) => value.as_u64().ok_or_else(|| {
+                                    CoreError::CorruptState(
+                                        "Invalid filename mapping version".into(),
+                                    )
+                                })?,
+                            };
+                            match version {
+                                0 => {
+                                    paths =
+                                        v2::Metainfo::legacy_storage_paths(&preview.torrent_bytes)
+                                            .map_err(|e| CoreError::CorruptState(e.to_string()))?
+                                            .ok_or_else(|| {
+                                                CoreError::CorruptState(
+                                                    "Saved v2 layout is missing".into(),
+                                                )
+                                            })?
+                                            .into_iter()
+                                            .map(|parts| parts.join("/"))
+                                            .collect()
+                                }
+                                1 => {
+                                    let names =
+                                        saved["file_names"].as_object().ok_or_else(|| {
+                                            CoreError::CorruptState(
+                                                "Saved filename map is missing".into(),
+                                            )
+                                        })?;
+                                    if names.len() != paths.len()
+                                        || !(0..paths.len())
+                                            .all(|i| names.contains_key(&i.to_string()))
+                                    {
+                                        return Err(CoreError::CorruptState(
+                                            "Saved filename map is incomplete".into(),
+                                        ));
+                                    }
+                                }
+                                _ => {
+                                    return Err(CoreError::CorruptState(
+                                        "Saved filename mapping version is unsupported".into(),
+                                    ));
+                                }
+                            }
+                        }
                         if let Some(names) = saved["file_names"].as_object() {
                             for (index, name) in names {
                                 let index: usize = index.parse().map_err(|_| {
@@ -102,6 +155,7 @@ impl Engine {
             [0, 0]
         };
         let options = SessionOptions {
+            peer_encryption,
             restore_queued: queue.max_active > 0,
             ratelimits: librqbit::limits::LimitsConfig {
                 download_bps: NonZeroU32::new(limits[0]),
@@ -118,6 +172,7 @@ impl Engine {
             disable_local_service_discovery: true,
             fastresume: false, // Always recheck disk data in this preview; never trust stale piece maps.
             listen: Some(librqbit::ListenerOptions {
+                mode: librqbit::ListenerMode::TcpAndUtp,
                 listen_addr: (std::net::Ipv6Addr::UNSPECIFIED, config.listen_port).into(),
                 ..Default::default()
             }),

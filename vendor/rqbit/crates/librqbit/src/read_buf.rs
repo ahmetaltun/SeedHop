@@ -57,7 +57,15 @@ impl ReadBuf {
         self.len = with_timeout(
             "reading",
             timeout,
-            conn.read(&mut *self.buf).map_err(Error::ReadHandshake),
+            conn.read_exact(&mut self.buf[..68])
+                .map_ok(|_| 68)
+                .map_err(|error| {
+                    if error.kind() == std::io::ErrorKind::UnexpectedEof {
+                        Error::PeerDisconnectedReadingHandshake
+                    } else {
+                        Error::ReadHandshake(error)
+                    }
+                }),
         )
         .await?;
         if self.len == 0 {

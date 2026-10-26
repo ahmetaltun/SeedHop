@@ -110,6 +110,9 @@ librqbit-dualstack-sockets = { workspace = true, features = ["axum"] }
 socket2.workspace = true
 nix = { workspace = true, features = ["uio"] }
 thiserror.workspace = true
+crypto-bigint = { version = "=0.5.5", default-features = false, features = ["zeroize"] }
+rc4 = { version = "=0.1.0", features = ["zeroize"] }
+zeroize = "1"
 
 [target.'cfg(windows)'.dependencies]
 windows = { workspace = true, features = ["Win32", "Win32_System", "Win32_System_IO", "Win32_System_Ioctl"] }

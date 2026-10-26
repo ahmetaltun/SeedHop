@@ -26,6 +26,9 @@ pub struct ParsedTorrent<BufType> {
 pub fn torrent_from_bytes<'de>(
     buf: &'de [u8],
 ) -> Result<TorrentMetaV1<ByteBuf<'de>>, bencode::DeserializeError> {
+    // Version-specific serde fields must not hide an unsupported meta version.
+    let v2 = crate::v2::Metainfo::parse(buf)
+        .map_err(|e| <bencode::DeserializeError as serde::de::Error>::custom(e.to_string()))?;
     let mut t: TorrentMetaV1<ByteBuf<'_>> = bencode::from_bytes(buf)
         .inspect_err(|e| tracing::trace!("error deserializing torrent: {e:#}"))
         .map_err(|e| e.into_kind())?;
@@ -35,9 +38,7 @@ pub fn torrent_from_bytes<'de>(
     let mut digest = sha1w::Sha1::new();
     digest.update(t.info.raw_bytes.as_ref());
     t.info_hash = Id20::new(digest.finish());
-    if let Some(v2) = crate::v2::Metainfo::parse(buf)
-        .map_err(|e| <bencode::DeserializeError as serde::de::Error>::custom(e.to_string()))?
-    {
+    if let Some(v2) = v2 {
         t.info_hash = Id20::new(v2.info_hash()[..20].try_into().unwrap());
         t.info.data.v2 = Some(std::sync::Arc::new(v2));
     }
@@ -183,9 +184,16 @@ where
     /// Iterate path components as strings. Will decode using the detected encoding, replacing
     /// unknown characters with a placeholder.
     pub fn iter_components(&self) -> impl Iterator<Item = Cow<'a, str>> + use<'a, BufType> {
+        if let FileIteratorNameData::V2(parts) = self.data {
+            // These strings are final storage names, not undecoded metainfo.
+            // Even a UTF-8 decoder could strip an initial U+FEFF here.
+            return Either::Left(parts.iter().map(|part| Cow::Borrowed(part.as_str())));
+        }
         let encoding = self.encoding;
-        self.iter_components_bytes()
-            .map(move |part| encoding.decode(part).0)
+        Either::Right(
+            self.iter_components_bytes()
+                .map(move |part| encoding.decode(part).0),
+        )
     }
 
     /// Iterate path components as bytes.
@@ -389,6 +397,11 @@ impl<BufType: AsRef<[u8]>> TorrentMetaV1Info<BufType> {
     }
 
     pub fn detect_encoding(&self) -> &'static Encoding {
+        // BEP 52 paths are already sanitized UTF-8. Raw hybrid names must
+        // never choose a legacy encoding for those storage strings.
+        if self.v2.is_some() {
+            return encoding_rs::UTF_8;
+        }
         let mut encdetect = chardetng::EncodingDetector::new(chardetng::Iso2022JpDetection::Deny);
         if let Some(name) = self.name.as_ref() {
             encdetect.feed(name.as_ref(), false);
@@ -411,7 +424,7 @@ impl<BufType: AsRef<[u8]>> TorrentMetaV1Info<BufType> {
             return Ok(Either::Left(v2.files().iter().map(move |file| {
                 FileDetails {
                     filename: FileIteratorName {
-                        encoding,
+                        encoding: encoding_rs::UTF_8,
                         data: FileIteratorNameData::V2(file.path()),
                     },
                     len: file.length(),

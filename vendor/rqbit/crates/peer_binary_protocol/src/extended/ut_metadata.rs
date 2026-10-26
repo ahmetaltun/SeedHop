@@ -33,6 +33,10 @@ impl<ByteBuf: ByteBufT> UtMetadataData<ByteBuf> {
 }
 
 impl<'a> UtMetadataData<ByteBuf<'a>> {
+    pub fn total_size(&self) -> u32 {
+        self.total_size
+    }
+
     pub fn piece(&self) -> u32 {
         self.piece
     }
@@ -93,6 +97,8 @@ pub enum UtMetadata<ByteBuf> {
     Request(u32),
     Data(UtMetadataData<ByteBuf>),
     Reject(u32),
+    /// BEP 9 requires unknown message types to be ignored.
+    Unknown(i64),
 }
 
 impl UtMetadata<ByteBufOwned> {
@@ -106,6 +112,7 @@ impl UtMetadata<ByteBufOwned> {
                 total_size: d.total_size,
             }),
             UtMetadata::Reject(r) => UtMetadata::Reject(*r),
+            UtMetadata::Unknown(kind) => UtMetadata::Unknown(*kind),
         }
     }
 }
@@ -114,16 +121,27 @@ impl<'a> UtMetadata<ByteBuf<'a>> {
     pub fn serialize(&self, writer: &mut Cursor<&mut [u8]>) -> Result<(), SerializeError> {
         #[derive(Serialize)]
         struct Message {
-            msg_type: u32,
-            piece: u32,
+            msg_type: i64,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            piece: Option<u32>,
             #[serde(skip_serializing_if = "Option::is_none")]
             total_size: Option<u32>,
         }
         match self {
+            UtMetadata::Unknown(kind) => {
+                bencode_serialize_to_writer(
+                    Message {
+                        msg_type: *kind,
+                        piece: None,
+                        total_size: None,
+                    },
+                    writer,
+                )?;
+            }
             UtMetadata::Request(piece) => {
                 let message = Message {
                     msg_type: 0,
-                    piece: *piece,
+                    piece: Some(*piece),
                     total_size: None,
                 };
                 bencode_serialize_to_writer(message, writer)?
@@ -131,7 +149,7 @@ impl<'a> UtMetadata<ByteBuf<'a>> {
             UtMetadata::Data(d) => {
                 let message = Message {
                     msg_type: 1,
-                    piece: d.piece,
+                    piece: Some(d.piece),
                     total_size: Some(d.total_size),
                 };
                 bencode_serialize_to_writer(message, writer)?;
@@ -141,7 +159,7 @@ impl<'a> UtMetadata<ByteBuf<'a>> {
             UtMetadata::Reject(piece) => {
                 let message = Message {
                     msg_type: 2,
-                    piece: *piece,
+                    piece: Some(*piece),
                     total_size: None,
                 };
                 bencode_serialize_to_writer(message, writer)?;
@@ -158,12 +176,24 @@ impl<'a> UtMetadata<ByteBuf<'a>> {
             total_size: Option<u32>,
         }
 
-        const MAX_BMSG_SIZE: usize =
-            b"d8:msg_typei10e5:piecei4294967296e10:total_sizei16384ee".len();
-        let (contig, is_contig) = match buf.get_contiguous(MAX_BMSG_SIZE.min(buf.len())) {
-            Some(c) => (c, true),
-            None => (buf.get()[0], false),
-        };
+        // Parse the complete first slice: optional future header keys must not
+        // be truncated by a guessed fixed header length. A split header asks
+        // ReadBuf to make the bounded frame contiguous and retry.
+        let [contig, second] = buf.get();
+        let is_contig = second.is_empty();
+        #[derive(serde_derive::Deserialize)]
+        struct Kind {
+            msg_type: i64,
+        }
+        let mut kind_de = BencodeDeserializer::new_from_buf(contig);
+        match Kind::deserialize(&mut kind_de) {
+            Ok(kind) if !(0..=2).contains(&kind.msg_type) => {
+                return Ok(UtMetadata::Unknown(kind.msg_type));
+            }
+            Ok(_) => {}
+            Err(error) if is_contig => return Err(MessageDeserializeError::Bencode(error)),
+            Err(_) => return Err(MessageDeserializeError::NeedContiguous),
+        }
 
         let mut de = BencodeDeserializer::new_from_buf(contig);
         let message = match UtMetadataMsg::deserialize(&mut de) {
@@ -211,7 +241,7 @@ impl<'a> UtMetadata<ByteBuf<'a>> {
                 }
                 Ok(UtMetadata::Reject(message.piece))
             }
-            other => Err(MessageDeserializeError::UtMetadataTypeUnknown(other)),
+            _ => unreachable!("unknown types returned before decoding known fields"),
         }
     }
 }

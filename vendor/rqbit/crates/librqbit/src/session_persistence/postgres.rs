@@ -44,6 +44,7 @@ impl TorrentsTableRecord {
                 is_paused: self.is_paused,
                 is_queued: false,
                 file_names: Default::default(),
+                file_name_mapping_version: 0,
                 file_priorities: Default::default(),
             },
         ))

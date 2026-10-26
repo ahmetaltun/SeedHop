@@ -4,6 +4,21 @@ use std::{
     time::{Duration, Instant},
 };
 
+fn peer_encryption() -> Result<librqbit::EncryptionPolicy, Box<dyn std::error::Error>> {
+    Ok(match std::env::var("SEEDHOP_PEER_ENCRYPTION").as_deref() {
+        Err(std::env::VarError::NotPresent) | Ok("allow") => librqbit::EncryptionPolicy::Allow,
+        Ok("disabled") => librqbit::EncryptionPolicy::Disabled,
+        Ok("prefer") => librqbit::EncryptionPolicy::Prefer,
+        Ok("require") => librqbit::EncryptionPolicy::Require,
+        _ => return Err("invalid SEEDHOP_PEER_ENCRYPTION policy".into()),
+    })
+}
+async fn open_engine(
+    config: EngineConfig,
+) -> Result<std::sync::Arc<Engine>, Box<dyn std::error::Error>> {
+    Ok(Engine::open_with_peer_encryption(config, peer_encryption()?).await?)
+}
+
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::var_os("SEEDHOP_DIAGNOSTICS").is_some() {
@@ -35,14 +50,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         // Controlled DHT bootstrap for the discovery harness. Uses the same vendored
         // Session discovery path as Engine without changing the app's public config.
-        Some("probe-dht") => {
-            let torrent = std::fs::read(args.get(2).ok_or("missing torrent")?)?;
+        Some(command @ ("probe-dht" | "probe-magnet-dht")) => {
+            let source = args.get(2).ok_or("missing torrent or magnet")?.clone();
+            let magnet = command == "probe-magnet-dht";
+            let torrent = if magnet {
+                None
+            } else {
+                Some(std::fs::read(&source)?)
+            };
             let downloads = PathBuf::from(args.get(3).ok_or("missing downloads")?);
             let bootstrap = args.get(4).ok_or("missing local bootstrap")?.clone();
-            let private = args.get(5).is_some_and(|s| s == "private");
+            let private = !magnet && args.get(5).is_some_and(|s| s == "private");
             let session = librqbit::Session::new_with_opts(
                 downloads.clone(),
                 librqbit::SessionOptions {
+                    peer_encryption: peer_encryption()?,
+                    client_name_and_version: if magnet {
+                        Some(format!("SeedHop/{}", env!("CARGO_PKG_VERSION")))
+                    } else {
+                        None
+                    },
                     dht: Some(librqbit::DhtSessionConfig {
                         bootstrap_addrs: Some(vec![bootstrap]),
                         persistence: None,
@@ -50,6 +77,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }),
                     disable_local_service_discovery: true,
                     fastresume: false,
+                    trackers: if magnet {
+                        [args.get(5).ok_or("missing extra tracker")?.parse()?]
+                            .into_iter()
+                            .collect()
+                    } else {
+                        Default::default()
+                    },
                     listen: Some(Default::default()),
                     ..Default::default()
                 },
@@ -57,9 +91,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await?;
             let handle = session
                 .add_torrent(
-                    librqbit::AddTorrent::from_bytes(torrent),
+                    if magnet {
+                        librqbit::AddTorrent::from_url(source)
+                    } else {
+                        librqbit::AddTorrent::from_bytes(torrent.unwrap())
+                    },
                     Some(librqbit::AddTorrentOptions {
                         output_folder: Some(downloads.to_string_lossy().into()),
+                        force_tracker_interval: if magnet {
+                            Some(Duration::from_millis(100))
+                        } else {
+                            None
+                        },
                         ..Default::default()
                     }),
                 )
@@ -93,7 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let torrent = std::fs::read(args.get(2).ok_or("missing torrent")?)?;
             let state = args.get(3).ok_or("missing state")?.clone();
             let downloads = args.get(4).ok_or("missing downloads")?.clone();
-            let engine = Engine::open(EngineConfig {
+            let engine = open_engine(EngineConfig {
                 state_directory: state,
                 download_directory: downloads.clone(),
                 allow_network_discovery: false,
@@ -127,7 +170,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use std::io::Write;
             let state = args.get(2).ok_or("missing state")?.clone();
             let downloads = args.get(3).ok_or("missing downloads")?.clone();
-            let engine = Engine::open(EngineConfig {
+            let engine = open_engine(EngineConfig {
                 state_directory: state,
                 download_directory: downloads.clone(),
                 allow_network_discovery: false,
@@ -159,18 +202,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )?;
             println!("Created 1 MiB deterministic fixture in {}", root.display());
         }
-        Some(command @ ("download" | "download-magnet")) => {
+        Some(command @ ("download" | "download-magnet" | "inspect-magnet")) => {
             let source = args.get(2).ok_or("missing torrent or magnet")?;
             let state = args.get(3).ok_or("missing state folder")?.clone();
             let downloads = args.get(4).ok_or("missing downloads folder")?.clone();
-            let engine = Engine::open(EngineConfig {
+            let engine = open_engine(EngineConfig {
                 state_directory: state,
                 download_directory: downloads.clone(),
                 allow_network_discovery: false,
                 listen_port: 0,
             })
             .await?;
-            let metadata = if command == "download-magnet" {
+            let metadata = if command != "download" {
                 tokio::time::timeout(
                     Duration::from_secs(30),
                     engine.inspect("interop-metadata".into(), Some(source.clone()), vec![]),
@@ -179,6 +222,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 adapter::preview(std::fs::read(source)?)?
             };
+            if command == "inspect-magnet" {
+                let output =
+                    serde_json::json!({ "metadata": metadata, "snapshot": engine.snapshot()? });
+                engine.shutdown().await?;
+                println!("{}", serde_json::to_string(&output)?);
+                return Ok(());
+            }
             let selected = if let Some(indices) = args.get(5) {
                 indices
                     .split(',')
@@ -190,7 +240,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let id = engine
                 .add(metadata.torrent_bytes, downloads, selected, false, false)
                 .await?;
-            let deadline = Instant::now() + Duration::from_secs(45);
+            let transfer_timeout = std::env::var("SEEDHOP_TRANSFER_TIMEOUT_SECS")
+                .ok()
+                .map(|value| value.parse::<u64>())
+                .transpose()?
+                .unwrap_or(45);
+            if !(5..=300).contains(&transfer_timeout) {
+                return Err("SEEDHOP_TRANSFER_TIMEOUT_SECS must be between 5 and 300".into());
+            }
+            let deadline = Instant::now() + Duration::from_secs(transfer_timeout);
             loop {
                 let snapshot = engine.snapshot()?;
                 let item = snapshot
@@ -211,7 +269,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => {
             return Err(
-                "Usage: seedhop-lab probe-dht TORRENT DOWNLOADS BOOTSTRAP [private] | inspect-v2 TORRENT | verify-v2-piece TORRENT INDEX FILE | fixture DIRECTORY | seed TORRENT STATE FILES | download TORRENT STATE DOWNLOADS [INDICES] | download-magnet MAGNET STATE DOWNLOADS [INDICES] | hold STATE DOWNLOADS".into(),
+                "Usage: seedhop-lab probe-dht TORRENT DOWNLOADS BOOTSTRAP [private] | probe-magnet-dht MAGNET DOWNLOADS BOOTSTRAP EXTRA_TRACKER | inspect-v2 TORRENT | inspect-magnet MAGNET STATE DOWNLOADS | verify-v2-piece TORRENT INDEX FILE | fixture DIRECTORY | seed TORRENT STATE FILES | download TORRENT STATE DOWNLOADS [INDICES] | download-magnet MAGNET STATE DOWNLOADS [INDICES] | hold STATE DOWNLOADS".into(),
             );
         }
     }

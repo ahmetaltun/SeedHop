@@ -134,13 +134,19 @@ impl EngineBridge {
                 .build()
                 .map_err(error)?,
         );
+        let config = EngineConfig {
+            state_directory,
+            download_directory,
+            allow_network_discovery: discovery,
+            listen_port: 0,
+        };
+        // Runtime::block_on polls its root future on the calling thread.
+        // macOS dispatch queues have a small stack; constructing the uTP
+        // dispatcher there overflows it even when Session::new is boxed.
+        // Construct and poll the engine on an owned Tokio worker instead.
         let core = runtime
-            .block_on(Engine::open(EngineConfig {
-                state_directory,
-                download_directory,
-                allow_network_discovery: discovery,
-                listen_port: 0,
-            }))
+            .block_on(runtime.spawn(async move { Engine::open(config).await }))
+            .map_err(error)?
             .map_err(error)?;
         Ok(Arc::new(Self {
             core: Mutex::new(Some(core)),
@@ -264,4 +270,31 @@ impl EngineBridge {
 #[uniffi::export]
 pub fn protocol_version() -> u32 {
     seedhop_core::PROTOCOL_VERSION
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn bridge_initializes_utp_and_shuts_down_from_a_small_host_stack() {
+        let state = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        std::thread::Builder::new()
+            .name("small-ffi-host".into())
+            .stack_size(512 * 1024)
+            .spawn(move || {
+                let bridge = super::EngineBridge::new(
+                    state.path().to_string_lossy().into_owned(),
+                    downloads.path().to_string_lossy().into_owned(),
+                    false,
+                )
+                .unwrap();
+                let snapshot = bridge.snapshot().unwrap();
+                assert!(snapshot.listen_port > 0);
+                assert!(snapshot.torrents.is_empty());
+                bridge.shutdown().unwrap();
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
 }

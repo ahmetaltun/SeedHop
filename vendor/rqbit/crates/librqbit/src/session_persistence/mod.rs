@@ -37,6 +37,8 @@ pub struct SerializedTorrent {
     #[serde(default)]
     file_names: std::collections::HashMap<usize, PathBuf>,
     #[serde(default)]
+    file_name_mapping_version: u8,
+    #[serde(default)]
     file_priorities: Vec<u8>,
 }
 
@@ -44,7 +46,7 @@ impl SerializedTorrent {
     pub fn info_hash(&self) -> &Id20 {
         &self.info_hash
     }
-    pub fn into_add_torrent(self) -> anyhow::Result<(AddTorrent<'static>, AddTorrentOptions)> {
+    pub fn into_add_torrent(mut self) -> anyhow::Result<(AddTorrent<'static>, AddTorrentOptions)> {
         if let Some(expected) = &self.info_hash_v2 {
             anyhow::ensure!(
                 !self.torrent_bytes.is_empty(),
@@ -62,6 +64,25 @@ impl SerializedTorrent {
                     && parsed.info_hash == self.info_hash,
                 "saved v2 identity does not match metadata"
             );
+            anyhow::ensure!(
+                self.file_name_mapping_version <= 1,
+                "saved filename mapping version is unsupported"
+            );
+            if self.file_name_mapping_version == 0 {
+                let paths = librqbit_core::v2::Metainfo::legacy_storage_paths(&self.torrent_bytes)?
+                    .context("saved v2 metadata has no legacy layout")?;
+                for (index, path) in paths.into_iter().enumerate() {
+                    self.file_names
+                        .entry(index)
+                        .or_insert_with(|| path.into_iter().collect());
+                }
+            } else {
+                anyhow::ensure!(
+                    self.file_names.len() == v2.files().len()
+                        && (0..v2.files().len()).all(|i| self.file_names.contains_key(&i)),
+                    "saved filename map is incomplete"
+                );
+            }
         }
         let add_torrent = if !self.torrent_bytes.is_empty() {
             AddTorrent::TorrentFileBytes(self.torrent_bytes)

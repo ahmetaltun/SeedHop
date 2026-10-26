@@ -53,6 +53,7 @@ pub struct Swarm {
     pub offline_tracker_requests: Arc<AtomicUsize>,
     pub corrupt: Arc<AtomicBool>,
     pub corrupt_blocks: Arc<AtomicUsize>,
+    pub corrupt_batch_blocks: Arc<AtomicUsize>,
     pub corrupt_proofs: Arc<AtomicBool>,
     pub corrupted_proofs: Arc<AtomicUsize>,
     tasks: Vec<JoinHandle<()>>,
@@ -87,12 +88,14 @@ impl Swarm {
         let relay_online = receiver.clone();
         let corrupt = Arc::new(AtomicBool::new(false));
         let corrupt_blocks = Arc::new(AtomicUsize::new(0));
+        let corrupt_batch_blocks = Arc::new(AtomicUsize::new(1));
         let corrupt_proofs = Arc::new(AtomicBool::new(false));
         let corrupted_proofs = Arc::new(AtomicUsize::new(0));
         let relay_proofs = corrupt_proofs.clone();
         let relay_proof_count = corrupted_proofs.clone();
         let corrupt_relay = corrupt.clone();
         let corrupt_count = corrupt_blocks.clone();
+        let corrupt_batch = corrupt_batch_blocks.clone();
         let relay_task = tokio::spawn(async move {
             let mut connections = tokio::task::JoinSet::new();
             loop {
@@ -103,6 +106,7 @@ impl Swarm {
                         if !*online.borrow_and_update() { continue; }
                         let corrupt = corrupt_relay.clone();
                         let count = corrupt_count.clone();
+                        let batch = corrupt_batch.clone();
                         let proofs = relay_proofs.clone();
                         let proof_count = relay_proof_count.clone();
                         connections.spawn(async move {
@@ -116,6 +120,9 @@ impl Swarm {
                                             let mut handshake = [0; 68];
                                             peer_rx.read_exact(&mut handshake).await?;
                                             client_tx.write_all(&handshake).await?;
+                                            let mut pending = Vec::new();
+                                            let mut pending_blocks = 0;
+                                            let mut pending_proofs = 0;
                                             loop {
                                                 let length = peer_rx.read_u32().await?;
                                                 if length > 1024 * 1024 { return Err::<(), _>(std::io::Error::other("oversized relay frame")); }
@@ -125,10 +132,25 @@ impl Swarm {
                                                 let damaged_proof = frame.first() == Some(&22) && frame.len() > 49 && proofs.load(Ordering::SeqCst);
                                                 if damaged { frame[9] ^= 1; }
                                                 if damaged_proof { frame[49] ^= 1; }
-                                                client_tx.write_u32(length).await?;
-                                                client_tx.write_all(&frame).await?;
-                                                if damaged { count.fetch_add(1, Ordering::SeqCst); }
-                                                if damaged_proof { proof_count.fetch_add(1, Ordering::SeqCst); }
+                                                let batch_size = batch.load(Ordering::SeqCst).clamp(1, 4);
+                                                if pending_blocks > 0 || (damaged && batch_size > 1) {
+                                                    pending.extend_from_slice(&length.to_be_bytes());
+                                                    pending.extend_from_slice(&frame);
+                                                    pending_blocks += usize::from(damaged);
+                                                    pending_proofs += usize::from(damaged_proof);
+                                                    if pending_blocks < batch_size { continue; }
+                                                    // Offer the complete corruption batch before the
+                                                    // receiver can disconnect on its first bad piece.
+                                                    client_tx.write_all(&pending).await?;
+                                                    count.fetch_add(pending_blocks, Ordering::SeqCst);
+                                                    proof_count.fetch_add(pending_proofs, Ordering::SeqCst);
+                                                    pending.clear(); pending_blocks = 0; pending_proofs = 0;
+                                                } else {
+                                                    client_tx.write_u32(length).await?;
+                                                    client_tx.write_all(&frame).await?;
+                                                    if damaged { count.fetch_add(1, Ordering::SeqCst); }
+                                                    if damaged_proof { proof_count.fetch_add(1, Ordering::SeqCst); }
+                                                }
                                             }
                                         };
                                         tokio::select! {
@@ -201,6 +223,7 @@ impl Swarm {
             offline_tracker_requests,
             corrupt,
             corrupt_blocks,
+            corrupt_batch_blocks,
             corrupt_proofs,
             corrupted_proofs,
             tasks: vec![relay_task, tracker_task],

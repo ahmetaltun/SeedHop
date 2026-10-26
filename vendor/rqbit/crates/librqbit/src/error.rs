@@ -4,6 +4,8 @@ use tokio::sync::AcquireError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    #[error(transparent)]
+    Encryption(#[from] crate::mse::Error),
     #[error("error connecting through proxy: {0:#}")]
     SocksConnect(
         #[from]

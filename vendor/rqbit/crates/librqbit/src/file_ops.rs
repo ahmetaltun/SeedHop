@@ -83,7 +83,16 @@ impl<'a> FileOps<'a> {
                 if pause_requested.load(Ordering::Relaxed) {
                     bail!("initial check paused");
                 }
-                if self.check_piece(piece.piece_index).unwrap_or(false) {
+                let checked = self.check_piece(piece.piece_index);
+                if let Err(error) = &checked
+                    && matches!(
+                        error.downcast_ref::<librqbit_core::v2::V2Error>(),
+                        Some(librqbit_core::v2::V2Error::HybridHashMismatch)
+                    )
+                {
+                    return Err(checked.unwrap_err());
+                }
+                if checked.unwrap_or(false) {
                     have.set(piece.piece_index.get() as usize, true);
                 }
                 progress.fetch_add(piece.len as u64, Ordering::Relaxed);
@@ -211,15 +220,40 @@ impl<'a> FileOps<'a> {
                 .find(|(_, fi)| fi.piece_range.contains(&piece_index.get()))
                 .context("piece has no file")?;
             let start = self.torrent.lengths().piece_offset(piece_index) - fi.offset_in_torrent;
-            return match v2.verify_piece_reader(piece_index.get() as u64, |offset, buf| {
+            let mut sha1 = Sha1::new();
+            let verified = v2.verify_piece_reader(piece_index.get() as u64, |offset, buf| {
                 self.files
                     .pread_exact(file_idx, start + offset, buf)
-                    .map_err(std::io::Error::other)
-            }) {
-                Ok(()) => Ok(true),
-                Err(librqbit_core::v2::V2Error::HashMismatch) => Ok(false),
-                Err(error) => Err(error.into()),
-            };
+                    .map_err(std::io::Error::other)?;
+                if v2.is_hybrid() {
+                    sha1.update(buf);
+                }
+                Ok(())
+            });
+            match verified {
+                Ok(()) => {}
+                Err(librqbit_core::v2::V2Error::HashMismatch) => return Ok(false),
+                Err(error) => return Err(error.into()),
+            }
+            if let Some(wire_length) = v2.hybrid_piece_size(piece_index.get() as u64) {
+                let real_length = self.torrent.lengths().piece_length(piece_index);
+                let mut padding = wire_length - real_length;
+                let zeroes = [0u8; 16384];
+                while padding > 0 {
+                    let count = padding.min(zeroes.len() as u32);
+                    sha1.update(&zeroes[..count as usize]);
+                    padding -= count;
+                }
+                if self
+                    .torrent
+                    .info()
+                    .compare_hash(piece_index.get(), sha1.finish())
+                    != Some(true)
+                {
+                    return Err(librqbit_core::v2::V2Error::HybridHashMismatch.into());
+                }
+            }
+            return Ok(true);
         }
         let mut h = Sha1::new();
         let piece_length = self.torrent.lengths().piece_length(piece_index);
@@ -298,6 +332,7 @@ impl<'a> FileOps<'a> {
     pub fn serve_hashes(
         &self,
         request: &peer_binary_protocol::HashRequest,
+        is_piece_have: impl Fn(ValidPieceIndex) -> bool,
     ) -> anyhow::Result<Vec<[u8; 32]>> {
         let v2 = self
             .torrent
@@ -305,9 +340,36 @@ impl<'a> FileOps<'a> {
             .v2
             .as_ref()
             .context("not a v2 torrent")?;
+        let piece_layer = (v2.piece_length() / librqbit_core::v2::BLOCK_LENGTH).ilog2();
+        anyhow::ensure!(
+            request.base_layer == 0 || request.base_layer == piece_layer,
+            "only leaf and piece hash layers are served"
+        );
         Ok(v2.serve_hashes(request, |file, offset, buf| {
+            let requested_file = &v2.files()[file];
+            // Identical roots may belong to several files. Any verified copy
+            // can supply a block, even when the first copy is unselected.
+            let available = v2
+                .files()
+                .iter()
+                .enumerate()
+                .find(|(_, candidate)| {
+                    candidate.pieces_root() == requested_file.pieces_root()
+                        && candidate.length() == requested_file.length()
+                        && self
+                            .torrent
+                            .lengths()
+                            .validate_piece_index(
+                                (candidate.first_piece() + offset / v2.piece_length()) as u32,
+                            )
+                            .is_some_and(&is_piece_have)
+                })
+                .map(|(index, _)| index)
+                .ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::NotFound, "hash data is not verified")
+                })?;
             self.files
-                .pread_exact(file, offset, buf)
+                .pread_exact(available, offset, buf)
                 .map_err(std::io::Error::other)
         })?)
     }

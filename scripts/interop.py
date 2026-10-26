@@ -93,6 +93,8 @@ class Tracker:
         self.ipv6 = ipv6
         self.info_hash = ""
         self.accepted_hashes = set()
+        self.peers_by_hash = None
+        self.suppress_ports = set()
         self.lock = threading.Lock()
         owner = self
 
@@ -104,14 +106,20 @@ class Tracker:
                           for key, value in [pair.split("=", 1)]}
                 advertised = int(values.get(b"port", b"0"))
                 valid = query.path == "/announce" and (values.get(b"info_hash", b"").hex() == owner.info_hash or values.get(b"info_hash", b"").hex() in owner.accepted_hashes)
-                endpoint = owner.peer if valid and advertised != owner.peer else 0
-                peers = (socket.inet_pton(socket.AF_INET6, "::1") if ipv6 else socket.inet_aton("127.0.0.1")) + struct.pack("!H", endpoint) if endpoint else b""
+                identity = values.get(b"info_hash", b"").hex()
+                advertised_peer = owner.peer if owner.peers_by_hash is None else owner.peers_by_hash.get(identity, 0)
+                candidates = advertised_peer if isinstance(advertised_peer, list) else [advertised_peer]
+                endpoints = [port for port in candidates if port and valid and advertised != port and advertised not in owner.suppress_ports]
+                endpoint = endpoints[0] if endpoints else 0
+                peers = b''.join((socket.inet_pton(socket.AF_INET6, "::1") if ipv6 else socket.inet_aton("127.0.0.1")) + struct.pack("!H", port) for port in endpoints)
                 reply = {b"interval": 1, b"peers": b""}
                 reply[b"peers6" if ipv6 else b"peers"] = peers
                 body = bencode(reply) if valid else bencode({b"failure reason": b"Unknown fixture"})
                 with owner.lock, (work / "tracker.jsonl").open("a") as log:
                     log.write(json.dumps({"time": time.monotonic(), "port": advertised,
+                                          "infoHash": identity, "left": int(values.get(b"left", b"0")), "event": values.get(b"event", b"").decode(errors="replace"),
                                           "validInfoHash": valid, "returnedPort": endpoint,
+                                          "returnedPorts": endpoints,
                                           "userAgent": self.headers.get("User-Agent", "")}) + "\n")
                 self.send_response(200)
                 self.send_header("Content-Length", str(len(body)))
@@ -135,8 +143,9 @@ class Tracker:
 
 
 class QBittorrent:
-    def __init__(self, work, executable, ipv6=False):
+    def __init__(self, work, executable, ipv6=False, protocol=1, encryption=2):
         self.work = work
+        self.protocol, self.encryption = protocol, encryption
         self.web, self.peer = two_ports()
         self.process = None
         self.log = (work / "qbit.log").open("w+")
@@ -186,7 +195,7 @@ Session\\InterfaceAddress={"::1" if ipv6 else "127.0.0.1"}
                     raise RuntimeError(f"Isolated qBittorrent failed to start; see {self.work}")
                 time.sleep(0.2)
         self.api("/app/setPreferences", {"json": json.dumps({
-            "encryption": 2, "bittorrent_protocol": 1, "queueing_enabled": False,
+            "encryption": self.encryption, "bittorrent_protocol": self.protocol, "queueing_enabled": False,
             "max_ratio": -1, "max_seeding_time": -1, "max_inactive_seeding_time": -1,
             "dht": False, "pex": False, "lsd": False, "upnp": False,
             "resolve_peer_countries": False})})
@@ -196,7 +205,7 @@ Session\\InterfaceAddress={"::1" if ipv6 else "127.0.0.1"}
         keys = ["encryption", "bittorrent_protocol", "queueing_enabled", "dht", "pex", "lsd", "upnp",
                 "max_ratio", "max_seeding_time", "current_network_interface", "current_interface_address"]
         write_json(self.work / "peer-settings.json", {key: prefs.get(key) for key in keys})
-        if prefs.get("encryption") != 2 or prefs.get("dht") or prefs.get("pex") or prefs.get("lsd"):
+        if prefs.get("encryption") != self.encryption or prefs.get("bittorrent_protocol") != self.protocol or prefs.get("dht") or prefs.get("pex") or prefs.get("lsd"):
             raise RuntimeError("qBittorrent did not apply the isolated test settings")
 
     def api(self, path, values=None):
@@ -224,8 +233,8 @@ Session\\InterfaceAddress={"::1" if ipv6 else "127.0.0.1"}
         elif added not in (b"Ok.", b"Ok", b""):
             raise RuntimeError(f"Unexpected add response: {added[:300]!r}")
 
-    def complete(self, info_hash):
-        deadline = time.monotonic() + 40
+    def complete(self, info_hash, timeout=40):
+        deadline = time.monotonic() + timeout
         while True:
             items = json.loads(self.api("/torrents/info?hashes=" + info_hash))
             if len(items) == 1 and items[0]["progress"] == 1 and items[0]["state"] in ("stalledUP", "uploading", "forcedUP"):

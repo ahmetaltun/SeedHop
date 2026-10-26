@@ -1,17 +1,19 @@
 //! BEP 52 metainfo, Merkle trees and authenticated piece verification.
-use serde::Serialize;
+use serde_derive::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
 };
 
+mod paths;
+
 pub const BLOCK_LENGTH: u64 = 16 * 1024;
 pub const MAX_METAINFO_LENGTH: usize = 32 * 1024 * 1024;
 type Hash = [u8; 32];
 type Result<T> = std::result::Result<T, V2Error>;
 
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum V2Error {
     #[error("Invalid torrent metadata: {0}")]
     Invalid(&'static str),
@@ -19,6 +21,10 @@ pub enum V2Error {
     Version(u64),
     #[error("The piece data does not match its SHA-256 hash.")]
     HashMismatch,
+    #[error("The legacy payload does not match its SHA-1 piece hash.")]
+    LegacyHashMismatch,
+    #[error("Hybrid SHA-1 and SHA-256 payload commitments are inconsistent.")]
+    HybridHashMismatch,
     #[error("Could not read piece data: {0}")]
     Read(String),
 }
@@ -30,6 +36,7 @@ pub struct Metainfo {
     name: String,
     piece_length: u64,
     hybrid: bool,
+    hybrid_length: Option<u64>,
     total_bytes: u64,
     piece_count: u64,
     files: Vec<File>,
@@ -70,6 +77,114 @@ impl Metainfo {
     pub fn parse(bytes: &[u8]) -> Result<Option<Self>> {
         Self::parse_inner(bytes, true)
     }
+    /// Check an acquired info dictionary before interpreting version-specific fields.
+    pub fn check_info_version(info: &[u8]) -> Result<()> {
+        if info.len() > MAX_METAINFO_LENGTH {
+            return Err(V2Error::Invalid("metadata exceeds 32 MiB"));
+        }
+        let mut parser = Parser {
+            bytes: info,
+            at: 0,
+            nodes: 0,
+            canonical: true,
+        };
+        let value = parser.value(0)?;
+        if parser.at != info.len() {
+            return Err(V2Error::Invalid("trailing info data"));
+        }
+        if let Some(version) = value.get(b"meta version")? {
+            let version = version.number()?;
+            if version != 2 {
+                return Err(V2Error::Version(version));
+            }
+        }
+        Ok(())
+    }
+    /// A safe optional container name; the info name remains purely advisory.
+    pub fn suggested_root_name(&self) -> String {
+        paths::component(self.name.as_bytes())
+    }
+
+    /// Preserve the on-disk names used before versioned filename mapping.
+    /// This is a restore-only migration; new imports always use `parse` paths.
+    pub fn legacy_storage_paths(bytes: &[u8]) -> Result<Option<Vec<Vec<String>>>> {
+        if Self::parse(bytes)?.is_none() {
+            return Ok(None);
+        }
+        let mut parser = Parser {
+            bytes,
+            at: 0,
+            nodes: 0,
+            canonical: true,
+        };
+        let root = parser.value(0)?;
+        let info = root.required(b"info")?;
+        // Match the historical encoding detector exactly. The old v2 adapter
+        // decoded its valid-UTF-8 path strings with this legacy guess.
+        let mut detector = chardetng::EncodingDetector::new(chardetng::Iso2022JpDetection::Deny);
+        if let Some(name) = info.get(b"name")? {
+            detector.feed(name.bytes()?, false);
+        }
+        if let Some(files) = info.get(b"files")? {
+            for file in files.list()? {
+                for part in file.required(b"path")?.list()? {
+                    detector.feed(part.bytes()?, false);
+                }
+            }
+        }
+        let encoding = detector.guess(None, chardetng::Utf8Detection::Allow);
+        fn walk(
+            tree: &Value<'_>,
+            path: &mut Vec<String>,
+            files: &mut Vec<Vec<String>>,
+            budget: &mut usize,
+            encoding: &'static encoding_rs::Encoding,
+        ) -> Result<()> {
+            let entries = tree.dict()?;
+            if entries.iter().any(|(key, _)| key.is_empty()) {
+                let size = path
+                    .iter()
+                    .map(|part| part.len() + 1 + std::mem::size_of::<String>())
+                    .sum();
+                *budget = budget
+                    .checked_sub(size)
+                    .ok_or(V2Error::Invalid("legacy file paths exceed 32 MiB"))?;
+                files.push(path.clone());
+            } else {
+                for (key, child) in entries {
+                    let raw = std::str::from_utf8(key)
+                        .map_err(|_| V2Error::Invalid("saved legacy filename is not UTF-8"))?;
+                    if raw.len() > 255
+                        || raw.is_empty()
+                        || matches!(raw, "." | "..")
+                        || raw.bytes().any(|b| matches!(b, 0 | b'/' | b'\\'))
+                    {
+                        return Err(V2Error::Invalid(
+                            "saved legacy filename was not supported before filename mapping",
+                        ));
+                    }
+                    path.push(encoding.decode(key).0.into_owned());
+                    if path.iter().map(|part| part.len() + 1).sum::<usize>() > 4096 {
+                        return Err(V2Error::Invalid("legacy file path exceeds 4096 bytes"));
+                    }
+                    walk(child, path, files, budget, encoding)?;
+                    path.pop();
+                }
+            }
+            Ok(())
+        }
+        let mut files = Vec::new();
+        let mut budget = MAX_METAINFO_LENGTH;
+        walk(
+            info.required(b"file tree")?,
+            &mut Vec::new(),
+            &mut files,
+            &mut budget,
+            encoding,
+        )?;
+        Ok(Some(files))
+    }
+
     fn parse_inner(bytes: &[u8], require_layers: bool) -> Result<Option<Self>> {
         if bytes.len() > MAX_METAINFO_LENGTH {
             return Err(V2Error::Invalid("metadata exceeds 32 MB"));
@@ -107,7 +222,15 @@ impl Metainfo {
         let tree = info.required(b"file tree")?;
         let mut files = Vec::new();
         let mut path_budget = MAX_METAINFO_LENGTH;
-        walk_tree(tree, &mut Vec::new(), &mut files, &mut path_budget)?;
+        let mut raw_paths = Vec::new();
+        walk_tree(
+            tree,
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &mut files,
+            &mut raw_paths,
+            &mut path_budget,
+        )?;
         if files.is_empty() {
             return Err(V2Error::Invalid("file tree contains no files"));
         }
@@ -165,11 +288,13 @@ impl Metainfo {
             return Err(V2Error::Invalid("unreferenced piece layer"));
         }
         let hybrid = info.get(b"pieces")?.is_some();
-        if hybrid {
-            validate_hybrid(info, &files, piece_length)?;
+        let hybrid_length = if hybrid {
+            Some(validate_hybrid(info, &files, &raw_paths, piece_length)?)
         } else if info.get(b"files")?.is_some() || info.get(b"length")?.is_some() {
             return Err(V2Error::Invalid("v1 file layout without v1 piece hashes"));
-        }
+        } else {
+            None
+        };
         let name = info
             .get(b"name")?
             .map(Value::bytes)
@@ -181,6 +306,7 @@ impl Metainfo {
             name,
             piece_length,
             hybrid,
+            hybrid_length,
             total_bytes,
             piece_count,
             files,
@@ -204,6 +330,19 @@ impl Metainfo {
     }
     pub fn is_hybrid(&self) -> bool {
         self.hybrid
+    }
+    pub fn hybrid_total_bytes(&self) -> Option<u64> {
+        self.hybrid_length
+    }
+    pub fn hybrid_piece_size(&self, index: u64) -> Option<u32> {
+        if index >= self.piece_count {
+            return None;
+        }
+        Some(
+            self.hybrid_length?
+                .checked_sub(index.checked_mul(self.piece_length)?)?
+                .min(self.piece_length) as u32,
+        )
     }
     pub fn files(&self) -> &[File] {
         &self.files
@@ -431,23 +570,12 @@ fn merkle_root(mut hashes: Vec<Hash>, padding: Hash) -> Hash {
     hashes[0]
 }
 
-fn component(bytes: &[u8]) -> Result<String> {
-    let value = std::str::from_utf8(bytes)
-        .map_err(|_| V2Error::Invalid("file names must be valid UTF-8 on this platform"))?;
-    if value.len() > 255
-        || value.is_empty()
-        || matches!(value, "." | "..")
-        || value.bytes().any(|b| matches!(b, 0 | b'/' | b'\\'))
-    {
-        return Err(V2Error::Invalid("unsafe file path component"));
-    }
-    Ok(value.into())
-}
-
-fn walk_tree(
-    tree: &Value<'_>,
+fn walk_tree<'a>(
+    tree: &Value<'a>,
+    raw_path: &mut Vec<&'a [u8]>,
     path: &mut Vec<String>,
     files: &mut Vec<File>,
+    raw_paths: &mut Vec<Vec<&'a [u8]>>,
     path_budget: &mut usize,
 ) -> Result<()> {
     let entries = tree.dict()?;
@@ -482,10 +610,12 @@ fn walk_tree(
             ));
         }
         // A long shared prefix must not expand a small input into unbounded owned paths.
-        let path_length = path.iter().map(|part| part.len() + 1).sum::<usize>();
+        let path_length = path.iter().map(|part| part.len() + 1).sum::<usize>()
+            + path.len() * (std::mem::size_of::<String>() + std::mem::size_of::<&[u8]>());
         *path_budget = path_budget
             .checked_sub(path_length)
             .ok_or(V2Error::Invalid("total file paths exceed 32 MiB"))?;
+        raw_paths.push(raw_path.clone());
         files.push(File {
             path: path.clone(),
             length,
@@ -498,19 +628,27 @@ fn walk_tree(
         if entries.is_empty() {
             return Err(V2Error::Invalid("empty directory in file tree"));
         }
-        for (key, child) in entries {
-            path.push(component(key)?);
+        let mapped = paths::components(entries.iter().map(|(key, _)| *key))?;
+        for ((key, child), name) in entries.iter().zip(mapped) {
+            raw_path.push(key);
+            path.push(name);
             if path.iter().map(|part| part.len() + 1).sum::<usize>() > 4096 {
                 return Err(V2Error::Invalid("file path exceeds 4096 bytes"));
             }
-            walk_tree(child, path, files, path_budget)?;
+            walk_tree(child, raw_path, path, files, raw_paths, path_budget)?;
             path.pop();
+            raw_path.pop();
         }
     }
     Ok(())
 }
 
-fn validate_hybrid(info: &Value<'_>, files: &[File], piece_length: u64) -> Result<()> {
+fn validate_hybrid(
+    info: &Value<'_>,
+    files: &[File],
+    raw_paths: &[Vec<&[u8]>],
+    piece_length: u64,
+) -> Result<u64> {
     let pieces = info.required(b"pieces")?.bytes()?;
     let mut offset = 0u64;
     if let Some(length) = info.get(b"length")? {
@@ -527,7 +665,7 @@ fn validate_hybrid(info: &Value<'_>, files: &[File], piece_length: u64) -> Resul
             || files.len() != 1
             || files[0].path.len() != 1
             || length.number()? != files[0].length
-            || info.required(b"name")?.bytes()? != files[0].path[0].as_bytes()
+            || info.required(b"name")?.bytes()? != raw_paths[0][0]
         {
             return Err(V2Error::Invalid(
                 "hybrid single-file layout differs from v2",
@@ -540,13 +678,16 @@ fn validate_hybrid(info: &Value<'_>, files: &[File], piece_length: u64) -> Resul
         let mut paths = BTreeSet::new();
         for entry in info.required(b"files")?.list()? {
             let length = entry.required(b"length")?.number()?;
-            let path: Vec<String> = entry
+            let path: Vec<&[u8]> = entry
                 .required(b"path")?
                 .list()?
                 .iter()
-                .map(|v| component(v.bytes()?))
+                .map(Value::bytes)
                 .collect::<Result<_>>()?;
-            if path.is_empty() || !paths.insert(path.clone()) {
+            if path.is_empty()
+                || path.iter().any(|part| part.is_empty())
+                || !paths.insert(path.clone())
+            {
                 return Err(V2Error::Invalid("duplicate or empty hybrid path"));
             }
             let attr = entry
@@ -567,7 +708,7 @@ fn validate_hybrid(info: &Value<'_>, files: &[File], piece_length: u64) -> Resul
                 let file = files
                     .get(next_file)
                     .ok_or(V2Error::Invalid("extra v1 file in hybrid"))?;
-                if file.path != path
+                if raw_paths[next_file] != path
                     || file.length != length
                     || (length != 0 && !offset.is_multiple_of(piece_length))
                 {
@@ -597,7 +738,7 @@ fn validate_hybrid(info: &Value<'_>, files: &[File], piece_length: u64) -> Resul
     if pieces.len() % 20 != 0 || pieces.len() as u64 / 20 != offset.div_ceil(piece_length) {
         return Err(V2Error::Invalid("incorrect v1 piece hash count in hybrid"));
     }
-    Ok(())
+    Ok(offset)
 }
 
 // Borrow raw spans for hashing, retain dictionary order and reject duplicates.
@@ -846,6 +987,9 @@ impl PendingMetainfo {
     pub fn info_hash(&self) -> Hash {
         self.meta.info_hash
     }
+    pub fn is_hybrid(&self) -> bool {
+        self.meta.is_hybrid()
+    }
     pub fn next_request(&self) -> Option<HashRequest> {
         self.requests.front().copied()
     }
@@ -880,4 +1024,151 @@ impl PendingMetainfo {
 }
 pub fn sha256(bytes: &[u8]) -> Hash {
     Sha256::digest(bytes).into()
+}
+
+/// Builds missing hybrid piece layers from SHA-1-authenticated legacy payload.
+/// Nothing becomes usable metainfo until every derived layer matches its root.
+/// The caller checks SHA-1 and wire padding before submitting block hashes.
+pub struct LegacyPieceLayers {
+    meta: Metainfo,
+    layers: BTreeMap<Hash, LegacyLayer>,
+    remaining: usize,
+    failed: bool,
+}
+struct LegacyLayer {
+    hashes: Vec<Hash>,
+    received: Vec<bool>,
+    first_pieces: Vec<u32>,
+    file_length: u64,
+    remaining: usize,
+}
+impl LegacyPieceLayers {
+    pub fn from_info(info: &[u8]) -> Result<Option<Self>> {
+        let Some(mut pending) = PendingMetainfo::from_info(info)? else {
+            return Ok(None);
+        };
+        if !pending.meta.hybrid {
+            return Err(V2Error::Invalid("legacy layers require hybrid metadata"));
+        }
+        let mut layers = BTreeMap::<Hash, LegacyLayer>::new();
+        let mut remaining = 0;
+        for file in &pending.meta.files {
+            if file.length <= pending.meta.piece_length {
+                continue;
+            }
+            let root = file.pieces_root.unwrap();
+            if let Some(layer) = layers.get_mut(&root) {
+                if layer.file_length != file.length {
+                    return Err(V2Error::Invalid(
+                        "shared pieces root has inconsistent file lengths",
+                    ));
+                }
+                layer.first_pieces.push(file.first_piece as u32);
+                continue;
+            }
+            let count = file.piece_count as usize;
+            remaining += count;
+            layers.insert(
+                root,
+                LegacyLayer {
+                    hashes: pending.layers.remove(&root).unwrap(),
+                    received: vec![false; count],
+                    first_pieces: vec![file.first_piece as u32],
+                    file_length: file.length,
+                    remaining: count,
+                },
+            );
+        }
+        Ok(Some(Self {
+            meta: pending.meta,
+            layers,
+            remaining,
+            failed: false,
+        }))
+    }
+    pub fn metainfo(&self) -> &Metainfo {
+        &self.meta
+    }
+    pub fn needed_pieces(&self) -> Vec<u32> {
+        self.layers
+            .values()
+            .flat_map(|layer| {
+                (0..layer.hashes.len()).map(|local| layer.first_pieces[0] + local as u32)
+            })
+            .collect()
+    }
+    fn location(&self, index: u32) -> Result<(Hash, usize)> {
+        let index = u64::from(index);
+        let file = self
+            .meta
+            .files
+            .iter()
+            .find(|file| index >= file.first_piece && index - file.first_piece < file.piece_count)
+            .ok_or(V2Error::Invalid("legacy layer piece index out of range"))?;
+        let root = file.pieces_root.unwrap();
+        if !self.layers.contains_key(&root) {
+            return Err(V2Error::Invalid("piece has no external layer"));
+        }
+        Ok((root, (index - file.first_piece) as usize))
+    }
+    /// Identical files can supply the same layer through different wire indices.
+    pub fn candidate_pieces(&self, canonical: u32) -> Result<Vec<u32>> {
+        let (root, local) = self.location(canonical)?;
+        Ok(self.layers[&root]
+            .first_pieces
+            .iter()
+            .map(|first| first + local as u32)
+            .collect())
+    }
+    pub fn complete_piece(&mut self, index: u32, mut blocks: Vec<Hash>) -> Result<()> {
+        if self.failed {
+            return Err(V2Error::HybridHashMismatch);
+        }
+        let (root, local) = self.location(index)?;
+        let real_length = self.meta.piece_size(u64::from(index))?;
+        if blocks.len() as u64 != real_length.div_ceil(BLOCK_LENGTH) {
+            return Err(V2Error::Invalid("incorrect legacy layer block count"));
+        }
+        let layer = self.layers.get_mut(&root).unwrap();
+        if layer.received[local] {
+            return Err(V2Error::Invalid("legacy layer piece already received"));
+        }
+        blocks.resize((self.meta.piece_length / BLOCK_LENGTH) as usize, [0; 32]);
+        layer.hashes[local] = merkle_root(blocks, [0; 32]);
+        layer.received[local] = true;
+        layer.remaining -= 1;
+        self.remaining -= 1;
+        if layer.remaining == 0
+            && merkle_root(
+                layer.hashes.clone(),
+                zero_hash(self.meta.piece_length / BLOCK_LENGTH),
+            ) != root
+        {
+            self.failed = true;
+            return Err(V2Error::HybridHashMismatch);
+        }
+        Ok(())
+    }
+    pub fn is_complete(&self) -> bool {
+        self.remaining == 0 && !self.failed
+    }
+    pub fn finish(mut self) -> Result<Metainfo> {
+        if self.failed {
+            return Err(V2Error::HybridHashMismatch);
+        }
+        if self.remaining != 0 {
+            return Err(V2Error::Invalid("legacy piece layers are incomplete"));
+        }
+        let layers: BTreeMap<_, Arc<[Hash]>> = self
+            .layers
+            .into_iter()
+            .map(|(root, layer)| (root, layer.hashes.into()))
+            .collect();
+        for file in &mut self.meta.files {
+            if file.length > self.meta.piece_length {
+                file.piece_hashes = layers[&file.pieces_root.unwrap()].clone();
+            }
+        }
+        Ok(self.meta)
+    }
 }

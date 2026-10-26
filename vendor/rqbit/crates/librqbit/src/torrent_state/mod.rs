@@ -47,7 +47,7 @@ use crate::storage::BoxStorageFactory;
 use crate::stream_connect::StreamConnector;
 use crate::torrent_state::stats::LiveStats;
 use crate::type_aliases::FileInfos;
-use crate::type_aliases::PeerStream;
+use crate::type_aliases::TorrentPeerStream;
 
 use initializing::TorrentStateInitializing;
 
@@ -418,12 +418,12 @@ impl ManagedTorrent {
     /// start_paused: if set, the torrent will initialize (check file integrity), but will not start
     pub(crate) fn start(
         self: &Arc<Self>,
-        peer_rx: Option<PeerStream>,
+        peer_rx: Option<TorrentPeerStream>,
         start_paused: bool,
     ) -> anyhow::Result<()> {
         fn _start<'a>(
             t: &'a Arc<ManagedTorrent>,
-            peer_rx: Option<PeerStream>,
+            peer_rx: Option<TorrentPeerStream>,
             start_paused: bool,
             session: Arc<Session>,
             g: Option<parking_lot::RwLockWriteGuard<'a, ManagedTorrentLocked>>,
@@ -794,7 +794,7 @@ fn spawn_fatal_errors_receiver(
     );
 }
 
-fn spawn_peer_adder(live: &Arc<TorrentStateLive>, mut peer_rx: PeerStream) {
+fn spawn_peer_adder(live: &Arc<TorrentStateLive>, mut peer_rx: TorrentPeerStream) {
     live.spawn(
         debug_span!(parent: live.torrent().span.clone(), "external_peer_adder"),
         format!("[{}]external_peer_adder", live.shared.id),
@@ -815,7 +815,7 @@ fn spawn_peer_adder(live: &Arc<TorrentStateLive>, mut peer_rx: PeerStream) {
                                 Some(live) => live,
                                 None => return Ok(()),
                             };
-                            live.add_peer_if_not_seen(peer)?;
+                            live.add_peer_with_info_hash(peer.addr, peer.info_hash)?;
                         }
                         Ok(None) => {
                             debug!("peer_rx closed, closing peer adder");

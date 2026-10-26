@@ -15,7 +15,8 @@ import Foundation
         let importSession = ImportSession()
         importSession.destination = downloads.path; importSession.paused = true
         await importSession.inspect(file:fixture.appendingPathComponent("fixture.torrent"),using:client.send)
-        guard importSession.preview != nil else { throw UserFacingError(message:importSession.error ?? "Missing preview") }
+        guard let preview = importSession.preview, preview.files.count == 1, let importedFile = preview.files.first else { throw UserFacingError(message:importSession.error ?? "Expected a single-file fixture preview") }
+        let importedPath = downloads.appendingPathComponent(importedFile.name)
         guard let id = await importSession.add(using:client.send) else { throw UserFacingError(message:importSession.error ?? "Missing transfer ID") }
         var limits=EngineRequest(command:"limits"); limits.downloadLimit=250_000; limits.uploadLimit=50_000
         _=try await client.send(limits)
@@ -23,7 +24,7 @@ import Foundation
         // Wait for the initial hash before issuing the explicit recheck.
         try await waitForPaused(client, id:id)
         let content = try Data(contentsOf:fixture.appendingPathComponent("seedhop-fixture.bin"))
-        try content.write(to:downloads.appendingPathComponent("seedhop-fixture.bin"))
+        try content.write(to:importedPath)
         var recheck = EngineRequest(command:"recheck"); recheck.id = id
         _ = try await client.send(recheck)
         try await waitForPaused(client, id:id)
@@ -40,7 +41,7 @@ import Foundation
         var relocate = EngineRequest(command:"relocate"); relocate.id = id; relocate.destination = moved.path
         _ = try await client.send(relocate); try await waitForPaused(client,id:id)
         guard try Data(contentsOf:moved.appendingPathComponent("renamed-fixture.bin")) == content,
-              !FileManager.default.fileExists(atPath:downloads.appendingPathComponent("seedhop-fixture.bin").path) else { throw UserFacingError(message:"XPC file move changed bytes or retained its source") }
+              !FileManager.default.fileExists(atPath:importedPath.path) else { throw UserFacingError(message:"XPC file move changed bytes or retained its source") }
         _=try await client.send(EngineRequest(command:"shutdown")); client.invalidate()
         try await Task.sleep(for:.milliseconds(600))
         try client.connect(background:false)

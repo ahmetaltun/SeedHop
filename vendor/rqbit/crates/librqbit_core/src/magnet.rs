@@ -17,6 +17,8 @@ pub struct Magnet {
 pub enum MagnetError {
     #[error("magnet link has neither v1 (btih) nor v2 (btmh) info hash")]
     NoInfoHash,
+    #[error("magnet link contains conflicting {0} info hashes")]
+    ConflictingInfoHash(&'static str),
 }
 
 impl Magnet {
@@ -87,10 +89,16 @@ impl Magnet {
                 "xt" => {
                     if let Some(ih) = value.as_ref().strip_prefix("urn:btih:") {
                         let i = Id20::from_str(ih)?;
+                        if id20.is_some_and(|previous| previous != i) {
+                            return Err(MagnetError::ConflictingInfoHash("btih").into());
+                        }
                         id20.replace(i);
                         info_hash_found = true;
                     } else if let Some(ih) = value.as_ref().strip_prefix("urn:btmh:1220") {
                         let i = Id32::from_str(ih)?;
+                        if id32.is_some_and(|previous| previous != i) {
+                            return Err(MagnetError::ConflictingInfoHash("btmh").into());
+                        }
                         id32.replace(i);
                         info_hash_found = true;
                     } else {

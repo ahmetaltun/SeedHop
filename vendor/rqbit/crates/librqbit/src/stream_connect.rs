@@ -60,6 +60,7 @@ pub(crate) struct SocksProxyConfig {
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct StreamConnectorArgs {
+    pub encryption_policy: crate::EncryptionPolicy,
     pub enable_tcp: bool,
     pub socks_proxy_config: Option<SocksProxyConfig>,
     pub utp_socket: Option<Arc<UtpSocketUdp>>,
@@ -127,6 +128,12 @@ gen_stats!(ConnectStatsAtomic ConnectStatsSnapshot, [], [
 
 #[derive(Debug)]
 pub(crate) struct StreamConnector {
+    /// Shared across simultaneous magnets and both hybrid lookup lanes.
+    pub metadata_slots: tokio::sync::Semaphore,
+
+    pub encryption_policy: crate::EncryptionPolicy,
+    pub incoming_crypto_semaphore: Arc<tokio::sync::Semaphore>,
+    pub outgoing_crypto_semaphore: Arc<tokio::sync::Semaphore>,
     proxy_config: Option<SocksProxyConfig>,
     enable_tcp: bool,
     bind_device: Option<BindDevice>,
@@ -152,6 +159,10 @@ impl StreamConnector {
         }
 
         Ok(Self {
+            encryption_policy: config.encryption_policy,
+            metadata_slots: tokio::sync::Semaphore::new(4),
+            incoming_crypto_semaphore: Arc::new(tokio::sync::Semaphore::new(8)),
+            outgoing_crypto_semaphore: Arc::new(tokio::sync::Semaphore::new(8)),
             proxy_config: config.socks_proxy_config,
             enable_tcp: config.enable_tcp,
             utp_socket: config.utp_socket,
@@ -205,6 +216,43 @@ impl StreamConnector {
 
     pub fn stats(&self) -> &ConnectStatsAtomic {
         &self.stats
+    }
+
+    pub fn can_connect_utp(&self) -> bool {
+        self.proxy_config.is_none() && self.utp_socket.is_some()
+    }
+
+    pub async fn reconnect(
+        &self,
+        kind: ConnectionKind,
+        addr: SocketAddr,
+    ) -> Result<(ConnectionKind, BoxAsyncReadVectored, BoxAsyncWrite)> {
+        match kind {
+            ConnectionKind::Tcp => {
+                let stream = self.tcp_connect(addr).await.map_err(Error::TcpConnect)?;
+                let (read, write) = stream.into_split();
+                Ok((kind, Box::new(read), Box::new(write)))
+            }
+            ConnectionKind::Utp => self.connect_utp(addr).await,
+            ConnectionKind::Socks => self.connect(addr).await,
+        }
+    }
+
+    pub async fn connect_utp(
+        &self,
+        addr: SocketAddr,
+    ) -> Result<(ConnectionKind, BoxAsyncReadVectored, BoxAsyncWrite)> {
+        if !self.can_connect_utp() {
+            return Err(Error::Anyhow(anyhow::anyhow!("direct uTP is unavailable")));
+        }
+        let sock = self.utp_socket.as_ref().unwrap();
+        let stream = self
+            .with_stat(ConnectionKind::Utp, addr.is_ipv6(), sock.connect(addr))
+            .await
+            .map_err(Error::UtpConnect)?;
+        let (read, write) = stream.split();
+        debug!(?addr, "connected over uTP");
+        Ok((ConnectionKind::Utp, Box::new(read), Box::new(write)))
     }
 
     pub async fn connect(

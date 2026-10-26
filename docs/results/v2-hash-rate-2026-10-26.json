@@ -1,0 +1,99 @@
+{
+  "date": "2026-10-26",
+  "status": "in_progress",
+  "scope": "Shared hash reply upload policy, valid blocks exceeding token-bucket bursts, and leaf/piece-only serving; discovery and final completion audit remain open",
+  "rust": {
+    "passed": 87,
+    "v2TargetPassed": 65,
+    "failed": 0,
+    "ignored": 1,
+    "command": "cargo test --workspace --locked -- --test-threads=1",
+    "log": ".build/v2-hash-rate-complete-rust.log"
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "format": "PASS",
+    "gitDiffCheck": "PASS",
+    "eighteenPatchForwardReconstruction": "PASS",
+    "eighteenPatchReverseReapply": "PASS"
+  },
+  "behavior": [
+    "Live hash responses and hash rejects use the same torrent/session upload limiters as payload uploads; rates are shared across peers",
+    "Valid transfers larger than a configured token-bucket burst are charged in bounded batches; they no longer fail with InsufficientCapacity",
+    "Hash serving supports the required leaf and piece base layers; optional intermediate/higher bases receive correlated rejects without closing the connection",
+    "Leaf proofs remain available after uploads; piece-layer metadata shortcuts avoid reading full files for ancestor hashes",
+    "Existing protocol request-size validation, 32 reply permits and blocking-work semaphore remain in force; leaf-proof disk work scales with requested blocks and piece size, with no new retained hash cache"
+  ],
+  "rawPeerCoverage": [
+    "Two peers share eight authenticated 96-byte hash replies through a 256 B/s burst, separately exercising torrent and session limiters",
+    "Upload and download charging above a 128-byte burst waits successfully instead of returning InsufficientCapacity",
+    "Optional base-layer reject followed by valid authenticated leaf/piece proofs on the same connection"
+  ],
+  "negativeControls": [
+    {
+      "behavior": "Existing burst handling",
+      "result": "Expected failure: RateLimitInsufficientCapacity(InsufficientCapacity(128))",
+      "log": ".build/v2-hash-rate-burst-before.log"
+    },
+    {
+      "behavior": "Existing uncharged hash replies",
+      "result": "Expected failure: eight replies completed in about 26 ms, bypassing shared upload policy",
+      "log": ".build/v2-hash-rate-wire-before.log"
+    }
+  ],
+  "requiredRc4Uploads": [
+    {
+      "format": "hybrid",
+      "direction": "upload",
+      "transport": "tcp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-required-upload-hybrid-za4z07z0"
+    },
+    {
+      "format": "hybrid",
+      "direction": "upload",
+      "transport": "utp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-required-upload-hybrid-qzduqjlh"
+    }
+  ],
+  "specification": "https://www.bittorrent.org/beps/bep_0052.html",
+  "native": "Not rebuilt. Last native package evidence is v2-filenames-2026-10-26.json; rebuild after the remaining engine audit.",
+  "remaining": [
+    "LSD registration ownership/announcement lifetime; PEX extension updates, zero IDs and private behavior",
+    "Legacy layer-fetch useful-interest, choke/cancel and wakeup/progress audit",
+    "Final conformance consistency, transport and native package validation; physical/certificate-backed release gates remain separate"
+  ],
+  "sourceSha256": {
+    "vendor/rqbit/crates/librqbit/src/file_ops.rs": "aef45adcf8e3bff2ffb14ec7d1ae9fd3cf0f2e1834d6e9e247c4af398307d92f",
+    "vendor/rqbit/crates/librqbit/src/limits.rs": "2385f292eaf9a82a48a65fa49a39ff4c24c240c5c1f1467517cd7f07ae937eb6",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/live/mod.rs": "07faabce8af3498dc8baa76cd1e75f1f4db3b899278b2d67bb89b4087b083024",
+    "crates/seedhop-core/tests/v2.rs": "4e8ba9f7e60513c671412242f6433f5fe3b1584692e6a9780dd6af525ab48402",
+    "vendor/patches/0018-seedhop-hash-rate-policy.patch": "97e2095447564dcde61d9d5ddadc3c7df6dc34ccd37c1d8a741c5587ee121308"
+  },
+  "logs": [
+    ".build/v2-hash-rate-burst-before.log",
+    ".build/v2-hash-rate-check.log",
+    ".build/v2-hash-rate-clippy.log",
+    ".build/v2-hash-rate-complete-rust.log",
+    ".build/v2-hash-rate-layers.log",
+    ".build/v2-hash-rate-patches.log",
+    ".build/v2-hash-rate-targeted.log",
+    ".build/v2-hash-rate-upload-tcp.log",
+    ".build/v2-hash-rate-upload-utp.log",
+    ".build/v2-hash-rate-wire-before.log"
+  ]
+}

@@ -1,0 +1,458 @@
+diff --git a/crates/librqbit/src/file_ops.rs b/crates/librqbit/src/file_ops.rs
+--- a/crates/librqbit/src/file_ops.rs
++++ b/crates/librqbit/src/file_ops.rs
+@@ -332,6 +332,7 @@
+     pub fn serve_hashes(
+         &self,
+         request: &peer_binary_protocol::HashRequest,
++        is_piece_have: impl Fn(ValidPieceIndex) -> bool,
+     ) -> anyhow::Result<Vec<[u8; 32]>> {
+         let v2 = self
+             .torrent
+@@ -340,8 +341,30 @@
+             .as_ref()
+             .context("not a v2 torrent")?;
+         Ok(v2.serve_hashes(request, |file, offset, buf| {
++            let requested_file = &v2.files()[file];
++            // Identical roots may belong to several files. Any verified copy
++            // can supply a block, even when the first copy is unselected.
++            let available = v2
++                .files()
++                .iter()
++                .enumerate()
++                .find(|(_, candidate)| {
++                    candidate.pieces_root() == requested_file.pieces_root()
++                        && candidate.length() == requested_file.length()
++                        && self
++                            .torrent
++                            .lengths()
++                            .validate_piece_index(
++                                (candidate.first_piece() + offset / v2.piece_length()) as u32,
++                            )
++                            .is_some_and(&is_piece_have)
++                })
++                .map(|(index, _)| index)
++                .ok_or_else(|| {
++                    std::io::Error::new(std::io::ErrorKind::NotFound, "hash data is not verified")
++                })?;
+             self.files
+-                .pread_exact(file, offset, buf)
++                .pread_exact(available, offset, buf)
+                 .map_err(std::io::Error::other)
+         })?)
+     }
+diff --git a/crates/librqbit/src/peer_connection.rs b/crates/librqbit/src/peer_connection.rs
+--- a/crates/librqbit/src/peer_connection.rs
++++ b/crates/librqbit/src/peer_connection.rs
+@@ -72,9 +72,10 @@
+ #[derive(Debug)]
+ pub enum WriterRequest {
+     Message(Message<'static>),
+-    UtMetadata(UtMetadata<ByteBufOwned>),
+     UtPex(UtPex<ByteBufOwned>),
+-    ReadChunkRequest(ChunkInfo),
++    BoundedMessage(Message<'static>, tokio::sync::OwnedSemaphorePermit),
++    UtMetadata(UtMetadata<ByteBufOwned>, tokio::sync::OwnedSemaphorePermit),
++    ReadChunkRequest(ChunkInfo, tokio::sync::OwnedSemaphorePermit),
+     Disconnect(anyhow::Result<()>),
+ }
+ 
+@@ -487,6 +488,7 @@
+                 tokio::task::yield_now().await;
+ 
+                 let mut uploaded_add = None;
++                let mut reply_permit = None;
+ 
+                 trace!("about to send: {:?}", &req);
+                 let ext_msg_ids = &|| {
+@@ -499,7 +501,12 @@
+ 
+                 let len = match req {
+                     WriterRequest::Message(msg) => msg.serialize(&mut *write_buf, ext_msg_ids)?,
+-                    WriterRequest::UtMetadata(utm) => {
++                    WriterRequest::BoundedMessage(msg, permit) => {
++                        reply_permit = Some(permit);
++                        msg.serialize(&mut *write_buf, ext_msg_ids)?
++                    }
++                    WriterRequest::UtMetadata(utm, permit) => {
++                        reply_permit = Some(permit);
+                         Message::Extended(ExtendedMessage::UtMetadata(utm.as_borrowed()))
+                             .serialize(&mut *write_buf, ext_msg_ids)?
+                     }
+@@ -507,7 +514,8 @@
+                         Message::Extended(ExtendedMessage::UtPex(ut_pex.as_borrowed()))
+                             .serialize(&mut *write_buf, ext_msg_ids)?
+                     }
+-                    WriterRequest::ReadChunkRequest(chunk) => {
++                    WriterRequest::ReadChunkRequest(chunk, permit) => {
++                        reply_permit = Some(permit);
+                         #[allow(unused_mut)]
+                         let mut skip_reading_for_e2e_tests = false;
+ 
+@@ -572,6 +580,9 @@
+                     write.flush().await.map_err(Error::Write)
+                 })
+                 .await?;
++
++                // Keep response capacity charged through socket backpressure.
++                drop(reply_permit);
+ 
+                 if let Some(uploaded_add) = uploaded_add {
+                     self.handler.on_uploaded_bytes(uploaded_add)
+diff --git a/crates/librqbit/src/peer_info_reader/legacy_layers.rs b/crates/librqbit/src/peer_info_reader/legacy_layers.rs
+--- a/crates/librqbit/src/peer_info_reader/legacy_layers.rs
++++ b/crates/librqbit/src/peer_info_reader/legacy_layers.rs
+@@ -201,6 +201,7 @@
+     shared: Arc<Shared>,
+     tx: tokio::sync::mpsc::UnboundedSender<WriterRequest>,
+     client: String,
++    reply_slots: Arc<tokio::sync::Semaphore>,
+ }
+ impl PeerConnectionHandler for Handler {
+     fn should_unchoke(&self) -> bool {
+@@ -220,6 +221,13 @@
+         Ok(())
+     }
+     async fn on_received_message(&self, message: Message<'_>) -> anyhow::Result<()> {
++        if let Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Request(index))) = message
++        {
++            let permit = self.reply_slots.clone().acquire_owned().await?;
++            self.tx
++                .send(WriterRequest::UtMetadata(UtMetadata::Reject(index), permit))?;
++            return Ok(());
++        }
+         let mut local = self.local.lock();
+         if matches!(message, Message::Bitfield(_)) && local.saw_message {
+             return Err(V2Error::Invalid("legacy layer bitfield is not first").into());
+@@ -301,10 +309,6 @@
+                 return Err(
+                     V2Error::Invalid("legacy peer rejected a layer payload request").into(),
+                 );
+-            }
+-            Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Request(index))) => {
+-                self.tx
+-                    .send(WriterRequest::UtMetadata(UtMetadata::Reject(index)))?;
+             }
+             Message::Hashes { .. }
+             | Message::HashRequest(_)
+@@ -356,6 +360,7 @@
+         shared: shared.clone(),
+         tx: tx.clone(),
+         client,
++        reply_slots: Arc::new(tokio::sync::Semaphore::new(32)),
+     };
+     let connection = PeerConnection::new(
+         addr,
+diff --git a/crates/librqbit/src/peer_info_reader/mod.rs b/crates/librqbit/src/peer_info_reader/mod.rs
+--- a/crates/librqbit/src/peer_info_reader/mod.rs
++++ b/crates/librqbit/src/peer_info_reader/mod.rs
+@@ -164,6 +164,7 @@
+         layers: Mutex::new(None),
+         pending_info: Mutex::new(None),
+         writer_tx,
++        reply_slots: Arc::new(tokio::sync::Semaphore::new(32)),
+         result_tx: Mutex::new(Some(result_tx)),
+         locked: RwLock::new(None),
+         client_name_and_version: client_name_and_version.clone(),
+@@ -318,6 +319,7 @@
+     layers: Mutex<Option<librqbit_core::v2::PendingMetainfo>>,
+     pending_info: Mutex<Option<TorrentAndInfoBytes>>,
+     writer_tx: UnboundedSender<WriterRequest>,
++    reply_slots: Arc<tokio::sync::Semaphore>,
+     result_tx: Mutex<
+         Option<
+             tokio::sync::oneshot::Sender<Result<TorrentAndInfoBytes, bencode::DeserializeError>>,
+@@ -402,21 +404,28 @@
+         // still a v2 peer connection, so requests need an explicit response.
+         match msg {
+             Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Request(index))) => {
++                let permit = self.reply_slots.clone().acquire_owned().await?;
+                 self.writer_tx
+-                    .send(WriterRequest::UtMetadata(UtMetadata::Reject(index)))?;
++                    .send(WriterRequest::UtMetadata(UtMetadata::Reject(index), permit))?;
+                 return Ok(());
+             }
+             Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Reject(index))) => {
+                 return Err(MetadataTransferError::Rejected(index).into());
+             }
+             Message::HashRequest(request) => {
+-                self.writer_tx
+-                    .send(WriterRequest::Message(Message::HashReject(request)))?;
++                let permit = self.reply_slots.clone().acquire_owned().await?;
++                self.writer_tx.send(WriterRequest::BoundedMessage(
++                    Message::HashReject(request),
++                    permit,
++                ))?;
+                 return Ok(());
+             }
+             Message::Request(request) if self.identity.v2_wire => {
+-                self.writer_tx
+-                    .send(WriterRequest::Message(Message::Reject(request)))?;
++                let permit = self.reply_slots.clone().acquire_owned().await?;
++                self.writer_tx.send(WriterRequest::BoundedMessage(
++                    Message::Reject(request),
++                    permit,
++                ))?;
+                 return Ok(());
+             }
+             Message::Piece(_) if self.identity.v2_wire => {
+diff --git a/crates/librqbit/src/piece_tracker.rs b/crates/librqbit/src/piece_tracker.rs
+--- a/crates/librqbit/src/piece_tracker.rs
++++ b/crates/librqbit/src/piece_tracker.rs
+@@ -137,6 +137,7 @@
+             if !self.chunks.is_piece_have(piece)
+                 && !self.inflight.contains_key(&piece)
+                 && (req.peer_has_piece)(piece)
++                && (req.can_steal)(piece)
+             {
+                 return self.reserve_piece(piece, req.peer);
+             }
+diff --git a/crates/librqbit/src/torrent_state/live/mod.rs b/crates/librqbit/src/torrent_state/live/mod.rs
+--- a/crates/librqbit/src/torrent_state/live/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/mod.rs
+@@ -55,7 +55,7 @@
+     time::{Duration, Instant},
+ };
+ 
+-use anyhow::{Context, bail};
++use anyhow::Context;
+ use buffers::{ByteBuf, ByteBufOwned};
+ use clone_to_owned::CloneToOwned;
+ use librqbit_core::{
+@@ -212,6 +212,7 @@
+     ratelimit_upload_tx: tokio::sync::mpsc::UnboundedSender<(
+         tokio::sync::mpsc::UnboundedSender<WriterRequest>,
+         ChunkInfo,
++        OwnedSemaphorePermit,
+     )>,
+     ratelimits: Limits,
+ }
+@@ -258,6 +259,7 @@
+         let (ratelimit_upload_tx, ratelimit_upload_rx) = tokio::sync::mpsc::unbounded_channel::<(
+             tokio::sync::mpsc::UnboundedSender<WriterRequest>,
+             ChunkInfo,
++            OwnedSemaphorePermit,
+         )>();
+         let ratelimits = Limits::new(paused.shared.options.ratelimits);
+ 
+@@ -441,9 +443,10 @@
+         mut rx: tokio::sync::mpsc::UnboundedReceiver<(
+             tokio::sync::mpsc::UnboundedSender<WriterRequest>,
+             ChunkInfo,
++            OwnedSemaphorePermit,
+         )>,
+     ) -> crate::Result<()> {
+-        while let Some((tx, ci)) = rx.recv().await {
++        while let Some((tx, ci, permit)) = rx.recv().await {
+             tokio::select! {
+                 _ = tx.closed() => {
+                     continue;
+@@ -462,7 +465,7 @@
+                     }
+                 }
+             }
+-            let _ = tx.send(WriterRequest::ReadChunkRequest(ci));
++            let _ = tx.send(WriterRequest::ReadChunkRequest(ci, permit));
+         }
+         Ok(())
+     }
+@@ -484,6 +487,7 @@
+             incoming: true,
+             on_bitfield_notify: Default::default(),
+             flow_control: Mutex::new(PeerFlowControl::default()),
++            reply_slots: Arc::new(tokio::sync::Semaphore::new(32)),
+             state: self.clone(),
+             tx,
+             counters,
+@@ -559,6 +563,7 @@
+             incoming: false,
+             on_bitfield_notify: Default::default(),
+             flow_control: Mutex::new(PeerFlowControl::default()),
++            reply_slots: Arc::new(tokio::sync::Semaphore::new(32)),
+             state: state.clone(),
+             tx,
+             counters,
+@@ -1058,6 +1063,9 @@
+     // RefCell would do, but tokio is unhappy when we use it.
+     flow_control: Mutex<PeerFlowControl>,
+ 
++    // Bound allocated replies and rate-limited uploads, including in-flight writes.
++    reply_slots: Arc<tokio::sync::Semaphore>,
++
+     // This is used to unpause chunk requester once the bitfield
+     // is received.
+     on_bitfield_notify: Notify,
+@@ -1116,22 +1124,31 @@
+ 
+         match message {
+             Message::HashRequest(request) => {
++                let permit = self.reply_slots.clone().acquire_owned().await?;
+                 let hashes = self
+                     .state
+                     .shared
+                     .spawner
+-                    .block_in_place_with_semaphore(|| self.state.file_ops().serve_hashes(&request))
++                    .block_in_place_with_semaphore(|| {
++                        self.state.file_ops().serve_hashes(&request, |piece| {
++                            self.state
++                                .lock_read("hash availability")
++                                .get_chunks()
++                                .is_ok_and(|chunks| chunks.is_piece_have(piece))
++                        })
++                    })
+                     .await;
+                 let response = match hashes {
+                     Ok(hashes) => Message::Hashes { request, hashes },
+                     Err(_) => Message::HashReject(request),
+                 };
+                 self.tx
+-                    .send(WriterRequest::Message(response))
++                    .send(WriterRequest::BoundedMessage(response, permit))
+                     .map_err(|_| anyhow::anyhow!("peer writer closed"))?;
+             }
+             Message::Request(request) => {
+                 self.on_download_request(request)
++                    .await
+                     .context("on_download_request")?;
+             }
+             Message::Bitfield(b) => self
+@@ -1172,6 +1189,7 @@
+                     );
+                 } else {
+                     self.send_metadata_piece(metadata_piece_id)
++                        .await
+                         .with_context(|| {
+                             format!("error sending metadata piece {metadata_piece_id}")
+                         })?;
+@@ -1636,19 +1654,26 @@
+         result
+     }
+ 
+-    fn on_download_request(&self, request: Request) -> anyhow::Result<()> {
+-        let result = self.queue_upload_request(request);
+-        if self.is_v2() {
+-            if let Err(error) = result {
++    async fn on_download_request(&self, request: Request) -> anyhow::Result<()> {
++        let permit = self.reply_slots.clone().acquire_owned().await?;
++        match self.upload_request_chunk(request) {
++            Ok(chunk) => {
++                self.state
++                    .ratelimit_upload_tx
++                    .send((self.tx.clone(), chunk, permit))?;
++            }
++            Err(error) if self.is_v2() => {
+                 // BEP 52 requires every payload request to receive a piece or
+                 // reject, including requests we cannot currently service.
+                 trace!(?request, ?error, "rejecting upload request");
+-                self.tx
+-                    .send(WriterRequest::Message(Message::Reject(request)))?;
+-            }
+-            return Ok(());
+-        }
+-        result
++                self.tx.send(WriterRequest::BoundedMessage(
++                    Message::Reject(request),
++                    permit,
++                ))?;
++            }
++            Err(error) => return Err(error),
++        }
++        Ok(())
+     }
+ 
+     fn on_rejected_request(&self, request: Request) -> anyhow::Result<()> {
+@@ -1698,7 +1723,7 @@
+         Ok(())
+     }
+ 
+-    fn queue_upload_request(&self, request: Request) -> anyhow::Result<()> {
++    fn upload_request_chunk(&self, request: Request) -> anyhow::Result<ChunkInfo> {
+         if self.state.torrent().options.disable_upload() {
+             anyhow::bail!("upload disabled, but peer requested a piece")
+         }
+@@ -1768,10 +1793,7 @@
+             );
+         }
+ 
+-        self.state
+-            .ratelimit_upload_tx
+-            .send((self.tx.clone(), chunk_info))?;
+-        Ok(())
++        Ok(chunk_info)
+     }
+ 
+     fn on_have(&self, have: u32) {
+@@ -2293,10 +2315,6 @@
+                 }
+             };
+ 
+-            // We don't care about per piece lock anymore, as it's removed from inflight pieces.
+-            // It shouldn't impact perf anyway, but dropping just in case.
+-            drop(ppl_guard);
+-
+             let full_piece_download_time = match full_piece_download_time {
+                 Some(t) => t,
+                 None => return Ok(()),
+@@ -2368,6 +2386,10 @@
+                     anyhow::bail!("i am probably a bogus peer. dying.")
+                 }
+             };
++            // We don't care about per piece lock anymore, as it's removed from inflight pieces.
++            // It shouldn't impact perf anyway, but dropping just in case.
++            drop(ppl_guard);
++
+             Ok(())
+         }
+ 
+@@ -2383,32 +2405,27 @@
+         Ok(())
+     }
+ 
+-    fn send_metadata_piece(&self, piece_id: u32) -> anyhow::Result<()> {
++    async fn send_metadata_piece(&self, piece_id: u32) -> anyhow::Result<()> {
++        let permit = self.reply_slots.clone().acquire_owned().await?;
+         let data = &self.state.metadata.info_bytes;
+-        let metadata_size = data.len();
+-        if metadata_size == 0 {
+-            anyhow::bail!("peer requested for info metadata but we don't have it")
+-        }
+-        let total_pieces: usize = (metadata_size as u64)
+-            .div_ceil(CHUNK_SIZE as u64)
+-            .try_into()?;
+-
+-        if piece_id as usize > total_pieces {
+-            bail!("piece out of bounds")
+-        }
+-
+-        let offset = piece_id * CHUNK_SIZE;
+-        let end = (offset + CHUNK_SIZE).min(data.len().try_into()?);
+-        let total_size: u32 = data
+-            .len()
+-            .try_into()
+-            .context("can't send metadata: len doesn't fit into u32")?;
+-        let data = data.slice(offset as usize..end as usize);
+-
++        let total_pieces = data.len().div_ceil(CHUNK_SIZE as usize);
++        let response = if piece_id as usize >= total_pieces {
++            UtMetadata::Reject(piece_id)
++        } else {
++            let offset = piece_id as usize * CHUNK_SIZE as usize;
++            let end = (offset + CHUNK_SIZE as usize).min(data.len());
++            let total_size = data
++                .len()
++                .try_into()
++                .context("can't send metadata: len doesn't fit into u32")?;
++            UtMetadata::Data(UtMetadataData::from_bytes(
++                piece_id,
++                total_size,
++                data.slice(offset..end).into(),
++            ))
++        };
+         self.tx
+-            .send(WriterRequest::UtMetadata(UtMetadata::Data(
+-                UtMetadataData::from_bytes(piece_id, total_size, data.into()),
+-            )))
++            .send(WriterRequest::UtMetadata(response, permit))
+             .context("error sending UtMetadata: channel closed")?;
+         Ok(())
+     }

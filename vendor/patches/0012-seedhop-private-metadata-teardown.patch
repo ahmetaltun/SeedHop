@@ -1,0 +1,472 @@
+diff --git a/crates/dht/src/dht.rs b/crates/dht/src/dht.rs
+--- a/crates/dht/src/dht.rs
++++ b/crates/dht/src/dht.rs
+@@ -437,7 +437,10 @@
+             self.callbacks.on_request_end(self, id, addr, &response);
+         }
+ 
+-        let response = match self.dht.request(self.request.clone(), addr).await {
++        // Process the response whose status and announce token were just
++        // recorded above. Reissuing here duplicated every recursive request
++        // and discarded the first response's nodes/peers.
++        let response = match response {
+             Ok(ResponseOrError::Response(r)) => r,
+             Ok(ResponseOrError::Error(e)) => {
+                 debug!("error response: {e:?}");
+diff --git a/crates/librqbit/src/dht_utils.rs b/crates/librqbit/src/dht_utils.rs
+--- a/crates/librqbit/src/dht_utils.rs
++++ b/crates/librqbit/src/dht_utils.rs
+@@ -1,12 +1,21 @@
+-use std::{collections::HashSet, net::SocketAddr, sync::Arc};
++use std::{
++    collections::{HashMap, HashSet},
++    net::SocketAddr,
++    sync::Arc,
++};
+ 
+ use anyhow::Context;
+ use buffers::ByteBufOwned;
+-use futures::{Stream, StreamExt, stream::FuturesUnordered};
++use futures::{
++    FutureExt, StreamExt,
++    future::{AbortHandle, Abortable},
++    stream::FuturesUnordered,
++};
+ use librqbit_core::torrent_metainfo::TorrentMetaV1Info;
+ use tracing::{Instrument, debug, debug_span};
+ 
+-use crate::peer_info_reader::MetadataIdentity;
++use crate::peer_info_reader::{MetadataIdentity, MetadataPrivacy, PrivateMetadata};
++use crate::type_aliases::PeerStream;
+ use crate::{
+     peer_connection::PeerConnectionOptions, peer_info_reader, spawn_utils::BlockingSpawner,
+     stream_connect::StreamConnector,
+@@ -51,24 +60,37 @@
+     },
+ }
+ 
+-pub async fn read_metainfo_from_peer_receiver<A: Stream<Item = SocketAddr> + Unpin>(
++pub(crate) struct MetadataDiscovery {
++    pub privacy: Arc<MetadataPrivacy>,
++    pub private_peers: Arc<dyn Fn(PrivateMetadata) -> PeerStream + Send + Sync>,
++}
++
++pub async fn read_metainfo_from_peer_receiver(
+     peer_id: Id20,
+     identity: MetadataIdentity,
+     initial_addrs: Vec<SocketAddr>,
+-    addrs_stream: A,
++    addrs_stream: PeerStream,
+     peer_connection_options: Option<PeerConnectionOptions>,
+     connector: Arc<StreamConnector>,
+     client_name_and_version: String,
+-) -> ReadMetainfoResult<A> {
++    discovery: Option<MetadataDiscovery>,
++) -> ReadMetainfoResult<PeerStream> {
+     let mut seen = HashSet::<SocketAddr>::new();
+     let mut addrs = addrs_stream;
+ 
+     let semaphore = tokio::sync::Semaphore::new(128);
+-
+-    let read_info_guarded = |addr| {
++    let privacy = discovery
++        .as_ref()
++        .map(|d| d.privacy.clone())
++        .unwrap_or_else(MetadataPrivacy::new);
++    let mut privacy_changes = privacy.subscribe();
++    let mut private_applied = false;
++
++    let read_info_guarded = |addr, identity| {
+         let semaphore = &semaphore;
+         let connector = connector.clone();
+         let client_name_and_version = client_name_and_version.clone();
++        let privacy = privacy.clone();
+         async move {
+             let token = semaphore.acquire().await?;
+             let mut attempt = 0;
+@@ -83,6 +105,7 @@
+                     BlockingSpawner::new(1),
+                     connector.clone(),
+                     client_name_and_version.clone(),
++                    privacy.clone(),
+                 )
+                 .instrument(debug_span!("read_metainfo_from_peer", ?addr))
+                 .await;
+@@ -104,25 +127,83 @@
+     };
+ 
+     let mut unordered = FuturesUnordered::new();
++    let mut handles = HashMap::new();
++    let wrap = |addr, identity| {
++        let (handle, registration) = AbortHandle::new_pair();
++        let future = Abortable::new(read_info_guarded(addr, identity), registration);
++        (handle, async move { (addr, future.await) }.boxed())
++    };
+ 
+     for a in initial_addrs {
+         seen.insert(a);
+-        unordered.push(read_info_guarded(a));
++        let (handle, future) = wrap(a, identity);
++        handles.insert(a, handle);
++        unordered.push(future);
+     }
+ 
+     let mut addrs_completed = false;
++    let mut pending_result: Option<(SocketAddr, TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned)> =
++        None;
+ 
+     loop {
++        privacy_changes.borrow_and_update();
++        if !private_applied && let Some(notice) = privacy.current() {
++            // The authenticated provider already knows this dictionary. Stop
++            // public discovery and all unrelated in-flight peer attempts now,
++            // rather than waiting for that provider's Merkle proofs to finish.
++            for (addr, handle) in &handles {
++                if *addr != notice.source {
++                    handle.abort();
++                }
++            }
++            seen.retain(|addr| *addr == notice.source);
++            addrs = discovery
++                .as_ref()
++                .map(|d| (d.private_peers)(notice))
++                .unwrap_or_else(|| futures::stream::iter([notice.source]).boxed());
++            addrs_completed = false;
++            private_applied = true;
++            debug!(source = ?notice.source, "private dictionary authenticated; public metadata discovery stopped");
++        }
++        if let Some((source, info, info_bytes)) = pending_result.take() {
++            if let Some(notice) = privacy.current() {
++                if librqbit_core::v2::sha256(info_bytes.as_ref()) != notice.dictionary_hash.0 {
++                    debug!(
++                        ?source,
++                        "discarding metadata that differs from the authenticated private dictionary"
++                    );
++                    continue;
++                }
++                if !private_applied {
++                    pending_result = Some((source, info, info_bytes));
++                    continue;
++                }
++                seen.insert(source);
++            }
++            return ReadMetainfoResult::Found {
++                source,
++                info,
++                info_bytes,
++                seen,
++                rx: addrs,
++            };
++        }
+         if addrs_completed && unordered.is_empty() {
+             return ReadMetainfoResult::ChannelClosed { seen };
+         }
+ 
+         tokio::select! {
++            biased;
++            changed = privacy_changes.changed() => { if changed.is_err() { unreachable!("privacy sender is retained by this lookup"); } },
+             done = unordered.next(), if !unordered.is_empty() => {
+                 match done {
+-                    Some(Ok((source, info, info_bytes))) => return ReadMetainfoResult::Found { source, info, info_bytes, seen, rx: addrs },
+-                    Some(Err(e)) => {
+-                        debug!("{:#}", e);
++                    Some((addr, result)) => {
++                        handles.remove(&addr);
++                        match result {
++                            Ok(Ok(result)) => pending_result = Some(result),
++                            Ok(Err(error)) => debug!("{:#}", error),
++                            Err(_) => debug!(?addr, "unrelated public metadata attempt cancelled"),
++                        }
+                     },
+                     None => unreachable!()
+                 }
+@@ -132,7 +213,10 @@
+                 match next_addr {
+                     Some(addr) => {
+                         if seen.insert(addr) {
+-                            unordered.push(read_info_guarded(addr));
++                            let identity = privacy.current().map(|notice| identity.with_dictionary_pin(notice.dictionary_hash)).unwrap_or(identity);
++                            let (handle, future) = wrap(addr, identity);
++                            handles.insert(addr, handle);
++                            unordered.push(future);
+                         }
+                         continue;
+                     },
+@@ -179,10 +263,11 @@
+             peer_id,
+             MetadataIdentity::legacy(info_hash, None),
+             Vec::new(),
+-            peer_rx,
++            peer_rx.boxed(),
+             None,
+             Arc::new(StreamConnector::new(Default::default()).await.unwrap()),
+             crate::client_name_and_version().to_owned(),
++            None,
+         )
+         .await
+         {
+diff --git a/crates/librqbit/src/peer_info_reader/mod.rs b/crates/librqbit/src/peer_info_reader/mod.rs
+--- a/crates/librqbit/src/peer_info_reader/mod.rs
++++ b/crates/librqbit/src/peer_info_reader/mod.rs
+@@ -32,6 +32,55 @@
+ 
+ pub(crate) mod legacy_layers;
+ 
++#[derive(Clone, Copy, Debug)]
++pub(crate) struct PrivateMetadata {
++    pub source: SocketAddr,
++    pub dictionary_hash: Id32,
++}
++pub(crate) struct MetadataPrivacy {
++    state: tokio::sync::watch::Sender<Option<PrivateMetadata>>,
++    trusted_peers: Vec<SocketAddr>,
++}
++impl MetadataPrivacy {
++    pub fn new() -> Arc<Self> {
++        Self::with_trusted_peers(Vec::new())
++    }
++    pub fn with_trusted_peers(trusted_peers: Vec<SocketAddr>) -> Arc<Self> {
++        let (state, _) = tokio::sync::watch::channel(None);
++        Arc::new(Self {
++            state,
++            trusted_peers,
++        })
++    }
++    pub fn private_initial(&self, notice: PrivateMetadata) -> Vec<SocketAddr> {
++        let mut peers = self.trusted_peers.clone();
++        if !peers.contains(&notice.source) {
++            peers.push(notice.source);
++        }
++        peers
++    }
++    pub fn current(&self) -> Option<PrivateMetadata> {
++        *self.state.borrow()
++    }
++    pub fn subscribe(&self) -> tokio::sync::watch::Receiver<Option<PrivateMetadata>> {
++        self.state.subscribe()
++    }
++    fn authenticated(&self, source: SocketAddr, dictionary: &[u8]) {
++        let notice = PrivateMetadata {
++            source,
++            dictionary_hash: Id32::new(librqbit_core::v2::sha256(dictionary)),
++        };
++        self.state.send_if_modified(|state| {
++            if state.is_none() {
++                *state = Some(notice);
++                true
++            } else {
++                false
++            }
++        });
++    }
++}
++
+ /// The negotiated wire identity and all full magnet commitments are distinct.
+ /// Legacy metadata can be constrained by a known v2 hash without using v2 wire.
+ #[derive(Clone, Copy, Debug)]
+@@ -40,6 +89,7 @@
+     pub v1: Option<Id20>,
+     pub v2: Option<Id32>,
+     pub v2_wire: bool,
++    dictionary_pin: Option<Id32>,
+ }
+ impl MetadataIdentity {
+     pub fn legacy(hash: Id20, required_v2: Option<Id32>) -> Self {
+@@ -48,6 +98,7 @@
+             v1: Some(hash),
+             v2: required_v2,
+             v2_wire: false,
++            dictionary_pin: None,
+         }
+     }
+     pub fn v2(hash: Id32, required_v1: Option<Id20>) -> Self {
+@@ -56,7 +107,12 @@
+             v1: required_v1,
+             v2: Some(hash),
+             v2_wire: true,
+-        }
++            dictionary_pin: None,
++        }
++    }
++    pub fn with_dictionary_pin(mut self, hash: Id32) -> Self {
++        self.dictionary_pin = Some(hash);
++        self
+     }
+ }
+ #[derive(Debug, thiserror::Error)]
+@@ -67,6 +123,8 @@
+     Sha256,
+     #[error("a dual-hash magnet must describe a hybrid torrent")]
+     NotHybrid,
++    #[error("metadata changed after the private dictionary was authenticated")]
++    PrivateDictionary,
+ }
+ 
+ pub(crate) async fn read_metainfo_from_peer(
+@@ -77,6 +135,7 @@
+     spawner: BlockingSpawner,
+     connector: Arc<StreamConnector>,
+     client_name_and_version: String,
++    privacy: Arc<MetadataPrivacy>,
+ ) -> anyhow::Result<TorrentAndInfoBytes> {
+     let (result_tx, result_rx) = tokio::sync::oneshot::channel::<
+         Result<(TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned), bencode::DeserializeError>,
+@@ -92,6 +151,7 @@
+         result_tx: Mutex::new(Some(result_tx)),
+         locked: RwLock::new(None),
+         client_name_and_version: client_name_and_version.clone(),
++        privacy,
+     };
+     let connection = PeerConnection::new(
+         addr,
+@@ -197,6 +257,12 @@
+             {
+                 return Err(MetadataIdentityError::Sha256.into());
+             }
++            if identity
++                .dictionary_pin
++                .is_some_and(|expected| librqbit_core::v2::sha256(&self.buffer) != expected.0)
++            {
++                return Err(MetadataIdentityError::PrivateDictionary.into());
++            }
+             Ok(true)
+         } else {
+             Ok(false)
+@@ -207,6 +273,7 @@
+ pub type TorrentAndInfoBytes = (TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned);
+ 
+ struct Handler {
++    privacy: Arc<MetadataPrivacy>,
+     addr: SocketAddr,
+     identity: MetadataIdentity,
+     handshake_hash: Mutex<Option<Id20>>,
+@@ -356,6 +423,9 @@
+                         "hybrid metadata handshake identity mismatch"
+                     );
+                 }
++                if info.0.private {
++                    self.privacy.authenticated(self.addr, info.1.as_ref());
++                }
+                 if self.identity.v2_wire {
+                     let pending =
+                         librqbit_core::v2::PendingMetainfo::from_info(info.1.as_ref())?
+diff --git a/crates/librqbit/src/session.rs b/crates/librqbit/src/session.rs
+--- a/crates/librqbit/src/session.rs
++++ b/crates/librqbit/src/session.rs
+@@ -18,13 +18,13 @@
+     bitv_factory::{BitVFactory, NonPersistentBitVFactory},
+     create_torrent,
+     create_torrent_file::CreateTorrentResult,
+-    dht_utils::{ReadMetainfoResult, read_metainfo_from_peer_receiver},
++    dht_utils::{MetadataDiscovery, ReadMetainfoResult, read_metainfo_from_peer_receiver},
+     ip_ranges::IpRanges,
+     limits::{Limits, LimitsConfig},
+     listen::{Accept, ListenerOptions},
+     merge_streams::merge_streams,
+     peer_connection::PeerConnectionOptions,
+-    peer_info_reader::MetadataIdentity,
++    peer_info_reader::{MetadataIdentity, MetadataPrivacy},
+     read_buf::ReadBuf,
+     session_persistence::{SessionPersistenceStore, json::JsonSessionPersistenceStore},
+     session_stats::SessionStats,
+@@ -1973,7 +1973,10 @@
+             Some(hash) => MetadataIdentity::v2(hash, v1_hash),
+             None => MetadataIdentity::legacy(info_hash, None),
+         };
+-        let preferred = self.resolve_magnet_one(identity, peer_rx, trackers, opts.peer_opts);
++        let privacy =
++            MetadataPrivacy::with_trusted_peers(opts.initial_peers.clone().unwrap_or_default());
++        let preferred =
++            self.resolve_magnet_one(identity, peer_rx, trackers, opts.peer_opts, privacy.clone());
+         let (Some(v1), Some(v2)) = (v1_hash, v2_hash) else {
+             return preferred.await;
+         };
+@@ -1992,6 +1995,7 @@
+             legacy_peers,
+             trackers,
+             opts.peer_opts,
++            privacy,
+         );
+         tokio::pin!(preferred, alternate);
+         let fatal = |error: &anyhow::Error| {
+@@ -2014,12 +2018,39 @@
+         }
+     }
+ 
++    fn metadata_discovery(
++        self: &Arc<Self>,
++        identity: MetadataIdentity,
++        trackers: &[url::Url],
++        privacy: Arc<MetadataPrivacy>,
++    ) -> MetadataDiscovery {
++        let session = self.clone();
++        let trackers = trackers.to_vec();
++        let trusted = privacy.clone();
++        MetadataDiscovery {
++            privacy,
++            private_peers: Arc::new(move |notice| {
++                session
++                    .make_peer_rx(
++                        identity.wire_hash,
++                        trackers.clone(),
++                        false,
++                        None,
++                        trusted.private_initial(notice),
++                        true,
++                    )
++                    .unwrap_or_else(|| futures::stream::empty().boxed())
++            }),
++        }
++    }
++
+     async fn resolve_magnet_one(
+         self: &Arc<Self>,
+         identity: MetadataIdentity,
+         peer_rx: PeerStream,
+         trackers: &[url::Url],
+         peer_opts: Option<PeerConnectionOptions>,
++        privacy: Arc<MetadataPrivacy>,
+     ) -> anyhow::Result<ResolveMagnetResult> {
+         let info_hash = identity.wire_hash;
+         match read_metainfo_from_peer_receiver(
+@@ -2030,6 +2061,7 @@
+             Some(self.merge_peer_opts(peer_opts)),
+             self.connector.clone(),
+             self.client_name_and_version.clone(),
++            Some(self.metadata_discovery(identity, trackers, privacy.clone())),
+         )
+         .await
+         {
+@@ -2089,15 +2121,32 @@
+                             Some(self.merge_peer_opts(peer_opts)),
+                             self.connector.clone(),
+                             self.client_name_and_version.clone(),
++                            Some(self.metadata_discovery(
++                                MetadataIdentity::v2(full, Some(info_hash)),
++                                trackers,
++                                privacy.clone(),
++                            )),
+                         );
+                         let legacy_initial = seen.iter().copied().collect();
+                         let legacy_info = info_bytes.clone();
+                         let legacy_pieces = info.pieces.clone();
++                        let legacy_privacy = privacy.clone();
+                         let legacy_lookup = async move {
+                             // Prefer cheap Merkle proofs. If no v2 provider
+                             // answers promptly, derive them from authenticated
+                             // legacy payload without allocating transfer files.
+                             tokio::time::sleep(Duration::from_secs(2)).await;
++                            let (private, legacy_initial) =
++                                if let Some(notice) = legacy_privacy.current() {
++                                    anyhow::ensure!(
++                                        librqbit_core::v2::sha256(legacy_info.as_ref())
++                                            == notice.dictionary_hash.0,
++                                        "metadata changed after private dictionary authentication"
++                                    );
++                                    (true, legacy_privacy.private_initial(notice))
++                                } else {
++                                    (private, legacy_initial)
++                                };
+                             let peers = self
+                                 .make_peer_rx(
+                                     info_hash,

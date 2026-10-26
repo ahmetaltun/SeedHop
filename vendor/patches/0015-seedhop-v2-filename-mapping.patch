@@ -1,0 +1,542 @@
+diff --git a/crates/librqbit/src/session.rs b/crates/librqbit/src/session.rs
+--- a/crates/librqbit/src/session.rs
++++ b/crates/librqbit/src/session.rs
+@@ -1318,6 +1318,10 @@
+             return Ok(None);
+         }
+ 
++        if let Some(v2) = &info.info().v2 {
++            return Ok(Some(PathBuf::from(v2.suggested_root_name())));
++        }
++
+         fn check_valid(pb: &Path) -> anyhow::Result<()> {
+             if pb.components().any(|x| !matches!(x, Component::Normal(_))) {
+                 bail!("path traversal in torrent name detected")
+@@ -1474,6 +1478,22 @@
+                 seen_peers,
+                 torrent_bytes: metadata.torrent_bytes,
+             }));
++        }
++
++        // Pin every v2 storage path, including unchanged names, so later
++        // sanitizer versions cannot move a restored transfer implicitly.
++        if let Some(v2) = &metadata.info.info().v2 {
++            anyhow::ensure!(
++                opts.file_names
++                    .keys()
++                    .all(|index| *index < v2.files().len()),
++                "filename map contains an invalid file index"
++            );
++            for (index, file) in metadata.info.iter_file_details().enumerate() {
++                opts.file_names
++                    .entry(index)
++                    .or_insert_with(|| file.filename.to_pathbuf());
++            }
+         }
+ 
+         let storage_factory = opts
+diff --git a/crates/librqbit/src/session_persistence/json.rs b/crates/librqbit/src/session_persistence/json.rs
+--- a/crates/librqbit/src/session_persistence/json.rs
++++ b/crates/librqbit/src/session_persistence/json.rs
+@@ -166,6 +166,11 @@
+             is_paused: torrent.is_paused(),
+             is_queued: torrent.is_queued(),
+             file_names: torrent.file_names(),
++            file_name_mapping_version: u8::from(
++                torrent
++                    .with_metadata(|m| m.info.info().v2.is_some())
++                    .unwrap_or(false),
++            ),
+             file_priorities: torrent.file_priorities(),
+             output_folder: torrent.output_folder(),
+         };
+diff --git a/crates/librqbit/src/session_persistence/mod.rs b/crates/librqbit/src/session_persistence/mod.rs
+--- a/crates/librqbit/src/session_persistence/mod.rs
++++ b/crates/librqbit/src/session_persistence/mod.rs
+@@ -37,6 +37,8 @@
+     #[serde(default)]
+     file_names: std::collections::HashMap<usize, PathBuf>,
+     #[serde(default)]
++    file_name_mapping_version: u8,
++    #[serde(default)]
+     file_priorities: Vec<u8>,
+ }
+ 
+@@ -44,7 +46,7 @@
+     pub fn info_hash(&self) -> &Id20 {
+         &self.info_hash
+     }
+-    pub fn into_add_torrent(self) -> anyhow::Result<(AddTorrent<'static>, AddTorrentOptions)> {
++    pub fn into_add_torrent(mut self) -> anyhow::Result<(AddTorrent<'static>, AddTorrentOptions)> {
+         if let Some(expected) = &self.info_hash_v2 {
+             anyhow::ensure!(
+                 !self.torrent_bytes.is_empty(),
+@@ -62,6 +64,25 @@
+                     && parsed.info_hash == self.info_hash,
+                 "saved v2 identity does not match metadata"
+             );
++            anyhow::ensure!(
++                self.file_name_mapping_version <= 1,
++                "saved filename mapping version is unsupported"
++            );
++            if self.file_name_mapping_version == 0 {
++                let paths = librqbit_core::v2::Metainfo::legacy_storage_paths(&self.torrent_bytes)?
++                    .context("saved v2 metadata has no legacy layout")?;
++                for (index, path) in paths.into_iter().enumerate() {
++                    self.file_names
++                        .entry(index)
++                        .or_insert_with(|| path.into_iter().collect());
++                }
++            } else {
++                anyhow::ensure!(
++                    self.file_names.len() == v2.files().len()
++                        && (0..v2.files().len()).all(|i| self.file_names.contains_key(&i)),
++                    "saved filename map is incomplete"
++                );
++            }
+         }
+         let add_torrent = if !self.torrent_bytes.is_empty() {
+             AddTorrent::TorrentFileBytes(self.torrent_bytes)
+diff --git a/crates/librqbit/src/session_persistence/postgres.rs b/crates/librqbit/src/session_persistence/postgres.rs
+--- a/crates/librqbit/src/session_persistence/postgres.rs
++++ b/crates/librqbit/src/session_persistence/postgres.rs
+@@ -44,6 +44,7 @@
+                 is_paused: self.is_paused,
+                 is_queued: false,
+                 file_names: Default::default(),
++                file_name_mapping_version: 0,
+                 file_priorities: Default::default(),
+             },
+         ))
+diff --git a/crates/librqbit_core/Cargo.toml b/crates/librqbit_core/Cargo.toml
+--- a/crates/librqbit_core/Cargo.toml
++++ b/crates/librqbit_core/Cargo.toml
+@@ -16,6 +16,8 @@
+ 
+ [dependencies]
+ sha2 = "0.10"
++unicode-normalization = "0.1.26"
++unicode-casefold = "0.2.0"
+ tracing.workspace = true
+ tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+ hex.workspace = true
+diff --git a/crates/librqbit_core/src/torrent_metainfo.rs b/crates/librqbit_core/src/torrent_metainfo.rs
+--- a/crates/librqbit_core/src/torrent_metainfo.rs
++++ b/crates/librqbit_core/src/torrent_metainfo.rs
+@@ -183,9 +183,16 @@
+     /// Iterate path components as strings. Will decode using the detected encoding, replacing
+     /// unknown characters with a placeholder.
+     pub fn iter_components(&self) -> impl Iterator<Item = Cow<'a, str>> + use<'a, BufType> {
++        if let FileIteratorNameData::V2(parts) = self.data {
++            // These strings are final storage names, not undecoded metainfo.
++            // Even a UTF-8 decoder could strip an initial U+FEFF here.
++            return Either::Left(parts.iter().map(|part| Cow::Borrowed(part.as_str())));
++        }
+         let encoding = self.encoding;
+-        self.iter_components_bytes()
+-            .map(move |part| encoding.decode(part).0)
++        Either::Right(
++            self.iter_components_bytes()
++                .map(move |part| encoding.decode(part).0),
++        )
+     }
+ 
+     /// Iterate path components as bytes.
+@@ -389,6 +396,11 @@
+     }
+ 
+     pub fn detect_encoding(&self) -> &'static Encoding {
++        // BEP 52 paths are already sanitized UTF-8. Raw hybrid names must
++        // never choose a legacy encoding for those storage strings.
++        if self.v2.is_some() {
++            return encoding_rs::UTF_8;
++        }
+         let mut encdetect = chardetng::EncodingDetector::new(chardetng::Iso2022JpDetection::Deny);
+         if let Some(name) = self.name.as_ref() {
+             encdetect.feed(name.as_ref(), false);
+@@ -411,7 +423,7 @@
+             return Ok(Either::Left(v2.files().iter().map(move |file| {
+                 FileDetails {
+                     filename: FileIteratorName {
+-                        encoding,
++                        encoding: encoding_rs::UTF_8,
+                         data: FileIteratorNameData::V2(file.path()),
+                     },
+                     len: file.length(),
+diff --git a/crates/librqbit_core/src/v2.rs b/crates/librqbit_core/src/v2.rs
+--- a/crates/librqbit_core/src/v2.rs
++++ b/crates/librqbit_core/src/v2.rs
+@@ -5,6 +5,8 @@
+     collections::{BTreeMap, BTreeSet},
+     sync::Arc,
+ };
++
++mod paths;
+ 
+ pub const BLOCK_LENGTH: u64 = 16 * 1024;
+ pub const MAX_METAINFO_LENGTH: usize = 32 * 1024 * 1024;
+@@ -75,6 +77,91 @@
+     pub fn parse(bytes: &[u8]) -> Result<Option<Self>> {
+         Self::parse_inner(bytes, true)
+     }
++    /// A safe optional container name; the info name remains purely advisory.
++    pub fn suggested_root_name(&self) -> String {
++        paths::component(self.name.as_bytes())
++    }
++
++    /// Preserve the on-disk names used before versioned filename mapping.
++    /// This is a restore-only migration; new imports always use `parse` paths.
++    pub fn legacy_storage_paths(bytes: &[u8]) -> Result<Option<Vec<Vec<String>>>> {
++        if Self::parse(bytes)?.is_none() {
++            return Ok(None);
++        }
++        let mut parser = Parser {
++            bytes,
++            at: 0,
++            nodes: 0,
++            canonical: true,
++        };
++        let root = parser.value(0)?;
++        let info = root.required(b"info")?;
++        // Match the historical encoding detector exactly. The old v2 adapter
++        // decoded its valid-UTF-8 path strings with this legacy guess.
++        let mut detector = chardetng::EncodingDetector::new(chardetng::Iso2022JpDetection::Deny);
++        if let Some(name) = info.get(b"name")? {
++            detector.feed(name.bytes()?, false);
++        }
++        if let Some(files) = info.get(b"files")? {
++            for file in files.list()? {
++                for part in file.required(b"path")?.list()? {
++                    detector.feed(part.bytes()?, false);
++                }
++            }
++        }
++        let encoding = detector.guess(None, chardetng::Utf8Detection::Allow);
++        fn walk(
++            tree: &Value<'_>,
++            path: &mut Vec<String>,
++            files: &mut Vec<Vec<String>>,
++            budget: &mut usize,
++            encoding: &'static encoding_rs::Encoding,
++        ) -> Result<()> {
++            let entries = tree.dict()?;
++            if entries.iter().any(|(key, _)| key.is_empty()) {
++                let size = path
++                    .iter()
++                    .map(|part| part.len() + 1 + std::mem::size_of::<String>())
++                    .sum();
++                *budget = budget
++                    .checked_sub(size)
++                    .ok_or(V2Error::Invalid("legacy file paths exceed 32 MiB"))?;
++                files.push(path.clone());
++            } else {
++                for (key, child) in entries {
++                    let raw = std::str::from_utf8(key)
++                        .map_err(|_| V2Error::Invalid("saved legacy filename is not UTF-8"))?;
++                    if raw.len() > 255
++                        || raw.is_empty()
++                        || matches!(raw, "." | "..")
++                        || raw.bytes().any(|b| matches!(b, 0 | b'/' | b'\\'))
++                    {
++                        return Err(V2Error::Invalid(
++                            "saved legacy filename was not supported before filename mapping",
++                        ));
++                    }
++                    path.push(encoding.decode(key).0.into_owned());
++                    if path.iter().map(|part| part.len() + 1).sum::<usize>() > 4096 {
++                        return Err(V2Error::Invalid("legacy file path exceeds 4096 bytes"));
++                    }
++                    walk(child, path, files, budget, encoding)?;
++                    path.pop();
++                }
++            }
++            Ok(())
++        }
++        let mut files = Vec::new();
++        let mut budget = MAX_METAINFO_LENGTH;
++        walk(
++            info.required(b"file tree")?,
++            &mut Vec::new(),
++            &mut files,
++            &mut budget,
++            encoding,
++        )?;
++        Ok(Some(files))
++    }
++
+     fn parse_inner(bytes: &[u8], require_layers: bool) -> Result<Option<Self>> {
+         if bytes.len() > MAX_METAINFO_LENGTH {
+             return Err(V2Error::Invalid("metadata exceeds 32 MB"));
+@@ -112,7 +199,15 @@
+         let tree = info.required(b"file tree")?;
+         let mut files = Vec::new();
+         let mut path_budget = MAX_METAINFO_LENGTH;
+-        walk_tree(tree, &mut Vec::new(), &mut files, &mut path_budget)?;
++        let mut raw_paths = Vec::new();
++        walk_tree(
++            tree,
++            &mut Vec::new(),
++            &mut Vec::new(),
++            &mut files,
++            &mut raw_paths,
++            &mut path_budget,
++        )?;
+         if files.is_empty() {
+             return Err(V2Error::Invalid("file tree contains no files"));
+         }
+@@ -171,7 +266,7 @@
+         }
+         let hybrid = info.get(b"pieces")?.is_some();
+         let hybrid_length = if hybrid {
+-            Some(validate_hybrid(info, &files, piece_length)?)
++            Some(validate_hybrid(info, &files, &raw_paths, piece_length)?)
+         } else if info.get(b"files")?.is_some() || info.get(b"length")?.is_some() {
+             return Err(V2Error::Invalid("v1 file layout without v1 piece hashes"));
+         } else {
+@@ -452,23 +547,12 @@
+     hashes[0]
+ }
+ 
+-fn component(bytes: &[u8]) -> Result<String> {
+-    let value = std::str::from_utf8(bytes)
+-        .map_err(|_| V2Error::Invalid("file names must be valid UTF-8 on this platform"))?;
+-    if value.len() > 255
+-        || value.is_empty()
+-        || matches!(value, "." | "..")
+-        || value.bytes().any(|b| matches!(b, 0 | b'/' | b'\\'))
+-    {
+-        return Err(V2Error::Invalid("unsafe file path component"));
+-    }
+-    Ok(value.into())
+-}
+-
+-fn walk_tree(
+-    tree: &Value<'_>,
++fn walk_tree<'a>(
++    tree: &Value<'a>,
++    raw_path: &mut Vec<&'a [u8]>,
+     path: &mut Vec<String>,
+     files: &mut Vec<File>,
++    raw_paths: &mut Vec<Vec<&'a [u8]>>,
+     path_budget: &mut usize,
+ ) -> Result<()> {
+     let entries = tree.dict()?;
+@@ -503,10 +587,12 @@
+             ));
+         }
+         // A long shared prefix must not expand a small input into unbounded owned paths.
+-        let path_length = path.iter().map(|part| part.len() + 1).sum::<usize>();
++        let path_length = path.iter().map(|part| part.len() + 1).sum::<usize>()
++            + path.len() * (std::mem::size_of::<String>() + std::mem::size_of::<&[u8]>());
+         *path_budget = path_budget
+             .checked_sub(path_length)
+             .ok_or(V2Error::Invalid("total file paths exceed 32 MiB"))?;
++        raw_paths.push(raw_path.clone());
+         files.push(File {
+             path: path.clone(),
+             length,
+@@ -519,19 +605,27 @@
+         if entries.is_empty() {
+             return Err(V2Error::Invalid("empty directory in file tree"));
+         }
+-        for (key, child) in entries {
+-            path.push(component(key)?);
++        let mapped = paths::components(entries.iter().map(|(key, _)| *key))?;
++        for ((key, child), name) in entries.iter().zip(mapped) {
++            raw_path.push(key);
++            path.push(name);
+             if path.iter().map(|part| part.len() + 1).sum::<usize>() > 4096 {
+                 return Err(V2Error::Invalid("file path exceeds 4096 bytes"));
+             }
+-            walk_tree(child, path, files, path_budget)?;
++            walk_tree(child, raw_path, path, files, raw_paths, path_budget)?;
+             path.pop();
++            raw_path.pop();
+         }
+     }
+     Ok(())
+ }
+ 
+-fn validate_hybrid(info: &Value<'_>, files: &[File], piece_length: u64) -> Result<u64> {
++fn validate_hybrid(
++    info: &Value<'_>,
++    files: &[File],
++    raw_paths: &[Vec<&[u8]>],
++    piece_length: u64,
++) -> Result<u64> {
+     let pieces = info.required(b"pieces")?.bytes()?;
+     let mut offset = 0u64;
+     if let Some(length) = info.get(b"length")? {
+@@ -548,7 +642,7 @@
+             || files.len() != 1
+             || files[0].path.len() != 1
+             || length.number()? != files[0].length
+-            || info.required(b"name")?.bytes()? != files[0].path[0].as_bytes()
++            || info.required(b"name")?.bytes()? != raw_paths[0][0]
+         {
+             return Err(V2Error::Invalid(
+                 "hybrid single-file layout differs from v2",
+@@ -561,13 +655,16 @@
+         let mut paths = BTreeSet::new();
+         for entry in info.required(b"files")?.list()? {
+             let length = entry.required(b"length")?.number()?;
+-            let path: Vec<String> = entry
++            let path: Vec<&[u8]> = entry
+                 .required(b"path")?
+                 .list()?
+                 .iter()
+-                .map(|v| component(v.bytes()?))
++                .map(Value::bytes)
+                 .collect::<Result<_>>()?;
+-            if path.is_empty() || !paths.insert(path.clone()) {
++            if path.is_empty()
++                || path.iter().any(|part| part.is_empty())
++                || !paths.insert(path.clone())
++            {
+                 return Err(V2Error::Invalid("duplicate or empty hybrid path"));
+             }
+             let attr = entry
+@@ -588,7 +685,7 @@
+                 let file = files
+                     .get(next_file)
+                     .ok_or(V2Error::Invalid("extra v1 file in hybrid"))?;
+-                if file.path != path
++                if raw_paths[next_file] != path
+                     || file.length != length
+                     || (length != 0 && !offset.is_multiple_of(piece_length))
+                 {
+diff --git a/crates/librqbit_core/src/v2/paths.rs b/crates/librqbit_core/src/v2/paths.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/librqbit_core/src/v2/paths.rs
+@@ -0,0 +1,130 @@
++//! Deterministic storage names; raw metainfo bytes remain authoritative.
++use super::{MAX_METAINFO_LENGTH, Result, V2Error, sha256};
++use std::collections::{BTreeMap, BTreeSet};
++use unicode_casefold::UnicodeCaseFold;
++use unicode_normalization::UnicodeNormalization;
++
++fn collision_key(name: &str) -> String {
++    name.nfkd()
++        .case_fold()
++        .nfkd()
++        .filter(|ch| !default_ignorable(*ch))
++        .collect()
++}
++
++fn suffixed(mut prefix: String, raw: &[u8]) -> String {
++    // %h cannot occur in an ordinary escaped component: literal '%' is
++    // escaped, and byte escapes contain exactly two hexadecimal digits.
++    while prefix.len() > 180 {
++        prefix.pop();
++    }
++    prefix.push_str("%h");
++    prefix.push_str(&hex::encode(sha256(raw)));
++    prefix
++}
++
++// Unicode 17 Default_Ignorable_Code_Point, DerivedCoreProperties.txt.
++// https://www.unicode.org/Public/17.0.0/ucd/DerivedCoreProperties.txt
++// Copyright Unicode, Inc.; see vendor/UNICODE-LICENSE.txt.
++// Used conservatively for collision detection, never to alter info bytes.
++fn default_ignorable(ch: char) -> bool {
++    matches!(ch as u32, 0x00ad | 0x034f | 0x061c | 0x115f..=0x1160
++        | 0x17b4..=0x17b5 | 0x180b..=0x180f | 0x200b..=0x200f
++        | 0x202a..=0x202e | 0x2060..=0x206f | 0x3164 | 0xfe00..=0xfe0f
++        | 0xfeff | 0xffa0 | 0xfff0..=0xfff8 | 0x1bca0..=0x1bca3
++        | 0x1d173..=0x1d17a | 0xe0000..=0xe0fff)
++}
++
++fn finish(mut out: String, raw: &[u8], shortened: bool) -> String {
++    if shortened {
++        out = suffixed(out, raw);
++    }
++    let key = collision_key(&out);
++    if key.is_empty() || matches!(key.as_str(), "." | "..") {
++        return suffixed(String::new(), raw);
++    }
++    let stem = key.split('.').next().unwrap_or_default();
++    if matches!(stem, "con" | "prn" | "aux" | "nul" | "conin$" | "conout$")
++        || (stem.len() == 4
++            && (stem.starts_with("com") || stem.starts_with("lpt"))
++            && matches!(stem.as_bytes()[3], b'1'..=b'9'))
++    {
++        // Another reserved namespace, distinct from byte escapes and hashes.
++        out.insert_str(0, "%r");
++    }
++    out
++}
++
++pub(super) fn component(raw: &[u8]) -> String {
++    use std::fmt::Write;
++    let mut out = String::new();
++    let trailing = raw
++        .iter()
++        .rposition(|b| !matches!(b, b'.' | b' '))
++        .map_or(0, |at| at + 1);
++    let mut at = 0;
++    // utf8_chunks scans once, without lossily turning invalid/overlong bytes
++    // into dots or separators. Output allocation never grows past one component.
++    for chunk in raw.utf8_chunks() {
++        for ch in chunk.valid().chars() {
++            let size = ch.len_utf8();
++            if ch.is_control()
++                || matches!(
++                    ch,
++                    '%' | '/' | '\\' | ':' | '<' | '>' | '"' | '|' | '?' | '*'
++                )
++                || (at >= trailing && matches!(ch, '.' | ' '))
++            {
++                for byte in &raw[at..at + size] {
++                    write!(&mut out, "%{byte:02X}").unwrap();
++                }
++            } else {
++                out.push(ch);
++            }
++            at += size;
++            if out.len() > 240 {
++                return finish(out, raw, true);
++            }
++        }
++        for byte in chunk.invalid() {
++            write!(&mut out, "%{byte:02X}").unwrap();
++            at += 1;
++            if out.len() > 240 {
++                return finish(out, raw, true);
++            }
++        }
++    }
++    finish(out, raw, false)
++}
++
++pub(super) fn components<'a>(keys: impl Iterator<Item = &'a [u8]>) -> Result<Vec<String>> {
++    let mut names = Vec::new();
++    let mut counts = BTreeMap::<String, usize>::new();
++    let mut budget = MAX_METAINFO_LENGTH;
++    for raw in keys {
++        let name = component(raw);
++        let key = collision_key(&name);
++        budget = budget
++            .checked_sub(
++                name.len() + 2 * key.len() + std::mem::size_of::<(String, String, &[u8])>(),
++            )
++            .ok_or(V2Error::Invalid("file names exceed 32 MiB"))?;
++        *counts.entry(key.clone()).or_default() += 1;
++        names.push((raw, name, key));
++    }
++    let mut used = BTreeSet::new();
++    names
++        .into_iter()
++        .map(|(raw, name, key)| {
++            let name = if counts[&key] > 1 {
++                suffixed(name, raw)
++            } else {
++                name
++            };
++            if !used.insert(collision_key(&name)) {
++                return Err(V2Error::Invalid("sanitized file name collision"));
++            }
++            Ok(name)
++        })
++        .collect()
++}

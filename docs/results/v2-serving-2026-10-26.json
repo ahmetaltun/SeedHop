@@ -1,0 +1,401 @@
+{
+  "date": "2026-10-26",
+  "status": "in_progress",
+  "scope": "Authenticated metadata/hash serving, bounded replies and upload scheduling, and streamed-piece ownership through verification. Full protocol objective remains active.",
+  "rust": {
+    "passed": 84,
+    "v2TargetPassed": 62,
+    "failed": 0,
+    "ignored": 1,
+    "command": "cargo test --workspace --locked -- --test-threads=1",
+    "log": ".build/v2-serving-complete-rust.log"
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "format": "PASS",
+    "gitDiffCheck": "PASS",
+    "seventeenPatchForwardReconstruction": "PASS",
+    "seventeenPatchReverseReapply": "PASS"
+  },
+  "behavior": [
+    "Metadata indices at piece count, above it and u32::MAX receive correlated rejects; subsequent valid blocks work on the same connection",
+    "Storage-derived hashes require verified pieces; identical-root files may supply any verified copy with matching length",
+    "Authenticated piece-layer metadata remains available without payload; uploading a chunk does not remove its subsequent leaf proof availability",
+    "Live peers admit 32 response jobs across hash/metadata replies, rejects and rate-limited payload uploads; metadata/legacy acquisition handlers also cap their rejection replies at 32",
+    "Response permits remain held through the socket write and flush; readers backpressure rather than discarding legitimate pipelined requests",
+    "Existing per-piece read lock now spans hash verification and HAVE publication; priority reservations must pass the same nonblocking lock check as stealing"
+  ],
+  "rawPeerCoverage": [
+    "Pure-v2 and hybrid: invalid metadata indices followed by both exact valid metadata blocks on the same peer",
+    "Pure-v2 and hybrid: corrupt/missing versus verified duplicate-root storage, metadata-only piece hashes, post-upload leaf proofs",
+    "256 pipelined 16 KiB metadata replies, another healthy peer responding concurrently, exact-byte draining without disconnect",
+    "Storage-gated verification with a second peer offering the same unselected streamed piece; no duplicate request before verification completes; exact stream and disk bytes"
+  ],
+  "negativeControls": [
+    {
+      "behavior": "Original metadata piece-count boundary",
+      "result": "Expected failure: bytes slice panic followed by peer EOF",
+      "log": ".build/v2-serving-before.log"
+    },
+    {
+      "behavior": "Storage hashes without verified availability",
+      "result": "Expected failure: served unverified leaf hashes",
+      "log": ".build/v2-hash-serving-before.log"
+    },
+    {
+      "behavior": "Priority reservation without per-piece lock check",
+      "result": "Expected failure: second peer requested verifying piece",
+      "log": ".build/v2-verification-lock-before.log"
+    }
+  ],
+  "independentInterestCases": [
+    {
+      "mode": "pure",
+      "result": "PASS",
+      "infoHashV2": "918caa09938910510a97591040604b2f65578cb00dc34a3565f0aa1e9181c156",
+      "wireHash": "918caa09938910510a97591040604b2f65578cb0",
+      "observerStates": [
+        "interested",
+        "not-interested",
+        "interested"
+      ],
+      "observerRequests": [
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "sourceRequests": [
+        {
+          "index": 0,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 0,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "evidence": ".build/interest-pure-1n3uf0m6"
+    },
+    {
+      "mode": "hybrid-v2",
+      "result": "PASS",
+      "infoHashV2": "f207c194dd139c1f52ae1c94fc3056b4956c07742b99a6e211d1694b51709dcf",
+      "wireHash": "f207c194dd139c1f52ae1c94fc3056b4956c0774",
+      "observerStates": [
+        "interested",
+        "not-interested",
+        "interested"
+      ],
+      "observerRequests": [
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "sourceRequests": [
+        {
+          "index": 0,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 0,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "evidence": ".build/interest-hybrid-v2-c5jgzdhr"
+    },
+    {
+      "mode": "hybrid-v1",
+      "result": "PASS",
+      "infoHashV2": "f207c194dd139c1f52ae1c94fc3056b4956c07742b99a6e211d1694b51709dcf",
+      "wireHash": "a2213944792df18b5df45de608d1ac5856422a3d",
+      "observerStates": [
+        "interested",
+        "not-interested",
+        "interested"
+      ],
+      "observerRequests": [
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "sourceRequests": [
+        {
+          "index": 0,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 0,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "evidence": ".build/interest-hybrid-v1-l19risjq"
+    }
+  ],
+  "independentMetadataCases": [
+    {
+      "mode": "healthy",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [],
+      "evidence": ".build/metadata-wire-healthy-qggvhoq0"
+    },
+    {
+      "mode": "changed",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [
+        0,
+        1
+      ],
+      "evidence": ".build/metadata-wire-changed-sq7nof2h"
+    },
+    {
+      "mode": "zero",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [],
+      "evidence": ".build/metadata-wire-zero-8uu_e540"
+    },
+    {
+      "mode": "reject",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [
+        0,
+        1
+      ],
+      "evidence": ".build/metadata-wire-reject-7mdld4qw"
+    },
+    {
+      "mode": "progress",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [],
+      "evidence": ".build/metadata-wire-progress-bjxt50e_"
+    }
+  ],
+  "independentLegacyLayerCases": [
+    {
+      "mode": "complete",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-complete-gjwmkca4"
+    },
+    {
+      "mode": "partial",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-partial-0e15ayx1"
+    },
+    {
+      "mode": "corrupt",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-corrupt-itw1np9u"
+    },
+    {
+      "mode": "padding",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-padding-_61ni5fs"
+    },
+    {
+      "mode": "private",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "45a6b345d79b6e49eb826420b9fb3b742a3215ba",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "evidence": ".build/legacy-layers-dual-private-dx1eq_c7"
+    },
+    {
+      "mode": "inconsistent",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "463da230a19ec0571fe00a59a0381e759cba3b2d",
+      "infoHashV2": "53753123a19c814d096f6c84f2e7704ec2fa98391cfdbd5a6347fc10cad61665",
+      "evidence": ".build/legacy-layers-dual-inconsistent-_8_54m9x"
+    },
+    {
+      "mode": "inspect-only",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-inspect-only-ykv0c2bd"
+    },
+    {
+      "mode": "inspect-unpadded",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "3bb8fc4a855ab7fae75912250ce18e51e64526d2",
+      "infoHashV2": "4a71b73ba65d423cc88ab43d56e3464966fcafae6c04a4a6ae98bf8cabee91c9",
+      "evidence": ".build/legacy-layers-dual-inspect-unpadded-gi0jlkwh"
+    }
+  ],
+  "requiredRc4Uploads": [
+    {
+      "format": "hybrid",
+      "direction": "upload",
+      "transport": "tcp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-required-upload-hybrid-aw73g15v"
+    },
+    {
+      "format": "hybrid",
+      "direction": "upload",
+      "transport": "utp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-required-upload-hybrid-as8_32dz"
+    }
+  ],
+  "specification": "https://www.bittorrent.org/beps/bep_0052.html",
+  "native": "Not rebuilt for this engine checkpoint. Last native package evidence remains v2-filenames-2026-10-26.json. Rebuild after final engine fixes.",
+  "remaining": [
+    "Hash serving rate-limit policy and computational cost review; the 32-job cap proves a concurrency/queue bound, not a byte/CPU rate",
+    "LSD registration ownership/announcement lifetime and PEX extension update/zero-ID/private behavior",
+    "Legacy layer-fetcher useful-interest/choke/cancellation audit",
+    "Final requirement consistency, transport regressions and native package validation; physical/certificate-backed gates remain separate"
+  ],
+  "sourceSha256": {
+    "Cargo.lock": "6f056c6547d3d71bcefa44c9df4bd4e954fd2f6c9b223cefbd41792158255e4d",
+    "crates/seedhop-core/Cargo.toml": "74abdb49210961696ab1ea394f2815ff6376a11d7c99b8d5746f8921f66e6981",
+    "crates/seedhop-core/tests/v2.rs": "b30bb1d0a1b6109ee421dce16b2a30ac82e30fe0cb0bd79ac433a094f7484bdb",
+    "crates/seedhop-core/tests/support/gated_storage.rs": "7da68cf896709f4928c2e70012de930fbb75a928cbb03d67b43ed683d89cc6be",
+    "vendor/rqbit/crates/librqbit/src/file_ops.rs": "244294c187823901c76350f655fa226c9dcdbe9f214788cd0cc321ca9f9c4e08",
+    "vendor/rqbit/crates/librqbit/src/peer_connection.rs": "d87571a24d71b5cbd879529a146021d4abcd469fd414edd4e3696e8133b787b5",
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/mod.rs": "2a76b091f2abd8f47568b1582cea94c54263e54e3fcb3f6708ef857695cd6bbb",
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/legacy_layers.rs": "d44df9c106513a8159592e553dfda1e16863bbe143fe27f6f349d11f0300c13d",
+    "vendor/rqbit/crates/librqbit/src/piece_tracker.rs": "492ae7a355c49fb6d82f681d1321518f88316519d99bc3718489f19ededc0994",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/live/mod.rs": "e78d8b6fea4320e774508ccc3a3572d2346201e0560891d0ca20316db97d6c24",
+    "vendor/patches/0017-seedhop-authenticated-serving.patch": "3ea3f5e029cc21fbe15ea686ead5a5d97b10a4d7e9b29a509631ae5c6dedaf20"
+  },
+  "logs": [
+    ".build/v2-serving-after.log",
+    ".build/v2-serving-before.log",
+    ".build/v2-serving-check.log",
+    ".build/v2-serving-clippy.log",
+    ".build/v2-serving-complete-rust.log",
+    ".build/v2-serving-interest.log",
+    ".build/v2-serving-legacy.log",
+    ".build/v2-serving-metadata-wire.log",
+    ".build/v2-serving-patches.log",
+    ".build/v2-serving-upload-tcp.log",
+    ".build/v2-serving-upload-utp.log"
+  ]
+}

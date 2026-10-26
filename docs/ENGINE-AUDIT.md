@@ -4,8 +4,31 @@ Baseline: `a499d2f243d124e144aef137afe7cb304a6e3f36`.
 `vendor/SOURCE.json` records archive provenance. Local deltas are recorded in
 `vendor/patches/0001-seedhop-reliability.patch`,
 `vendor/patches/0002-seedhop-bep52.patch`,
-`vendor/patches/0003-seedhop-metadata-guard.patch`, and
-`vendor/patches/0004-seedhop-file-controls.patch`; upstream's license is retained.
+`vendor/patches/0003-seedhop-metadata-guard.patch`,
+`vendor/patches/0004-seedhop-file-controls.patch`,
+`vendor/patches/0005-seedhop-v2-wire-completion.patch`,
+`vendor/patches/0006-seedhop-utp-fallback.patch`,
+`vendor/patches/0007-seedhop-hybrid-swarms.patch`,
+`vendor/patches/0008-seedhop-peer-encryption.patch`,
+`vendor/patches/0009-seedhop-magnet-proof-discovery.patch`,
+`vendor/patches/0010-seedhop-legacy-payload-layers.patch`, and
+`vendor/patches/0011-seedhop-dual-hash-magnets.patch` and
+`vendor/patches/0012-seedhop-private-metadata-teardown.patch` and
+`vendor/patches/0013-seedhop-metadata-wire-conformance.patch` and
+`vendor/patches/0014-seedhop-metadata-resource-bounds.patch` and
+`vendor/patches/0015-seedhop-v2-filename-mapping.patch` and
+`vendor/patches/0016-seedhop-peer-interest-state.patch` and
+`vendor/patches/0017-seedhop-authenticated-serving.patch` and
+`vendor/patches/0018-seedhop-hash-rate-policy.patch` and
+`vendor/patches/0019-seedhop-extension-discovery-policy.patch` and
+`vendor/patches/0020-seedhop-lsd-subscription-lifetime.patch` and
+`vendor/patches/0021-seedhop-legacy-layer-peer-state.patch` and
+`vendor/patches/0022-seedhop-final-wire-boundaries.patch`; upstream's license is retained.
+
+BEP 52, simultaneous hybrid swarms, MSE/PE encryption and TCP/uTP are implemented
+and verified. The final checkpoint and supported-client bounds are recorded in
+`BEP52-CONFORMANCE.md` and `results/v2-final-2026-10-26.json`. All twenty-two
+patches reconstruct current source and reverse/reapply byte-identically.
 
 ## Reliability changes
 
@@ -52,9 +75,9 @@ the engine does not write into rqbit's separate application directories.
 | File selection, limits, pause | `session.rs`, `limits.rs` | Exposed through core and UI |
 | Session persistence | `session_persistence/json.rs` | Enabled with reliability patches |
 | Streaming primitives | `ManagedTorrent::stream` | Not exposed in this milestone |
-| v2/hybrid | Shared BEP 52 metadata, SHA-256 verification, aligned storage, hash wire messages and magnet layers | Enabled through the v2 swarm; nine independent transfer/magnet/selection cases pass. See `BITTORRENT-V2.md` |
-| Encryption | No MSE/RC4 handshake implementation found in reviewed protocol/connection sources | Roadmap gap |
-| uTP | `listen.rs`, `librqbit-utp` | Experimental upstream; disabled here |
+| v2/hybrid | Shared BEP 52 metadata, dual hash verification, aligned storage, hash wire messages and magnet layers | Patch 0007 joins both hybrid swarms; patch 0009 separates metadata/proof discovery and fixes private trackers; patch 0010 derives layers from legacy payload; patch 0011 discovers metadata through either hash while enforcing both commitments in dual-hash magnets; patch 0012 stops public discovery immediately after private dictionary authentication and fixes duplicate recursive DHT RPCs. Final conformance and interoperability evidence is tracked in `V2-COMPLETION.md` |
+| Encryption | Patch 0008, `mse.rs`, session/peer connection integration | MSE/PE on TCP/uTP; Allow (default), Prefer, Require and Disabled policies. Require rejects bare/header-only peers; independent interoperability is recorded in `V2-COMPLETION.md` |
+| uTP | `listen.rs`, `librqbit-utp`, patch 0006 | App enables TCP/uTP; TCP handshake failure can retry uTP. Completion and independent evidence tracked in `V2-COMPLETION.md` |
 | File priorities; rarest-first | Patch 0004 orders requests by persistent file priority | Low/Normal/High exposed; rarest-first remains separate work |
 | Recheck, queueing, relocation, renaming | Patch 0004 and application storage transactions | Exposed across core, FFI/XPC, and native UI; see `FILE-MANAGEMENT.md` |
 | NAT-PMP | No implementation established by audit | Not exposed |
@@ -93,7 +116,8 @@ The focused second patch adds v2 identities, aligned piece/file accounting,
 SHA-256 download and restart checks, hash proof exchange, authenticated magnet
 layers, and persisted full hashes. Nine qBittorrent cases pass for pure v2 and
 hybrids through the v2 swarm, including uploads, downloads, selection and both
-magnet identities. Hybrids select v2 rather than simultaneous dual-swarm operation.
+magnet identities. That checkpoint selected the v2 swarm; patch 0007 subsequently
+adds simultaneous hybrid swarms and dual payload verification.
 See `BITTORRENT-V2.md` and `results/v2-wire-2026-10-25.json`.
 
 ## V2 hardening review

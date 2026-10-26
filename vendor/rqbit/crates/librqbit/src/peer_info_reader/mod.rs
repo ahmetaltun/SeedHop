@@ -30,35 +30,149 @@ use crate::{
     stream_connect::{ConnectionKind, StreamConnector},
 };
 
+pub(crate) mod legacy_layers;
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct PrivateMetadata {
+    pub source: SocketAddr,
+    pub dictionary_hash: Id32,
+}
+pub(crate) struct MetadataPrivacy {
+    state: tokio::sync::watch::Sender<Option<PrivateMetadata>>,
+    trusted_peers: Vec<SocketAddr>,
+}
+impl MetadataPrivacy {
+    pub fn new() -> Arc<Self> {
+        Self::with_trusted_peers(Vec::new())
+    }
+    pub fn with_trusted_peers(trusted_peers: Vec<SocketAddr>) -> Arc<Self> {
+        let (state, _) = tokio::sync::watch::channel(None);
+        Arc::new(Self {
+            state,
+            trusted_peers,
+        })
+    }
+    pub fn private_initial(&self, notice: PrivateMetadata) -> Vec<SocketAddr> {
+        let mut peers = self.trusted_peers.clone();
+        if !peers.contains(&notice.source) {
+            peers.push(notice.source);
+        }
+        peers
+    }
+    pub fn current(&self) -> Option<PrivateMetadata> {
+        *self.state.borrow()
+    }
+    pub fn subscribe(&self) -> tokio::sync::watch::Receiver<Option<PrivateMetadata>> {
+        self.state.subscribe()
+    }
+    fn authenticated(&self, source: SocketAddr, dictionary: &[u8]) {
+        let notice = PrivateMetadata {
+            source,
+            dictionary_hash: Id32::new(librqbit_core::v2::sha256(dictionary)),
+        };
+        self.state.send_if_modified(|state| {
+            if state.is_none() {
+                *state = Some(notice);
+                true
+            } else {
+                false
+            }
+        });
+    }
+}
+
+/// The negotiated wire identity and all full magnet commitments are distinct.
+/// Legacy metadata can be constrained by a known v2 hash without using v2 wire.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct MetadataIdentity {
+    pub wire_hash: Id20,
+    pub v1: Option<Id20>,
+    pub v2: Option<Id32>,
+    pub v2_wire: bool,
+    dictionary_pin: Option<Id32>,
+}
+impl MetadataIdentity {
+    pub fn legacy(hash: Id20, required_v2: Option<Id32>) -> Self {
+        Self {
+            wire_hash: hash,
+            v1: Some(hash),
+            v2: required_v2,
+            v2_wire: false,
+            dictionary_pin: None,
+        }
+    }
+    pub fn v2(hash: Id32, required_v1: Option<Id20>) -> Self {
+        Self {
+            wire_hash: hash.truncate_for_dht(),
+            v1: required_v1,
+            v2: Some(hash),
+            v2_wire: true,
+            dictionary_pin: None,
+        }
+    }
+    pub fn with_dictionary_pin(mut self, hash: Id32) -> Self {
+        self.dictionary_pin = Some(hash);
+        self
+    }
+}
+#[derive(Debug, thiserror::Error)]
+enum MetadataIdentityError {
+    #[error("metadata does not match the magnet's SHA-1 commitment")]
+    Sha1,
+    #[error("metadata does not match the magnet's SHA-256 commitment")]
+    Sha256,
+    #[error("a dual-hash magnet must describe a hybrid torrent")]
+    NotHybrid,
+    #[error("metadata changed after the private dictionary was authenticated")]
+    PrivateDictionary,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum MetadataTransferError {
+    #[error("metadata size {0} is outside 1..=32 MiB")]
+    SizeOutOfBounds(u32),
+    #[error("metadata total_size changed from {expected} to {received}")]
+    SizeChanged { expected: u32, received: u32 },
+    #[error("peer rejected required metadata piece {0}")]
+    Rejected(u32),
+    #[error("metadata peer made no useful progress for 20 seconds")]
+    NoProgress,
+    #[error("metadata peer exceeded the 120 second attempt deadline")]
+    Deadline,
+}
+
 pub(crate) async fn read_metainfo_from_peer(
     addr: SocketAddr,
     peer_id: Id20,
-    info_hash: Id20,
-    v2_hash: Option<Id32>,
+    identity: MetadataIdentity,
     peer_connection_options: Option<PeerConnectionOptions>,
     spawner: BlockingSpawner,
     connector: Arc<StreamConnector>,
     client_name_and_version: String,
+    privacy: Arc<MetadataPrivacy>,
 ) -> anyhow::Result<TorrentAndInfoBytes> {
     let (result_tx, result_rx) = tokio::sync::oneshot::channel::<
         Result<(TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned), bencode::DeserializeError>,
     >();
     let (writer_tx, writer_rx) = tokio::sync::mpsc::unbounded_channel::<WriterRequest>();
+    let (progress, mut progress_rx) = tokio::sync::watch::channel(tokio::time::Instant::now());
     let handler = Handler {
+        progress,
         addr,
-        info_hash,
-        v2_hash,
+        identity,
         handshake_hash: Mutex::new(None),
         layers: Mutex::new(None),
         pending_info: Mutex::new(None),
         writer_tx,
+        reply_slots: Arc::new(tokio::sync::Semaphore::new(32)),
         result_tx: Mutex::new(Some(result_tx)),
         locked: RwLock::new(None),
         client_name_and_version: client_name_and_version.clone(),
+        privacy,
     };
     let connection = PeerConnection::new(
         addr,
-        info_hash,
+        identity.wire_hash,
         peer_id,
         handler,
         peer_connection_options,
@@ -70,31 +184,32 @@ pub(crate) async fn read_metainfo_from_peer(
     let (_, brx) = tokio::sync::broadcast::channel(1);
     let connection_runner = async move { connection.manage_peer_outgoing(writer_rx, brx).await };
 
+    let watchdog = async move {
+        loop {
+            let deadline = *progress_rx.borrow_and_update() + std::time::Duration::from_secs(20);
+            match tokio::time::timeout_at(deadline, progress_rx.changed()).await {
+                Ok(Err(_)) => return,
+                Err(_) if progress_rx.borrow().elapsed() >= std::time::Duration::from_secs(20) => {
+                    return;
+                }
+                _ => {}
+            }
+        }
+    };
     let result = tokio::select! {
+        // A peer may close immediately after its final authenticated response.
+        // Prefer a completed result over an EOF observed in the same poll.
+        biased;
         result = result_reader => result??,
+        _ = watchdog => return Err(MetadataTransferError::NoProgress.into()),
+        _ = tokio::time::sleep(std::time::Duration::from_secs(120)) => return Err(MetadataTransferError::Deadline.into()),
         whatever = connection_runner => match whatever {
             Ok(_) => anyhow::bail!("connection runner completed first"),
             Err(e) => return Err(e.into())
         }
     };
-    // A btih-only hybrid magnet first authenticates SHA-1, then reconnects using
-    // its committed SHA-256 identity to fetch v2 Merkle layers.
-    if v2_hash.is_none() {
-        if let Some(pending) = librqbit_core::v2::PendingMetainfo::from_info(result.1.as_ref())? {
-            let full = Id32::new(pending.info_hash());
-            return Box::pin(read_metainfo_from_peer(
-                addr,
-                peer_id,
-                full.truncate_for_dht(),
-                Some(full),
-                peer_connection_options,
-                spawner,
-                connector,
-                client_name_and_version,
-            ))
-            .await;
-        }
-    }
+    // A legacy provider need not support hash messages or the v2 identity.
+    // The session discovers proof providers after authenticating this info.
     Ok(result)
 }
 
@@ -108,8 +223,8 @@ struct HandlerLocked {
 
 impl HandlerLocked {
     fn new(metadata_size: u32) -> anyhow::Result<Self> {
-        if metadata_size > 32 * 1024 * 1024 {
-            anyhow::bail!("metadata size {} is too big", metadata_size);
+        if metadata_size == 0 || metadata_size > 32 * 1024 * 1024 {
+            return Err(MetadataTransferError::SizeOutOfBounds(metadata_size).into());
         }
         let buffer = vec![0u8; metadata_size as usize];
         let total_pieces: usize = (metadata_size as u64)
@@ -135,9 +250,15 @@ impl HandlerLocked {
     fn record_piece(
         &mut self,
         d: &UtMetadataData<ByteBuf>,
-        info_hash: &Id20,
-        v2_hash: Option<Id32>,
+        identity: MetadataIdentity,
     ) -> anyhow::Result<bool> {
+        if d.total_size() != self.metadata_size {
+            return Err(MetadataTransferError::SizeChanged {
+                expected: self.metadata_size,
+                received: d.total_size(),
+            }
+            .into());
+        }
         let piece = d.piece();
         if piece as usize >= self.total_pieces {
             anyhow::bail!("wrong index");
@@ -162,13 +283,23 @@ impl HandlerLocked {
             // check metadata
             let mut hash = Sha1::new();
             hash.update(&self.buffer);
-            let matches = if let Some(expected) = v2_hash {
-                librqbit_core::v2::sha256(&self.buffer) == expected.0
-            } else {
-                hash.finish() == info_hash.0
-            };
-            if !matches {
-                anyhow::bail!("info checksum invalid");
+            if identity
+                .v1
+                .is_some_and(|expected| hash.finish() != expected.0)
+            {
+                return Err(MetadataIdentityError::Sha1.into());
+            }
+            if identity
+                .v2
+                .is_some_and(|expected| librqbit_core::v2::sha256(&self.buffer) != expected.0)
+            {
+                return Err(MetadataIdentityError::Sha256.into());
+            }
+            if identity
+                .dictionary_pin
+                .is_some_and(|expected| librqbit_core::v2::sha256(&self.buffer) != expected.0)
+            {
+                return Err(MetadataIdentityError::PrivateDictionary.into());
             }
             Ok(true)
         } else {
@@ -180,13 +311,15 @@ impl HandlerLocked {
 pub type TorrentAndInfoBytes = (TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned);
 
 struct Handler {
+    progress: tokio::sync::watch::Sender<tokio::time::Instant>,
+    privacy: Arc<MetadataPrivacy>,
     addr: SocketAddr,
-    info_hash: Id20,
-    v2_hash: Option<Id32>,
+    identity: MetadataIdentity,
     handshake_hash: Mutex<Option<Id20>>,
     layers: Mutex<Option<librqbit_core::v2::PendingMetainfo>>,
     pending_info: Mutex<Option<TorrentAndInfoBytes>>,
     writer_tx: UnboundedSender<WriterRequest>,
+    reply_slots: Arc<tokio::sync::Semaphore>,
     result_tx: Mutex<
         Option<
             tokio::sync::oneshot::Sender<Result<TorrentAndInfoBytes, bencode::DeserializeError>>,
@@ -229,15 +362,31 @@ impl Handler {
     }
 }
 impl PeerConnectionHandler for Handler {
+    fn update_my_extended_handshake(
+        &self,
+        handshake: &mut ExtendedHandshake<ByteBuf>,
+    ) -> anyhow::Result<()> {
+        // Acquisition connections do not participate in peer exchange.
+        handshake.m.ut_pex = None;
+        Ok(())
+    }
+
     // A hybrid peer can answer metadata discovery with its v2 wire identity.
     // No content is accepted until the original full SHA-1 commitment and this
     // candidate's truncated SHA-256 identity both match the received info bytes.
-    fn accepts_metadata_hash_upgrade(&self, _hash: Id20) -> bool {
-        self.v2_hash.is_none()
+    fn accepts_metadata_hash_upgrade(&self, hash: Id20) -> bool {
+        !self.identity.v2_wire
+            && self
+                .identity
+                .v2
+                .is_none_or(|expected| hash == expected.truncate_for_dht())
     }
 
     fn is_v2(&self) -> bool {
-        self.v2_hash.is_some()
+        self.identity.v2_wire
+    }
+    fn should_unchoke(&self) -> bool {
+        false
     }
     fn should_send_bitfield(&self) -> bool {
         false
@@ -260,6 +409,40 @@ impl PeerConnectionHandler for Handler {
     async fn on_received_message(&self, msg: Message<'_>) -> anyhow::Result<()> {
         trace!("{}: received message: {:?}", self.addr, msg);
 
+        // Metadata discovery advertises no payload or hash availability. It is
+        // still a v2 peer connection, so requests need an explicit response.
+        match msg {
+            Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Request(index))) => {
+                let permit = self.reply_slots.clone().acquire_owned().await?;
+                self.writer_tx
+                    .send(WriterRequest::UtMetadata(UtMetadata::Reject(index), permit))?;
+                return Ok(());
+            }
+            Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Reject(index))) => {
+                return Err(MetadataTransferError::Rejected(index).into());
+            }
+            Message::HashRequest(request) => {
+                let permit = self.reply_slots.clone().acquire_owned().await?;
+                self.writer_tx.send(WriterRequest::BoundedMessage(
+                    Message::HashReject(request),
+                    permit,
+                ))?;
+                return Ok(());
+            }
+            Message::Request(request) if self.identity.v2_wire => {
+                let permit = self.reply_slots.clone().acquire_owned().await?;
+                self.writer_tx.send(WriterRequest::BoundedMessage(
+                    Message::Reject(request),
+                    permit,
+                ))?;
+                return Ok(());
+            }
+            Message::Piece(_) if self.identity.v2_wire => {
+                anyhow::bail!("unsolicited payload during metadata discovery");
+            }
+            _ => {}
+        }
+
         if let Message::Hashes {
             request,
             ref hashes,
@@ -270,6 +453,7 @@ impl PeerConnectionHandler for Handler {
                 .as_mut()
                 .ok_or_else(|| anyhow::anyhow!("unsolicited hashes"))?
                 .accept(request, hashes)?;
+            self.progress.send_replace(tokio::time::Instant::now());
             self.request_next_layer()?;
             return Ok(());
         }
@@ -284,9 +468,11 @@ impl PeerConnectionHandler for Handler {
                 .ok_or_else(|| {
                     anyhow::anyhow!("metadata data received after info dictionary completed")
                 })?
-                .record_piece(&utdata, &self.info_hash, self.v2_hash)?;
+                .record_piece(&utdata, self.identity)?;
+            self.progress.send_replace(tokio::time::Instant::now());
             if piece_ready {
                 let buf = Bytes::from(self.locked.write().take().unwrap().buffer);
+                librqbit_core::v2::Metainfo::check_info_version(&buf)?;
                 let info = from_bytes::<TorrentMetaV1Info<ByteBuf>>(&buf)
                     .map(|i| {
                         use clone_to_owned::CloneToOwned;
@@ -300,19 +486,25 @@ impl PeerConnectionHandler for Handler {
 
                 let info = info?;
                 if let Some(candidate) = *self.handshake_hash.lock()
-                    && candidate != self.info_hash
+                    && candidate != self.identity.wire_hash
                 {
                     anyhow::ensure!(
                         candidate.0 == librqbit_core::v2::sha256(info.1.as_ref())[..20],
                         "hybrid metadata handshake identity mismatch"
                     );
                 }
-                if self.v2_hash.is_some() {
+                if info.0.private {
+                    self.privacy.authenticated(self.addr, info.1.as_ref());
+                }
+                if self.identity.v2_wire {
                     let pending =
                         librqbit_core::v2::PendingMetainfo::from_info(info.1.as_ref())?
                             .ok_or_else(|| anyhow::anyhow!("v2 magnet supplied v1 metadata"))?;
-                    if Some(Id32::new(pending.info_hash())) != self.v2_hash {
+                    if Some(Id32::new(pending.info_hash())) != self.identity.v2 {
                         anyhow::bail!("v2 metadata identity mismatch");
+                    }
+                    if self.identity.v1.is_some() && !pending.is_hybrid() {
+                        return Err(MetadataIdentityError::NotHybrid.into());
                     }
                     *self.pending_info.lock() = Some(info);
                     *self.layers.lock() = Some(pending);
@@ -335,20 +527,34 @@ impl PeerConnectionHandler for Handler {
         &self,
         extended_handshake: &ExtendedHandshake<ByteBuf>,
     ) -> anyhow::Result<()> {
+        // BEP 10 allows later extension-handshake updates. They must not
+        // allocate a second dictionary or replay all outstanding requests.
+        if let Some(current) = self.locked.read().as_ref() {
+            if let Some(received) = extended_handshake.metadata_size {
+                if received != current.metadata_size {
+                    return Err(MetadataTransferError::SizeChanged {
+                        expected: current.metadata_size,
+                        received,
+                    }
+                    .into());
+                }
+            }
+            return Ok(());
+        }
+        if self.pending_info.lock().is_some() {
+            return Ok(());
+        }
         let metadata_size = match extended_handshake.metadata_size {
             Some(metadata_size) => metadata_size,
             None => anyhow::bail!("peer does not have metadata_size"),
         };
 
-        if extended_handshake.m.ut_metadata.is_none() {
+        if extended_handshake.m.ut_metadata.is_none_or(|id| id == 0) {
             anyhow::bail!("peer does not support ut_metadata");
         }
 
-        self.writer_tx
-            .send(WriterRequest::Message(Message::Unchoke))?;
-        self.writer_tx
-            .send(WriterRequest::Message(Message::Interested))?;
-
+        // Metadata and Merkle-hash requests are independent of payload
+        // choking. This connection has no payload interest or availability.
         let inner = HandlerLocked::new(metadata_size)?;
         let total_pieces = inner.total_pieces;
 

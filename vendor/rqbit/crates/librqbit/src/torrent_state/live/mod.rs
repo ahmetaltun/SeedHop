@@ -55,7 +55,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use anyhow::{Context, bail};
+use anyhow::Context;
 use buffers::{ByteBuf, ByteBufOwned};
 use clone_to_owned::CloneToOwned;
 use librqbit_core::{
@@ -212,6 +212,7 @@ pub struct TorrentStateLive {
     ratelimit_upload_tx: tokio::sync::mpsc::UnboundedSender<(
         tokio::sync::mpsc::UnboundedSender<WriterRequest>,
         ChunkInfo,
+        OwnedSemaphorePermit,
     )>,
     ratelimits: Limits,
 }
@@ -258,6 +259,7 @@ impl TorrentStateLive {
         let (ratelimit_upload_tx, ratelimit_upload_rx) = tokio::sync::mpsc::unbounded_channel::<(
             tokio::sync::mpsc::UnboundedSender<WriterRequest>,
             ChunkInfo,
+            OwnedSemaphorePermit,
         )>();
         let ratelimits = Limits::new(paused.shared.options.ratelimits);
 
@@ -441,9 +443,10 @@ impl TorrentStateLive {
         mut rx: tokio::sync::mpsc::UnboundedReceiver<(
             tokio::sync::mpsc::UnboundedSender<WriterRequest>,
             ChunkInfo,
+            OwnedSemaphorePermit,
         )>,
     ) -> crate::Result<()> {
-        while let Some((tx, ci)) = rx.recv().await {
+        while let Some((tx, ci, permit)) = rx.recv().await {
             tokio::select! {
                 _ = tx.closed() => {
                     continue;
@@ -462,7 +465,7 @@ impl TorrentStateLive {
                     }
                 }
             }
-            let _ = tx.send(WriterRequest::ReadChunkRequest(ci));
+            let _ = tx.send(WriterRequest::ReadChunkRequest(ci, permit));
         }
         Ok(())
     }
@@ -477,13 +480,19 @@ impl TorrentStateLive {
     ) -> crate::Result<()> {
         let handler = PeerHandler {
             addr: checked_peer.addr,
+            wire_v2: AtomicBool::new(
+                checked_peer.handshake.info_hash == self.shared.info_hash
+                    && self.metadata.info.info().v2.is_some(),
+            ),
             incoming: true,
             on_bitfield_notify: Default::default(),
             flow_control: Mutex::new(PeerFlowControl::default()),
+            reply_slots: Arc::new(tokio::sync::Semaphore::new(32)),
             state: self.clone(),
             tx,
             counters,
             first_message_received: AtomicBool::new(false),
+            pex_token: Mutex::new(None),
             cancel_token: self.cancellation_token.child_token(),
             client_name_and_version: self.shared.client_name_and_version().to_owned(),
         };
@@ -495,7 +504,7 @@ impl TorrentStateLive {
         };
         let peer_connection = PeerConnection::new(
             checked_peer.addr,
-            self.shared.info_hash,
+            checked_peer.handshake.info_hash,
             self.shared.peer_id,
             &handler,
             Some(options),
@@ -503,9 +512,11 @@ impl TorrentStateLive {
             self.shared.connector.clone(),
         );
         let requester = handler.task_peer_chunk_requester();
+        let interest = handler.task_interest();
 
         let res = tokio::select! {
             r = requester => {r}
+            r = interest => {r}
             r = peer_connection.manage_peer_incoming(
                 rx,
                 checked_peer,
@@ -539,15 +550,26 @@ impl TorrentStateLive {
             .with_peer(addr, |p| p.stats.counters.clone())
             .ok_or(Error::BugPeerNotFound)?;
 
+        let wire_hash = state
+            .peers
+            .with_peer(addr, |peer| peer.outgoing_info_hash)
+            .flatten()
+            .unwrap_or(state.shared.info_hash);
+
         let handler = PeerHandler {
             addr,
+            wire_v2: AtomicBool::new(
+                wire_hash == state.shared.info_hash && state.metadata.info.info().v2.is_some(),
+            ),
             incoming: false,
             on_bitfield_notify: Default::default(),
             flow_control: Mutex::new(PeerFlowControl::default()),
+            reply_slots: Arc::new(tokio::sync::Semaphore::new(32)),
             state: state.clone(),
             tx,
             counters,
             first_message_received: AtomicBool::new(false),
+            pex_token: Mutex::new(None),
             cancel_token: state.cancellation_token.child_token(),
             client_name_and_version: state.shared.client_name_and_version().to_owned(),
         };
@@ -560,7 +582,7 @@ impl TorrentStateLive {
         };
         let peer_connection = PeerConnection::new(
             addr,
-            state.shared.info_hash,
+            wire_hash,
             state.shared.peer_id,
             &handler,
             Some(options),
@@ -572,6 +594,7 @@ impl TorrentStateLive {
                 .task_peer_chunk_requester()
                 .instrument(debug_span!("chunk_requester"))
         );
+        let interest = aframe!(handler.task_interest());
         let conn_manager = aframe!(
             peer_connection
                 .manage_peer_outgoing(rx, state.have_broadcast_tx.subscribe())
@@ -584,6 +607,7 @@ impl TorrentStateLive {
             .fetch_add(1, Ordering::Relaxed);
         let res = tokio::select! {
             r = requester => {r}
+            r = interest => {r}
             r = conn_manager => {r}
         };
 
@@ -723,8 +747,12 @@ impl TorrentStateLive {
         let _ = self.have_broadcast_tx.send(index);
     }
 
-    pub(crate) fn add_peer_if_not_seen(&self, addr: SocketAddr) -> crate::Result<bool> {
-        match self.peers.add_if_not_seen(addr) {
+    pub(crate) fn add_peer_with_info_hash(
+        &self,
+        addr: SocketAddr,
+        info_hash: Id20,
+    ) -> crate::Result<bool> {
+        match self.peers.add_if_not_seen(addr, info_hash) {
             Some(handle) => handle,
             None => return Ok(false),
         };
@@ -809,6 +837,8 @@ impl TorrentStateLive {
         let mut g = self.lock_write("update_only_files");
         let pt = g.get_pieces_mut()?;
         let hns = pt.update_only_files(&self.metadata.file_infos, only_files)?;
+        drop(g);
+        self.new_pieces_notify.notify_waiters();
         if !hns.finished() {
             self.reconnect_all_not_needed_peers();
         }
@@ -915,6 +945,7 @@ impl TorrentStateLive {
         self: Arc<Self>,
         this_peer_addr: SocketAddr,
         tx: PeerTx,
+        wire_hash: Id20,
     ) -> anyhow::Result<()> {
         // As per BEP 11 we should not send more than 50 peers at once
         // (here it also applies to fist message, should be OK as we anyhow really have more)
@@ -947,6 +978,11 @@ impl TorrentStateLive {
                 connected.extend(
                     live_peers
                         .difference(&peer_view_of_live_peers)
+                        .filter(|addr| {
+                            self.peers
+                                .with_peer(**addr, |p| p.outgoing_info_hash == Some(wire_hash))
+                                .unwrap_or(false)
+                        })
                         .take(MAX_SENT_PEERS)
                         .copied(),
                 );
@@ -973,6 +1009,8 @@ impl TorrentStateLive {
             };
 
             let filter = |addr: &SocketAddr| !(peer_ip_non_local && other_ip_is_local(&addr.ip()));
+            connected.retain(filter);
+            dropped.retain(filter);
 
             // BEP 11 - Dont send closed if they are now in live
             // it's assured by mutual exclusion of two  above sets  if in sent_peers_live, it cannot be in addrs_live_to_sent,
@@ -1001,6 +1039,7 @@ const DEFAULT_PEER_REQUEST_WINDOW: usize = 128;
 struct PeerFlowControl {
     i_am_choked: bool,
     request_window: usize,
+    am_interested: bool,
 }
 
 impl Default for PeerFlowControl {
@@ -1008,6 +1047,7 @@ impl Default for PeerFlowControl {
         Self {
             i_am_choked: true,
             request_window: DEFAULT_PEER_REQUEST_WINDOW,
+            am_interested: false,
         }
     }
 }
@@ -1015,14 +1055,18 @@ impl Default for PeerFlowControl {
 // All peer state that would never be used by other actors should pe put here.
 // This state tracks a live peer.
 struct PeerHandler {
+    wire_v2: AtomicBool,
     state: Arc<TorrentStateLive>,
     counters: Arc<AtomicPeerCounters>,
     // Semantically, we don't need a lock here, as this is only requested from
-    // one future (requester + manage_peer).
+    // the requester, connection reader and independent interest monitor.
     //
     // However as PeerConnectionHandler takes &self everywhere, we need shared mutability.
     // RefCell would do, but tokio is unhappy when we use it.
     flow_control: Mutex<PeerFlowControl>,
+
+    // Bound allocated replies and rate-limited uploads, including in-flight writes.
+    reply_slots: Arc<tokio::sync::Semaphore>,
 
     // This is used to unpause chunk requester once the bitfield
     // is received.
@@ -1035,13 +1079,28 @@ struct PeerHandler {
     first_message_received: AtomicBool,
 
     cancel_token: CancellationToken,
+    pex_token: Mutex<Option<CancellationToken>>,
 
     client_name_and_version: String,
 }
 
 impl PeerConnectionHandler for &'_ PeerHandler {
     fn is_v2(&self) -> bool {
+        self.wire_v2.load(Ordering::Relaxed)
+    }
+    fn supports_v2(&self) -> bool {
         self.state.metadata.info.info().v2.is_some()
+    }
+    fn accepts_metadata_hash_upgrade(&self, hash: Id20) -> bool {
+        hash == self.state.shared.info_hash
+            && self
+                .state
+                .metadata
+                .info
+                .info()
+                .v2
+                .as_ref()
+                .is_some_and(|v| v.is_hybrid())
     }
     fn on_connected(&self, connection_time: Duration) {
         self.counters
@@ -1056,39 +1115,59 @@ impl PeerConnectionHandler for &'_ PeerHandler {
     async fn on_received_message(&self, message: Message<'_>) -> anyhow::Result<()> {
         // The first message must be "bitfield", but if it's not sent,
         // assume the bitfield is all zeroes and was sent.
-        if !matches!(&message, Message::Bitfield(..))
-            && !self.first_message_received.swap(true, Ordering::Relaxed)
-        {
+        // BEP 10's extension handshake is dispatched separately by the reader.
+        let first = !self.first_message_received.swap(true, Ordering::Relaxed);
+        if matches!(&message, Message::Bitfield(..)) {
+            if !first && self.state.metadata.info.info().v2.is_some() {
+                anyhow::bail!("bitfield must be the first peer message");
+            }
+        } else if first {
             self.on_bitfield_notify.notify_waiters();
         }
 
         match message {
             Message::HashRequest(request) => {
+                let permit = self.reply_slots.clone().acquire_owned().await?;
                 let hashes = self
                     .state
                     .shared
                     .spawner
-                    .block_in_place_with_semaphore(|| self.state.file_ops().serve_hashes(&request))
+                    .block_in_place_with_semaphore(|| {
+                        self.state.file_ops().serve_hashes(&request, |piece| {
+                            self.state
+                                .lock_read("hash availability")
+                                .get_chunks()
+                                .is_ok_and(|chunks| chunks.is_piece_have(piece))
+                        })
+                    })
                     .await;
                 let response = match hashes {
                     Ok(hashes) => Message::Hashes { request, hashes },
                     Err(_) => Message::HashReject(request),
                 };
+                let charged_bytes = match &response {
+                    Message::Hashes { hashes, .. } => hashes.len() as u32 * 32,
+                    _ => 53,
+                };
+                let amount = NonZeroU32::new(charged_bytes).context("empty hash response")?;
+                self.state.ratelimits.prepare_for_upload(amount).await?;
+                if let Some(session) = self.state.shared.session.upgrade() {
+                    session.ratelimits.prepare_for_upload(amount).await?;
+                }
                 self.tx
-                    .send(WriterRequest::Message(response))
+                    .send(WriterRequest::BoundedMessage(response, permit))
                     .map_err(|_| anyhow::anyhow!("peer writer closed"))?;
             }
             Message::Request(request) => {
                 self.on_download_request(request)
+                    .await
                     .context("on_download_request")?;
             }
             Message::Bitfield(b) => self
                 .on_bitfield(b.clone_to_owned(None))
                 .context("on_bitfield")?,
             Message::Reject(request) => {
-                // Disconnecting releases this peer's in-flight pieces through the
-                // existing cleanup path, so rejected requests cannot stall them.
-                anyhow::bail!("peer rejected payload request {request:?}");
+                self.on_rejected_request(request)?;
             }
             Message::Hashes { .. } | Message::HashReject(_) => {
                 anyhow::bail!("unsolicited hash response during payload transfer");
@@ -1105,7 +1184,7 @@ impl PeerConnectionHandler for &'_ PeerHandler {
             }
             Message::Have(h) => self.on_have(h),
             Message::NotInterested => {
-                trace!("received \"not interested\", but we don't process it yet")
+                self.state.peers.mark_peer_interested(self.addr, false);
             }
             Message::Cancel(_) => {
                 trace!("received \"cancel\", but we don't process it yet")
@@ -1122,6 +1201,7 @@ impl PeerConnectionHandler for &'_ PeerHandler {
                     );
                 } else {
                     self.send_metadata_piece(metadata_piece_id)
+                        .await
                         .with_context(|| {
                             format!("error sending metadata piece {metadata_piece_id}")
                         })?;
@@ -1159,7 +1239,18 @@ impl PeerConnectionHandler for &'_ PeerHandler {
     }
 
     fn on_handshake(&self, handshake: Handshake, ckind: ConnectionKind) -> anyhow::Result<()> {
+        self.wire_v2.store(
+            handshake.info_hash == self.state.shared.info_hash
+                && self.state.metadata.info.info().v2.is_some(),
+            Ordering::Relaxed,
+        );
+        let wire_hash = handshake.info_hash;
         self.state.set_peer_live(self.addr, handshake, ckind);
+        self.state
+            .peers
+            .with_peer_mut(self.addr, "record negotiated wire identity", |peer| {
+                peer.outgoing_info_hash = Some(wire_hash);
+            });
         Ok(())
     }
 
@@ -1202,26 +1293,40 @@ impl PeerConnectionHandler for &'_ PeerHandler {
                     request_window, "updated peer request window from extended handshake"
                 );
                 flow.request_window = request_window;
+                drop(flow);
                 self.notify_request_slots_changed();
             }
         }
 
-        if !self.state.metadata.info.info().private && hs.m.ut_pex.is_some() {
-            spawn_with_cancel(
-                debug_span!(
-                    parent: self.state.shared.span.clone(),
-                    "sending_pex_to_peer",
-                    peer = ?self.addr,
-                ),
-                format!(
-                    "[{}][addr={}]sending_pex_to_peer",
-                    self.state.shared.id, self.addr
-                ),
-                self.cancel_token.clone(),
-                self.state
-                    .clone()
-                    .task_send_pex_to_peer(self.addr, self.tx.clone()),
-            );
+        if !self.state.metadata.info.info().private
+            && let Some(id) = hs.m.ut_pex
+        {
+            let mut current = self.pex_token.lock();
+            if id == 0 {
+                if let Some(token) = current.take() {
+                    token.cancel();
+                }
+            } else if current.is_none() {
+                let token = self.cancel_token.child_token();
+                *current = Some(token.clone());
+                spawn_with_cancel(
+                    debug_span!(parent: self.state.shared.span.clone(), "sending_pex_to_peer", peer = ?self.addr),
+                    format!(
+                        "[{}][addr={}]sending_pex_to_peer",
+                        self.state.shared.id, self.addr
+                    ),
+                    token,
+                    self.state.clone().task_send_pex_to_peer(
+                        self.addr,
+                        self.tx.clone(),
+                        if self.is_v2() {
+                            self.state.shared.info_hash
+                        } else {
+                            self.state.metadata.v1_info_hash
+                        },
+                    ),
+                );
+            }
         }
         // Lets update outgoing Socket address for incoming connection
         if self.incoming
@@ -1232,7 +1337,12 @@ impl PeerConnectionHandler for &'_ PeerHandler {
             self.state
                 .peers
                 .with_peer_mut(self.addr, "update outgoing addr", |peer| {
-                    peer.outgoing_address = Some(outgoing_addr)
+                    peer.outgoing_address = Some(outgoing_addr);
+                    peer.outgoing_info_hash = Some(if self.is_v2() {
+                        self.state.shared.info_hash
+                    } else {
+                        self.state.metadata.v1_info_hash
+                    });
                 });
         }
 
@@ -1265,6 +1375,12 @@ impl PeerConnectionHandler for &'_ PeerHandler {
         &self,
         handshake: &mut ExtendedHandshake<ByteBuf>,
     ) -> anyhow::Result<()> {
+        if self.state.metadata.info.info().private {
+            handshake.m.ut_pex = None;
+            handshake.m.ut_metadata = None;
+            handshake.metadata_size = None;
+            return Ok(());
+        }
         let info_bytes = &self.state.metadata.info_bytes;
         if !info_bytes.is_empty()
             && let Ok(len) = info_bytes.len().try_into()
@@ -1281,6 +1397,36 @@ impl PeerConnectionHandler for &'_ PeerHandler {
 }
 
 impl PeerHandler {
+    fn wire_request_length(&self, piece: ValidPieceIndex, begin: u32, real: u32) -> u32 {
+        if !self.is_v2()
+            && let Some(length) = self
+                .state
+                .metadata
+                .info
+                .info()
+                .v2
+                .as_ref()
+                .and_then(|v| v.hybrid_piece_size(piece.get() as u64))
+        {
+            return length.saturating_sub(begin).min(CHUNK_SIZE);
+        }
+        real
+    }
+
+    fn real_request_length(&self, piece: ValidPieceIndex, begin: u32, wire: u32) -> u32 {
+        let real = self
+            .state
+            .lengths
+            .piece_length(piece)
+            .saturating_sub(begin)
+            .min(CHUNK_SIZE);
+        if wire == self.wire_request_length(piece, begin, real) {
+            real
+        } else {
+            wire
+        }
+    }
+
     fn on_peer_died(self, error: Option<crate::Error>) -> crate::Result<()> {
         let peers = &self.state.peers;
         let handle = self.addr;
@@ -1297,9 +1443,35 @@ impl PeerHandler {
             }
         };
         let prev = pe.value_mut().take_state(peers);
+        let mut try_other_hash = false;
 
         match prev {
-            PeerState::Connecting(_) => {}
+            PeerState::Connecting(_) => {
+                // Initial/PEX endpoints may support only one hybrid identity.
+                // Try the other authenticated identity once before backoff.
+                if !self.incoming
+                    && !pe.value().tried_alternate_hash
+                    && self
+                        .state
+                        .metadata
+                        .info
+                        .info()
+                        .v2
+                        .as_ref()
+                        .is_some_and(|v| v.is_hybrid())
+                {
+                    let peer = pe.value_mut();
+                    peer.outgoing_info_hash = Some(
+                        if peer.outgoing_info_hash == Some(self.state.shared.info_hash) {
+                            self.state.metadata.v1_info_hash
+                        } else {
+                            self.state.shared.info_hash
+                        },
+                    );
+                    peer.tried_alternate_hash = true;
+                    try_other_hash = true;
+                }
+            }
             PeerState::Live(live) => {
                 let mut g = self.state.lock_write("mark_chunk_requests_canceled");
 
@@ -1358,7 +1530,7 @@ impl PeerHandler {
 
         self.counters.errors.fetch_add(1, Ordering::Relaxed);
 
-        if self.state.is_finished_and_no_active_streams() {
+        if self.state.is_finished_and_no_active_streams() && !try_other_hash {
             debug!("torrent finished, not re-queueing");
             pe.value_mut().set_state(PeerState::NotNeeded, peers);
             return Ok(());
@@ -1375,7 +1547,11 @@ impl PeerHandler {
             return Ok(());
         }
 
-        let backoff = pe.value_mut().stats.backoff.next();
+        let backoff = if try_other_hash {
+            Some(Duration::ZERO)
+        } else {
+            pe.value_mut().stats.backoff.next()
+        };
 
         // Prevent deadlocks.
         drop(pe);
@@ -1503,7 +1679,76 @@ impl PeerHandler {
         result
     }
 
-    fn on_download_request(&self, request: Request) -> anyhow::Result<()> {
+    async fn on_download_request(&self, request: Request) -> anyhow::Result<()> {
+        let permit = self.reply_slots.clone().acquire_owned().await?;
+        match self.upload_request_chunk(request) {
+            Ok(chunk) => {
+                self.state
+                    .ratelimit_upload_tx
+                    .send((self.tx.clone(), chunk, permit))?;
+            }
+            Err(error) if self.is_v2() => {
+                // BEP 52 requires every payload request to receive a piece or
+                // reject, including requests we cannot currently service.
+                trace!(?request, ?error, "rejecting upload request");
+                self.tx.send(WriterRequest::BoundedMessage(
+                    Message::Reject(request),
+                    permit,
+                ))?;
+            }
+            Err(error) => return Err(error),
+        }
+        Ok(())
+    }
+
+    fn on_rejected_request(&self, request: Request) -> anyhow::Result<()> {
+        let piece = self
+            .state
+            .lengths
+            .validate_piece_index(request.index)
+            .context("reject contains an invalid piece index")?;
+        let chunk = self
+            .state
+            .lengths
+            .chunk_info_from_received_data(
+                piece,
+                request.begin,
+                self.real_request_length(piece, request.begin, request.length),
+            )
+            .context("reject contains an invalid chunk range")?;
+        anyhow::ensure!(
+            request.length == self.wire_request_length(piece, request.begin, chunk.size),
+            "reject does not match requested wire length"
+        );
+        self.state
+            .peers
+            .with_live_mut(self.addr, "reject request", |live| -> anyhow::Result<()> {
+                match live.remove_inflight_request(&chunk) {
+                    RemoveInflightRequestResult::Unexpected => {
+                        anyhow::bail!("unsolicited payload reject")
+                    }
+                    RemoveInflightRequestResult::LateCanceled => return Ok(()),
+                    RemoveInflightRequestResult::Expected => {}
+                }
+                // Keep the connection for other pieces; do not repeatedly request
+                // this one until a fresh HAVE/bitfield advertises it again.
+                if let Some(mut bit) = live.bitfield.get_mut(request.index as usize) {
+                    *bit = false;
+                }
+                live.cancel_inflight_requests_for_piece(piece);
+                self.state
+                    .lock_write("release rejected piece")
+                    .get_pieces_mut()?
+                    .release_piece_owned_by(piece, self.addr);
+                Ok(())
+            })
+            .context("reject from a missing peer")??;
+        self.notify_request_slots_changed();
+        self.state.new_pieces_notify.notify_waiters();
+        Ok(())
+    }
+
+    fn upload_request_chunk(&self, request: Request) -> anyhow::Result<ChunkInfo> {
         if self.state.torrent().options.disable_upload() {
             anyhow::bail!("upload disabled, but peer requested a piece")
         }
@@ -1523,29 +1768,34 @@ impl PeerHandler {
             .lengths
             .chunk_info_from_received_data(piece_index, request.begin, request.length)
             .or_else(|| {
-                // Hybrid peers may request a whole 16 KiB block across a padding gap.
-                // Return zeros for the gap without reading into the following file.
-                if self
+                let v2 = self
                     .state
                     .metadata
                     .info
                     .info()
                     .v2
                     .as_ref()
-                    .is_some_and(|v| v.is_hybrid())
-                    && request.length == 16384
-                {
-                    self.state
-                        .lengths
-                        .iter_chunk_infos(piece_index)
-                        .find(|c| c.offset == request.begin && c.size < request.length)
-                        .map(|mut c| {
-                            c.size = request.length;
-                            c
-                        })
+                    .filter(|v| v.is_hybrid())?;
+                let wire_length = if self.is_v2() {
+                    v2.piece_length() as u32
                 } else {
-                    None
+                    v2.hybrid_piece_size(request.index as u64)?
+                };
+                let remaining = wire_length.checked_sub(request.begin)?;
+                if request.length == 0
+                    || !request.begin.is_multiple_of(CHUNK_SIZE)
+                    || request.length != remaining.min(CHUNK_SIZE)
+                {
+                    return None;
                 }
+                Some(ChunkInfo {
+                    piece_index,
+                    chunk_index: request.begin / CHUNK_SIZE,
+                    absolute_index: self.state.lengths.default_chunks_per_piece() * request.index
+                        + request.begin / CHUNK_SIZE,
+                    offset: request.begin,
+                    size: request.length,
+                })
             }) {
             Some(d) => d,
             None => {
@@ -1568,10 +1818,7 @@ impl PeerHandler {
             );
         }
 
-        self.state
-            .ratelimit_upload_tx
-            .send((self.tx.clone(), chunk_info))?;
-        Ok(())
+        Ok(chunk_info)
     }
 
     fn on_have(&self, have: u32) {
@@ -1606,6 +1853,7 @@ impl PeerHandler {
                 }
             });
         self.on_bitfield_notify.notify_waiters();
+        self.state.new_pieces_notify.notify_waiters();
     }
 
     fn on_bitfield(&self, bitfield: ByteBufOwned) -> anyhow::Result<()> {
@@ -1617,6 +1865,11 @@ impl PeerHandler {
             );
         }
         let bf = BF::from_boxed_slice(bitfield.0.to_vec().into_boxed_slice());
+        if self.state.metadata.info.info().v2.is_some()
+            && bf[self.state.lengths.total_pieces() as usize..].any()
+        {
+            anyhow::bail!("bitfield has nonzero spare bits");
+        }
         if let Some(true) = bf
             .get(..self.state.lengths.total_pieces() as usize)
             .map(|s| s.all())
@@ -1625,6 +1878,7 @@ impl PeerHandler {
         }
         self.state.peers.update_bitfield(self.addr, bf);
         self.on_bitfield_notify.notify_waiters();
+        self.state.new_pieces_notify.notify_waiters();
         Ok(())
     }
 
@@ -1663,34 +1917,99 @@ impl PeerHandler {
         }
     }
 
+    fn piece_is_wanted(
+        &self,
+        chunks: &crate::chunk_tracker::ChunkTracker,
+        piece: ValidPieceIndex,
+    ) -> bool {
+        !chunks.is_piece_have(piece)
+            && (chunks.get_selected_pieces()[piece.get_usize()]
+                || self
+                    .state
+                    .streams
+                    .iter_next_pieces(&self.state.lengths)
+                    .any(|target| target == piece))
+    }
+
+    fn set_interest(&self, interested: bool) -> crate::Result<()> {
+        let mut flow = self.lock_flow_control("update payload interest");
+        self.write_interest(&mut flow, interested)
+    }
+
+    fn write_interest(&self, flow: &mut PeerFlowControl, interested: bool) -> crate::Result<()> {
+        if flow.am_interested != interested {
+            self.tx
+                .send(WriterRequest::Message(if interested {
+                    Message::Interested
+                } else {
+                    Message::NotInterested
+                }))
+                .map_err(|_| Error::PeerTaskDead)?;
+            flow.am_interested = interested;
+        }
+        Ok(())
+    }
+
+    fn refresh_interest(&self) -> crate::Result<bool> {
+        self.state
+            .peers
+            .with_live_mut(
+                self.addr,
+                "refresh peer interest",
+                |live| -> crate::Result<bool> {
+                    let mut state = self.state.lock_write("refresh peer interest");
+                    let pieces = state.get_pieces_mut()?;
+                    for piece in pieces.pieces_owned_by(self.addr) {
+                        if !self.piece_is_wanted(pieces.chunks(), piece) {
+                            live.cancel_inflight_requests_for_piece(piece);
+                            pieces.release_piece_owned_by(piece, self.addr);
+                        }
+                    }
+                    let chunks = pieces.chunks();
+                    let interested = chunks.needs_any_from(live.bitfield.as_raw_slice())
+                        || self
+                            .state
+                            .streams
+                            .iter_next_pieces(&self.state.lengths)
+                            .any(|piece| {
+                                !chunks.is_piece_have(piece)
+                                    && live
+                                        .bitfield
+                                        .get(piece.get_usize())
+                                        .is_some_and(|value| *value)
+                            });
+                    self.set_interest(interested)?;
+                    Ok(interested)
+                },
+            )
+            .unwrap_or(Ok(false))
+    }
+
+    async fn task_interest(&self) -> crate::Result<()> {
+        loop {
+            let changed = self.state.new_pieces_notify.notified();
+            self.refresh_interest()?;
+            // Streaming demand/seek changes do not currently have a shared
+            // piece notification. Keep those updates bounded and independent
+            // of the payload requester waiting for an unchoke or rate limit.
+            tokio::select! {
+                _ = changed => {},
+                _ = tokio::time::sleep(Duration::from_millis(250)) => {},
+            }
+        }
+    }
+
     // The job of this is to request chunks and also to keep peer alive.
     // The moment this ends, the peer is disconnected.
     async fn task_peer_chunk_requester(&self) -> crate::Result<()> {
         let handle = self.addr;
         self.wait_for_bitfield().await;
 
-        let mut update_interest = {
-            let mut current = false;
-            move |h: &PeerHandler, new_value: bool| -> crate::Result<()> {
-                if new_value != current {
-                    h.tx.send(if new_value {
-                        WriterRequest::Message(Message::Interested)
-                    } else {
-                        WriterRequest::Message(Message::NotInterested)
-                    })
-                    .ok()
-                    .ok_or(Error::PeerTaskDead)?;
-                    current = new_value;
-                }
-                Ok(())
-            }
-        };
-
         loop {
             // If we have full torrent, we don't need to request more pieces.
             // However we might still need to seed them to the peer.
             if self.state.is_finished_and_no_active_streams() {
-                update_interest(self, false)?;
+                self.refresh_interest()?;
                 if self
                     .state
                     .peers
@@ -1715,7 +2034,13 @@ impl PeerHandler {
                 }
             }
 
-            update_interest(self, true)?;
+            if !self.refresh_interest()? {
+                tokio::select! {
+                    _ = self.state.new_pieces_notify.notified() => {},
+                    _ = tokio::time::sleep(Duration::from_millis(250)) => {},
+                }
+                continue;
+            }
             aframe!(self.wait_for_request_slot()).await;
 
             // Acquire a piece using the strategy: try steal (10x) → reserve → steal (3x).
@@ -1742,7 +2067,7 @@ impl PeerHandler {
                 let request = Request {
                     index: next.get(),
                     begin: chunk.offset,
-                    length: chunk.size,
+                    length: self.wire_request_length(next, chunk.offset, chunk.size),
                 };
 
                 aframe!(self.wait_for_request_slot()).await;
@@ -1761,39 +2086,57 @@ impl PeerHandler {
 
                 aframe!(self.wait_for_request_slot()).await;
 
-                match self
-                    .state
-                    .peers
-                    .with_live_mut(handle, "add chunk request", |live| {
-                        live.add_inflight_request(chunk)
-                    }) {
-                    Some(true) => {}
-                    Some(false) => {
-                        // This request was already in-flight for this peer for this chunk.
-                        // This might happen in theory, but not very likely.
-                        //
-                        // Example:
-                        // someone stole a piece from us, and then died, the piece became "needed" again, and we reserved it
-                        // all before the piece request was processed by us.
-                        warn!(
-                            id = self.state.shared.id,
-                            info_hash = ?self.state.shared.info_hash,
-                            addr = ?self.addr,
-                            "we already requested {:?} previously",
-                            chunk
+                let queued = self.state.peers.with_live_mut(
+                    handle,
+                    "add chunk request",
+                    |live| -> crate::Result<bool> {
+                        let state = self.state.lock_read("check requested piece ownership");
+                        let pieces = state.pieces.as_ref().ok_or(Error::ChunkTrackerEmpty)?;
+                        if !pieces.owns_piece(next, self.addr)
+                            || !self.piece_is_wanted(pieces.chunks(), next)
+                            || !live
+                                .bitfield
+                                .get(next.get_usize())
+                                .is_some_and(|value| *value)
+                        {
+                            return Ok(false);
+                        }
+                        // Interest and request enter the same ordered writer queue
+                        // while selection/ownership and this peer are locked.
+                        let mut flow = self.lock_flow_control("queue payload request");
+                        if flow.i_am_choked
+                            || live.requested_inflight_count() >= flow.request_window
+                        {
+                            return Ok(false);
+                        }
+                        self.write_interest(&mut flow, true)?;
+                        if live.add_inflight_request(chunk, request.length) {
+                            self.tx
+                                .send(WriterRequest::Message(Message::Request(request)))
+                                .map_err(|_| Error::PeerTaskDead)?;
+                        }
+                        Ok(true)
+                    },
+                );
+                match queued {
+                    Some(Ok(true)) => {}
+                    Some(Ok(false)) => {
+                        self.state.peers.with_live_mut(
+                            handle,
+                            "release stale request piece",
+                            |live| {
+                                let mut state =
+                                    self.state.lock_write("release stale request piece");
+                                if let Ok(pieces) = state.get_pieces_mut() {
+                                    live.cancel_inflight_requests_for_piece(next);
+                                    pieces.release_piece_owned_by(next, self.addr);
+                                }
+                            },
                         );
-                        continue;
+                        break;
                     }
-                    // peer died
+                    Some(Err(error)) => return Err(error),
                     None => return Ok(()),
-                };
-
-                if self
-                    .tx
-                    .send(WriterRequest::Message(Message::Request(request)))
-                    .is_err()
-                {
-                    return Ok(());
                 }
             }
         }
@@ -1801,6 +2144,22 @@ impl PeerHandler {
 
     fn on_i_am_choked(&self) {
         self.lock_flow_control("i_am_choked = true").i_am_choked = true;
+        if !self.is_v2() {
+            // Legacy choking implicitly drops outstanding requests. V2 keeps
+            // them pending until the peer explicitly sends piece or reject.
+            self.state
+                .peers
+                .with_live_mut(self.addr, "legacy choke cancellation", |live| {
+                    let mut state = self.state.lock_write("legacy choke cancellation");
+                    if let Ok(pieces) = state.get_pieces_mut() {
+                        for piece in pieces.pieces_owned_by(self.addr) {
+                            live.cancel_inflight_requests_for_piece(piece);
+                            pieces.release_piece_owned_by(piece, self.addr);
+                        }
+                    }
+                });
+            self.state.new_pieces_notify.notify_waiters();
+        }
         self.notify_request_slots_changed();
     }
 
@@ -1821,6 +2180,23 @@ impl PeerHandler {
             .lengths
             .validate_piece_index(piece.index)
             .with_context(|| format!("peer sent an invalid piece {}", piece.index))?;
+        let actual_length: u32 = piece.len().try_into().context("oversized piece")?;
+        let real_length = self.real_request_length(piece_index, piece.begin, actual_length);
+        if real_length < actual_length {
+            anyhow::ensure!(
+                piece
+                    .data()
+                    .0
+                    .iter()
+                    .chain(piece.data().1)
+                    .skip(real_length as usize)
+                    .all(|b| *b == 0),
+                "hybrid peer sent nonzero padding"
+            );
+        }
+        let piece = piece
+            .prefix(real_length as usize)
+            .context("invalid hybrid piece prefix")?;
         let chunk_info = match self.state.lengths.chunk_info_from_received_data(
             piece_index,
             piece.begin,
@@ -1833,6 +2209,10 @@ impl PeerHandler {
         };
 
         // Peer chunk/byte counters.
+        anyhow::ensure!(
+            actual_length == self.wire_request_length(piece_index, piece.begin, chunk_info.size),
+            "piece does not match requested wire length"
+        );
         self.counters
             .fetched_bytes
             .fetch_add(piece.len() as u64, Ordering::Relaxed);
@@ -1960,20 +2340,21 @@ impl PeerHandler {
                 }
             };
 
-            // We don't care about per piece lock anymore, as it's removed from inflight pieces.
-            // It shouldn't impact perf anyway, but dropping just in case.
-            drop(ppl_guard);
-
             let full_piece_download_time = match full_piece_download_time {
                 Some(t) => t,
                 None => return Ok(()),
             };
 
-            match state
-                .file_ops()
-                .check_piece(chunk_info.piece_index)
-                .with_context(|| format!("error checking piece={index}"))?
+            let checked = state.file_ops().check_piece(chunk_info.piece_index);
+            if let Err(error) = &checked
+                && matches!(
+                    error.downcast_ref::<librqbit_core::v2::V2Error>(),
+                    Some(librqbit_core::v2::V2Error::HybridHashMismatch)
+                )
             {
+                return state.on_fatal_error(checked.unwrap_err());
+            }
+            match checked.with_context(|| format!("error checking piece={index}"))? {
                 true => {
                     {
                         let mut g = state.lock_write("mark_piece_downloaded");
@@ -2030,6 +2411,10 @@ impl PeerHandler {
                     anyhow::bail!("i am probably a bogus peer. dying.")
                 }
             };
+            // We don't care about per piece lock anymore, as it's removed from inflight pieces.
+            // It shouldn't impact perf anyway, but dropping just in case.
+            drop(ppl_guard);
+
             Ok(())
         }
 
@@ -2045,53 +2430,53 @@ impl PeerHandler {
         Ok(())
     }
 
-    fn send_metadata_piece(&self, piece_id: u32) -> anyhow::Result<()> {
+    async fn send_metadata_piece(&self, piece_id: u32) -> anyhow::Result<()> {
+        let permit = self.reply_slots.clone().acquire_owned().await?;
         let data = &self.state.metadata.info_bytes;
-        let metadata_size = data.len();
-        if metadata_size == 0 {
-            anyhow::bail!("peer requested for info metadata but we don't have it")
-        }
-        let total_pieces: usize = (metadata_size as u64)
-            .div_ceil(CHUNK_SIZE as u64)
-            .try_into()?;
-
-        if piece_id as usize > total_pieces {
-            bail!("piece out of bounds")
-        }
-
-        let offset = piece_id * CHUNK_SIZE;
-        let end = (offset + CHUNK_SIZE).min(data.len().try_into()?);
-        let total_size: u32 = data
-            .len()
-            .try_into()
-            .context("can't send metadata: len doesn't fit into u32")?;
-        let data = data.slice(offset as usize..end as usize);
-
+        let total_pieces = data.len().div_ceil(CHUNK_SIZE as usize);
+        let response = if piece_id as usize >= total_pieces {
+            UtMetadata::Reject(piece_id)
+        } else {
+            let offset = piece_id as usize * CHUNK_SIZE as usize;
+            let end = (offset + CHUNK_SIZE as usize).min(data.len());
+            let total_size = data
+                .len()
+                .try_into()
+                .context("can't send metadata: len doesn't fit into u32")?;
+            UtMetadata::Data(UtMetadataData::from_bytes(
+                piece_id,
+                total_size,
+                data.slice(offset..end).into(),
+            ))
+        };
         self.tx
-            .send(WriterRequest::UtMetadata(UtMetadata::Data(
-                UtMetadataData::from_bytes(piece_id, total_size, data.into()),
-            )))
+            .send(WriterRequest::UtMetadata(response, permit))
             .context("error sending UtMetadata: channel closed")?;
         Ok(())
     }
 
     fn on_pex_message(&self, msg: UtPex<ByteBuf<'_>>) {
-        msg.dropped_peers()
-            .chain(msg.added_peers())
-            .for_each(|peer| {
-                self.state
-                    .add_peer_if_not_seen(peer.addr)
-                    .map_err(|error| {
-                        warn!(
-                            id = self.state.shared.id,
-                            info_hash = ?self.state.shared.info_hash,
-                            ?peer,
-                            "failed to add peer: {error:#}"
-                        );
-                        error
-                    })
-                    .ok();
-            });
+        msg.added_peers().for_each(|peer| {
+            self.state
+                .add_peer_with_info_hash(
+                    peer.addr,
+                    if self.is_v2() {
+                        self.state.shared.info_hash
+                    } else {
+                        self.state.metadata.v1_info_hash
+                    },
+                )
+                .map_err(|error| {
+                    warn!(
+                        id = self.state.shared.id,
+                        info_hash = ?self.state.shared.info_hash,
+                        ?peer,
+                        "failed to add peer: {error:#}"
+                    );
+                    error
+                })
+                .ok();
+        });
     }
 
     fn is_choked(&self) -> bool {

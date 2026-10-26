@@ -8,6 +8,7 @@ use super::PeerExtendedMessageIds;
 
 #[derive(Deserialize, Serialize, Debug, Default, Eq, PartialEq)]
 pub struct ExtendedHandshake<ByteBuf: ByteBufT> {
+    #[serde(default)]
     pub m: PeerExtendedMessageIds,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub p: Option<u32>,

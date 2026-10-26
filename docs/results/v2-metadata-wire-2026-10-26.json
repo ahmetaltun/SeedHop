@@ -1,0 +1,452 @@
+{
+  "date": "2026-10-26",
+  "status": "in_progress",
+  "scope": "BEP 9 metadata wire extensibility, size consistency, updates and metadata-only choking; full objective remains active",
+  "rust": {
+    "passed": 67,
+    "v2TargetPassed": 46,
+    "failed": 0,
+    "ignored": 1,
+    "command": "cargo test --workspace --locked -- --test-threads=1",
+    "log": ".build/v2-metadata-wire-final-rust.log"
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "format": "PASS",
+    "thirteenPatchForwardReconstruction": "PASS",
+    "thirteenPatchReverseReapply": "PASS",
+    "pythonCompile": "PASS"
+  },
+  "independentWireCases": [
+    {
+      "mode": "healthy",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [],
+      "evidence": ".build/metadata-wire-healthy-cfx8541a"
+    },
+    {
+      "mode": "changed",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [
+        0,
+        1
+      ],
+      "evidence": ".build/metadata-wire-changed-qj38qsqs"
+    },
+    {
+      "mode": "zero",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [],
+      "evidence": ".build/metadata-wire-zero-0ld99csu"
+    },
+    {
+      "mode": "reject",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [
+        0,
+        1
+      ],
+      "evidence": ".build/metadata-wire-reject-8p3hn976"
+    }
+  ],
+  "codecCoverage": [
+    "Unknown signed/large IDs with no piece and opaque body ignored across all ring-buffer splits, preserving following frame",
+    "Known headers accept future keys beyond previous fixed-header prefix"
+  ],
+  "privateRegressions": [
+    {
+      "mode": "public-control",
+      "result": "PASS",
+      "publicControl": true,
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "bytes": 140012,
+      "unrelatedConnections": 2,
+      "closedConnections": 2,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 0,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 1,
+      "lateAnnounces": 1,
+      "extraTrackerQueriesAfterBarrier": 8,
+      "barrierTime": 3112.005867791,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-public-control-l1r9mjca"
+    },
+    {
+      "mode": "pure",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "ae8e7007593b335a05ef474a804f5507c9333a895d9e50c034d5c9e143cb2956",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 3115.630548708,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-pure-9l7mcidb"
+    },
+    {
+      "mode": "hybrid",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 3118.130911916,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-hybrid-wcti2cjm"
+    },
+    {
+      "mode": "dual",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 2,
+      "closedConnections": 2,
+      "acceptedBeforeProofRelease": 2,
+      "closedBeforeProofRelease": 2,
+      "lateDhtReplies": 2,
+      "gatedHashes": 2,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 3120.680920291,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        },
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-dual-czcmkndz"
+    },
+    {
+      "mode": "btih",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 3123.234364083,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-btih-kvsck6tq"
+    }
+  ],
+  "hybridRegressions": [
+    {
+      "direction": "download-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-v1-px7vwbgg"
+    },
+    {
+      "direction": "download-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-mixed-rq1d_97e"
+    },
+    {
+      "direction": "magnet-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-mixed-_hjy3v4x"
+    },
+    {
+      "direction": "magnet-v1-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-v1-mixed-89pezix6"
+    },
+    {
+      "direction": "magnet-dual-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-dual-mixed-krzryq91"
+    },
+    {
+      "direction": "upload-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-upload-v1-3q5o7ezd"
+    }
+  ],
+  "legacyDualRegressions": [
+    {
+      "mode": "complete",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-complete-y8e9gsyo"
+    },
+    {
+      "mode": "partial",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-partial-b6gm6wgi"
+    },
+    {
+      "mode": "corrupt",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-corrupt-dc7xovpy"
+    },
+    {
+      "mode": "padding",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-padding-_y8oww9f"
+    },
+    {
+      "mode": "private",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "45a6b345d79b6e49eb826420b9fb3b742a3215ba",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "evidence": ".build/legacy-layers-dual-private-9fh8uihq"
+    },
+    {
+      "mode": "inconsistent",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "463da230a19ec0571fe00a59a0381e759cba3b2d",
+      "infoHashV2": "53753123a19c814d096f6c84f2e7704ec2fa98391cfdbd5a6347fc10cad61665",
+      "evidence": ".build/legacy-layers-dual-inconsistent-i5bdzmtj"
+    },
+    {
+      "mode": "inspect-only",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-inspect-only-cpvktyyk"
+    },
+    {
+      "mode": "inspect-unpadded",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "3bb8fc4a855ab7fae75912250ce18e51e64526d2",
+      "infoHashV2": "4a71b73ba65d423cc88ab43d56e3464966fcafae6c04a4a6ae98bf8cabee91c9",
+      "evidence": ".build/legacy-layers-dual-inspect-unpadded-4qdqfnx6"
+    }
+  ],
+  "dualMagnetTransportRegressions": [
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "tcp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-off-magnet-dual-hybrid-eev3uqg7"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "tcp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-required-magnet-dual-hybrid-vh_hfh8t"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "utp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-off-magnet-dual-hybrid-bnsmdxs_"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "utp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-required-magnet-dual-hybrid-eqlbowsr"
+    }
+  ],
+  "specification": {
+    "reference": "https://www.bittorrent.org/beps/bep_0009.html",
+    "requirements": [
+      "Unknown metadata message types ignored",
+      "Data total_size agrees with advertised metadata_size",
+      "Requests during incomplete metadata answered by correlated reject"
+    ]
+  },
+  "remaining": [
+    "Metadata resource limits, complete payload interest/choke/cancellation/hash-serving audit",
+    "BEP 52 filename sanitization",
+    "Private tracker failure policy and hostile PEX/public discovery audit",
+    "Legacy layer fetcher adversarial/transport audit",
+    "Native XPC initialization: authenticated helper crashes in uTP dispatcher construction on small dispatch-queue stack; fix and repeat native integration"
+  ],
+  "sourceSha256": {
+    "vendor/rqbit/crates/librqbit/src/peer_connection.rs": "bdc1c6d8462fbf9ef9166d2c9ea8874dfa9bda9d43521a02443ee71be2496a35",
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/mod.rs": "2c58abf37118e26ed120db29bb3a6f1c248a63ee8428564ca54cdd25e93af535",
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/legacy_layers.rs": "c57862ffc70967e1fc193d1b4e9cfaa5903e2047bd60afb8a3cdbdd569c531ce",
+    "vendor/rqbit/crates/peer_binary_protocol/src/extended/ut_metadata.rs": "e8391d4de4a02da2bd114c60c99fb45e7a59fd5a55274f39497042a40f350619",
+    "crates/seedhop-core/tests/v2.rs": "9e42198475c286dbf2fd55e3525b66f78887c2212f39e568e571833523f21719",
+    "scripts/v2_metadata_wire.py": "a81f3d15fc96801d23108956426d5c5771948692e362a93cd169ed7e05144e4b",
+    "vendor/patches/0013-seedhop-metadata-wire-conformance.patch": "46e88fcab2ca935eea298e522a498b29950cfa1760081be482aecc9bd1eda01a"
+  },
+  "logs": [
+    ".build/v2-metadata-wire-check.log",
+    ".build/v2-metadata-wire-clippy.log",
+    ".build/v2-metadata-wire-codec.log",
+    ".build/v2-metadata-wire-final-check.log",
+    ".build/v2-metadata-wire-final-clippy.log",
+    ".build/v2-metadata-wire-final-format.log",
+    ".build/v2-metadata-wire-final-interop.log",
+    ".build/v2-metadata-wire-final-rust.log",
+    ".build/v2-metadata-wire-hybrid-regressions.log",
+    ".build/v2-metadata-wire-interop-fixed-tracker.log",
+    ".build/v2-metadata-wire-interop.log",
+    ".build/v2-metadata-wire-legacy-regressions.log",
+    ".build/v2-metadata-wire-native-build.log",
+    ".build/v2-metadata-wire-native-system.log",
+    ".build/v2-metadata-wire-native-v2.log",
+    ".build/v2-metadata-wire-patches.log",
+    ".build/v2-metadata-wire-private-regressions.log",
+    ".build/v2-metadata-wire-rust.log",
+    ".build/v2-metadata-wire-transport-regressions.log"
+  ]
+}

@@ -18,12 +18,13 @@ use crate::{
     bitv_factory::{BitVFactory, NonPersistentBitVFactory},
     create_torrent,
     create_torrent_file::CreateTorrentResult,
-    dht_utils::{ReadMetainfoResult, read_metainfo_from_peer_receiver},
+    dht_utils::{MetadataDiscovery, ReadMetainfoResult, read_metainfo_from_peer_receiver},
     ip_ranges::IpRanges,
     limits::{Limits, LimitsConfig},
     listen::{Accept, ListenerOptions},
     merge_streams::merge_streams,
     peer_connection::PeerConnectionOptions,
+    peer_info_reader::{MetadataIdentity, MetadataPrivacy},
     read_buf::ReadBuf,
     session_persistence::{SessionPersistenceStore, json::JsonSessionPersistenceStore},
     session_stats::SessionStats,
@@ -38,7 +39,9 @@ use crate::{
         ManagedTorrentHandle, ManagedTorrentLocked, ManagedTorrentOptions, ManagedTorrentState,
         TorrentMetadata, TorrentStateLive, initializing::TorrentStateInitializing,
     },
-    type_aliases::{BoxAsyncReadVectored, BoxAsyncWrite, PeerStream},
+    type_aliases::{
+        BoxAsyncReadVectored, BoxAsyncWrite, PeerStream, TorrentPeer, TorrentPeerStream,
+    },
 };
 use anyhow::{Context, bail};
 use arc_swap::ArcSwapOption;
@@ -424,6 +427,7 @@ impl Default for DhtSessionConfig {
 }
 
 pub struct SessionOptions {
+    pub peer_encryption: crate::EncryptionPolicy,
     pub restore_queued: bool,
     /// DHT configuration. Set to None to disable DHT entirely.
     /// Defaults to DHT enabled with persistence.
@@ -493,6 +497,7 @@ pub struct SessionOptions {
 impl Default for SessionOptions {
     fn default() -> Self {
         Self {
+            peer_encryption: Default::default(),
             restore_queued: false,
             dht: Some(DhtSessionConfig::default()),
             bind_device_name: None,
@@ -569,6 +574,7 @@ pub(crate) struct CheckedIncomingConnection {
 struct InternalAddResult {
     info_hash: Id20,
     v2_hash: Option<librqbit_core::Id32>,
+    magnet_v1_hash: Option<Id20>,
     metadata: Option<TorrentMetadata>,
     trackers: Vec<url::Url>,
     name: Option<String>,
@@ -755,6 +761,7 @@ impl Session {
 
             let stream_connector = Arc::new(
                 StreamConnector::new(StreamConnectorArgs {
+                    encryption_policy: opts.peer_encryption,
                     enable_tcp: opts.connect.as_ref().map(|c| c.enable_tcp).unwrap_or(true),
                     socks_proxy_config: proxy_config,
                     utp_socket: listen_result.as_ref().and_then(|l| l.utp_socket.clone()),
@@ -960,12 +967,69 @@ impl Session {
             bail!("Incoming ip {incoming_ip} is not in allowlist");
         }
 
+        use crate::vectored_traits::AsyncReadVectoredIntoCompat;
+        use tokio::io::AsyncReadExt;
+        let policy = self.connector.encryption_policy;
+        let negotiated = tokio::time::timeout(rwtimeout, async {
+            let mut first = [0; 20];
+            reader.read_exact(&mut first).await?;
+            let _permit = if first != *crate::mse::PLAIN_PREFIX {
+                Some(self.connector.incoming_crypto_semaphore.acquire().await?)
+            } else {
+                None
+            };
+            crate::mse::incoming_after_prefix(
+                reader,
+                writer,
+                first,
+                |identifier| {
+                    for torrent in self.db.read().torrents.values() {
+                        let key = torrent.info_hash().0;
+                        if crate::mse::stream_key_hash(&key) == identifier {
+                            return Some(key);
+                        }
+                        if let Ok(Some(key)) = torrent.with_metadata(|m| {
+                            m.info
+                                .info()
+                                .v2
+                                .as_ref()
+                                .filter(|v| v.is_hybrid())
+                                .map(|_| m.v1_info_hash.0)
+                        }) && crate::mse::stream_key_hash(&key) == identifier
+                        {
+                            return Some(key);
+                        }
+                    }
+                    None
+                },
+                policy,
+            )
+            .await
+            .map_err(anyhow::Error::from)
+        })
+        .await
+        .context("incoming MSE/peer handshake timed out")??;
+        let stream_key = negotiated.info_hash;
+        if stream_key.is_some() {
+            debug!(
+                rc4 = negotiated.encrypted,
+                "MSE incoming negotiation completed"
+            );
+        }
+        let mut reader: BoxAsyncReadVectored = Box::new(negotiated.read.into_vectored_compat());
+        let writer: BoxAsyncWrite = Box::new(negotiated.write);
         let mut read_buf = ReadBuf::new();
         let mut h = read_buf
             .read_handshake(&mut reader, rwtimeout)
             .await
             .context("error reading handshake")?;
         trace!("received handshake from {addr}: {:?}", h);
+        if let Some(key) = stream_key {
+            anyhow::ensure!(
+                h.info_hash.0 == key,
+                "MSE stream key and BitTorrent handshake identify different torrents"
+            );
+        }
 
         if h.peer_id == self.peer_id {
             bail!("seems like we are connecting to ourselves, ignoring");
@@ -978,19 +1042,20 @@ impl Session {
             .iter()
             .find(|(_, t)| {
                 t.info_hash() == h.info_hash
-                    || (h.reserved & 0x10 != 0
-                        && t.with_metadata(|m| {
-                            m.info.info().v2.as_ref().is_some_and(|v| v.is_hybrid())
-                                && m.v1_info_hash == h.info_hash
-                        })
-                        .unwrap_or(false))
+                    || t.with_metadata(|m| {
+                        m.info.info().v2.as_ref().is_some_and(|v| v.is_hybrid())
+                            && m.v1_info_hash == h.info_hash
+                    })
+                    .unwrap_or(false)
             })
             .map(|(id, t)| (*id, t.clone()))
             .with_context(|| format!("didn't find a matching torrent {:?}", h.info_hash))?;
 
         // A v1 hybrid handshake may explicitly offer a BEP 52 upgrade.
         // Normalize only after matching both the v1 identity and the upgrade bit.
-        h.info_hash = torrent.info_hash();
+        if h.reserved & 0x10 != 0 {
+            h.info_hash = torrent.info_hash();
+        }
         let live = torrent
             .live_wait_initializing(Duration::from_secs(5))
             .await
@@ -1151,9 +1216,10 @@ impl Session {
                     let magnet = Magnet::parse(&magnet)
                         .context("provided path is not a valid magnet URL")?;
                     let v2_hash = magnet.as_id32();
+                    let magnet_v1_hash = magnet.as_id20();
                     let info_hash = v2_hash
                         .map(|h| h.truncate_for_dht())
-                        .or_else(|| magnet.as_id20())
+                        .or(magnet_v1_hash)
                         .context("magnet has no supported info hash")?;
                     if let Some(so) = magnet.get_select_only() {
                         // Only overwrite opts.only_files if user didn't specify
@@ -1165,6 +1231,7 @@ impl Session {
                     InternalAddResult {
                         info_hash,
                         v2_hash,
+                        magnet_v1_hash,
                         trackers: magnet
                             .trackers
                             .into_iter()
@@ -1210,6 +1277,7 @@ impl Session {
 
                     InternalAddResult {
                         info_hash: torrent.meta.info_hash,
+                        magnet_v1_hash: None,
                         v2_hash: torrent
                             .meta
                             .info
@@ -1250,6 +1318,10 @@ impl Session {
             return Ok(None);
         }
 
+        if let Some(v2) = &info.info().v2 {
+            return Ok(Some(PathBuf::from(v2.suggested_root_name())));
+        }
+
         fn check_valid(pb: &Path) -> anyhow::Result<()> {
             if pb.components().any(|x| !matches!(x, Component::Normal(_))) {
                 bail!("path traversal in torrent name detected")
@@ -1288,11 +1360,13 @@ impl Session {
         let InternalAddResult {
             mut info_hash,
             v2_hash,
+            magnet_v1_hash,
             metadata,
-            trackers,
+            mut trackers,
             name,
         } = add_res;
 
+        let was_magnet = metadata.is_none();
         let private = metadata.as_ref().is_some_and(|m| m.info.info().private);
 
         let make_peer_rx = || {
@@ -1308,7 +1382,7 @@ impl Session {
 
         let mut seen_peers = Vec::new();
 
-        let (metadata, peer_rx) = {
+        let (metadata, mut peer_rx) = {
             match metadata {
                 Some(metadata) => {
                     let mut peer_rx = None;
@@ -1322,8 +1396,16 @@ impl Session {
                         "no known way to resolve peers (no DHT, no trackers, no initial_peers)",
                     )?;
                     let resolved_magnet = self
-                        .resolve_magnet(info_hash, v2_hash, peer_rx, &trackers, opts.peer_opts)
+                        .resolve_magnet(
+                            info_hash,
+                            v2_hash,
+                            magnet_v1_hash,
+                            peer_rx,
+                            &trackers,
+                            &opts,
+                        )
                         .await?;
+                    info_hash = resolved_magnet.discovery_hash;
 
                     // Add back seen_peers into the peer stream, as we consumed some peers
                     // while resolving the magnet.
@@ -1340,6 +1422,29 @@ impl Session {
             }
         };
 
+        // Retain the private tracker choice before converting it to an
+        // unordered set. Both hybrid swarms, resume and reconnect must keep
+        // using the same first tracker rather than choosing a different one.
+        if metadata.info.info().private {
+            trackers.truncate(1);
+        }
+
+        // A private flag learned from magnet metadata must also stop the
+        // pre-metadata public discovery stream before live transfer begins.
+        if was_magnet && metadata.info.info().private {
+            peer_rx = None;
+            if !opts.paused && !opts.list_only {
+                peer_rx = self.make_peer_rx(
+                    info_hash,
+                    trackers.clone(),
+                    true,
+                    opts.force_tracker_interval,
+                    opts.initial_peers.clone().unwrap_or_default(),
+                    true,
+                );
+            }
+        }
+        let discovery_hash = info_hash;
         if let Some(v2) = &metadata.info.info().v2 {
             info_hash = librqbit_core::Id32::new(v2.info_hash()).truncate_for_dht();
         }
@@ -1373,6 +1478,22 @@ impl Session {
                 seen_peers,
                 torrent_bytes: metadata.torrent_bytes,
             }));
+        }
+
+        // Pin every v2 storage path, including unchanged names, so later
+        // sanitizer versions cannot move a restored transfer implicitly.
+        if let Some(v2) = &metadata.info.info().v2 {
+            anyhow::ensure!(
+                opts.file_names
+                    .keys()
+                    .all(|index| *index < v2.files().len()),
+                "filename map contains an invalid file index"
+            );
+            for (index, file) in metadata.info.iter_file_details().enumerate() {
+                opts.file_names
+                    .entry(index)
+                    .or_insert_with(|| file.filename.to_pathbuf());
+            }
         }
 
         let storage_factory = opts
@@ -1482,6 +1603,51 @@ impl Session {
             .allow_overwrite
             .store(true, std::sync::atomic::Ordering::Relaxed);
 
+        let v1_hash = metadata.v1_info_hash;
+        let hybrid = metadata
+            .info
+            .info()
+            .v2
+            .as_ref()
+            .is_some_and(|v| v.is_hybrid());
+        let initial_peers = managed_torrent.shared.options.initial_peers.clone();
+        let mut peer_rx: Option<TorrentPeerStream> = peer_rx.map(|peers| {
+            peers
+                .map(move |addr| TorrentPeer {
+                    addr,
+                    info_hash: if hybrid && initial_peers.contains(&addr) {
+                        v1_hash
+                    } else {
+                        discovery_hash
+                    },
+                })
+                .boxed()
+        });
+        if hybrid && !opts.paused {
+            let other_hash = if discovery_hash == info_hash {
+                v1_hash
+            } else {
+                info_hash
+            };
+            let other = self
+                .make_peer_rx(
+                    other_hash,
+                    managed_torrent.shared.trackers.iter().cloned().collect(),
+                    true,
+                    managed_torrent.shared.options.force_tracker_interval,
+                    vec![],
+                    metadata.info.info().private,
+                )
+                .map(|peers| {
+                    peers
+                        .map(move |addr| TorrentPeer {
+                            addr,
+                            info_hash: other_hash,
+                        })
+                        .boxed()
+                });
+            peer_rx = merge_two_optional_streams(peer_rx, other).map(|peers| peers.boxed());
+        }
         managed_torrent
             .start(peer_rx, opts.paused)
             .context("error starting torrent")?;
@@ -1590,20 +1756,61 @@ impl Session {
         Ok(())
     }
 
-    pub fn make_peer_rx_managed_torrent(
+    pub(crate) fn make_peer_rx_managed_torrent(
         self: &Arc<Self>,
         t: &Arc<ManagedTorrent>,
         announce: bool,
-    ) -> Option<PeerStream> {
+    ) -> Option<TorrentPeerStream> {
         let is_private = t.with_metadata(|m| m.info.info().private).unwrap_or(false);
-        self.make_peer_rx(
-            t.info_hash(),
-            t.shared().trackers.iter().cloned().collect(),
-            announce,
-            t.shared().options.force_tracker_interval,
-            t.shared().options.initial_peers.clone(),
-            is_private,
-        )
+        let hybrid_hash = t
+            .with_metadata(|m| {
+                m.info
+                    .info()
+                    .v2
+                    .as_ref()
+                    .filter(|v| v.is_hybrid())
+                    .map(|_| m.v1_info_hash)
+            })
+            .ok()
+            .flatten();
+        let canonical_hash = t.info_hash();
+        let canonical = self
+            .make_peer_rx(
+                t.info_hash(),
+                t.shared().trackers.iter().cloned().collect(),
+                announce,
+                t.shared().options.force_tracker_interval,
+                if hybrid_hash.is_some() {
+                    vec![]
+                } else {
+                    t.shared().options.initial_peers.clone()
+                },
+                is_private,
+            )
+            .map(|peers| {
+                peers
+                    .map(move |addr| TorrentPeer {
+                        addr,
+                        info_hash: canonical_hash,
+                    })
+                    .boxed()
+            });
+        let legacy = hybrid_hash.and_then(|info_hash| {
+            self.make_peer_rx(
+                info_hash,
+                t.shared().trackers.iter().cloned().collect(),
+                announce,
+                t.shared().options.force_tracker_interval,
+                t.shared().options.initial_peers.clone(),
+                is_private,
+            )
+            .map(|peers| {
+                peers
+                    .map(move |addr| TorrentPeer { addr, info_hash })
+                    .boxed()
+            })
+        });
+        merge_two_optional_streams(canonical, legacy).map(|peers| peers.boxed())
     }
 
     // Get a peer stream from both DHT and trackers.
@@ -1636,12 +1843,14 @@ impl Session {
             trackers.clear();
         }
 
-        if is_private && trackers.len() > 1 {
-            warn!(
-                ?info_hash,
-                "private trackers are not fully implemented, so using only the first tracker"
-            );
-            trackers.truncate(1);
+        if is_private {
+            if trackers.len() > 1 {
+                warn!(
+                    ?info_hash,
+                    "private trackers are not fully implemented, so using only the first tracker"
+                );
+                trackers.truncate(1);
+            }
         } else if !self.disable_trackers {
             trackers.extend(self.trackers.iter().cloned());
         }
@@ -1775,28 +1984,262 @@ impl Session {
         self: &Arc<Self>,
         info_hash: Id20,
         v2_hash: Option<librqbit_core::Id32>,
+        v1_hash: Option<Id20>,
+        peer_rx: PeerStream,
+        trackers: &[url::Url],
+        opts: &AddTorrentOptions,
+    ) -> anyhow::Result<ResolveMagnetResult> {
+        let identity = match v2_hash {
+            Some(hash) => MetadataIdentity::v2(hash, v1_hash),
+            None => MetadataIdentity::legacy(info_hash, None),
+        };
+        let privacy =
+            MetadataPrivacy::with_trusted_peers(opts.initial_peers.clone().unwrap_or_default());
+        let preferred =
+            self.resolve_magnet_one(identity, peer_rx, trackers, opts.peer_opts, privacy.clone());
+        let (Some(v1), Some(v2)) = (v1_hash, v2_hash) else {
+            return preferred.await;
+        };
+        let Some(legacy_peers) = self.make_peer_rx(
+            v1,
+            trackers.to_vec(),
+            !opts.paused && !opts.list_only,
+            opts.force_tracker_interval,
+            opts.initial_peers.clone().unwrap_or_default(),
+            false,
+        ) else {
+            return preferred.await;
+        };
+        let alternate = self.resolve_magnet_one(
+            MetadataIdentity::legacy(v1, Some(v2)),
+            legacy_peers,
+            trackers,
+            opts.peer_opts,
+            privacy,
+        );
+        tokio::pin!(preferred, alternate);
+        let fatal = |error: &anyhow::Error| {
+            error.chain().any(|cause| {
+                cause.downcast_ref::<librqbit_core::v2::V2Error>()
+                    == Some(&librqbit_core::v2::V2Error::HybridHashMismatch)
+            })
+        };
+        tokio::select! {
+            result = &mut preferred => match result {
+                Ok(result) => Ok(result),
+                Err(error) if fatal(&error) => Err(error),
+                Err(error) => { debug!(%error, "v2 magnet metadata lookup ended; waiting for legacy swarm"); alternate.await }
+            },
+            result = &mut alternate => match result {
+                Ok(result) => Ok(result),
+                Err(error) if fatal(&error) => Err(error),
+                Err(error) => { debug!(%error, "legacy magnet metadata lookup ended; waiting for v2 swarm"); preferred.await }
+            },
+        }
+    }
+
+    fn metadata_discovery(
+        self: &Arc<Self>,
+        identity: MetadataIdentity,
+        trackers: &[url::Url],
+        privacy: Arc<MetadataPrivacy>,
+    ) -> MetadataDiscovery {
+        let session = self.clone();
+        let trackers = trackers.to_vec();
+        let trusted = privacy.clone();
+        MetadataDiscovery {
+            privacy,
+            private_peers: Arc::new(move |notice| {
+                session
+                    .make_peer_rx(
+                        identity.wire_hash,
+                        trackers.clone(),
+                        false,
+                        None,
+                        trusted.private_initial(notice),
+                        true,
+                    )
+                    .unwrap_or_else(|| futures::stream::empty().boxed())
+            }),
+        }
+    }
+
+    async fn resolve_magnet_one(
+        self: &Arc<Self>,
+        identity: MetadataIdentity,
         peer_rx: PeerStream,
         trackers: &[url::Url],
         peer_opts: Option<PeerConnectionOptions>,
+        privacy: Arc<MetadataPrivacy>,
     ) -> anyhow::Result<ResolveMagnetResult> {
+        let info_hash = identity.wire_hash;
         match read_metainfo_from_peer_receiver(
             self.peer_id,
-            info_hash,
-            v2_hash,
+            identity,
             Default::default(),
             peer_rx,
             Some(self.merge_peer_opts(peer_opts)),
             self.connector.clone(),
             self.client_name_and_version.clone(),
+            Some(self.metadata_discovery(identity, trackers, privacy.clone())),
         )
         .await
         {
             ReadMetainfoResult::Found {
-                info,
-                info_bytes,
-                rx,
-                seen,
+                source,
+                mut info,
+                mut info_bytes,
+                mut rx,
+                mut seen,
             } => {
+                // The SHA-1-authenticated info dictionary commits to the full
+                // v2 identity, but its provider may be strictly v1-only. Use a
+                // separate v2 discovery stream for the missing Merkle layers.
+                let legacy_pending = if identity.v2_wire {
+                    None
+                } else {
+                    librqbit_core::v2::PendingMetainfo::from_info(info_bytes.as_ref())?
+                };
+                if !identity.v2_wire && identity.v2.is_some() {
+                    anyhow::ensure!(
+                        legacy_pending
+                            .as_ref()
+                            .is_some_and(|pending| pending.is_hybrid()),
+                        "a dual-hash magnet must describe a hybrid torrent"
+                    );
+                }
+                if let Some(pending) = legacy_pending {
+                    if pending.next_request().is_none() {
+                        // Files no larger than a piece need no external layer.
+                        info.v2 = Some(Arc::new(pending.finish()?));
+                    } else {
+                        let full = librqbit_core::Id32::new(pending.info_hash());
+                        drop(pending);
+                        let private = info.private;
+                        if private {
+                            // Stop pre-metadata public discovery immediately.
+                            // Only the authenticated provider already knows
+                            // this dictionary; discard other public candidates.
+                            rx = futures::stream::empty().boxed();
+                            seen = std::collections::HashSet::from([source]);
+                        }
+                        let proofs = self
+                            .make_peer_rx(
+                                full.truncate_for_dht(),
+                                trackers.to_vec(),
+                                false,
+                                None,
+                                seen.iter().copied().collect(),
+                                private,
+                            )
+                            .context("no way to discover v2 Merkle proof providers")?;
+                        let proof_lookup = read_metainfo_from_peer_receiver(
+                            self.peer_id,
+                            MetadataIdentity::v2(full, Some(info_hash)),
+                            vec![],
+                            proofs,
+                            Some(self.merge_peer_opts(peer_opts)),
+                            self.connector.clone(),
+                            self.client_name_and_version.clone(),
+                            Some(self.metadata_discovery(
+                                MetadataIdentity::v2(full, Some(info_hash)),
+                                trackers,
+                                privacy.clone(),
+                            )),
+                        );
+                        let legacy_initial = seen.iter().copied().collect();
+                        let legacy_info = info_bytes.clone();
+                        let legacy_pieces = info.pieces.clone();
+                        let legacy_privacy = privacy.clone();
+                        let legacy_lookup = async move {
+                            // Prefer cheap Merkle proofs. If no v2 provider
+                            // answers promptly, derive them from authenticated
+                            // legacy payload without allocating transfer files.
+                            tokio::time::sleep(Duration::from_secs(2)).await;
+                            let (private, legacy_initial) =
+                                if let Some(notice) = legacy_privacy.current() {
+                                    anyhow::ensure!(
+                                        librqbit_core::v2::sha256(legacy_info.as_ref())
+                                            == notice.dictionary_hash.0,
+                                        "metadata changed after private dictionary authentication"
+                                    );
+                                    (true, legacy_privacy.private_initial(notice))
+                                } else {
+                                    (private, legacy_initial)
+                                };
+                            let peers = self
+                                .make_peer_rx(
+                                    info_hash,
+                                    trackers.to_vec(),
+                                    false,
+                                    None,
+                                    legacy_initial,
+                                    private,
+                                )
+                                .context(
+                                    "no legacy peers available for Merkle layer acquisition",
+                                )?;
+                            crate::peer_info_reader::legacy_layers::read_from_peers(
+                                self.peer_id,
+                                info_hash,
+                                legacy_info,
+                                legacy_pieces,
+                                peers,
+                                Some(self.merge_peer_opts(peer_opts)),
+                                self.connector.clone(),
+                                self.client_name_and_version.clone(),
+                            )
+                            .await
+                        };
+                        tokio::pin!(proof_lookup, legacy_lookup);
+                        let result = tokio::select! {
+                            result = &mut proof_lookup => match result {
+                                ReadMetainfoResult::Found { .. } => Some(result),
+                                ReadMetainfoResult::ChannelClosed { .. } => {
+                                    let (layers, peers) = legacy_lookup.await?;
+                                    info.v2 = Some(Arc::new(layers));
+                                    seen.extend(peers);
+                                    None
+                                }
+                            },
+                            result = &mut legacy_lookup => match result {
+                                Ok((layers, peers)) => {
+                                    info.v2 = Some(Arc::new(layers));
+                                    seen.extend(peers);
+                                    None
+                                }
+                                Err(error) => {
+                                    if error.chain().any(|cause| cause.downcast_ref::<librqbit_core::v2::V2Error>() == Some(&librqbit_core::v2::V2Error::HybridHashMismatch)) {
+                                        return Err(error);
+                                    }
+                                    debug!(%error, "legacy layer acquisition ended; waiting for a v2 proof provider");
+                                    Some(proof_lookup.await)
+                                }
+                            }
+                        };
+                        if let Some(result) = result {
+                            match result {
+                                ReadMetainfoResult::Found {
+                                    info: verified,
+                                    info_bytes: verified_bytes,
+                                    seen: proof_peers,
+                                    ..
+                                } => {
+                                    anyhow::ensure!(
+                                        verified_bytes.as_ref() == info_bytes.as_ref(),
+                                        "v2 proof source changed the authenticated info dictionary"
+                                    );
+                                    info = verified;
+                                    info_bytes = verified_bytes;
+                                    seen.extend(proof_peers);
+                                }
+                                ReadMetainfoResult::ChannelClosed { .. } => {
+                                    bail!("no peer supplied the required v2 Merkle layers")
+                                }
+                            }
+                        }
+                    }
+                }
                 trace!(?info, "received result from DHT");
                 let torrent_bytes = torrent_file_from_info_bytes(
                     info_bytes.as_ref(),
@@ -1804,8 +2247,11 @@ impl Session {
                     info.v2.as_deref(),
                 )?;
                 let info = info.validate()?;
+                let metadata = TorrentMetadata::new(info, torrent_bytes, info_bytes.0)?;
+                debug!(wire_hash = %info_hash.as_string(), wire_v2 = identity.v2_wire, "magnet metadata authenticated");
                 Ok(ResolveMagnetResult {
-                    metadata: TorrentMetadata::new(info, torrent_bytes, info_bytes.0)?,
+                    discovery_hash: info_hash,
+                    metadata,
                     peer_rx: rx,
                     seen_peers: {
                         let seen = seen.into_iter().collect_vec();
@@ -1865,6 +2311,7 @@ impl Session {
 }
 
 pub(crate) struct ResolveMagnetResult {
+    pub discovery_hash: Id20,
     pub metadata: TorrentMetadata,
     pub peer_rx: PeerStream,
     pub seen_peers: Vec<SocketAddr>,
@@ -1920,7 +2367,14 @@ impl tracker_comms::TorrentStatsProvider for PeerRxTorrentInfo {
     fn get(&self) -> tracker_comms::TrackerCommsStats {
         let mt = self.session.with_torrents(|torrents| {
             for (_, mt) in torrents {
-                if mt.info_hash() == self.info_hash {
+                if mt.info_hash() == self.info_hash
+                    || mt
+                        .with_metadata(|m| {
+                            m.v1_info_hash == self.info_hash
+                                && m.info.info().v2.as_ref().is_some_and(|v| v.is_hybrid())
+                        })
+                        .unwrap_or(false)
+                {
                     return Some(mt.clone());
                 }
             }
@@ -1934,13 +2388,44 @@ impl tracker_comms::TorrentStatsProvider for PeerRxTorrentInfo {
             }
         };
         let stats = mt.stats();
+        let legacy_bytes = mt
+            .with_metadata(|metadata| {
+                if metadata.v1_info_hash != self.info_hash {
+                    return None;
+                }
+                let v2 = metadata.info.info().v2.as_ref()?;
+                let total = v2.hybrid_total_bytes()?;
+                let count = |chunks: &crate::chunk_tracker::ChunkTracker| {
+                    metadata
+                        .lengths()
+                        .iter_piece_infos()
+                        .filter(|p| chunks.get_have_pieces().as_slice()[p.piece_index.get_usize()])
+                        .map(|p| {
+                            v2.hybrid_piece_size(p.piece_index.get() as u64)
+                                .unwrap_or(0) as u64
+                        })
+                        .sum::<u64>()
+                };
+                let downloaded = match &mt.locked.read().state {
+                    ManagedTorrentState::Live(live) => live
+                        .lock_read("legacy tracker stats")
+                        .get_chunks()
+                        .map(count)
+                        .unwrap_or(0),
+                    ManagedTorrentState::Paused(paused) => count(&paused.chunk_tracker),
+                    _ => 0,
+                };
+                Some((downloaded, total))
+            })
+            .ok()
+            .flatten();
 
         use crate::torrent_state::stats::TorrentStatsState as TS;
         use tracker_comms::TrackerCommsStatsState as S;
 
         tracker_comms::TrackerCommsStats {
-            downloaded_bytes: stats.progress_bytes,
-            total_bytes: stats.total_bytes,
+            downloaded_bytes: legacy_bytes.map(|v| v.0).unwrap_or(stats.progress_bytes),
+            total_bytes: legacy_bytes.map(|v| v.1).unwrap_or(stats.total_bytes),
             uploaded_bytes: stats.uploaded_bytes,
             torrent_state: match stats.state {
                 TS::Initializing { .. } => S::Initializing,

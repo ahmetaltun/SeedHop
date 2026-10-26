@@ -1,0 +1,511 @@
+{
+  "date": "2026-10-26",
+  "status": "in_progress",
+  "scope": "BEP 10 optional/additive extension IDs, disabled output, owned PEX sender tasks, and private PEX policy; full protocol audit remains active",
+  "rust": {
+    "passed": 91,
+    "v2TargetPassed": 69,
+    "failed": 0,
+    "ignored": 1,
+    "command": "cargo test --workspace --locked -- --test-threads=1",
+    "log": ".build/v2-extensions-complete-rust.log"
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "format": "PASS",
+    "pythonCompile": "PASS",
+    "gitDiffCheck": "PASS",
+    "nineteenPatchForwardReconstruction": "PASS",
+    "nineteenPatchReverseReapply": "PASS"
+  },
+  "behavior": [
+    "Optional extension IDs omit None during bencoding; an absent m dictionary decodes as no changes",
+    "Later extension m dictionaries merge per-peer ID changes; omitted IDs remain active, zero disables and positive IDs may re-enable",
+    "Codec never uses ID zero for metadata or PEX; queued replies for disabled/unnegotiated extensions are dropped before writing",
+    "Public live peers own at most one PEX worker; repeated handshakes preserve it, zero cancels it, re-enabling creates one replacement",
+    "Private live peers do not advertise, receive or send PEX; their existing non-serving metadata policy is reflected by omitting ut_metadata and metadata_size",
+    "Metadata and legacy-layer acquisition connections omit PEX advertisement because they do not participate in peer exchange"
+  ],
+  "rawPeerCoverage": [
+    "Optional-field codec and absent m dictionary; zero cannot serialize as metadata",
+    "Metadata ID 11 survives PEX-only and reqq-only updates, zero suppresses replies without closing, ID 13 re-enables valid replies",
+    "Pure-v2/hybrid public positive control connects to a PEX endpoint; private counterpart omits unsupported capabilities and never connects",
+    "Real outgoing source plus incoming observer, repeated enable/disable/re-enable updates: exactly one PEX message on custom ID 9; private control sends zero"
+  ],
+  "negativeControls": [
+    {
+      "behavior": "Optional extension fields",
+      "result": "Expected failure: bencode does not support None",
+      "log": ".build/v2-extensions-codec-before.log"
+    },
+    {
+      "behavior": "Replacement instead of additive extension updates",
+      "result": "Expected failure: peer EOF after PEX-only update erased metadata ID",
+      "log": ".build/v2-extensions-update-before.log"
+    },
+    {
+      "behavior": "Private extension advertisement",
+      "result": "Expected failure: private peer advertised PEX",
+      "log": ".build/v2-extensions-private-before.log"
+    },
+    {
+      "behavior": "Unowned repeated PEX tasks",
+      "result": "Expected failure: five exchanges instead of one after enable/disable/re-enable",
+      "log": ".build/v2-extensions-tasks-negative.log"
+    }
+  ],
+  "fixtureCorrection": "Independent private/legacy peers assumed every extension handshake contained ut_metadata. They now honor optional/additive IDs while retaining metadata-request correlation and exact-byte checks. Private handshakes additionally assert PEX is absent. The initial KeyError and successful rerun are retained in separate logs.",
+  "independentPrivateCases": [
+    {
+      "mode": "public-control",
+      "result": "PASS",
+      "publicControl": true,
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "bytes": 140012,
+      "unrelatedConnections": 2,
+      "closedConnections": 2,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 0,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 1,
+      "lateAnnounces": 1,
+      "extraTrackerQueriesAfterBarrier": 8,
+      "barrierTime": 24768.565831833,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "extensionHandshakes": [
+        {
+          "metadataId": 3,
+          "pexId": null
+        },
+        {
+          "metadataId": 3,
+          "pexId": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-public-control-0emvq5y5"
+    },
+    {
+      "mode": "pure",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "ae8e7007593b335a05ef474a804f5507c9333a895d9e50c034d5c9e143cb2956",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 24771.5360775,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "extensionHandshakes": [
+        {
+          "metadataId": 3,
+          "pexId": null
+        },
+        {
+          "metadataId": null,
+          "pexId": null
+        }
+      ],
+      "evidence": ".build/private-metadata-pure-h7p6col_"
+    },
+    {
+      "mode": "hybrid",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 24774.066211458,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "extensionHandshakes": [
+        {
+          "metadataId": 3,
+          "pexId": null
+        },
+        {
+          "metadataId": null,
+          "pexId": null
+        }
+      ],
+      "evidence": ".build/private-metadata-hybrid-b223t92x"
+    },
+    {
+      "mode": "dual",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 2,
+      "closedConnections": 2,
+      "acceptedBeforeProofRelease": 2,
+      "closedBeforeProofRelease": 2,
+      "lateDhtReplies": 2,
+      "gatedHashes": 2,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 24776.608560166,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        },
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "extensionHandshakes": [
+        {
+          "metadataId": 3,
+          "pexId": null
+        },
+        {
+          "metadataId": 3,
+          "pexId": null
+        },
+        {
+          "metadataId": 3,
+          "pexId": null
+        },
+        {
+          "metadataId": null,
+          "pexId": null
+        }
+      ],
+      "evidence": ".build/private-metadata-dual-bihert3h"
+    },
+    {
+      "mode": "btih",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 24779.639651666,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "extensionHandshakes": [
+        {
+          "metadataId": 3,
+          "pexId": null
+        },
+        {
+          "metadataId": 3,
+          "pexId": null
+        },
+        {
+          "metadataId": null,
+          "pexId": null
+        }
+      ],
+      "evidence": ".build/private-metadata-btih-lxrcx2nk"
+    }
+  ],
+  "independentMetadataCases": [
+    {
+      "mode": "healthy",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [],
+      "evidence": ".build/metadata-wire-healthy-_ks93rhz"
+    },
+    {
+      "mode": "changed",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [
+        0,
+        1
+      ],
+      "evidence": ".build/metadata-wire-changed-yg9mzbli"
+    },
+    {
+      "mode": "zero",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [],
+      "evidence": ".build/metadata-wire-zero-3f5h12al"
+    },
+    {
+      "mode": "reject",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [
+        0,
+        1
+      ],
+      "evidence": ".build/metadata-wire-reject-ft_j6anr"
+    },
+    {
+      "mode": "progress",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [],
+      "evidence": ".build/metadata-wire-progress-6s7j5ezy"
+    }
+  ],
+  "independentLegacyLayerCases": [
+    {
+      "mode": "complete",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-complete-o412o124"
+    },
+    {
+      "mode": "partial",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-partial-vcky6ybl"
+    },
+    {
+      "mode": "corrupt",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-corrupt-1iuesw2i"
+    },
+    {
+      "mode": "padding",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-padding-jsnxwpl1"
+    },
+    {
+      "mode": "private",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "45a6b345d79b6e49eb826420b9fb3b742a3215ba",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "evidence": ".build/legacy-layers-dual-private-mzpagi09"
+    },
+    {
+      "mode": "inconsistent",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "463da230a19ec0571fe00a59a0381e759cba3b2d",
+      "infoHashV2": "53753123a19c814d096f6c84f2e7704ec2fa98391cfdbd5a6347fc10cad61665",
+      "evidence": ".build/legacy-layers-dual-inconsistent-_2dpmphz"
+    },
+    {
+      "mode": "inspect-only",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-inspect-only-g1t6ymmu"
+    },
+    {
+      "mode": "inspect-unpadded",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "3bb8fc4a855ab7fae75912250ce18e51e64526d2",
+      "infoHashV2": "4a71b73ba65d423cc88ab43d56e3464966fcafae6c04a4a6ae98bf8cabee91c9",
+      "evidence": ".build/legacy-layers-dual-inspect-unpadded-3w_7jcbj"
+    }
+  ],
+  "dualMagnetTransports": [
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "tcp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-off-magnet-dual-hybrid-d9cgo6_g"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "tcp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-required-magnet-dual-hybrid-otedxt2x"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "utp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-off-magnet-dual-hybrid-km86k47x"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "utp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-required-magnet-dual-hybrid-dbknnefn"
+    }
+  ],
+  "specifications": [
+    "https://www.bittorrent.org/beps/bep_0010.html",
+    "https://www.bittorrent.org/beps/bep_0027.html"
+  ],
+  "native": "Not rebuilt. Last native package evidence remains v2-filenames-2026-10-26.json. Rebuild after remaining engine fixes.",
+  "remaining": [
+    "LSD registration ownership, fan-out and periodic announcement cancellation",
+    "Legacy layer-fetch useful interest, choke/cancel and wakeup/progress audit",
+    "Final requirement consistency, transport and native package validation; physical/certificate-backed release gates remain separate"
+  ],
+  "sourceSha256": {
+    "vendor/rqbit/crates/librqbit/src/peer_connection.rs": "cb7d75eab35f31556bd0fb2befd7f9a833e5f9a89ad608b51b6283aece36156d",
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/mod.rs": "de1420d0b85a8922451d5b3ed2d49465ded4f2d42c5a1319899ccb66c2012fa6",
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/legacy_layers.rs": "9b5ba9ca7fe5cad3c7116a13fccb72c9a263452bc672c5f411637b5b634423fc",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/live/mod.rs": "7c9f66597dcd982acb1fdc2303c04771ba0358aca9492b14f9d27781b69ab817",
+    "vendor/rqbit/crates/peer_binary_protocol/src/extended/mod.rs": "be2d8e9f6f6b6d3709af36899000fde8a6bd244f5f7970632269392bf9718464",
+    "vendor/rqbit/crates/peer_binary_protocol/src/extended/handshake.rs": "9187761f442004bcc4789de029deb3997e74ec431489e47f25c3b6f475725d91",
+    "crates/seedhop-core/tests/v2.rs": "3926399bac747c5d9c71e424554847fe395cba16d603974d92f7011ea774c843",
+    "scripts/v2_private_metadata.py": "f21b18c1f5fa371d4ed1974fd7b46323221929843d263dea346fb902b0e3571d",
+    "scripts/v2_hybrid_interop.py": "9058a4a149d9f219c04b22882005a8da9da51f1253122144f0efeee8c4cf0925",
+    "vendor/patches/0019-seedhop-extension-discovery-policy.patch": "3f545b1f991a7738e5922cb478bf49fec6459fef7b3c3c466c48a75b49e71b1c"
+  },
+  "logs": [
+    ".build/v2-extensions-check.log",
+    ".build/v2-extensions-clippy.log",
+    ".build/v2-extensions-codec-before.log",
+    ".build/v2-extensions-complete-rust.log",
+    ".build/v2-extensions-final-check.log",
+    ".build/v2-extensions-final-clippy.log",
+    ".build/v2-extensions-legacy-independent.log",
+    ".build/v2-extensions-magnet-tcp-rc4.log",
+    ".build/v2-extensions-magnet-tcp.log",
+    ".build/v2-extensions-magnet-utp-rc4.log",
+    ".build/v2-extensions-magnet-utp.log",
+    ".build/v2-extensions-metadata-independent.log",
+    ".build/v2-extensions-patches.log",
+    ".build/v2-extensions-private-before.log",
+    ".build/v2-extensions-private-independent-fixed.log",
+    ".build/v2-extensions-private-independent.log",
+    ".build/v2-extensions-private.log",
+    ".build/v2-extensions-targeted.log",
+    ".build/v2-extensions-tasks-before.log",
+    ".build/v2-extensions-tasks-negative.log",
+    ".build/v2-extensions-update-before.log"
+  ]
+}

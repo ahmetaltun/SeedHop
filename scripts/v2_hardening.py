@@ -5,6 +5,7 @@ No public DHT or normal qBittorrent profile is used. Retains packet logs and byt
 """
 import argparse
 import contextlib
+import hashlib
 import json
 import os
 import pathlib
@@ -44,6 +45,7 @@ class DatagramFixture:
     def __init__(self, work, dht=False):
         self.work, self.dht = work, dht
         self.peer, self.info_hash = 0, ''
+        self.accepted_hashes = set()
         self.events, self.errors = [], []
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind(('127.0.0.1', 0))
@@ -72,7 +74,7 @@ class DatagramFixture:
             assert connection == 0x41727101980
             return struct.pack('!IIQ', 0, transaction, 0x53454544484f50)
         assert action == 1 and connection == 0x53454544484f50 and len(packet) >= 98
-        valid = packet[16:36].hex() == self.info_hash
+        valid = packet[16:36].hex() in {self.info_hash, *self.accepted_hashes}
         advertised = struct.unpack('!H', packet[96:98])[0]
         endpoint = self.peer if valid and advertised != self.peer else 0
         self.events.append({'query': 'announce', 'hash': packet[16:36].hex(), 'valid': valid,
@@ -89,10 +91,18 @@ class DatagramFixture:
         event = {'query': method.decode()}
         if method in (b'get_peers', b'announce_peer'):
             identity = args[b'info_hash'].hex()
-            event.update(hash=identity, valid=identity == self.info_hash)
+            valid = identity in {self.info_hash, *self.accepted_hashes}
+            event.update(hash=identity, valid=valid)
             response[b'token'] = b'fixture-token'
-            if method == b'get_peers' and identity == self.info_hash:
-                response[b'values'] = [socket.inet_aton('127.0.0.1') + struct.pack('!H', self.peer)]
+            if method == b'get_peers' and valid:
+                observed = {e.get('hash') for e in self.events
+                            if e.get('query') == 'get_peers' and e.get('valid')}
+                observed.add(identity)
+                # Do not finish this tiny transfer before both independent
+                # hybrid lookups get scheduled. Each identity must reach the
+                # fixture before it advertises the shared payload peer.
+                if {self.info_hash, *self.accepted_hashes}.issubset(observed):
+                    response[b'values'] = [socket.inet_aton('127.0.0.1') + struct.pack('!H', self.peer)]
         else:
             response[b'nodes'] = response[b'id'] + socket.inet_aton('127.0.0.1') + struct.pack('!H', self.port)
         self.events.append(event)
@@ -177,6 +187,8 @@ def run_case(mode, hybrid, executable):
         torrent, files, info = fixture(work, hybrid, None if dht else tracker.url, private=private)
         identity = digest(bencode(info))[:20].hex()
         tracker.info_hash = identity
+        if hybrid:
+            tracker.accepted_hashes.add(hashlib.sha1(bencode(info)).hexdigest())
         peer = QBittorrent(work, executable, ipv6=ipv6)
         cleanup.callback(peer.close)
         try:
@@ -235,6 +247,9 @@ def run_case(mode, hybrid, executable):
                     assert (downloads / path).read_bytes() == data, path
                 if isinstance(tracker, DatagramFixture):
                     assert any(e.get('valid') and e.get('query') in ('announce', 'get_peers') for e in tracker.events)
+                    if hybrid:
+                        observed = {e.get('hash') for e in tracker.events if e.get('valid')}
+                        assert {identity, hashlib.sha1(bencode(info)).hexdigest()}.issubset(observed), 'both hybrid discovery identities must be exercised'
             result = {'mode': mode, 'format': 'hybrid' if hybrid else 'v2', 'result': 'PASS',
                       'infoHashV2': digest(bencode(info)).hex(), 'qBittorrent': peer.version,
                       'libtorrent': peer.build.get('libtorrent'), 'evidence': str(work.relative_to(ROOT))}

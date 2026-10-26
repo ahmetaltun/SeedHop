@@ -1,0 +1,106 @@
+{
+  "date": "2026-10-26",
+  "status": "in_progress",
+  "scope": "Repair native XPC initialization without disabling uTP; full protocol goal remains active",
+  "rootCause": {
+    "crashReport": "/Users/ahmet/Library/Logs/DiagnosticReports/SeedHopEngine-2026-10-26-121753.ips",
+    "exception": "EXC_BAD_ACCESS/SIGBUS at stack guard on app.seedhop.host queue",
+    "frames": [
+      "librqbit_utp::spawn_utils::spawn",
+      "UtpSocket::new_with_opts",
+      "Session::new_with_opts",
+      "Engine::open",
+      "Runtime::block_on"
+    ],
+    "authentication": "Both cdhash requirements successfully set before initialization; signature/authentication not the failure"
+  },
+  "fix": "Construct and poll Engine::open on an owned Tokio worker, awaiting its JoinHandle from the small-stack FFI caller",
+  "smallStackRegression": {
+    "result": "PASS",
+    "hostStackBytes": 524288,
+    "coverage": "FFI initialization with actual TCP/uTP listener, snapshot and synchronous shutdown"
+  },
+  "rust": {
+    "passed": 68,
+    "v2TargetPassed": 46,
+    "failed": 0,
+    "ignored": 1,
+    "log": ".build/v2-native-stack-rust.log"
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "format": "PASS",
+    "gitDiffCheck": "PASS",
+    "nativeBuild": "PASS",
+    "codesignDeepStrict": "PASS (ad-hoc)"
+  },
+  "nativeCases": [
+    {
+      "format": "v2",
+      "result": "PASS",
+      "log": ".build/v2-native-stack-v2.log",
+      "coverage": [
+        "mutual XPC requirements",
+        "protocol handshake",
+        "import",
+        "Force Recheck",
+        "priorities",
+        "queue",
+        "rename",
+        "relocation with exact bytes",
+        "restart",
+        "paused selection",
+        "removal",
+        "shutdown"
+      ]
+    },
+    {
+      "format": "hybrid",
+      "result": "PASS",
+      "log": ".build/v2-native-stack-hybrid.log",
+      "coverage": [
+        "mutual XPC requirements",
+        "protocol handshake",
+        "import",
+        "Force Recheck",
+        "priorities",
+        "queue",
+        "rename",
+        "relocation with exact bytes",
+        "restart",
+        "paused selection",
+        "removal",
+        "shutdown"
+      ]
+    }
+  ],
+  "limits": [
+    "Ad-hoc development integration only; certificate-backed signing and physical lifecycle remain separate deferred release gates",
+    "Smoke imports paused data and validates recheck/file operations; public-network transfer certification is not claimed"
+  ],
+  "remaining": "docs/BEP52-CONFORMANCE.md open rows: metadata resources, filename sanitization, interest/choke/cancel/hash-serving, privacy and legacy-fetch adversarial/transport audit",
+  "sourceSha256": {
+    "crates/seedhop-ffi/src/lib.rs": "877981145d9bca790b3ec8728e450eb9839c5e9621c49bfb7a6cd43b80542591",
+    "crates/seedhop-ffi/Cargo.toml": "9f3db3b519015d7d9e422af29a3d2b5387a5db2bccd19e6fd3e0418c9309372a",
+    "Cargo.lock": "562c16ba2d776c180a38a0dffe571f6c829b03be50f535c513e261b583f1daf5",
+    "scripts/build.py": "8e8794a81d04c21e5f283769dbc42aa3eea772017eb66847fcf07a89048f4823",
+    "macOS/App/EngineSelfTest.swift": "3e75257dabacec737fa3dc5bbcb86848655052acce351e8246bee3f3189e2c9c",
+    "vendor/patches/0013-seedhop-metadata-wire-conformance.patch": "46e88fcab2ca935eea298e522a498b29950cfa1760081be482aecc9bd1eda01a"
+  },
+  "nativeBinarySha256": {
+    ".build/SeedHop.app/Contents/MacOS/SeedHop": "e897f07c9e184153a9c49e6eaee9dae4fbb31608aa86e6d2db19b17b5f91086b",
+    ".build/SeedHop.app/Contents/XPCServices/SeedHopEngine.xpc/Contents/MacOS/SeedHopEngine": "1835d644b3212e5a87ebf729d82bc3ecc09d6e2f77567b0da4cff901c81bdf78",
+    ".build/SeedHop.app/Contents/Frameworks/libseedhop_ffi.dylib": "3f904808035dee6576b35bde36e246f00ff3eb4105285563c63283e73def001d"
+  },
+  "logs": [
+    ".build/v2-native-stack-build.log",
+    ".build/v2-native-stack-check.log",
+    ".build/v2-native-stack-clippy.log",
+    ".build/v2-native-stack-format.log",
+    ".build/v2-native-stack-hybrid.log",
+    ".build/v2-native-stack-rust.log",
+    ".build/v2-native-stack-test.log",
+    ".build/v2-native-stack-v2.log"
+  ]
+}

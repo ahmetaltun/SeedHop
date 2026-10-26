@@ -1,0 +1,57 @@
+diff --git a/crates/librqbit/src/file_ops.rs b/crates/librqbit/src/file_ops.rs
+--- a/crates/librqbit/src/file_ops.rs
++++ b/crates/librqbit/src/file_ops.rs
+@@ -340,6 +340,11 @@
+             .v2
+             .as_ref()
+             .context("not a v2 torrent")?;
++        let piece_layer = (v2.piece_length() / librqbit_core::v2::BLOCK_LENGTH).ilog2();
++        anyhow::ensure!(
++            request.base_layer == 0 || request.base_layer == piece_layer,
++            "only leaf and piece hash layers are served"
++        );
+         Ok(v2.serve_hashes(request, |file, offset, buf| {
+             let requested_file = &v2.files()[file];
+             // Identical roots may belong to several files. Any verified copy
+diff --git a/crates/librqbit/src/limits.rs b/crates/librqbit/src/limits.rs
+--- a/crates/librqbit/src/limits.rs
++++ b/crates/librqbit/src/limits.rs
+@@ -34,7 +34,18 @@
+     async fn acquire(&self, size: NonZeroU32) -> crate::Result<()> {
+         let lim = self.limiter.load().clone();
+         if let Some(rl) = lim.as_ref() {
+-            rl.until_n_ready(size).await?;
++            let mut remaining = size.get();
++            let mut max_batch = size;
++            while let Some(batch) = NonZeroU32::new(remaining.min(max_batch.get())) {
++                match rl.until_n_ready(batch).await {
++                    Ok(()) => remaining -= batch.get(),
++                    Err(capacity) => {
++                        // A valid wire block can exceed a low configured burst.
++                        // Charge it in batches instead of disconnecting the peer.
++                        max_batch = NonZeroU32::new(capacity.0).ok_or(capacity)?;
++                    }
++                }
++            }
+         }
+         Ok(())
+     }
+diff --git a/crates/librqbit/src/torrent_state/live/mod.rs b/crates/librqbit/src/torrent_state/live/mod.rs
+--- a/crates/librqbit/src/torrent_state/live/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/mod.rs
+@@ -1142,6 +1142,15 @@
+                     Ok(hashes) => Message::Hashes { request, hashes },
+                     Err(_) => Message::HashReject(request),
+                 };
++                let charged_bytes = match &response {
++                    Message::Hashes { hashes, .. } => hashes.len() as u32 * 32,
++                    _ => 53,
++                };
++                let amount = NonZeroU32::new(charged_bytes).context("empty hash response")?;
++                self.state.ratelimits.prepare_for_upload(amount).await?;
++                if let Some(session) = self.state.shared.session.upgrade() {
++                    session.ratelimits.prepare_for_upload(amount).await?;
++                }
+                 self.tx
+                     .send(WriterRequest::BoundedMessage(response, permit))
+                     .map_err(|_| anyhow::anyhow!("peer writer closed"))?;

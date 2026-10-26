@@ -1,10 +1,22 @@
 # BitTorrent v2 implementation
 
+The requested protocol scope is implemented and verified: BEP 52, simultaneous
+hybrid v1/v2 swarms, MSE/PE encryption, TCP and uTP. The final October 26 checkpoint
+passes 94 workspace Rust tests, three isolated LSD tests, 95 independent protocol
+cases and four rebuilt native XPC smokes. One opt-in disk-image test remains
+ignored. See [the requirement audit](BEP52-CONFORMANCE.md),
+[implementation checkpoints](V2-COMPLETION.md) and
+[final evidence](results/v2-final-2026-10-26.json). Twenty-two ordered vendor
+patches reconstruct current source and reverse/reapply byte-identically.
+Certificate-backed signing, physical lifecycle/network recovery and UI
+accessibility remain separate release gates.
+
 SeedHop imports, downloads, seeds, selects files, pauses/resumes, and restores
 pure v2 and hybrid torrents. Both `.torrent` files and `btmh` magnets are supported.
-Hybrid torrents use the v2 swarm and SHA-256 verification; this implementation
-does not join both swarms simultaneously or claim simultaneous SHA-1/SHA-256
-payload verification. Existing v1 torrents retain their v1 behavior.
+Hybrid torrents announce both identities and share storage across v1 and v2
+connections. Every hybrid piece must pass both SHA-1 and SHA-256 verification
+before it is advertised or counted as complete. Existing v1 torrents retain
+their v1 behavior.
 
 Specification: [BEP 52](https://www.bittorrent.org/beps/bep_0052.html).
 The focused engine delta is `vendor/patches/0002-seedhop-bep52.patch`, applied after
@@ -22,6 +34,8 @@ the reliability patch to the pinned rqbit revision.
   absolute offsets and never read gap bytes from another file.
 - Initial checks, downloads and restart checks verify SHA-256 Merkle pieces with
   a bounded 16 KiB read buffer, rather than allocating an entire piece in memory.
+  Hybrid checks also verify SHA-1, synthesizing the validated BEP 47 padding
+  without storing padding files or reading bytes from adjacent files.
 - The peer codec supports hash request (21), hashes (22), hash reject (23), and
   reject (16). Hash serving covers block and piece layers plus required uncle
   hashes. Requests are bounded to 512 base hashes and checked before allocation.
@@ -31,14 +45,22 @@ the reliability patch to the pinned rqbit revision.
   the authenticated info dictionary. The complete metainfo, including layers,
   is persisted for restoration and metadata serving.
 - Legacy `btih` hybrid magnets verify the original SHA-1 metadata commitment
-  before upgrading to the derived SHA-256 identity. Hybrid peer handshakes may
+  before discovering proof providers using the derived SHA-256 identity. The
+  metadata peer can be strictly v1-only; files no larger than a piece need no
+  external proof connection. When no v2 proof provider answers, btih hybrids
+  can derive missing layers from SHA-1-verified legacy payload, checking complete
+  layers against the committed SHA-256 file roots before accepting the metainfo.
+  Dual-hash magnets discover metadata through either swarm and check both full
+  commitments, plus the hybrid format, before requesting proofs or payload.
+  Hybrid peer handshakes may
   negotiate a v2 identity; padded final-block upload requests return virtual
   zero bytes without crossing into the next file.
 
 Metadata parsing retains the 32 MiB input limit, 64-level nesting limit,
 200,000-value limit, checked size arithmetic, shared identical-file layers, and
-safe path limits (255 bytes/component, 4096 bytes/path, 32 MiB aggregate paths).
-Symlinks and invalid UTF-8 names are rejected on this platform.
+safe path limits (248 bytes per newly mapped component, 4096 bytes/path, and
+32 MiB aggregate paths). Invalid UTF-8 and reserved names are mapped to safe
+components; unsupported symlink storage is rejected on this platform.
 
 ## Executed validation — October 25, 2026
 
@@ -84,9 +106,21 @@ cargo run -p seedhop-core --bin seedhop-lab -- verify-v2-piece FILE.torrent INDE
 The additional controlled discovery and hostile-peer results are documented in
 [V2 hardening](V2-HARDENING.md). UDP trackers, local DHT discovery, IPv6 transfers
 in both directions, and private torrents have dedicated fixtures. These do not
-certify a public DHT swarm, every tracker, or all peer extensions. Encrypted peers
-and experimental uTP remain separate protocol work. Priorities, queueing,
+certify a public DHT swarm, every tracker, or all peer extensions. The subsequent
+[completion work](V2-COMPLETION.md) enables uTP and validates the nine independent
+scenarios over forced uTP as well as TCP. Patch 0008 adds MSE/PE encryption and
+four explicit policies on both transports; see the completion record. Priorities, queueing,
 Force Recheck, relocation, and renaming are covered in `FILE-MANAGEMENT.md`.
-Hybrid v1-only peers cannot exchange payload with the selected v2 swarm.
+Hybrid v1-only peers can upload and download payload when authenticated v2
+metadata/layers are available. Btih hybrid magnets also resolve through an
+exclusively legacy swarm by deriving missing layers from payload. Dual-hash
+magnets also discover metadata through either swarm. The completed conformance audit and separate network release gates are tracked
+in `V2-COMPLETION.md`.
 UI accessibility, physical sleep/drive recovery, and certificate-backed
 background lifecycle gates in `VALIDATION.md` remain open.
+
+Filename handling maps invalid/reserved components and filesystem aliases into
+deterministic safe storage paths while preserving original info bytes and raw
+hybrid-layout equality. Valid Unicode names stay readable. Complete versioned
+path maps preserve restarts, and older sessions retain their existing files and
+renames on upgrade. See the filename checkpoint in `V2-COMPLETION.md`.

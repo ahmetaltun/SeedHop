@@ -1,0 +1,547 @@
+{
+  "date": "2026-10-26",
+  "status": "in_progress",
+  "scope": "Shared metadata acquisition concurrency, bounded peer admission/discovery queues and useful-progress deadlines; full protocol goal remains active",
+  "limits": {
+    "sessionAcquisitionSlots": 4,
+    "pendingFuturesPerLookup": 8,
+    "rememberedEndpointsPerLookup": 4096,
+    "dhtPeerQueue": 1024,
+    "lsdPeerQueue": 1024,
+    "usefulProgressSeconds": 20,
+    "attemptDeadlineSeconds": 120,
+    "maxRawDictionaryBytesPerPeer": 33554432,
+    "maxActiveRawDictionaryBuffersBytes": 134217728,
+    "qualifier": "Raw dictionary buffers only; decoded structures, layers and caller-retained completed previews are not included in whole-process memory certification"
+  },
+  "rust": {
+    "passed": 69,
+    "v2TargetPassed": 47,
+    "failed": 0,
+    "ignored": 1,
+    "log": ".build/v2-metadata-resources-final-rust.log"
+  },
+  "resourceRegression": {
+    "result": "PASS",
+    "test": "metadata_limits_are_shared_and_keepalives_cannot_block_a_healthy_provider",
+    "cases": [
+      "Two concurrent previews share the four-peer limit; duplicate initial endpoints take no extra slot",
+      "Four 32-MiB-advertising providers keep sockets alive but send no metadata; typed progress timeout releases capacity to queued healthy provider",
+      "Successful resolution creates no transfer files or membership"
+    ]
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "format": "PASS",
+    "pythonCompile": "PASS",
+    "gitDiffCheck": "PASS",
+    "fourteenPatchForwardReconstruction": "PASS",
+    "fourteenPatchReverseReapply": "PASS"
+  },
+  "independentWireCases": [
+    {
+      "mode": "healthy",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [],
+      "evidence": ".build/metadata-wire-healthy-g3bgfb2o"
+    },
+    {
+      "mode": "changed",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [
+        0,
+        1
+      ],
+      "evidence": ".build/metadata-wire-changed-7m7wz6z9"
+    },
+    {
+      "mode": "zero",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [],
+      "evidence": ".build/metadata-wire-zero-bwlibhgn"
+    },
+    {
+      "mode": "reject",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [
+        0,
+        1
+      ],
+      "evidence": ".build/metadata-wire-reject-lipd6e8c"
+    },
+    {
+      "mode": "progress",
+      "result": "PASS",
+      "healthyRequests": [
+        0,
+        1
+      ],
+      "metadataRejects": [
+        7
+      ],
+      "badRequests": [],
+      "evidence": ".build/metadata-wire-progress-hvgpbu1z"
+    }
+  ],
+  "slowControl": {
+    "result": "PASS",
+    "dataBlocks": 2,
+    "delaySecondsPerBlock": 12,
+    "socketKeepalives": true,
+    "elapsedExceedsProgressTimeout": true
+  },
+  "privateCases": [
+    {
+      "mode": "public-control",
+      "result": "PASS",
+      "publicControl": true,
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "bytes": 140012,
+      "unrelatedConnections": 2,
+      "closedConnections": 2,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 0,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 1,
+      "lateAnnounces": 1,
+      "extraTrackerQueriesAfterBarrier": 7,
+      "barrierTime": 4008.095463416,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-public-control-e3t83r4l"
+    },
+    {
+      "mode": "pure",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "ae8e7007593b335a05ef474a804f5507c9333a895d9e50c034d5c9e143cb2956",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 4011.035234291,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-pure-2x4go65y"
+    },
+    {
+      "mode": "hybrid",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 4013.547516125,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-hybrid-7veor1t1"
+    },
+    {
+      "mode": "dual",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 2,
+      "closedConnections": 2,
+      "acceptedBeforeProofRelease": 2,
+      "closedBeforeProofRelease": 2,
+      "lateDhtReplies": 2,
+      "gatedHashes": 2,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 4016.097834,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        },
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-dual-3za7kw2s"
+    },
+    {
+      "mode": "btih",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 4018.612145708,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-btih-jamcx6yo"
+    }
+  ],
+  "hybridRegressions": [
+    {
+      "direction": "download-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-v1-9o7t5xy2"
+    },
+    {
+      "direction": "download-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-mixed-td2r2h37"
+    },
+    {
+      "direction": "magnet-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-mixed-q5xxji0q"
+    },
+    {
+      "direction": "magnet-v1-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-v1-mixed-xqp5j8m6"
+    },
+    {
+      "direction": "magnet-dual-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-dual-mixed-aby4wp8p"
+    },
+    {
+      "direction": "upload-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-upload-v1-5xve6q__"
+    }
+  ],
+  "hardeningRegressions": [
+    {
+      "mode": "udp",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-udp-0ljls0y3"
+    },
+    {
+      "mode": "ipv6",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-ipv6-5xi6peot"
+    },
+    {
+      "mode": "ipv6-upload",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-ipv6-upload-t4bkftvg"
+    },
+    {
+      "mode": "private",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-private-b1_zalq3"
+    },
+    {
+      "mode": "dht",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-dht-s7tccbi3"
+    },
+    {
+      "mode": "private-dht",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-private-dht-ezlskybn"
+    },
+    {
+      "mode": "duplicate-metadata",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-duplicate-metadata-b_6_5o_l"
+    }
+  ],
+  "legacyDualRegressions": [
+    {
+      "mode": "complete",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-complete-zw894j26"
+    },
+    {
+      "mode": "partial",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-partial-0xc6pqxi"
+    },
+    {
+      "mode": "corrupt",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-corrupt-yll_pmyt"
+    },
+    {
+      "mode": "padding",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-padding-hxwc2xgd"
+    },
+    {
+      "mode": "private",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "45a6b345d79b6e49eb826420b9fb3b742a3215ba",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "evidence": ".build/legacy-layers-dual-private-6makkn6z"
+    },
+    {
+      "mode": "inconsistent",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "463da230a19ec0571fe00a59a0381e759cba3b2d",
+      "infoHashV2": "53753123a19c814d096f6c84f2e7704ec2fa98391cfdbd5a6347fc10cad61665",
+      "evidence": ".build/legacy-layers-dual-inconsistent-kcb7k__1"
+    },
+    {
+      "mode": "inspect-only",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-inspect-only-so0k9zrw"
+    },
+    {
+      "mode": "inspect-unpadded",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "3bb8fc4a855ab7fae75912250ce18e51e64526d2",
+      "infoHashV2": "4a71b73ba65d423cc88ab43d56e3464966fcafae6c04a4a6ae98bf8cabee91c9",
+      "evidence": ".build/legacy-layers-dual-inspect-unpadded-v3d31ir3"
+    }
+  ],
+  "dualMagnetTransportRegressions": [
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "tcp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-off-magnet-dual-hybrid-vdt66cnr"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "tcp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-required-magnet-dual-hybrid-hrgfoliq"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "utp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-off-magnet-dual-hybrid-0wmthfdz"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "utp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-required-magnet-dual-hybrid-8z80_zq6"
+    }
+  ],
+  "remaining": [
+    "Filename sanitization with raw hybrid-layout equality preserved",
+    "Live interest/choke/cancel/hash-serving conformance",
+    "LSD subscription ownership and periodic announcement lifetime; hostile PEX/private discovery audit",
+    "Legacy layer fetcher adversarial and transport audit",
+    "Final native rebuild after the remaining engine changes; prior native-stack record is historical"
+  ],
+  "sourceSha256": {
+    "vendor/rqbit/crates/dht/src/dht.rs": "42b39c2da46c9e29fd3c54ced1778c479880c35283da112a9bd4e18aa2c068b2",
+    "vendor/rqbit/crates/librqbit/src/dht_utils.rs": "5f9820f512ca95fbd6bf2958de019c2ab1e1214a46f2cb34c84608d19b42d6ce",
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/mod.rs": "a9de7896e52003851cec5622b96201749cdc2eee3194cb30cfc99cb0e2353293",
+    "vendor/rqbit/crates/librqbit/src/stream_connect.rs": "c56f02dba067395a6999226b29daa164e0639412b3a71dbaaed9a76bd7784c6b",
+    "vendor/rqbit/crates/librqbit_lsd/src/lib.rs": "3b5f8d3378a5135d9bebd0fb8b9ce4b428663aacf4db9d33db3f9231d991d98f",
+    "crates/seedhop-core/tests/v2.rs": "d67e53009155412cd6bb141021cc96803d5ed6cc726d0a462579b808bd2cef07",
+    "scripts/v2_metadata_wire.py": "77cf93da2c9de006059a60a18d676e9435a3a98b402a4a3116e47fe19b3ddf4c",
+    "vendor/patches/0014-seedhop-metadata-resource-bounds.patch": "e1a2188e2ce1a526a9745b3d65ba67e5bfdbf363058bf8cf10e32e9cb06a7672"
+  },
+  "logs": [
+    ".build/v2-metadata-resources-check.log",
+    ".build/v2-metadata-resources-final-check.log",
+    ".build/v2-metadata-resources-final-clippy.log",
+    ".build/v2-metadata-resources-final-rust.log",
+    ".build/v2-metadata-resources-format.log",
+    ".build/v2-metadata-resources-hardening.log",
+    ".build/v2-metadata-resources-hybrid.log",
+    ".build/v2-metadata-resources-legacy.log",
+    ".build/v2-metadata-resources-lsd-check.log",
+    ".build/v2-metadata-resources-lsd-clippy.log",
+    ".build/v2-metadata-resources-patches.log",
+    ".build/v2-metadata-resources-private.log",
+    ".build/v2-metadata-resources-rust.log",
+    ".build/v2-metadata-resources-targeted-final.log",
+    ".build/v2-metadata-resources-targeted-fixed-field.log",
+    ".build/v2-metadata-resources-targeted.log",
+    ".build/v2-metadata-resources-transports.log",
+    ".build/v2-metadata-resources-wire-keepalive-control.log",
+    ".build/v2-metadata-resources-wire.log"
+  ]
+}

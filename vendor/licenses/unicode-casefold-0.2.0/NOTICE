@@ -1,0 +1,8 @@
+unicode-casefold 0.2.0
+Authors: Chris Wong <lambda.fairy@gmail.com>
+Source: https://github.com/lfairy/unicode-casefold
+Declared license: MIT/Apache-2.0 (from the published Cargo.toml).
+SeedHop distributes this dependency under the Apache-2.0 option.
+The published crate omits standalone license files; the standard Apache-2.0
+license is retained here. Generated Unicode data is also covered by the
+Unicode license bundled in Resources/UNICODE-LICENSE.txt.

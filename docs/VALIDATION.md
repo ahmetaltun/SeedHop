@@ -3,6 +3,21 @@
 Status: **implemented development foundation; full milestone acceptance pending**.
 No public distribution or notarization was performed.
 
+## Protocol completion checkpoint — 2026-10-26
+
+The requested BEP 52, simultaneous hybrid v1/v2, MSE/PE encryption and TCP/uTP
+scope is implemented and verified. The final source passes 94 workspace Rust
+tests (one opt-in disk-image test ignored), three isolated LSD tests, 95
+independent protocol cases and four rebuilt packaged-native XPC smokes. Ad-hoc
+deep/strict signatures and bundled license bytes pass. See
+[`BEP52-CONFORMANCE.md`](BEP52-CONFORMANCE.md) and
+[`v2-final-2026-10-26.json`](results/v2-final-2026-10-26.json).
+
+This closes protocol implementation, not milestone release acceptance. Remaining
+release work is certificate-backed signing/notarization and service identity,
+physical login/sleep/drive/interface recovery, then UI accessibility acceptance.
+The user-deferred gates below remain deferred; no public distribution occurred.
+
 ## Transfer-control follow-up — 2026-10-25
 
 Force Recheck, file priorities, basic queueing, relocation, and local renaming
@@ -25,8 +40,10 @@ file-control additions; it does not certify the final build or actual logout/log
 **User-deferred checks:** further certificate-backed validation, actual
 logout/login, sleep/wake, physical removable-drive loss, and interface loss.
 No external physical drive was attached. Local signing configuration was reset
-to ad-hoc, and the final normal app is ad-hoc signed. Encryption and uTP remain
-independent protocol projects. The deferred gates remain open.
+to ad-hoc, and the final normal app is ad-hoc signed. MSE/PE encryption has since
+been implemented and independently checked over TCP/uTP.
+The subsequent uTP integration and protocol work are tracked in
+`V2-COMPLETION.md`. The deferred gates remain open.
 
 ## Environment
 
@@ -94,6 +111,35 @@ VoiceOver completion remain unverified. The subsequent app-owned native menu
 checks verify search/table focus and fixture-window reopening; they do not
 certify physical keyboard input, VoiceOver, or reopening with a real transfer.
 
+The October 26 encryption build initially failed its foreground XPC smoke.
+Crash reports subsequently identified stack exhaustion while constructing the
+uTP dispatcher on the host dispatch queue, after successful authentication.
+FFI initialization now runs on a Tokio worker and passes a 512 KiB host-stack
+regression. The rebuilt ad-hoc app passes deep/strict signature verification
+and both pure-v2/hybrid XPC import, recheck, priority/queue, rename/relocation,
+exact-byte, restart and shutdown checks. See
+[the evidence](results/v2-native-stack-2026-10-26.json). That native checkpoint
+passed 76 Rust tests (54 v2), with one opt-in disk-image test ignored.
+The filename checkpoint additionally verifies regular and raw-name pure-v2/hybrid
+native imports and a byte-identical bundled Unicode data license; see
+[the filename evidence](results/v2-filenames-2026-10-26.json).
+The later engine serving checkpoint passed 84 Rust tests (62 v2), including
+metadata-boundary, verified-hash and gated verification-race regressions; see
+[the serving evidence](results/v2-serving-2026-10-26.json). Its native package
+will be rebuilt after the remaining engine fixes. The hash-rate checkpoint
+passes 87 Rust tests (65 v2), including shared rate and low-burst handling; see
+[the hash-rate evidence](results/v2-hash-rate-2026-10-26.json).
+The extension-policy checkpoint passes 91 Rust tests (69 v2), including
+private PEX suppression and repeated extension enable/disable/re-enable; see
+[the extension evidence](results/v2-extensions-2026-10-26.json).
+The LSD checkpoint passes 92 workspace Rust tests (70 v2), plus three
+production-source LSD tests for shared subscriptions, worker lifetime and full
+queue isolation; see [the LSD evidence](results/v2-lsd-2026-10-26.json).
+The legacy-fetch checkpoint retains 92 passing workspace tests and adds five
+independent causal cases plus sixteen legacy regressions; see
+[the legacy-flow evidence](results/v2-legacy-flow-2026-10-26.json).
+Certificate-backed signing and physical lifecycle validation remain deferred.
+
 ## Remaining acceptance gates
 
 - Validate the final build's certificate-backed lifecycle, revoked permission,
@@ -110,8 +156,9 @@ certify physical keyboard input, VoiceOver, or reopening with a real transfer.
 - Validate routed IPv6-only networks and public-swarm discovery. Controlled
   private DHT suppression, local DHT/UDP discovery, IPv6 transfers in both
   directions, malicious proofs, corrupt peer data, and partial restart now have
-  dedicated v2/hybrid fixtures. See `V2-HARDENING.md`. Encryption and uTP remain
-  separate protocol projects.
+  dedicated v2/hybrid fixtures. See `V2-HARDENING.md`. MSE/PE encryption on TCP/uTP
+  has dedicated interoperability and hostile-handshake checks; remaining uTP
+  network/recovery validation is tracked in `V2-COMPLETION.md`.
 - Complete the user-deferred physical and actual login checks before declaring
   recovery acceptance complete. Force Recheck, priorities, basic queueing,
   relocation, and renaming are implemented; see `FILE-MANAGEMENT.md`.

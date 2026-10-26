@@ -16,6 +16,8 @@ sha1-ring = ["sha1w/sha1-ring"]
 
 [dependencies]
 sha2 = "0.10"
+unicode-normalization = "0.1.26"
+unicode-casefold = "0.2.0"
 tracing.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 hex.workspace = true

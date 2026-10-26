@@ -1,0 +1,222 @@
+diff --git a/crates/librqbit/src/peer_connection.rs b/crates/librqbit/src/peer_connection.rs
+--- a/crates/librqbit/src/peer_connection.rs
++++ b/crates/librqbit/src/peer_connection.rs
+@@ -507,10 +507,16 @@
+                     }
+                     WriterRequest::UtMetadata(utm, permit) => {
+                         reply_permit = Some(permit);
++                        if ext_msg_ids().ut_metadata.is_none_or(|id| id == 0) {
++                            continue;
++                        }
+                         Message::Extended(ExtendedMessage::UtMetadata(utm.as_borrowed()))
+                             .serialize(&mut *write_buf, ext_msg_ids)?
+                     }
+                     WriterRequest::UtPex(ut_pex) => {
++                        if ext_msg_ids().ut_pex.is_none_or(|id| id == 0) {
++                            continue;
++                        }
+                         Message::Extended(ExtendedMessage::UtPex(ut_pex.as_borrowed()))
+                             .serialize(&mut *write_buf, ext_msg_ids)?
+                     }
+@@ -602,7 +608,10 @@
+                 tokio::task::yield_now().await;
+ 
+                 if let Message::Extended(ExtendedMessage::Handshake(h)) = &message {
+-                    *extended_handshake_ref.write() = Some(h.peer_extended_messages());
++                    extended_handshake_ref
++                        .write()
++                        .get_or_insert_with(Default::default)
++                        .apply_update(h.peer_extended_messages());
+                     self.handler
+                         .on_extended_handshake(h)
+                         .map_err(Error::Anyhow)?;
+diff --git a/crates/librqbit/src/peer_info_reader/legacy_layers.rs b/crates/librqbit/src/peer_info_reader/legacy_layers.rs
+--- a/crates/librqbit/src/peer_info_reader/legacy_layers.rs
++++ b/crates/librqbit/src/peer_info_reader/legacy_layers.rs
+@@ -204,6 +204,15 @@
+     reply_slots: Arc<tokio::sync::Semaphore>,
+ }
+ impl PeerConnectionHandler for Handler {
++    fn update_my_extended_handshake(
++        &self,
++        handshake: &mut ExtendedHandshake<ByteBuf>,
++    ) -> anyhow::Result<()> {
++        // Acquisition connections do not participate in peer exchange.
++        handshake.m.ut_pex = None;
++        Ok(())
++    }
++
+     fn should_unchoke(&self) -> bool {
+         false
+     }
+diff --git a/crates/librqbit/src/peer_info_reader/mod.rs b/crates/librqbit/src/peer_info_reader/mod.rs
+--- a/crates/librqbit/src/peer_info_reader/mod.rs
++++ b/crates/librqbit/src/peer_info_reader/mod.rs
+@@ -362,6 +362,15 @@
+     }
+ }
+ impl PeerConnectionHandler for Handler {
++    fn update_my_extended_handshake(
++        &self,
++        handshake: &mut ExtendedHandshake<ByteBuf>,
++    ) -> anyhow::Result<()> {
++        // Acquisition connections do not participate in peer exchange.
++        handshake.m.ut_pex = None;
++        Ok(())
++    }
++
+     // A hybrid peer can answer metadata discovery with its v2 wire identity.
+     // No content is accepted until the original full SHA-1 commitment and this
+     // candidate's truncated SHA-256 identity both match the received info bytes.
+diff --git a/crates/librqbit/src/torrent_state/live/mod.rs b/crates/librqbit/src/torrent_state/live/mod.rs
+--- a/crates/librqbit/src/torrent_state/live/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/mod.rs
+@@ -492,6 +492,7 @@
+             tx,
+             counters,
+             first_message_received: AtomicBool::new(false),
++            pex_token: Mutex::new(None),
+             cancel_token: self.cancellation_token.child_token(),
+             client_name_and_version: self.shared.client_name_and_version().to_owned(),
+         };
+@@ -568,6 +569,7 @@
+             tx,
+             counters,
+             first_message_received: AtomicBool::new(false),
++            pex_token: Mutex::new(None),
+             cancel_token: state.cancellation_token.child_token(),
+             client_name_and_version: state.shared.client_name_and_version().to_owned(),
+         };
+@@ -1077,6 +1079,7 @@
+     first_message_received: AtomicBool,
+ 
+     cancel_token: CancellationToken,
++    pex_token: Mutex<Option<CancellationToken>>,
+ 
+     client_name_and_version: String,
+ }
+@@ -1295,28 +1298,35 @@
+             }
+         }
+ 
+-        if !self.state.metadata.info.info().private && hs.m.ut_pex.is_some() {
+-            spawn_with_cancel(
+-                debug_span!(
+-                    parent: self.state.shared.span.clone(),
+-                    "sending_pex_to_peer",
+-                    peer = ?self.addr,
+-                ),
+-                format!(
+-                    "[{}][addr={}]sending_pex_to_peer",
+-                    self.state.shared.id, self.addr
+-                ),
+-                self.cancel_token.clone(),
+-                self.state.clone().task_send_pex_to_peer(
+-                    self.addr,
+-                    self.tx.clone(),
+-                    if self.is_v2() {
+-                        self.state.shared.info_hash
+-                    } else {
+-                        self.state.metadata.v1_info_hash
+-                    },
+-                ),
+-            );
++        if !self.state.metadata.info.info().private
++            && let Some(id) = hs.m.ut_pex
++        {
++            let mut current = self.pex_token.lock();
++            if id == 0 {
++                if let Some(token) = current.take() {
++                    token.cancel();
++                }
++            } else if current.is_none() {
++                let token = self.cancel_token.child_token();
++                *current = Some(token.clone());
++                spawn_with_cancel(
++                    debug_span!(parent: self.state.shared.span.clone(), "sending_pex_to_peer", peer = ?self.addr),
++                    format!(
++                        "[{}][addr={}]sending_pex_to_peer",
++                        self.state.shared.id, self.addr
++                    ),
++                    token,
++                    self.state.clone().task_send_pex_to_peer(
++                        self.addr,
++                        self.tx.clone(),
++                        if self.is_v2() {
++                            self.state.shared.info_hash
++                        } else {
++                            self.state.metadata.v1_info_hash
++                        },
++                    ),
++                );
++            }
+         }
+         // Lets update outgoing Socket address for incoming connection
+         if self.incoming
+@@ -1365,6 +1375,12 @@
+         &self,
+         handshake: &mut ExtendedHandshake<ByteBuf>,
+     ) -> anyhow::Result<()> {
++        if self.state.metadata.info.info().private {
++            handshake.m.ut_pex = None;
++            handshake.m.ut_metadata = None;
++            handshake.metadata_size = None;
++            return Ok(());
++        }
+         let info_bytes = &self.state.metadata.info_bytes;
+         if !info_bytes.is_empty()
+             && let Ok(len) = info_bytes.len().try_into()
+diff --git a/crates/peer_binary_protocol/src/extended/handshake.rs b/crates/peer_binary_protocol/src/extended/handshake.rs
+--- a/crates/peer_binary_protocol/src/extended/handshake.rs
++++ b/crates/peer_binary_protocol/src/extended/handshake.rs
+@@ -8,6 +8,7 @@
+ 
+ #[derive(Deserialize, Serialize, Debug, Default, Eq, PartialEq)]
+ pub struct ExtendedHandshake<ByteBuf: ByteBufT> {
++    #[serde(default)]
+     pub m: PeerExtendedMessageIds,
+     #[serde(skip_serializing_if = "Option::is_none")]
+     pub p: Option<u32>,
+diff --git a/crates/peer_binary_protocol/src/extended/mod.rs b/crates/peer_binary_protocol/src/extended/mod.rs
+--- a/crates/peer_binary_protocol/src/extended/mod.rs
++++ b/crates/peer_binary_protocol/src/extended/mod.rs
+@@ -26,11 +26,23 @@
+ 
+ #[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+ pub struct PeerExtendedMessageIds {
++    #[serde(skip_serializing_if = "Option::is_none")]
+     pub ut_metadata: Option<u8>,
++    #[serde(skip_serializing_if = "Option::is_none")]
+     pub ut_pex: Option<u8>,
+ }
+ 
+ impl PeerExtendedMessageIds {
++    /// BEP 10 updates contain changes only; omitted extensions keep their IDs.
++    pub fn apply_update(&mut self, update: Self) {
++        if update.ut_metadata.is_some() {
++            self.ut_metadata = update.ut_metadata;
++        }
++        if update.ut_pex.is_some() {
++            self.ut_pex = update.ut_pex;
++        }
++    }
++
+     pub fn my() -> Self {
+         Self {
+             ut_metadata: Some(MY_EXTENDED_UT_METADATA),
+@@ -66,6 +78,7 @@
+             ExtendedMessage::UtMetadata(u) => {
+                 let emsg_id = peer_extended_msg_ids()
+                     .ut_metadata
++                    .filter(|id| *id != 0)
+                     .ok_or(SerializeError::NeedUtMetadata)?;
+                 out.write_u8(emsg_id)?;
+                 u.serialize(&mut out)?;
+@@ -73,6 +86,7 @@
+             ExtendedMessage::UtPex(m) => {
+                 let emsg_id = peer_extended_msg_ids()
+                     .ut_pex
++                    .filter(|id| *id != 0)
+                     .ok_or(SerializeError::NeedPex)?;
+                 out.write_u8(emsg_id)?;
+                 bencode_serialize_to_writer(m, &mut out)?;

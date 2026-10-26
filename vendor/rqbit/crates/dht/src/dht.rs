@@ -192,21 +192,21 @@ struct RecursiveRequest<C: RecursiveRequestCallbacks> {
     request: Request,
     dht: Arc<DhtState>,
     useful_nodes: RwLock<Vec<MaybeUsefulNode>>,
-    peer_tx: tokio::sync::mpsc::UnboundedSender<SocketAddr>,
+    peer_tx: tokio::sync::mpsc::Sender<SocketAddr>,
     node_tx: tokio::sync::mpsc::UnboundedSender<(Option<Id20>, SocketAddr, usize)>,
     callbacks: C,
 }
 
 pub struct RequestPeersStream {
-    rx: tokio::sync::mpsc::UnboundedReceiver<SocketAddr>,
+    rx: tokio::sync::mpsc::Receiver<SocketAddr>,
     cancel_join_handle_v4: tokio::task::JoinHandle<()>,
     cancel_join_handle_v6: tokio::task::JoinHandle<()>,
 }
 
 impl RequestPeersStream {
     fn new(dht: Arc<DhtState>, info_hash: Id20, announce_port: Option<u16>) -> Self {
-        let (peer_tx, peer_rx) = unbounded_channel();
-        let make = |is_v4: bool, dht: Arc<DhtState>, peer_tx: UnboundedSender<SocketAddr>| {
+        let (peer_tx, peer_rx) = channel(1024);
+        let make = |is_v4: bool, dht: Arc<DhtState>, peer_tx: Sender<SocketAddr>| {
             let (node_tx, node_rx) = unbounded_channel();
             let rp = Arc::new(RecursiveRequest {
                 max_depth: 4,
@@ -272,7 +272,7 @@ impl RecursiveRequest<RecursiveRequestCallbacksFindNodes> {
             dht,
             useful_nodes_limit: 32,
             useful_nodes: RwLock::new(Vec::new()),
-            peer_tx: unbounded_channel().0,
+            peer_tx: channel(1).0,
             node_tx,
             callbacks: RecursiveRequestCallbacksFindNodes {},
         };
@@ -437,7 +437,10 @@ impl<C: RecursiveRequestCallbacks> RecursiveRequest<C> {
             self.callbacks.on_request_end(self, id, addr, &response);
         }
 
-        let response = match self.dht.request(self.request.clone(), addr).await {
+        // Process the response whose status and announce token were just
+        // recorded above. Reissuing here duplicated every recursive request
+        // and discarded the first response's nodes/peers.
+        let response = match response {
             Ok(ResponseOrError::Response(r)) => r,
             Ok(ResponseOrError::Error(e)) => {
                 debug!("error response: {e:?}");
@@ -451,7 +454,12 @@ impl<C: RecursiveRequestCallbacks> RecursiveRequest<C> {
 
         if let Some(peers) = response.values {
             for peer in peers {
-                self.peer_tx.send(peer.0).ok().ok_or(Error::ReceiverDead)?;
+                match self.peer_tx.try_send(peer.0) {
+                    Ok(()) | Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {}
+                    Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                        return Err(Error::ReceiverDead);
+                    }
+                }
             }
         }
 

@@ -1,0 +1,229 @@
+diff --git a/crates/librqbit/src/dht_utils.rs b/crates/librqbit/src/dht_utils.rs
+index dea568d..9672fa8 100644
+--- a/crates/librqbit/src/dht_utils.rs
++++ b/crates/librqbit/src/dht_utils.rs
+@@ -48,20 +48,52 @@ pub async fn read_metainfo_from_peer_receiver<A: Stream<Item = SocketAddr> + Unp
+         let client_name_and_version = client_name_and_version.clone();
+         async move {
+             let token = semaphore.acquire().await?;
+-            let ret = peer_info_reader::read_metainfo_from_peer(
+-                addr,
+-                peer_id,
+-                info_hash,
+-                v2_hash,
+-                peer_connection_options,
+-                // This shouldn't be called anyway as we aren't reading/writing to disk, so it's
+-                // ok not to use a shared one.
+-                BlockingSpawner::new(1),
+-                connector,
+-                client_name_and_version,
+-            )
+-            .instrument(debug_span!("read_metainfo_from_peer", ?addr))
+-            .await
++            let mut attempt = 0;
++            let ret = loop {
++                let result = peer_info_reader::read_metainfo_from_peer(
++                    addr,
++                    peer_id,
++                    info_hash,
++                    v2_hash,
++                    peer_connection_options,
++                    // This shouldn't be called anyway as we aren't reading/writing to disk, so it's
++                    // ok not to use a shared one.
++                    BlockingSpawner::new(1),
++                    connector.clone(),
++                    client_name_and_version.clone(),
++                )
++                .instrument(debug_span!("read_metainfo_from_peer", ?addr))
++                .await;
++                let transient = result
++                    .as_ref()
++                    .err()
++                    .and_then(|error| error.downcast_ref::<crate::Error>())
++                    .is_some_and(|error| {
++                        matches!(
++                            error,
++                            crate::Error::TcpConnect(_)
++                                | crate::Error::UtpConnect(_)
++                                | crate::Error::SocksConnect(_)
++                                | crate::Error::Connect { .. }
++                                | crate::Error::WriteHandshake(_)
++                                | crate::Error::ReadHandshake(_)
++                                | crate::Error::Timeout(_)
++                                | crate::Error::PeerDisconnectedReadingHandshake
++                                | crate::Error::PeerDisconnected
++                                | crate::Error::Read(_)
++                                | crate::Error::Write(_)
++                        )
++                    });
++                if attempt >= 2 || !transient {
++                    break result;
++                }
++                attempt += 1;
++                debug!(
++                    ?addr,
++                    attempt, "retrying transient metadata connection failure"
++                );
++                tokio::time::sleep(std::time::Duration::from_millis(250 * attempt)).await;
++            }
+             .with_context(|| format!("error reading metainfo from {addr}"));
+             drop(token);
+             ret
+diff --git a/crates/librqbit/src/peer_connection.rs b/crates/librqbit/src/peer_connection.rs
+index 12b14e9..07465a1 100644
+--- a/crates/librqbit/src/peer_connection.rs
++++ b/crates/librqbit/src/peer_connection.rs
+@@ -206,12 +206,41 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
+         .await
+     }
+ 
++    async fn outgoing_handshake(
++        &self,
++        read: &mut BoxAsyncReadVectored,
++        write: &mut BoxAsyncWrite,
++        write_buf: &mut [u8],
++        rwtimeout: Duration,
++    ) -> Result<(ReadBuf, Handshake)> {
++        use tokio::io::AsyncWriteExt;
++        let handshake = Handshake::new(self.info_hash, self.peer_id).with_v2(self.handler.is_v2());
++        let hsz = handshake.serialize_unchecked_len(write_buf);
++        with_timeout(
++            "writing handshake",
++            rwtimeout,
++            write
++                .write_all(&write_buf[..hsz])
++                .map_err(Error::WriteHandshake),
++        )
++        .await?;
++        let mut read_buf = ReadBuf::new();
++        let h = read_buf.read_handshake(read, rwtimeout).await?;
++        if h.info_hash != self.info_hash && !self.handler.accepts_metadata_hash_upgrade(h.info_hash)
++        {
++            return Err(Error::WrongInfoHash);
++        }
++        if h.peer_id == self.peer_id {
++            return Err(Error::ConnectingToOurselves);
++        }
++        Ok((read_buf, h))
++    }
++
+     pub async fn manage_peer_outgoing(
+         &self,
+         outgoing_chan: tokio::sync::mpsc::UnboundedReceiver<WriterRequest>,
+         have_broadcast: tokio::sync::broadcast::Receiver<ValidPieceIndex>,
+     ) -> Result<()> {
+-        use tokio::io::AsyncWriteExt;
+         let rwtimeout = self
+             .options
+             .read_write_timeout
+@@ -223,47 +252,50 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
+             .unwrap_or_else(|| Duration::from_secs(10));
+ 
+         let now = Instant::now();
+-        let (ckind, mut read, mut write) = with_timeout(
++        let (mut ckind, mut read, mut write) = with_timeout(
+             "connecting",
+             connect_timeout,
+             self.connector.connect(self.addr),
+         )
+         .await?;
+ 
+-        async move {
+-            self.handler.on_connected(now.elapsed());
+-
+-            let mut write_buf = Box::new([0u8; MAX_MSG_LEN]);
+-            let handshake =
+-                Handshake::new(self.info_hash, self.peer_id).with_v2(self.handler.is_v2());
+-            let hsz = handshake.serialize_unchecked_len(&mut *write_buf);
+-            with_timeout(
+-                "writing",
+-                rwtimeout,
+-                write
+-                    .write_all(&write_buf[..hsz])
+-                    .map_err(Error::WriteHandshake),
+-            )
+-            .await?;
++        let mut write_buf = Box::new([0u8; MAX_MSG_LEN]);
++        let (read_buf, h) = match self
++            .outgoing_handshake(&mut read, &mut write, &mut *write_buf, rwtimeout)
++            .await
++        {
++            Ok(handshake) => handshake,
++            Err(tcp_error)
++                if matches!(ckind, ConnectionKind::Tcp)
++                    && self.connector.can_connect_utp()
++                    && !matches!(
++                        &tcp_error,
++                        Error::WrongInfoHash | Error::ConnectingToOurselves
++                    ) =>
++            {
++                debug!(?tcp_error, "TCP peer handshake failed, retrying over uTP");
++                drop(read);
++                drop(write);
++                (ckind, read, write) = with_timeout(
++                    "connecting over uTP",
++                    connect_timeout,
++                    self.connector.connect_utp(self.addr),
++                )
++                .await?;
++                self.outgoing_handshake(&mut read, &mut write, &mut *write_buf, rwtimeout)
++                    .await?
++            }
++            Err(error) => return Err(error),
++        };
++        self.handler.on_connected(now.elapsed());
+ 
+-            let mut read_buf = ReadBuf::new();
+-            let h = read_buf.read_handshake(&mut read, rwtimeout).await?;
++        async move {
+             let handshake_supports_extended = h.supports_extended();
+             trace!(
+                 peer_id=?h.peer_id,
+                 decoded_id=?try_decode_peer_id(h.peer_id),
+                 "connected",
+             );
+-            if h.info_hash != self.info_hash
+-                && !self.handler.accepts_metadata_hash_upgrade(h.info_hash)
+-            {
+-                return Err(Error::WrongInfoHash);
+-            }
+-
+-            if h.peer_id == self.peer_id {
+-                return Err(Error::ConnectingToOurselves);
+-            }
+-
+             self.handler.on_handshake(h, ckind).map_err(Error::Anyhow)?;
+ 
+             self.manage_peer(ManagePeerArgs {
+diff --git a/crates/librqbit/src/stream_connect.rs b/crates/librqbit/src/stream_connect.rs
+index ab9b0e9..8a2ab21 100644
+--- a/crates/librqbit/src/stream_connect.rs
++++ b/crates/librqbit/src/stream_connect.rs
+@@ -207,6 +207,27 @@ impl StreamConnector {
+         &self.stats
+     }
+ 
++    pub fn can_connect_utp(&self) -> bool {
++        self.proxy_config.is_none() && self.utp_socket.is_some()
++    }
++
++    pub async fn connect_utp(
++        &self,
++        addr: SocketAddr,
++    ) -> Result<(ConnectionKind, BoxAsyncReadVectored, BoxAsyncWrite)> {
++        if !self.can_connect_utp() {
++            return Err(Error::Anyhow(anyhow::anyhow!("direct uTP is unavailable")));
++        }
++        let sock = self.utp_socket.as_ref().unwrap();
++        let stream = self
++            .with_stat(ConnectionKind::Utp, addr.is_ipv6(), sock.connect(addr))
++            .await
++            .map_err(Error::UtpConnect)?;
++        let (read, write) = stream.split();
++        debug!(?addr, "connected over uTP after TCP handshake failure");
++        Ok((ConnectionKind::Utp, Box::new(read), Box::new(write)))
++    }
++
+     pub async fn connect(
+         &self,
+         addr: SocketAddr,

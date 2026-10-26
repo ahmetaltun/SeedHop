@@ -137,6 +137,7 @@ impl PieceTracker {
             if !self.chunks.is_piece_have(piece)
                 && !self.inflight.contains_key(&piece)
                 && (req.peer_has_piece)(piece)
+                && (req.can_steal)(piece)
             {
                 return self.reserve_piece(piece, req.peer);
             }
@@ -237,6 +238,31 @@ impl PieceTracker {
     /// Mark piece as failed after hash verification failure - requeues the piece.
     pub fn mark_piece_hash_failed(&mut self, piece: ValidPieceIndex) {
         self.chunks.mark_piece_broken_if_not_have(piece);
+    }
+
+    pub(crate) fn owns_piece(&self, piece: ValidPieceIndex, peer: PeerHandle) -> bool {
+        self.inflight
+            .get(&piece)
+            .is_some_and(|owner| owner.peer == peer)
+    }
+
+    pub(crate) fn pieces_owned_by(&self, peer: PeerHandle) -> Vec<ValidPieceIndex> {
+        self.inflight
+            .iter()
+            .filter_map(|(piece, owner)| (owner.peer == peer).then_some(*piece))
+            .collect()
+    }
+
+    /// Requeue a rejected piece only if it still belongs to this connection.
+    pub fn release_piece_owned_by(&mut self, piece: ValidPieceIndex, peer: PeerHandle) {
+        if self
+            .inflight
+            .get(&piece)
+            .is_some_and(|info| info.peer == peer)
+        {
+            self.inflight.remove(&piece);
+            self.chunks.mark_piece_broken_if_not_have(piece);
+        }
     }
 
     /// Release all pieces owned by a peer (on peer death).

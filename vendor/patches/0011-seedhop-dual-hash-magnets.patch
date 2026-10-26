@@ -1,0 +1,468 @@
+diff --git a/crates/librqbit/src/dht_utils.rs b/crates/librqbit/src/dht_utils.rs
+--- a/crates/librqbit/src/dht_utils.rs
++++ b/crates/librqbit/src/dht_utils.rs
+@@ -6,6 +6,7 @@
+ use librqbit_core::torrent_metainfo::TorrentMetaV1Info;
+ use tracing::{Instrument, debug, debug_span};
+ 
++use crate::peer_info_reader::MetadataIdentity;
+ use crate::{
+     peer_connection::PeerConnectionOptions, peer_info_reader, spawn_utils::BlockingSpawner,
+     stream_connect::StreamConnector,
+@@ -52,8 +53,7 @@
+ 
+ pub async fn read_metainfo_from_peer_receiver<A: Stream<Item = SocketAddr> + Unpin>(
+     peer_id: Id20,
+-    info_hash: Id20,
+-    v2_hash: Option<librqbit_core::Id32>,
++    identity: MetadataIdentity,
+     initial_addrs: Vec<SocketAddr>,
+     addrs_stream: A,
+     peer_connection_options: Option<PeerConnectionOptions>,
+@@ -76,8 +76,7 @@
+                 let result = peer_info_reader::read_metainfo_from_peer(
+                     addr,
+                     peer_id,
+-                    info_hash,
+-                    v2_hash,
++                    identity,
+                     peer_connection_options,
+                     // This shouldn't be called anyway as we aren't reading/writing to disk, so it's
+                     // ok not to use a shared one.
+@@ -178,7 +177,7 @@
+         let peer_id = generate_peer_id(b"-xx1234-");
+         match read_metainfo_from_peer_receiver(
+             peer_id,
+-            info_hash,
++            MetadataIdentity::legacy(info_hash, None),
+             Vec::new(),
+             peer_rx,
+             None,
+diff --git a/crates/librqbit/src/peer_info_reader/mod.rs b/crates/librqbit/src/peer_info_reader/mod.rs
+--- a/crates/librqbit/src/peer_info_reader/mod.rs
++++ b/crates/librqbit/src/peer_info_reader/mod.rs
+@@ -32,11 +32,47 @@
+ 
+ pub(crate) mod legacy_layers;
+ 
++/// The negotiated wire identity and all full magnet commitments are distinct.
++/// Legacy metadata can be constrained by a known v2 hash without using v2 wire.
++#[derive(Clone, Copy, Debug)]
++pub(crate) struct MetadataIdentity {
++    pub wire_hash: Id20,
++    pub v1: Option<Id20>,
++    pub v2: Option<Id32>,
++    pub v2_wire: bool,
++}
++impl MetadataIdentity {
++    pub fn legacy(hash: Id20, required_v2: Option<Id32>) -> Self {
++        Self {
++            wire_hash: hash,
++            v1: Some(hash),
++            v2: required_v2,
++            v2_wire: false,
++        }
++    }
++    pub fn v2(hash: Id32, required_v1: Option<Id20>) -> Self {
++        Self {
++            wire_hash: hash.truncate_for_dht(),
++            v1: required_v1,
++            v2: Some(hash),
++            v2_wire: true,
++        }
++    }
++}
++#[derive(Debug, thiserror::Error)]
++enum MetadataIdentityError {
++    #[error("metadata does not match the magnet's SHA-1 commitment")]
++    Sha1,
++    #[error("metadata does not match the magnet's SHA-256 commitment")]
++    Sha256,
++    #[error("a dual-hash magnet must describe a hybrid torrent")]
++    NotHybrid,
++}
++
+ pub(crate) async fn read_metainfo_from_peer(
+     addr: SocketAddr,
+     peer_id: Id20,
+-    info_hash: Id20,
+-    v2_hash: Option<Id32>,
++    identity: MetadataIdentity,
+     peer_connection_options: Option<PeerConnectionOptions>,
+     spawner: BlockingSpawner,
+     connector: Arc<StreamConnector>,
+@@ -48,8 +84,7 @@
+     let (writer_tx, writer_rx) = tokio::sync::mpsc::unbounded_channel::<WriterRequest>();
+     let handler = Handler {
+         addr,
+-        info_hash,
+-        v2_hash,
++        identity,
+         handshake_hash: Mutex::new(None),
+         layers: Mutex::new(None),
+         pending_info: Mutex::new(None),
+@@ -60,7 +95,7 @@
+     };
+     let connection = PeerConnection::new(
+         addr,
+-        info_hash,
++        identity.wire_hash,
+         peer_id,
+         handler,
+         peer_connection_options,
+@@ -124,8 +159,7 @@
+     fn record_piece(
+         &mut self,
+         d: &UtMetadataData<ByteBuf>,
+-        info_hash: &Id20,
+-        v2_hash: Option<Id32>,
++        identity: MetadataIdentity,
+     ) -> anyhow::Result<bool> {
+         let piece = d.piece();
+         if piece as usize >= self.total_pieces {
+@@ -151,13 +185,17 @@
+             // check metadata
+             let mut hash = Sha1::new();
+             hash.update(&self.buffer);
+-            let matches = if let Some(expected) = v2_hash {
+-                librqbit_core::v2::sha256(&self.buffer) == expected.0
+-            } else {
+-                hash.finish() == info_hash.0
+-            };
+-            if !matches {
+-                anyhow::bail!("info checksum invalid");
++            if identity
++                .v1
++                .is_some_and(|expected| hash.finish() != expected.0)
++            {
++                return Err(MetadataIdentityError::Sha1.into());
++            }
++            if identity
++                .v2
++                .is_some_and(|expected| librqbit_core::v2::sha256(&self.buffer) != expected.0)
++            {
++                return Err(MetadataIdentityError::Sha256.into());
+             }
+             Ok(true)
+         } else {
+@@ -170,8 +208,7 @@
+ 
+ struct Handler {
+     addr: SocketAddr,
+-    info_hash: Id20,
+-    v2_hash: Option<Id32>,
++    identity: MetadataIdentity,
+     handshake_hash: Mutex<Option<Id20>>,
+     layers: Mutex<Option<librqbit_core::v2::PendingMetainfo>>,
+     pending_info: Mutex<Option<TorrentAndInfoBytes>>,
+@@ -221,12 +258,16 @@
+     // A hybrid peer can answer metadata discovery with its v2 wire identity.
+     // No content is accepted until the original full SHA-1 commitment and this
+     // candidate's truncated SHA-256 identity both match the received info bytes.
+-    fn accepts_metadata_hash_upgrade(&self, _hash: Id20) -> bool {
+-        self.v2_hash.is_none()
++    fn accepts_metadata_hash_upgrade(&self, hash: Id20) -> bool {
++        !self.identity.v2_wire
++            && self
++                .identity
++                .v2
++                .is_none_or(|expected| hash == expected.truncate_for_dht())
+     }
+ 
+     fn is_v2(&self) -> bool {
+-        self.v2_hash.is_some()
++        self.identity.v2_wire
+     }
+     fn should_send_bitfield(&self) -> bool {
+         false
+@@ -257,12 +298,12 @@
+                     .send(WriterRequest::Message(Message::HashReject(request)))?;
+                 return Ok(());
+             }
+-            Message::Request(request) if self.v2_hash.is_some() => {
++            Message::Request(request) if self.identity.v2_wire => {
+                 self.writer_tx
+                     .send(WriterRequest::Message(Message::Reject(request)))?;
+                 return Ok(());
+             }
+-            Message::Piece(_) if self.v2_hash.is_some() => {
++            Message::Piece(_) if self.identity.v2_wire => {
+                 anyhow::bail!("unsolicited payload during metadata discovery");
+             }
+             _ => {}
+@@ -292,7 +333,7 @@
+                 .ok_or_else(|| {
+                     anyhow::anyhow!("metadata data received after info dictionary completed")
+                 })?
+-                .record_piece(&utdata, &self.info_hash, self.v2_hash)?;
++                .record_piece(&utdata, self.identity)?;
+             if piece_ready {
+                 let buf = Bytes::from(self.locked.write().take().unwrap().buffer);
+                 let info = from_bytes::<TorrentMetaV1Info<ByteBuf>>(&buf)
+@@ -308,19 +349,22 @@
+ 
+                 let info = info?;
+                 if let Some(candidate) = *self.handshake_hash.lock()
+-                    && candidate != self.info_hash
++                    && candidate != self.identity.wire_hash
+                 {
+                     anyhow::ensure!(
+                         candidate.0 == librqbit_core::v2::sha256(info.1.as_ref())[..20],
+                         "hybrid metadata handshake identity mismatch"
+                     );
+                 }
+-                if self.v2_hash.is_some() {
++                if self.identity.v2_wire {
+                     let pending =
+                         librqbit_core::v2::PendingMetainfo::from_info(info.1.as_ref())?
+                             .ok_or_else(|| anyhow::anyhow!("v2 magnet supplied v1 metadata"))?;
+-                    if Some(Id32::new(pending.info_hash())) != self.v2_hash {
++                    if Some(Id32::new(pending.info_hash())) != self.identity.v2 {
+                         anyhow::bail!("v2 metadata identity mismatch");
++                    }
++                    if self.identity.v1.is_some() && !pending.is_hybrid() {
++                        return Err(MetadataIdentityError::NotHybrid.into());
+                     }
+                     *self.pending_info.lock() = Some(info);
+                     *self.layers.lock() = Some(pending);
+diff --git a/crates/librqbit/src/session.rs b/crates/librqbit/src/session.rs
+--- a/crates/librqbit/src/session.rs
++++ b/crates/librqbit/src/session.rs
+@@ -24,6 +24,7 @@
+     listen::{Accept, ListenerOptions},
+     merge_streams::merge_streams,
+     peer_connection::PeerConnectionOptions,
++    peer_info_reader::MetadataIdentity,
+     read_buf::ReadBuf,
+     session_persistence::{SessionPersistenceStore, json::JsonSessionPersistenceStore},
+     session_stats::SessionStats,
+@@ -573,6 +574,7 @@
+ struct InternalAddResult {
+     info_hash: Id20,
+     v2_hash: Option<librqbit_core::Id32>,
++    magnet_v1_hash: Option<Id20>,
+     metadata: Option<TorrentMetadata>,
+     trackers: Vec<url::Url>,
+     name: Option<String>,
+@@ -1214,9 +1216,10 @@
+                     let magnet = Magnet::parse(&magnet)
+                         .context("provided path is not a valid magnet URL")?;
+                     let v2_hash = magnet.as_id32();
++                    let magnet_v1_hash = magnet.as_id20();
+                     let info_hash = v2_hash
+                         .map(|h| h.truncate_for_dht())
+-                        .or_else(|| magnet.as_id20())
++                        .or(magnet_v1_hash)
+                         .context("magnet has no supported info hash")?;
+                     if let Some(so) = magnet.get_select_only() {
+                         // Only overwrite opts.only_files if user didn't specify
+@@ -1228,6 +1231,7 @@
+                     InternalAddResult {
+                         info_hash,
+                         v2_hash,
++                        magnet_v1_hash,
+                         trackers: magnet
+                             .trackers
+                             .into_iter()
+@@ -1273,6 +1277,7 @@
+ 
+                     InternalAddResult {
+                         info_hash: torrent.meta.info_hash,
++                        magnet_v1_hash: None,
+                         v2_hash: torrent
+                             .meta
+                             .info
+@@ -1351,6 +1356,7 @@
+         let InternalAddResult {
+             mut info_hash,
+             v2_hash,
++            magnet_v1_hash,
+             metadata,
+             mut trackers,
+             name,
+@@ -1386,8 +1392,16 @@
+                         "no known way to resolve peers (no DHT, no trackers, no initial_peers)",
+                     )?;
+                     let resolved_magnet = self
+-                        .resolve_magnet(info_hash, v2_hash, peer_rx, &trackers, opts.peer_opts)
++                        .resolve_magnet(
++                            info_hash,
++                            v2_hash,
++                            magnet_v1_hash,
++                            peer_rx,
++                            &trackers,
++                            &opts,
++                        )
+                         .await?;
++                    info_hash = resolved_magnet.discovery_hash;
+ 
+                     // Add back seen_peers into the peer stream, as we consumed some peers
+                     // while resolving the magnet.
+@@ -1950,14 +1964,67 @@
+         self: &Arc<Self>,
+         info_hash: Id20,
+         v2_hash: Option<librqbit_core::Id32>,
++        v1_hash: Option<Id20>,
++        peer_rx: PeerStream,
++        trackers: &[url::Url],
++        opts: &AddTorrentOptions,
++    ) -> anyhow::Result<ResolveMagnetResult> {
++        let identity = match v2_hash {
++            Some(hash) => MetadataIdentity::v2(hash, v1_hash),
++            None => MetadataIdentity::legacy(info_hash, None),
++        };
++        let preferred = self.resolve_magnet_one(identity, peer_rx, trackers, opts.peer_opts);
++        let (Some(v1), Some(v2)) = (v1_hash, v2_hash) else {
++            return preferred.await;
++        };
++        let Some(legacy_peers) = self.make_peer_rx(
++            v1,
++            trackers.to_vec(),
++            !opts.paused && !opts.list_only,
++            opts.force_tracker_interval,
++            opts.initial_peers.clone().unwrap_or_default(),
++            false,
++        ) else {
++            return preferred.await;
++        };
++        let alternate = self.resolve_magnet_one(
++            MetadataIdentity::legacy(v1, Some(v2)),
++            legacy_peers,
++            trackers,
++            opts.peer_opts,
++        );
++        tokio::pin!(preferred, alternate);
++        let fatal = |error: &anyhow::Error| {
++            error.chain().any(|cause| {
++                cause.downcast_ref::<librqbit_core::v2::V2Error>()
++                    == Some(&librqbit_core::v2::V2Error::HybridHashMismatch)
++            })
++        };
++        tokio::select! {
++            result = &mut preferred => match result {
++                Ok(result) => Ok(result),
++                Err(error) if fatal(&error) => Err(error),
++                Err(error) => { debug!(%error, "v2 magnet metadata lookup ended; waiting for legacy swarm"); alternate.await }
++            },
++            result = &mut alternate => match result {
++                Ok(result) => Ok(result),
++                Err(error) if fatal(&error) => Err(error),
++                Err(error) => { debug!(%error, "legacy magnet metadata lookup ended; waiting for v2 swarm"); preferred.await }
++            },
++        }
++    }
++
++    async fn resolve_magnet_one(
++        self: &Arc<Self>,
++        identity: MetadataIdentity,
+         peer_rx: PeerStream,
+         trackers: &[url::Url],
+         peer_opts: Option<PeerConnectionOptions>,
+     ) -> anyhow::Result<ResolveMagnetResult> {
++        let info_hash = identity.wire_hash;
+         match read_metainfo_from_peer_receiver(
+             self.peer_id,
+-            info_hash,
+-            v2_hash,
++            identity,
+             Default::default(),
+             peer_rx,
+             Some(self.merge_peer_opts(peer_opts)),
+@@ -1976,10 +2043,20 @@
+                 // The SHA-1-authenticated info dictionary commits to the full
+                 // v2 identity, but its provider may be strictly v1-only. Use a
+                 // separate v2 discovery stream for the missing Merkle layers.
+-                if v2_hash.is_none()
+-                    && let Some(pending) =
+-                        librqbit_core::v2::PendingMetainfo::from_info(info_bytes.as_ref())?
+-                {
++                let legacy_pending = if identity.v2_wire {
++                    None
++                } else {
++                    librqbit_core::v2::PendingMetainfo::from_info(info_bytes.as_ref())?
++                };
++                if !identity.v2_wire && identity.v2.is_some() {
++                    anyhow::ensure!(
++                        legacy_pending
++                            .as_ref()
++                            .is_some_and(|pending| pending.is_hybrid()),
++                        "a dual-hash magnet must describe a hybrid torrent"
++                    );
++                }
++                if let Some(pending) = legacy_pending {
+                     if pending.next_request().is_none() {
+                         // Files no larger than a piece need no external layer.
+                         info.v2 = Some(Arc::new(pending.finish()?));
+@@ -2006,8 +2083,7 @@
+                             .context("no way to discover v2 Merkle proof providers")?;
+                         let proof_lookup = read_metainfo_from_peer_receiver(
+                             self.peer_id,
+-                            full.truncate_for_dht(),
+-                            Some(full),
++                            MetadataIdentity::v2(full, Some(info_hash)),
+                             vec![],
+                             proofs,
+                             Some(self.merge_peer_opts(peer_opts)),
+@@ -2102,8 +2178,11 @@
+                     info.v2.as_deref(),
+                 )?;
+                 let info = info.validate()?;
++                let metadata = TorrentMetadata::new(info, torrent_bytes, info_bytes.0)?;
++                debug!(wire_hash = %info_hash.as_string(), wire_v2 = identity.v2_wire, "magnet metadata authenticated");
+                 Ok(ResolveMagnetResult {
+-                    metadata: TorrentMetadata::new(info, torrent_bytes, info_bytes.0)?,
++                    discovery_hash: info_hash,
++                    metadata,
+                     peer_rx: rx,
+                     seen_peers: {
+                         let seen = seen.into_iter().collect_vec();
+@@ -2163,6 +2242,7 @@
+ }
+ 
+ pub(crate) struct ResolveMagnetResult {
++    pub discovery_hash: Id20,
+     pub metadata: TorrentMetadata,
+     pub peer_rx: PeerStream,
+     pub seen_peers: Vec<SocketAddr>,
+diff --git a/crates/librqbit_core/src/magnet.rs b/crates/librqbit_core/src/magnet.rs
+--- a/crates/librqbit_core/src/magnet.rs
++++ b/crates/librqbit_core/src/magnet.rs
+@@ -17,6 +17,8 @@
+ pub enum MagnetError {
+     #[error("magnet link has neither v1 (btih) nor v2 (btmh) info hash")]
+     NoInfoHash,
++    #[error("magnet link contains conflicting {0} info hashes")]
++    ConflictingInfoHash(&'static str),
+ }
+ 
+ impl Magnet {
+@@ -87,10 +89,16 @@
+                 "xt" => {
+                     if let Some(ih) = value.as_ref().strip_prefix("urn:btih:") {
+                         let i = Id20::from_str(ih)?;
++                        if id20.is_some_and(|previous| previous != i) {
++                            return Err(MagnetError::ConflictingInfoHash("btih").into());
++                        }
+                         id20.replace(i);
+                         info_hash_found = true;
+                     } else if let Some(ih) = value.as_ref().strip_prefix("urn:btmh:1220") {
+                         let i = Id32::from_str(ih)?;
++                        if id32.is_some_and(|previous| previous != i) {
++                            return Err(MagnetError::ConflictingInfoHash("btmh").into());
++                        }
+                         id32.replace(i);
+                         info_hash_found = true;
+                     } else {
+diff --git a/crates/librqbit_core/src/v2.rs b/crates/librqbit_core/src/v2.rs
+--- a/crates/librqbit_core/src/v2.rs
++++ b/crates/librqbit_core/src/v2.rs
+@@ -867,6 +867,9 @@
+     pub fn info_hash(&self) -> Hash {
+         self.meta.info_hash
+     }
++    pub fn is_hybrid(&self) -> bool {
++        self.meta.is_hybrid()
++    }
+     pub fn next_request(&self) -> Option<HashRequest> {
+         self.requests.front().copied()
+     }

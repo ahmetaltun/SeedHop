@@ -1,0 +1,186 @@
+diff --git a/crates/librqbit/src/dht_utils.rs b/crates/librqbit/src/dht_utils.rs
+--- a/crates/librqbit/src/dht_utils.rs
++++ b/crates/librqbit/src/dht_utils.rs
+@@ -16,6 +16,7 @@
+ #[allow(clippy::large_enum_variant)]
+ pub enum ReadMetainfoResult<Rx> {
+     Found {
++        source: SocketAddr,
+         info: TorrentMetaV1Info<ByteBufOwned>,
+         info_bytes: ByteBufOwned,
+         rx: Rx,
+@@ -97,7 +98,7 @@
+             }
+             .with_context(|| format!("error reading metainfo from {addr}"));
+             drop(token);
+-            ret
++            ret.map(|(info, info_bytes)| (addr, info, info_bytes))
+         }
+     };
+ 
+@@ -118,7 +119,7 @@
+         tokio::select! {
+             done = unordered.next(), if !unordered.is_empty() => {
+                 match done {
+-                    Some(Ok((info, info_bytes))) => return ReadMetainfoResult::Found { info, info_bytes, seen, rx: addrs },
++                    Some(Ok((source, info, info_bytes))) => return ReadMetainfoResult::Found { source, info, info_bytes, seen, rx: addrs },
+                     Some(Err(e)) => {
+                         debug!("{:#}", e);
+                     },
+diff --git a/crates/librqbit/src/peer_info_reader/mod.rs b/crates/librqbit/src/peer_info_reader/mod.rs
+--- a/crates/librqbit/src/peer_info_reader/mod.rs
++++ b/crates/librqbit/src/peer_info_reader/mod.rs
+@@ -80,24 +80,8 @@
+             Err(e) => return Err(e.into())
+         }
+     };
+-    // A btih-only hybrid magnet first authenticates SHA-1, then reconnects using
+-    // its committed SHA-256 identity to fetch v2 Merkle layers.
+-    if v2_hash.is_none() {
+-        if let Some(pending) = librqbit_core::v2::PendingMetainfo::from_info(result.1.as_ref())? {
+-            let full = Id32::new(pending.info_hash());
+-            return Box::pin(read_metainfo_from_peer(
+-                addr,
+-                peer_id,
+-                full.truncate_for_dht(),
+-                Some(full),
+-                peer_connection_options,
+-                spawner,
+-                connector,
+-                client_name_and_version,
+-            ))
+-            .await;
+-        }
+-    }
++    // A legacy provider need not support hash messages or the v2 identity.
++    // The session discovers proof providers after authenticating this info.
+     Ok(result)
+ }
+ 
+diff --git a/crates/librqbit/src/session.rs b/crates/librqbit/src/session.rs
+--- a/crates/librqbit/src/session.rs
++++ b/crates/librqbit/src/session.rs
+@@ -1352,7 +1352,7 @@
+             mut info_hash,
+             v2_hash,
+             metadata,
+-            trackers,
++            mut trackers,
+             name,
+         } = add_res;
+ 
+@@ -1403,6 +1403,13 @@
+                 }
+             }
+         };
++
++        // Retain the private tracker choice before converting it to an
++        // unordered set. Both hybrid swarms, resume and reconnect must keep
++        // using the same first tracker rather than choosing a different one.
++        if metadata.info.info().private {
++            trackers.truncate(1);
++        }
+ 
+         // A private flag learned from magnet metadata must also stop the
+         // pre-metadata public discovery stream before live transfer begins.
+@@ -1802,12 +1809,14 @@
+             trackers.clear();
+         }
+ 
+-        if is_private && trackers.len() > 1 {
+-            warn!(
+-                ?info_hash,
+-                "private trackers are not fully implemented, so using only the first tracker"
+-            );
+-            trackers.truncate(1);
++        if is_private {
++            if trackers.len() > 1 {
++                warn!(
++                    ?info_hash,
++                    "private trackers are not fully implemented, so using only the first tracker"
++                );
++                trackers.truncate(1);
++            }
+         } else if !self.disable_trackers {
+             trackers.extend(self.trackers.iter().cloned());
+         }
+@@ -1958,11 +1967,75 @@
+         .await
+         {
+             ReadMetainfoResult::Found {
+-                info,
+-                info_bytes,
+-                rx,
+-                seen,
++                source,
++                mut info,
++                mut info_bytes,
++                mut rx,
++                mut seen,
+             } => {
++                // The SHA-1-authenticated info dictionary commits to the full
++                // v2 identity, but its provider may be strictly v1-only. Use a
++                // separate v2 discovery stream for the missing Merkle layers.
++                if v2_hash.is_none()
++                    && let Some(pending) =
++                        librqbit_core::v2::PendingMetainfo::from_info(info_bytes.as_ref())?
++                {
++                    if pending.next_request().is_none() {
++                        // Files no larger than a piece need no external layer.
++                        info.v2 = Some(Arc::new(pending.finish()?));
++                    } else {
++                        let full = librqbit_core::Id32::new(pending.info_hash());
++                        drop(pending);
++                        let private = info.private;
++                        if private {
++                            // Stop pre-metadata public discovery immediately.
++                            // Only the authenticated provider already knows
++                            // this dictionary; discard other public candidates.
++                            rx = futures::stream::empty().boxed();
++                            seen = std::collections::HashSet::from([source]);
++                        }
++                        let proofs = self
++                            .make_peer_rx(
++                                full.truncate_for_dht(),
++                                trackers.to_vec(),
++                                false,
++                                None,
++                                seen.iter().copied().collect(),
++                                private,
++                            )
++                            .context("no way to discover v2 Merkle proof providers")?;
++                        let result = read_metainfo_from_peer_receiver(
++                            self.peer_id,
++                            full.truncate_for_dht(),
++                            Some(full),
++                            vec![],
++                            proofs,
++                            Some(self.merge_peer_opts(peer_opts)),
++                            self.connector.clone(),
++                            self.client_name_and_version.clone(),
++                        )
++                        .await;
++                        match result {
++                            ReadMetainfoResult::Found {
++                                info: verified,
++                                info_bytes: verified_bytes,
++                                seen: proof_peers,
++                                ..
++                            } => {
++                                anyhow::ensure!(
++                                    verified_bytes.as_ref() == info_bytes.as_ref(),
++                                    "v2 proof source changed the authenticated info dictionary"
++                                );
++                                info = verified;
++                                info_bytes = verified_bytes;
++                                seen.extend(proof_peers);
++                            }
++                            ReadMetainfoResult::ChannelClosed { .. } => {
++                                bail!("no peer supplied the required v2 Merkle layers")
++                            }
++                        }
++                    }
++                }
+                 trace!(?info, "received result from DHT");
+                 let torrent_bytes = torrent_file_from_info_bytes(
+                     info_bytes.as_ref(),

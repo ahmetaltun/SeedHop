@@ -1,0 +1,681 @@
+{
+  "date": "2026-10-26",
+  "status": "in_progress",
+  "scope": "Live interest independent of choke/window waits, current request ownership, selection cancellation and separate legacy/v2 choke semantics; full protocol objective remains active",
+  "rust": {
+    "passed": 80,
+    "v2TargetPassed": 58,
+    "failed": 0,
+    "ignored": 1,
+    "command": "cargo test --workspace --locked -- --test-threads=1",
+    "log": ".build/v2-interest-complete-rust.log"
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "format": "PASS",
+    "pythonCompile": "PASS",
+    "gitDiffCheck": "PASS",
+    "sixteenPatchForwardReconstruction": "PASS",
+    "sixteenPatchReverseReapply": "PASS"
+  },
+  "behavior": [
+    "Useful peer pieces are missing selected pieces or current streaming demand, independent of choke state",
+    "Interest transitions run independently of requester capacity/rate waits; notifications plus 250 ms streaming fallback",
+    "Unneeded owned requests cancel through exact ledger; late piece/reject responses remain correlated without writing unwanted payload",
+    "Request enqueue checks peer/ownership/selection/choke/window together and orders interest before payload request",
+    "Legacy choke retires implicit cancellations and releases claims; v2 requires explicit piece/reject response",
+    "Released unselected pieces do not reenter selected download queue",
+    "Selection and request-window updates drop state/flow locks before notifying peer work"
+  ],
+  "rawPeerCoverage": [
+    "Pure-v2, hybrid v2 wire and hybrid legacy wire: unhelpful bitfield, HAVE, selection loss/regain while choked, exact cancellation, late replies, subsequent byte-exact transfer",
+    "Pure-v2 and hybrid: another peer completes the only useful advertised piece, causing not-interested while choked; fresh HAVE regains interest",
+    "Unselected stream start, seek, drop and restart; byte-exact reads without changing selected files",
+    "One-request window: legacy choking must allow retry after unchoke; v2 must keep the request pending until explicit reject"
+  ],
+  "independentOutgoingCases": [
+    {
+      "mode": "pure",
+      "result": "PASS",
+      "infoHashV2": "918caa09938910510a97591040604b2f65578cb00dc34a3565f0aa1e9181c156",
+      "wireHash": "918caa09938910510a97591040604b2f65578cb0",
+      "observerStates": [
+        "interested",
+        "not-interested",
+        "interested"
+      ],
+      "observerRequests": [
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "sourceRequests": [
+        {
+          "index": 0,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 0,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "evidence": ".build/interest-pure-2sk8mteq"
+    },
+    {
+      "mode": "hybrid-v2",
+      "result": "PASS",
+      "infoHashV2": "f207c194dd139c1f52ae1c94fc3056b4956c07742b99a6e211d1694b51709dcf",
+      "wireHash": "f207c194dd139c1f52ae1c94fc3056b4956c0774",
+      "observerStates": [
+        "interested",
+        "not-interested",
+        "interested"
+      ],
+      "observerRequests": [
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "sourceRequests": [
+        {
+          "index": 0,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 0,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "evidence": ".build/interest-hybrid-v2-bgigl7ct"
+    },
+    {
+      "mode": "hybrid-v1",
+      "result": "PASS",
+      "infoHashV2": "f207c194dd139c1f52ae1c94fc3056b4956c07742b99a6e211d1694b51709dcf",
+      "wireHash": "a2213944792df18b5df45de608d1ac5856422a3d",
+      "observerStates": [
+        "interested",
+        "not-interested",
+        "interested"
+      ],
+      "observerRequests": [
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "sourceRequests": [
+        {
+          "index": 0,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 0,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "evidence": ".build/interest-hybrid-v1-sut2kqqd"
+    }
+  ],
+  "hybridRegressions": [
+    {
+      "direction": "download-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-v1-klo2e573"
+    },
+    {
+      "direction": "download-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-mixed-ctxfs5uq"
+    },
+    {
+      "direction": "magnet-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-mixed-0hctbic_"
+    },
+    {
+      "direction": "magnet-v1-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-v1-mixed-xmjn6pe4"
+    },
+    {
+      "direction": "magnet-dual-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-dual-mixed-9i847xjk"
+    },
+    {
+      "direction": "upload-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-upload-v1-k_p3in7p"
+    }
+  ],
+  "legacyDualRegressions": [
+    {
+      "mode": "complete",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-complete-sltpo6qi"
+    },
+    {
+      "mode": "partial",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-partial-eli_tydz"
+    },
+    {
+      "mode": "corrupt",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-corrupt-klqcf0c3"
+    },
+    {
+      "mode": "padding",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-padding-_um_m9c_"
+    },
+    {
+      "mode": "private",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "45a6b345d79b6e49eb826420b9fb3b742a3215ba",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "evidence": ".build/legacy-layers-dual-private-kss6xt9c"
+    },
+    {
+      "mode": "inconsistent",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "463da230a19ec0571fe00a59a0381e759cba3b2d",
+      "infoHashV2": "53753123a19c814d096f6c84f2e7704ec2fa98391cfdbd5a6347fc10cad61665",
+      "evidence": ".build/legacy-layers-dual-inconsistent-jk1r7lms"
+    },
+    {
+      "mode": "inspect-only",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-inspect-only-h8fgcyhz"
+    },
+    {
+      "mode": "inspect-unpadded",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "3bb8fc4a855ab7fae75912250ce18e51e64526d2",
+      "infoHashV2": "4a71b73ba65d423cc88ab43d56e3464966fcafae6c04a4a6ae98bf8cabee91c9",
+      "evidence": ".build/legacy-layers-dual-inspect-unpadded-vlmhngus"
+    }
+  ],
+  "privateRegressions": [
+    {
+      "mode": "public-control",
+      "result": "PASS",
+      "publicControl": true,
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "bytes": 140012,
+      "unrelatedConnections": 2,
+      "closedConnections": 2,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 0,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 1,
+      "lateAnnounces": 1,
+      "extraTrackerQueriesAfterBarrier": 7,
+      "barrierTime": 20770.748330875,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-public-control-6a6ux1z5"
+    },
+    {
+      "mode": "pure",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "ae8e7007593b335a05ef474a804f5507c9333a895d9e50c034d5c9e143cb2956",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 20773.690578541,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-pure-0hpgiubz"
+    },
+    {
+      "mode": "hybrid",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 20776.226258458,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-hybrid-bts4nkyu"
+    },
+    {
+      "mode": "dual",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 2,
+      "closedConnections": 2,
+      "acceptedBeforeProofRelease": 2,
+      "closedBeforeProofRelease": 2,
+      "lateDhtReplies": 2,
+      "gatedHashes": 2,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 20778.745596708,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        },
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-dual-80p2cftq"
+    },
+    {
+      "mode": "btih",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 20781.269548041,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-btih-tokj3zv4"
+    }
+  ],
+  "dualMagnetTransportRegressions": [
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "tcp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-off-magnet-dual-hybrid-5dt8d04p"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "tcp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-required-magnet-dual-hybrid-fur8tt3p"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "utp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-off-magnet-dual-hybrid-4cs7chi9"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "utp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-required-magnet-dual-hybrid-yr1i8h59"
+    }
+  ],
+  "impairedLegacyUtpCases": [
+    {
+      "direction": "download",
+      "format": "hybrid",
+      "encryption": "off",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 4377,
+        "dropped": 62,
+        "delayed": 203,
+        "reordered": 184,
+        "blackoutDropped": 20,
+        "forwardedAfterBlackout": 4250,
+        "repeatedDataSequences": 220
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-download-legacy-plain-1udnchdz",
+      "forcedLegacyWire": true,
+      "wireHandshakes": [
+        {
+          "direction": "toTarget",
+          "infoHash": "fd0be900f032f01de506c94cc1a895b2c5b6db56",
+          "v2UpgradeBit": false
+        },
+        {
+          "direction": "fromTarget",
+          "infoHash": "fd0be900f032f01de506c94cc1a895b2c5b6db56",
+          "v2UpgradeBit": false
+        }
+      ]
+    },
+    {
+      "direction": "upload",
+      "format": "hybrid",
+      "encryption": "off",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 2633,
+        "dropped": 49,
+        "delayed": 162,
+        "reordered": 133,
+        "blackoutDropped": 2,
+        "forwardedAfterBlackout": 2515,
+        "repeatedDataSequences": 133
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-upload-legacy-plain-_yds93mj",
+      "forcedLegacyWire": true,
+      "wireHandshakes": [
+        {
+          "direction": "toTarget",
+          "infoHash": "fd0be900f032f01de506c94cc1a895b2c5b6db56",
+          "v2UpgradeBit": false
+        },
+        {
+          "direction": "fromTarget",
+          "infoHash": "fd0be900f032f01de506c94cc1a895b2c5b6db56",
+          "v2UpgradeBit": false
+        }
+      ]
+    }
+  ],
+  "impairedEncryptedUtpCases": [
+    {
+      "direction": "download",
+      "format": "hybrid",
+      "encryption": "required",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 3482,
+        "dropped": 49,
+        "delayed": 161,
+        "reordered": 149,
+        "blackoutDropped": 11,
+        "forwardedAfterBlackout": 3346,
+        "repeatedDataSequences": 171
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-download-hybrid-rc4-i05zx57c",
+      "forcedLegacyWire": false,
+      "wireHandshakes": []
+    },
+    {
+      "direction": "upload",
+      "format": "hybrid",
+      "encryption": "required",
+      "transport": "utp",
+      "bytes": 2097343,
+      "largeFileSha256": "540823d67a4d227857a4ccce87c9bd53e8a8843388685ff18ffe2b46aead164b",
+      "result": "PASS",
+      "relay": {
+        "forwarded": 2634,
+        "dropped": 49,
+        "delayed": 162,
+        "reordered": 131,
+        "blackoutDropped": 3,
+        "forwardedAfterBlackout": 2517,
+        "repeatedDataSequences": 133
+      },
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/utp-impaired-upload-hybrid-rc4-vyvh9r3m",
+      "forcedLegacyWire": false,
+      "wireHandshakes": []
+    }
+  ],
+  "recoveryFixture": {
+    "initialFullRun": "FAIL: nondeterministic four-block corruption gate timed out",
+    "isolatedRun": "PASS without a production change; fixture gate depended on pipelined blocks surviving disconnect after the first bad piece",
+    "fix": "Optional test-only batch of four corrupted blocks; default relay behavior unchanged; two-piece delivery, zero verified corrupt progress, interruption, partial restart and exact recovery assertions retained",
+    "targetedBatchedLog": ".build/v2-interest-recovery-batched.log",
+    "finalWorkspaceResult": "PASS"
+  },
+  "specification": [
+    "https://www.bittorrent.org/beps/bep_0003.html",
+    "https://www.bittorrent.org/beps/bep_0052.html"
+  ],
+  "native": "Not rebuilt for this engine-only checkpoint. Last native package evidence is v2-filenames-2026-10-26.json; rebuild after remaining serving/discovery work.",
+  "remaining": [
+    "Metadata serving index equal to piece count currently reaches a slice; reject safely and test",
+    "Authenticated hash availability, bounded response work and priority reservation during hash verification",
+    "LSD subscription ownership/announcement lifetime, PEX extension ID zero/optional IDs and private discovery",
+    "Legacy layer-fetcher peer-state and transport audit",
+    "Final requirement-by-requirement and native validation; physical/certificate-backed gates remain separate"
+  ],
+  "sourceSha256": {
+    "vendor/rqbit/crates/librqbit/src/chunk_tracker.rs": "4fd4e3e61678deb09fe7ff61ac042dc680a2ed6d76befc349a66dd751f754dee",
+    "vendor/rqbit/crates/librqbit/src/piece_tracker.rs": "e63c0ebef599f889dd6d0e5824ce754a08206996d56c44cab0382665c0e5caea",
+    "vendor/rqbit/crates/librqbit/src/torrent_state/live/mod.rs": "f04060786374d2d74abe2d7bdbe0aaec7388226e5c7e7ade45c8b96e633edbd1",
+    "crates/seedhop-core/tests/v2.rs": "d6d9d91ef030d5e047e503ab72f05a2c7f6fb381b756166cb813441711006c0a",
+    "crates/seedhop-core/tests/support/mod.rs": "c1440158a18f6ef0cd704eb79433801d52ddf532ca9ea4d552c25488a91bdb01",
+    "scripts/v2_interest.py": "164c2d176017f876e5344f6737332f4a34c036e7fab58d42979d23bad53f4611",
+    "vendor/patches/0016-seedhop-peer-interest-state.patch": "1b3c4666ec554ca57fbf7eea19161e12472a74783d1461f90032238f01713bd4"
+  },
+  "logs": [
+    ".build/v2-interest-check.log",
+    ".build/v2-interest-choke-baseline-fixed-header.log",
+    ".build/v2-interest-choke-baseline.log",
+    ".build/v2-interest-choke-fixed.log",
+    ".build/v2-interest-clippy.log",
+    ".build/v2-interest-complete-check.log",
+    ".build/v2-interest-complete-clippy.log",
+    ".build/v2-interest-complete-hybrid.log",
+    ".build/v2-interest-complete-independent.log",
+    ".build/v2-interest-complete-legacy.log",
+    ".build/v2-interest-complete-patches.log",
+    ".build/v2-interest-complete-private.log",
+    ".build/v2-interest-complete-rust.log",
+    ".build/v2-interest-current-check.log",
+    ".build/v2-interest-current-clippy.log",
+    ".build/v2-interest-final-check.log",
+    ".build/v2-interest-final-clippy.log",
+    ".build/v2-interest-format.log",
+    ".build/v2-interest-independent-fixed-folder.log",
+    ".build/v2-interest-independent.log",
+    ".build/v2-interest-patches.log",
+    ".build/v2-interest-recovery-batched.log",
+    ".build/v2-interest-recovery-diagnostics.log",
+    ".build/v2-interest-recovery-gate.log",
+    ".build/v2-interest-rust.log",
+    ".build/v2-interest-stream-fixed-test.log",
+    ".build/v2-interest-stream-test.log",
+    ".build/v2-interest-targeted-fixed-comparison.log",
+    ".build/v2-interest-targeted.log",
+    ".build/v2-interest-transports.log",
+    ".build/v2-interest-updated-check.log",
+    ".build/v2-interest-utp-loss-encrypted.log",
+    ".build/v2-interest-utp-loss-legacy.log",
+    ".build/v2-interest-utp-loss.log"
+  ]
+}

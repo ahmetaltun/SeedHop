@@ -38,12 +38,16 @@ impl PeerStates {
         self.stats.snapshot()
     }
 
-    pub fn add_if_not_seen(&self, addr: SocketAddr) -> Option<PeerHandle> {
+    pub fn add_if_not_seen(
+        &self,
+        addr: SocketAddr,
+        info_hash: librqbit_core::hash_id::Id20,
+    ) -> Option<PeerHandle> {
         use dashmap::mapref::entry::Entry;
         match self.states.entry(addr) {
             Entry::Occupied(_) => None,
             Entry::Vacant(vac) => {
-                vac.insert(Peer::new_with_outgoing_address(addr));
+                vac.insert(Peer::new_with_outgoing_address(addr, info_hash));
                 atomic_inc(&self.stats.queued);
                 atomic_inc(&self.session_stats.queued);
 

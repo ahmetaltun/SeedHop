@@ -1,0 +1,1561 @@
+{
+  "date": "2026-10-26",
+  "status": "in_progress",
+  "scope": "BEP 52 filename sanitization, original-byte hybrid validation, exact UTF-8 boundaries and saved-path migration; full protocol goal remains active",
+  "policy": {
+    "componentMaxUtf8Bytes": 248,
+    "pathMaxBytes": 4096,
+    "siblingCollisions": "Unicode normalization/full case folding with default-ignorable code points ignored conservatively; original-byte SHA-256 suffix disambiguates",
+    "invalidNames": "Byte escapes; separate reserved and hash namespaces; strict UTF-8 never decodes overlong dots/separators",
+    "ordinaryUnicode": "Preserved, including emoji and initial BOM characters",
+    "hashes": "Original info bytes and raw hybrid path equality remain authoritative",
+    "persistence": "Every v2 path is pinned by index with file_name_mapping_version=1. Older sessions reproduce historical validation/encoding and retain rename overrides without moving files. Incomplete/current, invalid or future maps fail before I/O."
+  },
+  "rust": {
+    "passed": 76,
+    "v2TargetPassed": 54,
+    "failed": 0,
+    "ignored": 1,
+    "command": "cargo test --workspace --locked -- --test-threads=1",
+    "log": ".build/v2-filenames-complete-rust.log"
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "format": "PASS",
+    "pythonCompile": "PASS",
+    "gitDiffCheck": "PASS",
+    "fifteenPatchForwardReconstruction": "PASS",
+    "fifteenPatchReverseReapply": "PASS",
+    "nativeAdHocBuild": "PASS",
+    "codesignDeepStrict": "PASS",
+    "bundledUnicodeLicenseByteIdentical": "PASS",
+    "supplementalDependencyAttributionBundled": "PASS: unicode-casefold author/source notice and Apache-2.0 license option retained"
+  },
+  "independentFilenameCases": [
+    {
+      "mode": "pure-file",
+      "result": "PASS",
+      "bytes": 3822,
+      "files": 28,
+      "infoHashV2": "321913365b648519507d166b6692413b40bccddf3eb6954fc6e8eb666b235764",
+      "metadataRequests": [],
+      "wireIdentities": [
+        "321913365b648519507d166b6692413b40bccddf",
+        "321913365b648519507d166b6692413b40bccddf"
+      ],
+      "uploads": {
+        "v2Requests": 28
+      },
+      "mappings": [
+        {
+          "raw": [
+            "254646"
+          ],
+          "storage": "%25FF",
+          "bytes": 123
+        },
+        {
+          "raw": [
+            "256866616b65"
+          ],
+          "storage": "%25hfake",
+          "bytes": 124
+        },
+        {
+          "raw": [
+            "2e"
+          ],
+          "storage": "%2E",
+          "bytes": 125
+        },
+        {
+          "raw": [
+            "2e2e",
+            "657363617065"
+          ],
+          "storage": "%2E%2E/escape",
+          "bytes": 126
+        },
+        {
+          "raw": [
+            "2ee2808d"
+          ],
+          "storage": "%ha8f4536ab57ac3af65d7ebd3a9e947709d13d5dc433a63c8b8cd911bbfb21672",
+          "bytes": 127
+        },
+        {
+          "raw": [
+            "41"
+          ],
+          "storage": "A%h559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd",
+          "bytes": 128
+        },
+        {
+          "raw": [
+            "434f4d31"
+          ],
+          "storage": "%rCOM1",
+          "bytes": 129
+        },
+        {
+          "raw": [
+            "434f4e2e747874"
+          ],
+          "storage": "%rCON.txt",
+          "bytes": 130
+        },
+        {
+          "raw": [
+            "446972",
+            "66696c65"
+          ],
+          "storage": "Dir%h9c09272bdf8456ce4d64e1567119a27bd51b23f2892a2ec14e78f6c64de06cbf/file",
+          "bytes": 131
+        },
+        {
+          "raw": [
+            "61"
+          ],
+          "storage": "a%hca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+          "bytes": 132
+        },
+        {
+          "raw": [
+            "61e2808d"
+          ],
+          "storage": "a\u200d%hb63d6e248b2f643d432963e8b8f4776cc9f8453fce1f9abaa2f14ad1b2b6ec8b",
+          "bytes": 133
+        },
+        {
+          "raw": [
+            "626164006e616d65"
+          ],
+          "storage": "bad%00name",
+          "bytes": 134
+        },
+        {
+          "raw": [
+            "6261642f6e616d65"
+          ],
+          "storage": "bad%2Fname",
+          "bytes": 135
+        },
+        {
+          "raw": [
+            "6261645c6e616d65"
+          ],
+          "storage": "bad%5Cname",
+          "bytes": 136
+        },
+        {
+          "raw": [
+            "646972",
+            "46494c45"
+          ],
+          "storage": "dir%h2b64c6d9afd8a34ed0dbf35f7de171a8825a50d9f42f05e98fe2b1addf00ab44/FILE",
+          "bytes": 137
+        },
+        {
+          "raw": [
+            "65cc81"
+          ],
+          "storage": "e\u0301%hbf12767b0f2a56b2190075bae8169f656e3ce8d6357d4aff184bc6c7ea48f9f6",
+          "bytes": 138
+        },
+        {
+          "raw": [
+            "68656c6c6f"
+          ],
+          "storage": "hello%h2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+          "bytes": 139
+        },
+        {
+          "raw": [
+            "7373"
+          ],
+          "storage": "ss%ha31fe9656fc8d3a459e623dc8204e6d0268f8df56d734dac3ca3262edb5db883",
+          "bytes": 140
+        },
+        {
+          "raw": [
+            "7461696c2e20"
+          ],
+          "storage": "tail%2E%20",
+          "bytes": 141
+        },
+        {
+          "raw": [
+            "78787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"
+          ],
+          "storage": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx%h85e62acd750c4eb56b7b6a1d66dca5bfaac5f062608a1a893410d0288936c09a",
+          "bytes": 142
+        },
+        {
+          "raw": [
+            "7878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"
+          ],
+          "storage": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx%h15eb95a462ee20bd91a415ae2d4aed341288186ddaa2b37908f7d592f0c3f85f",
+          "bytes": 143
+        },
+        {
+          "raw": [
+            "c0aec0ae"
+          ],
+          "storage": "%C0%AE%C0%AE",
+          "bytes": 144
+        },
+        {
+          "raw": [
+            "c39f"
+          ],
+          "storage": "\u00df%hcd3a7e92a9114307055e4a0583acd6549ec3bb6d7c10ecc6ce11ae3d76b3d7db",
+          "bytes": 145
+        },
+        {
+          "raw": [
+            "c3a9"
+          ],
+          "storage": "\u00e9%h4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c",
+          "bytes": 146
+        },
+        {
+          "raw": [
+            "e2808d"
+          ],
+          "storage": "%hb34b7a15cf631544f3bfd30f601dc2c6953760b956eb1d40aea01c7f8bacd118",
+          "bytes": 147
+        },
+        {
+          "raw": [
+            "efbbbf68656c6c6f"
+          ],
+          "storage": "\ufeffhello%h7489ebbcc2a00056ddaaaac190bce473e5c03696ea1bd8ed83cf59a174283862",
+          "bytes": 148
+        },
+        {
+          "raw": [
+            "f09f8fa02e747874"
+          ],
+          "storage": "\ud83c\udfe0.txt",
+          "bytes": 149
+        },
+        {
+          "raw": [
+            "ff"
+          ],
+          "storage": "%FF",
+          "bytes": 150
+        }
+      ],
+      "evidence": ".build/filenames-pure-file-u6d1as4y"
+    },
+    {
+      "mode": "pure-magnet",
+      "result": "PASS",
+      "bytes": 3822,
+      "files": 28,
+      "infoHashV2": "321913365b648519507d166b6692413b40bccddf3eb6954fc6e8eb666b235764",
+      "metadataRequests": [
+        0
+      ],
+      "wireIdentities": [
+        "321913365b648519507d166b6692413b40bccddf",
+        "321913365b648519507d166b6692413b40bccddf"
+      ],
+      "uploads": {},
+      "mappings": [
+        {
+          "raw": [
+            "254646"
+          ],
+          "storage": "%25FF",
+          "bytes": 123
+        },
+        {
+          "raw": [
+            "256866616b65"
+          ],
+          "storage": "%25hfake",
+          "bytes": 124
+        },
+        {
+          "raw": [
+            "2e"
+          ],
+          "storage": "%2E",
+          "bytes": 125
+        },
+        {
+          "raw": [
+            "2e2e",
+            "657363617065"
+          ],
+          "storage": "%2E%2E/escape",
+          "bytes": 126
+        },
+        {
+          "raw": [
+            "2ee2808d"
+          ],
+          "storage": "%ha8f4536ab57ac3af65d7ebd3a9e947709d13d5dc433a63c8b8cd911bbfb21672",
+          "bytes": 127
+        },
+        {
+          "raw": [
+            "41"
+          ],
+          "storage": "A%h559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd",
+          "bytes": 128
+        },
+        {
+          "raw": [
+            "434f4d31"
+          ],
+          "storage": "%rCOM1",
+          "bytes": 129
+        },
+        {
+          "raw": [
+            "434f4e2e747874"
+          ],
+          "storage": "%rCON.txt",
+          "bytes": 130
+        },
+        {
+          "raw": [
+            "446972",
+            "66696c65"
+          ],
+          "storage": "Dir%h9c09272bdf8456ce4d64e1567119a27bd51b23f2892a2ec14e78f6c64de06cbf/file",
+          "bytes": 131
+        },
+        {
+          "raw": [
+            "61"
+          ],
+          "storage": "a%hca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+          "bytes": 132
+        },
+        {
+          "raw": [
+            "61e2808d"
+          ],
+          "storage": "a\u200d%hb63d6e248b2f643d432963e8b8f4776cc9f8453fce1f9abaa2f14ad1b2b6ec8b",
+          "bytes": 133
+        },
+        {
+          "raw": [
+            "626164006e616d65"
+          ],
+          "storage": "bad%00name",
+          "bytes": 134
+        },
+        {
+          "raw": [
+            "6261642f6e616d65"
+          ],
+          "storage": "bad%2Fname",
+          "bytes": 135
+        },
+        {
+          "raw": [
+            "6261645c6e616d65"
+          ],
+          "storage": "bad%5Cname",
+          "bytes": 136
+        },
+        {
+          "raw": [
+            "646972",
+            "46494c45"
+          ],
+          "storage": "dir%h2b64c6d9afd8a34ed0dbf35f7de171a8825a50d9f42f05e98fe2b1addf00ab44/FILE",
+          "bytes": 137
+        },
+        {
+          "raw": [
+            "65cc81"
+          ],
+          "storage": "e\u0301%hbf12767b0f2a56b2190075bae8169f656e3ce8d6357d4aff184bc6c7ea48f9f6",
+          "bytes": 138
+        },
+        {
+          "raw": [
+            "68656c6c6f"
+          ],
+          "storage": "hello%h2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+          "bytes": 139
+        },
+        {
+          "raw": [
+            "7373"
+          ],
+          "storage": "ss%ha31fe9656fc8d3a459e623dc8204e6d0268f8df56d734dac3ca3262edb5db883",
+          "bytes": 140
+        },
+        {
+          "raw": [
+            "7461696c2e20"
+          ],
+          "storage": "tail%2E%20",
+          "bytes": 141
+        },
+        {
+          "raw": [
+            "78787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"
+          ],
+          "storage": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx%h85e62acd750c4eb56b7b6a1d66dca5bfaac5f062608a1a893410d0288936c09a",
+          "bytes": 142
+        },
+        {
+          "raw": [
+            "7878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"
+          ],
+          "storage": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx%h15eb95a462ee20bd91a415ae2d4aed341288186ddaa2b37908f7d592f0c3f85f",
+          "bytes": 143
+        },
+        {
+          "raw": [
+            "c0aec0ae"
+          ],
+          "storage": "%C0%AE%C0%AE",
+          "bytes": 144
+        },
+        {
+          "raw": [
+            "c39f"
+          ],
+          "storage": "\u00df%hcd3a7e92a9114307055e4a0583acd6549ec3bb6d7c10ecc6ce11ae3d76b3d7db",
+          "bytes": 145
+        },
+        {
+          "raw": [
+            "c3a9"
+          ],
+          "storage": "\u00e9%h4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c",
+          "bytes": 146
+        },
+        {
+          "raw": [
+            "e2808d"
+          ],
+          "storage": "%hb34b7a15cf631544f3bfd30f601dc2c6953760b956eb1d40aea01c7f8bacd118",
+          "bytes": 147
+        },
+        {
+          "raw": [
+            "efbbbf68656c6c6f"
+          ],
+          "storage": "\ufeffhello%h7489ebbcc2a00056ddaaaac190bce473e5c03696ea1bd8ed83cf59a174283862",
+          "bytes": 148
+        },
+        {
+          "raw": [
+            "f09f8fa02e747874"
+          ],
+          "storage": "\ud83c\udfe0.txt",
+          "bytes": 149
+        },
+        {
+          "raw": [
+            "ff"
+          ],
+          "storage": "%FF",
+          "bytes": 150
+        }
+      ],
+      "evidence": ".build/filenames-pure-magnet-d67y7l6q"
+    },
+    {
+      "mode": "hybrid-file",
+      "result": "PASS",
+      "bytes": 3822,
+      "files": 28,
+      "infoHashV2": "9b35459057577bcb8998044c6c33fd90d372e5ed5d2b6c85932fd42edf39bfd5",
+      "metadataRequests": [],
+      "wireIdentities": [
+        "9b35459057577bcb8998044c6c33fd90d372e5ed",
+        "9b35459057577bcb8998044c6c33fd90d372e5ed"
+      ],
+      "uploads": {
+        "v2Requests": 28,
+        "v1Requests": 56
+      },
+      "mappings": [
+        {
+          "raw": [
+            "254646"
+          ],
+          "storage": "%25FF",
+          "bytes": 123
+        },
+        {
+          "raw": [
+            "256866616b65"
+          ],
+          "storage": "%25hfake",
+          "bytes": 124
+        },
+        {
+          "raw": [
+            "2e"
+          ],
+          "storage": "%2E",
+          "bytes": 125
+        },
+        {
+          "raw": [
+            "2e2e",
+            "657363617065"
+          ],
+          "storage": "%2E%2E/escape",
+          "bytes": 126
+        },
+        {
+          "raw": [
+            "2ee2808d"
+          ],
+          "storage": "%ha8f4536ab57ac3af65d7ebd3a9e947709d13d5dc433a63c8b8cd911bbfb21672",
+          "bytes": 127
+        },
+        {
+          "raw": [
+            "41"
+          ],
+          "storage": "A%h559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd",
+          "bytes": 128
+        },
+        {
+          "raw": [
+            "434f4d31"
+          ],
+          "storage": "%rCOM1",
+          "bytes": 129
+        },
+        {
+          "raw": [
+            "434f4e2e747874"
+          ],
+          "storage": "%rCON.txt",
+          "bytes": 130
+        },
+        {
+          "raw": [
+            "446972",
+            "66696c65"
+          ],
+          "storage": "Dir%h9c09272bdf8456ce4d64e1567119a27bd51b23f2892a2ec14e78f6c64de06cbf/file",
+          "bytes": 131
+        },
+        {
+          "raw": [
+            "61"
+          ],
+          "storage": "a%hca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+          "bytes": 132
+        },
+        {
+          "raw": [
+            "61e2808d"
+          ],
+          "storage": "a\u200d%hb63d6e248b2f643d432963e8b8f4776cc9f8453fce1f9abaa2f14ad1b2b6ec8b",
+          "bytes": 133
+        },
+        {
+          "raw": [
+            "626164006e616d65"
+          ],
+          "storage": "bad%00name",
+          "bytes": 134
+        },
+        {
+          "raw": [
+            "6261642f6e616d65"
+          ],
+          "storage": "bad%2Fname",
+          "bytes": 135
+        },
+        {
+          "raw": [
+            "6261645c6e616d65"
+          ],
+          "storage": "bad%5Cname",
+          "bytes": 136
+        },
+        {
+          "raw": [
+            "646972",
+            "46494c45"
+          ],
+          "storage": "dir%h2b64c6d9afd8a34ed0dbf35f7de171a8825a50d9f42f05e98fe2b1addf00ab44/FILE",
+          "bytes": 137
+        },
+        {
+          "raw": [
+            "65cc81"
+          ],
+          "storage": "e\u0301%hbf12767b0f2a56b2190075bae8169f656e3ce8d6357d4aff184bc6c7ea48f9f6",
+          "bytes": 138
+        },
+        {
+          "raw": [
+            "68656c6c6f"
+          ],
+          "storage": "hello%h2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+          "bytes": 139
+        },
+        {
+          "raw": [
+            "7373"
+          ],
+          "storage": "ss%ha31fe9656fc8d3a459e623dc8204e6d0268f8df56d734dac3ca3262edb5db883",
+          "bytes": 140
+        },
+        {
+          "raw": [
+            "7461696c2e20"
+          ],
+          "storage": "tail%2E%20",
+          "bytes": 141
+        },
+        {
+          "raw": [
+            "78787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"
+          ],
+          "storage": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx%h85e62acd750c4eb56b7b6a1d66dca5bfaac5f062608a1a893410d0288936c09a",
+          "bytes": 142
+        },
+        {
+          "raw": [
+            "7878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"
+          ],
+          "storage": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx%h15eb95a462ee20bd91a415ae2d4aed341288186ddaa2b37908f7d592f0c3f85f",
+          "bytes": 143
+        },
+        {
+          "raw": [
+            "c0aec0ae"
+          ],
+          "storage": "%C0%AE%C0%AE",
+          "bytes": 144
+        },
+        {
+          "raw": [
+            "c39f"
+          ],
+          "storage": "\u00df%hcd3a7e92a9114307055e4a0583acd6549ec3bb6d7c10ecc6ce11ae3d76b3d7db",
+          "bytes": 145
+        },
+        {
+          "raw": [
+            "c3a9"
+          ],
+          "storage": "\u00e9%h4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c",
+          "bytes": 146
+        },
+        {
+          "raw": [
+            "e2808d"
+          ],
+          "storage": "%hb34b7a15cf631544f3bfd30f601dc2c6953760b956eb1d40aea01c7f8bacd118",
+          "bytes": 147
+        },
+        {
+          "raw": [
+            "efbbbf68656c6c6f"
+          ],
+          "storage": "\ufeffhello%h7489ebbcc2a00056ddaaaac190bce473e5c03696ea1bd8ed83cf59a174283862",
+          "bytes": 148
+        },
+        {
+          "raw": [
+            "f09f8fa02e747874"
+          ],
+          "storage": "\ud83c\udfe0.txt",
+          "bytes": 149
+        },
+        {
+          "raw": [
+            "ff"
+          ],
+          "storage": "%FF",
+          "bytes": 150
+        }
+      ],
+      "evidence": ".build/filenames-hybrid-file-6co1nmmc"
+    },
+    {
+      "mode": "hybrid-btih",
+      "result": "PASS",
+      "bytes": 3822,
+      "files": 28,
+      "infoHashV2": "9b35459057577bcb8998044c6c33fd90d372e5ed5d2b6c85932fd42edf39bfd5",
+      "metadataRequests": [
+        0
+      ],
+      "wireIdentities": [
+        "1eebbca1d24a81dd84fee6c1008858ebc52bac36",
+        "1eebbca1d24a81dd84fee6c1008858ebc52bac36"
+      ],
+      "uploads": {},
+      "mappings": [
+        {
+          "raw": [
+            "254646"
+          ],
+          "storage": "%25FF",
+          "bytes": 123
+        },
+        {
+          "raw": [
+            "256866616b65"
+          ],
+          "storage": "%25hfake",
+          "bytes": 124
+        },
+        {
+          "raw": [
+            "2e"
+          ],
+          "storage": "%2E",
+          "bytes": 125
+        },
+        {
+          "raw": [
+            "2e2e",
+            "657363617065"
+          ],
+          "storage": "%2E%2E/escape",
+          "bytes": 126
+        },
+        {
+          "raw": [
+            "2ee2808d"
+          ],
+          "storage": "%ha8f4536ab57ac3af65d7ebd3a9e947709d13d5dc433a63c8b8cd911bbfb21672",
+          "bytes": 127
+        },
+        {
+          "raw": [
+            "41"
+          ],
+          "storage": "A%h559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd",
+          "bytes": 128
+        },
+        {
+          "raw": [
+            "434f4d31"
+          ],
+          "storage": "%rCOM1",
+          "bytes": 129
+        },
+        {
+          "raw": [
+            "434f4e2e747874"
+          ],
+          "storage": "%rCON.txt",
+          "bytes": 130
+        },
+        {
+          "raw": [
+            "446972",
+            "66696c65"
+          ],
+          "storage": "Dir%h9c09272bdf8456ce4d64e1567119a27bd51b23f2892a2ec14e78f6c64de06cbf/file",
+          "bytes": 131
+        },
+        {
+          "raw": [
+            "61"
+          ],
+          "storage": "a%hca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+          "bytes": 132
+        },
+        {
+          "raw": [
+            "61e2808d"
+          ],
+          "storage": "a\u200d%hb63d6e248b2f643d432963e8b8f4776cc9f8453fce1f9abaa2f14ad1b2b6ec8b",
+          "bytes": 133
+        },
+        {
+          "raw": [
+            "626164006e616d65"
+          ],
+          "storage": "bad%00name",
+          "bytes": 134
+        },
+        {
+          "raw": [
+            "6261642f6e616d65"
+          ],
+          "storage": "bad%2Fname",
+          "bytes": 135
+        },
+        {
+          "raw": [
+            "6261645c6e616d65"
+          ],
+          "storage": "bad%5Cname",
+          "bytes": 136
+        },
+        {
+          "raw": [
+            "646972",
+            "46494c45"
+          ],
+          "storage": "dir%h2b64c6d9afd8a34ed0dbf35f7de171a8825a50d9f42f05e98fe2b1addf00ab44/FILE",
+          "bytes": 137
+        },
+        {
+          "raw": [
+            "65cc81"
+          ],
+          "storage": "e\u0301%hbf12767b0f2a56b2190075bae8169f656e3ce8d6357d4aff184bc6c7ea48f9f6",
+          "bytes": 138
+        },
+        {
+          "raw": [
+            "68656c6c6f"
+          ],
+          "storage": "hello%h2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+          "bytes": 139
+        },
+        {
+          "raw": [
+            "7373"
+          ],
+          "storage": "ss%ha31fe9656fc8d3a459e623dc8204e6d0268f8df56d734dac3ca3262edb5db883",
+          "bytes": 140
+        },
+        {
+          "raw": [
+            "7461696c2e20"
+          ],
+          "storage": "tail%2E%20",
+          "bytes": 141
+        },
+        {
+          "raw": [
+            "78787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"
+          ],
+          "storage": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx%h85e62acd750c4eb56b7b6a1d66dca5bfaac5f062608a1a893410d0288936c09a",
+          "bytes": 142
+        },
+        {
+          "raw": [
+            "7878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"
+          ],
+          "storage": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx%h15eb95a462ee20bd91a415ae2d4aed341288186ddaa2b37908f7d592f0c3f85f",
+          "bytes": 143
+        },
+        {
+          "raw": [
+            "c0aec0ae"
+          ],
+          "storage": "%C0%AE%C0%AE",
+          "bytes": 144
+        },
+        {
+          "raw": [
+            "c39f"
+          ],
+          "storage": "\u00df%hcd3a7e92a9114307055e4a0583acd6549ec3bb6d7c10ecc6ce11ae3d76b3d7db",
+          "bytes": 145
+        },
+        {
+          "raw": [
+            "c3a9"
+          ],
+          "storage": "\u00e9%h4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c",
+          "bytes": 146
+        },
+        {
+          "raw": [
+            "e2808d"
+          ],
+          "storage": "%hb34b7a15cf631544f3bfd30f601dc2c6953760b956eb1d40aea01c7f8bacd118",
+          "bytes": 147
+        },
+        {
+          "raw": [
+            "efbbbf68656c6c6f"
+          ],
+          "storage": "\ufeffhello%h7489ebbcc2a00056ddaaaac190bce473e5c03696ea1bd8ed83cf59a174283862",
+          "bytes": 148
+        },
+        {
+          "raw": [
+            "f09f8fa02e747874"
+          ],
+          "storage": "\ud83c\udfe0.txt",
+          "bytes": 149
+        },
+        {
+          "raw": [
+            "ff"
+          ],
+          "storage": "%FF",
+          "bytes": 150
+        }
+      ],
+      "evidence": ".build/filenames-hybrid-btih-xhu36cu5"
+    },
+    {
+      "mode": "hybrid-dual",
+      "result": "PASS",
+      "bytes": 3822,
+      "files": 28,
+      "infoHashV2": "9b35459057577bcb8998044c6c33fd90d372e5ed5d2b6c85932fd42edf39bfd5",
+      "metadataRequests": [
+        0
+      ],
+      "wireIdentities": [
+        "1eebbca1d24a81dd84fee6c1008858ebc52bac36",
+        "1eebbca1d24a81dd84fee6c1008858ebc52bac36"
+      ],
+      "uploads": {},
+      "mappings": [
+        {
+          "raw": [
+            "254646"
+          ],
+          "storage": "%25FF",
+          "bytes": 123
+        },
+        {
+          "raw": [
+            "256866616b65"
+          ],
+          "storage": "%25hfake",
+          "bytes": 124
+        },
+        {
+          "raw": [
+            "2e"
+          ],
+          "storage": "%2E",
+          "bytes": 125
+        },
+        {
+          "raw": [
+            "2e2e",
+            "657363617065"
+          ],
+          "storage": "%2E%2E/escape",
+          "bytes": 126
+        },
+        {
+          "raw": [
+            "2ee2808d"
+          ],
+          "storage": "%ha8f4536ab57ac3af65d7ebd3a9e947709d13d5dc433a63c8b8cd911bbfb21672",
+          "bytes": 127
+        },
+        {
+          "raw": [
+            "41"
+          ],
+          "storage": "A%h559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd",
+          "bytes": 128
+        },
+        {
+          "raw": [
+            "434f4d31"
+          ],
+          "storage": "%rCOM1",
+          "bytes": 129
+        },
+        {
+          "raw": [
+            "434f4e2e747874"
+          ],
+          "storage": "%rCON.txt",
+          "bytes": 130
+        },
+        {
+          "raw": [
+            "446972",
+            "66696c65"
+          ],
+          "storage": "Dir%h9c09272bdf8456ce4d64e1567119a27bd51b23f2892a2ec14e78f6c64de06cbf/file",
+          "bytes": 131
+        },
+        {
+          "raw": [
+            "61"
+          ],
+          "storage": "a%hca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+          "bytes": 132
+        },
+        {
+          "raw": [
+            "61e2808d"
+          ],
+          "storage": "a\u200d%hb63d6e248b2f643d432963e8b8f4776cc9f8453fce1f9abaa2f14ad1b2b6ec8b",
+          "bytes": 133
+        },
+        {
+          "raw": [
+            "626164006e616d65"
+          ],
+          "storage": "bad%00name",
+          "bytes": 134
+        },
+        {
+          "raw": [
+            "6261642f6e616d65"
+          ],
+          "storage": "bad%2Fname",
+          "bytes": 135
+        },
+        {
+          "raw": [
+            "6261645c6e616d65"
+          ],
+          "storage": "bad%5Cname",
+          "bytes": 136
+        },
+        {
+          "raw": [
+            "646972",
+            "46494c45"
+          ],
+          "storage": "dir%h2b64c6d9afd8a34ed0dbf35f7de171a8825a50d9f42f05e98fe2b1addf00ab44/FILE",
+          "bytes": 137
+        },
+        {
+          "raw": [
+            "65cc81"
+          ],
+          "storage": "e\u0301%hbf12767b0f2a56b2190075bae8169f656e3ce8d6357d4aff184bc6c7ea48f9f6",
+          "bytes": 138
+        },
+        {
+          "raw": [
+            "68656c6c6f"
+          ],
+          "storage": "hello%h2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+          "bytes": 139
+        },
+        {
+          "raw": [
+            "7373"
+          ],
+          "storage": "ss%ha31fe9656fc8d3a459e623dc8204e6d0268f8df56d734dac3ca3262edb5db883",
+          "bytes": 140
+        },
+        {
+          "raw": [
+            "7461696c2e20"
+          ],
+          "storage": "tail%2E%20",
+          "bytes": 141
+        },
+        {
+          "raw": [
+            "78787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"
+          ],
+          "storage": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx%h85e62acd750c4eb56b7b6a1d66dca5bfaac5f062608a1a893410d0288936c09a",
+          "bytes": 142
+        },
+        {
+          "raw": [
+            "7878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"
+          ],
+          "storage": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx%h15eb95a462ee20bd91a415ae2d4aed341288186ddaa2b37908f7d592f0c3f85f",
+          "bytes": 143
+        },
+        {
+          "raw": [
+            "c0aec0ae"
+          ],
+          "storage": "%C0%AE%C0%AE",
+          "bytes": 144
+        },
+        {
+          "raw": [
+            "c39f"
+          ],
+          "storage": "\u00df%hcd3a7e92a9114307055e4a0583acd6549ec3bb6d7c10ecc6ce11ae3d76b3d7db",
+          "bytes": 145
+        },
+        {
+          "raw": [
+            "c3a9"
+          ],
+          "storage": "\u00e9%h4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c",
+          "bytes": 146
+        },
+        {
+          "raw": [
+            "e2808d"
+          ],
+          "storage": "%hb34b7a15cf631544f3bfd30f601dc2c6953760b956eb1d40aea01c7f8bacd118",
+          "bytes": 147
+        },
+        {
+          "raw": [
+            "efbbbf68656c6c6f"
+          ],
+          "storage": "\ufeffhello%h7489ebbcc2a00056ddaaaac190bce473e5c03696ea1bd8ed83cf59a174283862",
+          "bytes": 148
+        },
+        {
+          "raw": [
+            "f09f8fa02e747874"
+          ],
+          "storage": "\ud83c\udfe0.txt",
+          "bytes": 149
+        },
+        {
+          "raw": [
+            "ff"
+          ],
+          "storage": "%FF",
+          "bytes": 150
+        }
+      ],
+      "evidence": ".build/filenames-hybrid-dual-aslnr4_f"
+    }
+  ],
+  "rawCoverage": [
+    "Invalid UTF-8 and overlong dot encodings",
+    "Dot and traversal-looking components, slash/backslash/NUL inside one raw key",
+    "Literal percent/escape strings, reserved device names, trailing dot/space, long names",
+    "Case/Unicode-normalization/full-case-fold/default-ignorable aliases, initial BOM, readable emoji",
+    "File/directory aliases and nested traversal-looking directory",
+    "28 distinct filesystem inodes and exact bytes per case",
+    "28 v2 upload requests for each file case; 56 legacy upload requests include virtual padding"
+  ],
+  "rustAdditionalCoverage": [
+    "Preserved full info hash and piece order; file previews exactly equal finalized storage components",
+    "Hybrid single/multifile layout comparisons reject substituted sanitized spellings",
+    "File recheck/restart preserves sanitized names and verified progress",
+    "Pure-v2/hybrid old JSON sessions preserve percent/reserved/Unicode names plus prior rename and migrate once",
+    "Incomplete/future/invalid saved path-map versions rejected without changing state/files",
+    "Unsafe advisory names cannot reject valid content or escape default container folder"
+  ],
+  "nativeCases": [
+    {
+      "format": "v2",
+      "result": "PASS",
+      "log": ".build/v2-filenames-packaged-native-v2.log"
+    },
+    {
+      "format": "hybrid",
+      "result": "PASS",
+      "log": ".build/v2-filenames-packaged-native-hybrid.log"
+    },
+    {
+      "format": "raw-v2",
+      "result": "PASS",
+      "log": ".build/v2-filenames-packaged-native-raw-v2.log"
+    },
+    {
+      "format": "raw-hybrid",
+      "result": "PASS",
+      "log": ".build/v2-filenames-packaged-native-raw-hybrid.log"
+    }
+  ],
+  "nativeCoverage": [
+    "mutual XPC requirements",
+    "protocol handshake",
+    "import through actual preview path",
+    "Force Recheck",
+    "priorities/queue",
+    "rename/relocation with exact bytes",
+    "restart/paused selection",
+    "removal/shutdown"
+  ],
+  "hybridRegressions": [
+    {
+      "direction": "download-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-v1-_0nbajgj"
+    },
+    {
+      "direction": "download-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-mixed-l_4xecq6"
+    },
+    {
+      "direction": "magnet-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-mixed-xtpyn4fu"
+    },
+    {
+      "direction": "magnet-v1-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-v1-mixed-9_rq0_06"
+    },
+    {
+      "direction": "magnet-dual-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-dual-mixed-58dcbw0c"
+    },
+    {
+      "direction": "upload-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-upload-v1-zmhjs8ke"
+    }
+  ],
+  "legacyDualRegressions": [
+    {
+      "mode": "complete",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-complete-225bd7uf"
+    },
+    {
+      "mode": "partial",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-partial-l9ge4g3b"
+    },
+    {
+      "mode": "corrupt",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-corrupt-52peffta"
+    },
+    {
+      "mode": "padding",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-padding-qpy5nzcf"
+    },
+    {
+      "mode": "private",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "45a6b345d79b6e49eb826420b9fb3b742a3215ba",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "evidence": ".build/legacy-layers-dual-private-cyn5odmh"
+    },
+    {
+      "mode": "inconsistent",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "463da230a19ec0571fe00a59a0381e759cba3b2d",
+      "infoHashV2": "53753123a19c814d096f6c84f2e7704ec2fa98391cfdbd5a6347fc10cad61665",
+      "evidence": ".build/legacy-layers-dual-inconsistent-09k1lm79"
+    },
+    {
+      "mode": "inspect-only",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-inspect-only-9kqua4vr"
+    },
+    {
+      "mode": "inspect-unpadded",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "3bb8fc4a855ab7fae75912250ce18e51e64526d2",
+      "infoHashV2": "4a71b73ba65d423cc88ab43d56e3464966fcafae6c04a4a6ae98bf8cabee91c9",
+      "evidence": ".build/legacy-layers-dual-inspect-unpadded-6mo_rlt6"
+    }
+  ],
+  "privateRegressions": [
+    {
+      "mode": "public-control",
+      "result": "PASS",
+      "publicControl": true,
+      "infoHashV2": "d31a9c8420de9bc33490a6d21bee498e4a585e103b725d7d35bc6babb2ab8deb",
+      "bytes": 140012,
+      "unrelatedConnections": 2,
+      "closedConnections": 2,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 0,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 1,
+      "lateAnnounces": 1,
+      "extraTrackerQueriesAfterBarrier": 8,
+      "barrierTime": 6881.334533333,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-public-control-7hocnjz4"
+    },
+    {
+      "mode": "pure",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "ae8e7007593b335a05ef474a804f5507c9333a895d9e50c034d5c9e143cb2956",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 6884.304182083,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-pure-pa72pjbu"
+    },
+    {
+      "mode": "hybrid",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 6886.820444833,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-hybrid-s7yggije"
+    },
+    {
+      "mode": "dual",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 2,
+      "closedConnections": 2,
+      "acceptedBeforeProofRelease": 2,
+      "closedBeforeProofRelease": 2,
+      "lateDhtReplies": 2,
+      "gatedHashes": 2,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 6889.349768458,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        },
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-dual-t45krv27"
+    },
+    {
+      "mode": "btih",
+      "result": "PASS",
+      "publicControl": false,
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "bytes": 140012,
+      "unrelatedConnections": 1,
+      "closedConnections": 1,
+      "acceptedBeforeProofRelease": 1,
+      "closedBeforeProofRelease": 1,
+      "lateDhtReplies": 1,
+      "gatedHashes": 1,
+      "descendantQueries": 0,
+      "lateAnnounces": 0,
+      "extraTrackerQueriesAfterBarrier": 0,
+      "barrierTime": 6892.379578375,
+      "hashRequests": [
+        {
+          "root": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "base": 1,
+          "index": 0,
+          "length": 4,
+          "proof": 1
+        }
+      ],
+      "evidence": ".build/private-metadata-btih-_p__c_15"
+    }
+  ],
+  "dualMagnetTransportRegressions": [
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "tcp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-off-magnet-dual-hybrid-_mgb91_o"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "tcp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-required-magnet-dual-hybrid-2fh191dd"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "utp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-off-magnet-dual-hybrid-4ruut24b"
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "utp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-required-magnet-dual-hybrid-_0fafx3d"
+    }
+  ],
+  "developmentFindings": [
+    "A test exposed legacy encoding guesses re-decoding finished UTF-8 strings; fixed at the shared adapter boundary",
+    "Finished strings now bypass even UTF-8 decoder BOM handling",
+    "Old traversal-rejection fixture replaced by actually invalid missing-root metadata; traversal-looking names now have positive containment tests",
+    "Vendor new-file patch headers corrected; final fifteen-patch reconstruction and full reverse/reapply byte-identical",
+    "unicode-casefold published archive omits standalone license files; final app bundles author/source notice and standard Apache-2.0 license in addition to the Unicode data license"
+  ],
+  "references": [
+    "https://www.bittorrent.org/beps/bep_0052.html",
+    "https://docs.rs/unicode-normalization/0.1.26/unicode_normalization/",
+    "https://docs.rs/unicode-casefold/0.2.0/unicode_casefold/",
+    "https://www.unicode.org/Public/17.0.0/ucd/DerivedCoreProperties.txt"
+  ],
+  "remaining": [
+    "Live interest/choke/cancel/hash-serving conformance",
+    "LSD subscription ownership and periodic announcement lifetime, hostile PEX/private discovery audit",
+    "Legacy layer fetcher adversarial and transport audit",
+    "Final requirement-by-requirement protocol completion review; certificate-backed signing and physical lifecycle remain separate deferred gates"
+  ],
+  "sourceSha256": {
+    "vendor/rqbit/crates/librqbit_core/Cargo.toml": "da489a0753795e8a6d06202cd90343eca5f7e9e22686dfd436a03e9580528d7f",
+    "vendor/rqbit/crates/librqbit_core/src/v2.rs": "e4143503158d6ef6d15f3ba13af9251dbf6189a358461a00dd37a1c9945ff493",
+    "vendor/rqbit/crates/librqbit_core/src/v2/paths.rs": "faa495df5ec41dd8e9dad95ff0ad4920ef7f6c5a912e5af2142d6053c588c7a5",
+    "vendor/rqbit/crates/librqbit_core/src/torrent_metainfo.rs": "abf51528f51a91cdb9ce9835206f19323fad2d0d4c924ce7cef954b44802d740",
+    "vendor/rqbit/crates/librqbit/src/session.rs": "867eadc89910a33a18d83e6a4ae62e1b9ccbb1d2f20b6aa98bcdaa58d703e305",
+    "vendor/rqbit/crates/librqbit/src/session_persistence/mod.rs": "6ac5032206410039f2bbe32b5ea4501914c257b2535b72cd8e91c42a350dfe60",
+    "vendor/rqbit/crates/librqbit/src/session_persistence/json.rs": "1a85524a8ba689736f773f47bb0a0bfe217133d50e65461e55cf1df43cd588fe",
+    "vendor/rqbit/crates/librqbit/src/session_persistence/postgres.rs": "c96d1c4d22101c38cb96cb1eca3b83367e341594e803a272ff1336254fa230a9",
+    "crates/seedhop-core/src/lib.rs": "8e87db7a0585fc3235ef3b41b35bb0c612a275f64262300726ec152d807dbf9c",
+    "crates/seedhop-core/tests/v2.rs": "918cacd4d87f02d84acba5572c5265070dabef9dedf965d17d02f84152eca14a",
+    "scripts/v2_filenames.py": "fcde7c69f2cdf28f6a497c7d7cc79c8bc19d7c6c3393ad0ef4a838c727245026",
+    "scripts/build.py": "e4a620cf4075761ecfef235dd2084a686b6ea622d3cee922e89f451de7ccef56",
+    "macOS/App/EngineSelfTest.swift": "aab7e7fa6a2b68701380a83a985173fd335eeb1903a6a9267d8f12e7b4549ac1",
+    "Cargo.lock": "eb7c1a42750ff8071ed4c8f1b8f6f264641262a7bd884bab9b1b8da0f85377d1",
+    "THIRD_PARTY_NOTICES.md": "3482e8cd7a97cc9f77df6dbdf29d55fa81bd2821fb2cd8190f8505cdb541ff8b",
+    "vendor/UNICODE-LICENSE.txt": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+    "vendor/patches/0015-seedhop-v2-filename-mapping.patch": "87ba1ca4d7bb5d0675785c67d19b156f3a0192ae19bc7eaa79ec9443a11e50a0",
+    "vendor/licenses/unicode-casefold-0.2.0/LICENSE-APACHE": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+    "vendor/licenses/unicode-casefold-0.2.0/NOTICE": "ff3f93b241e8e979852aa93df52d6dc95a8b7887e2fe293780bfd9b159b52d73"
+  },
+  "nativeBinarySha256": {
+    ".build/SeedHop.app/Contents/MacOS/SeedHop": "9218d470ad648e3b9650a332dfa0ec20a5e14ac5e0c3290af71f66912a5015d8",
+    ".build/SeedHop.app/Contents/XPCServices/SeedHopEngine.xpc/Contents/MacOS/SeedHopEngine": "021c60219c53ffe83bffc05bca2a8b83067a4971142700c905011566198537ad",
+    ".build/SeedHop.app/Contents/Frameworks/libseedhop_ffi.dylib": "38136607ad50b7c47844aa4e94a5712a6c62d4c4e73cb352fc20f8e982a3ea4c"
+  },
+  "logs": [
+    ".build/v2-filenames-complete-check.log",
+    ".build/v2-filenames-complete-clippy.log",
+    ".build/v2-filenames-complete-format.log",
+    ".build/v2-filenames-complete-hybrid.log",
+    ".build/v2-filenames-complete-independent.log",
+    ".build/v2-filenames-complete-legacy.log",
+    ".build/v2-filenames-complete-native-build.log",
+    ".build/v2-filenames-complete-native-hybrid.log",
+    ".build/v2-filenames-complete-native-raw-hybrid.log",
+    ".build/v2-filenames-complete-native-raw-v2.log",
+    ".build/v2-filenames-complete-native-v2.log",
+    ".build/v2-filenames-complete-patches.log",
+    ".build/v2-filenames-complete-private.log",
+    ".build/v2-filenames-complete-rust.log",
+    ".build/v2-filenames-complete-transports.log",
+    ".build/v2-filenames-license-packaging.log",
+    ".build/v2-filenames-packaged-native-v2.log",
+    ".build/v2-filenames-packaged-native-hybrid.log",
+    ".build/v2-filenames-packaged-native-raw-v2.log",
+    ".build/v2-filenames-packaged-native-raw-hybrid.log"
+  ]
+}

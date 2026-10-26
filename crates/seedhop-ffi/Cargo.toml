@@ -21,3 +21,6 @@ required-features = ["bindgen"]
 
 [features]
 bindgen = ["uniffi/cli"]
+
+[dev-dependencies]
+tempfile = "3"

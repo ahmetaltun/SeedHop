@@ -1,0 +1,91 @@
+diff --git a/crates/librqbit/src/peer_info_reader/mod.rs b/crates/librqbit/src/peer_info_reader/mod.rs
+--- a/crates/librqbit/src/peer_info_reader/mod.rs
++++ b/crates/librqbit/src/peer_info_reader/mod.rs
+@@ -472,6 +472,7 @@
+             self.progress.send_replace(tokio::time::Instant::now());
+             if piece_ready {
+                 let buf = Bytes::from(self.locked.write().take().unwrap().buffer);
++                librqbit_core::v2::Metainfo::check_info_version(&buf)?;
+                 let info = from_bytes::<TorrentMetaV1Info<ByteBuf>>(&buf)
+                     .map(|i| {
+                         use clone_to_owned::CloneToOwned;
+diff --git a/crates/librqbit_core/src/torrent_metainfo.rs b/crates/librqbit_core/src/torrent_metainfo.rs
+--- a/crates/librqbit_core/src/torrent_metainfo.rs
++++ b/crates/librqbit_core/src/torrent_metainfo.rs
+@@ -26,6 +26,9 @@
+ pub fn torrent_from_bytes<'de>(
+     buf: &'de [u8],
+ ) -> Result<TorrentMetaV1<ByteBuf<'de>>, bencode::DeserializeError> {
++    // Version-specific serde fields must not hide an unsupported meta version.
++    let v2 = crate::v2::Metainfo::parse(buf)
++        .map_err(|e| <bencode::DeserializeError as serde::de::Error>::custom(e.to_string()))?;
+     let mut t: TorrentMetaV1<ByteBuf<'_>> = bencode::from_bytes(buf)
+         .inspect_err(|e| tracing::trace!("error deserializing torrent: {e:#}"))
+         .map_err(|e| e.into_kind())?;
+@@ -35,9 +38,7 @@
+     let mut digest = sha1w::Sha1::new();
+     digest.update(t.info.raw_bytes.as_ref());
+     t.info_hash = Id20::new(digest.finish());
+-    if let Some(v2) = crate::v2::Metainfo::parse(buf)
+-        .map_err(|e| <bencode::DeserializeError as serde::de::Error>::custom(e.to_string()))?
+-    {
++    if let Some(v2) = v2 {
+         t.info_hash = Id20::new(v2.info_hash()[..20].try_into().unwrap());
+         t.info.data.v2 = Some(std::sync::Arc::new(v2));
+     }
+diff --git a/crates/librqbit_core/src/v2.rs b/crates/librqbit_core/src/v2.rs
+--- a/crates/librqbit_core/src/v2.rs
++++ b/crates/librqbit_core/src/v2.rs
+@@ -76,6 +76,29 @@
+     /// Returns None for v1. Version detection uses dictionary keys, never byte scanning.
+     pub fn parse(bytes: &[u8]) -> Result<Option<Self>> {
+         Self::parse_inner(bytes, true)
++    }
++    /// Check an acquired info dictionary before interpreting version-specific fields.
++    pub fn check_info_version(info: &[u8]) -> Result<()> {
++        if info.len() > MAX_METAINFO_LENGTH {
++            return Err(V2Error::Invalid("metadata exceeds 32 MiB"));
++        }
++        let mut parser = Parser {
++            bytes: info,
++            at: 0,
++            nodes: 0,
++            canonical: true,
++        };
++        let value = parser.value(0)?;
++        if parser.at != info.len() {
++            return Err(V2Error::Invalid("trailing info data"));
++        }
++        if let Some(version) = value.get(b"meta version")? {
++            let version = version.number()?;
++            if version != 2 {
++                return Err(V2Error::Version(version));
++            }
++        }
++        Ok(())
+     }
+     /// A safe optional container name; the info name remains purely advisory.
+     pub fn suggested_root_name(&self) -> String {
+diff --git a/crates/peer_binary_protocol/src/lib.rs b/crates/peer_binary_protocol/src/lib.rs
+--- a/crates/peer_binary_protocol/src/lib.rs
++++ b/crates/peer_binary_protocol/src/lib.rs
+@@ -459,9 +459,6 @@
+             21..=23 => {
+                 check_msg_len!(min 48);
+                 let request = HashRequest::decode(buf.consume::<48>().unwrap());
+-                if !request.valid() {
+-                    return Err(MessageDeserializeError::InvalidHashRequest);
+-                }
+                 let message = match msg_id {
+                     21 | 23 => {
+                         check_msg_len!(48);
+@@ -472,7 +469,8 @@
+                         }
+                     }
+                     _ => {
+-                        if (msg_len - 48) % 32 != 0 || (msg_len - 48) / 32 > 544 {
++                        if !request.valid() || (msg_len - 48) % 32 != 0 || (msg_len - 48) / 32 > 544
++                        {
+                             return Err(MessageDeserializeError::InvalidHashRequest);
+                         }
+                         let mut hashes = Vec::with_capacity((msg_len - 48) / 32);

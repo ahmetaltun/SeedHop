@@ -1,0 +1,410 @@
+{
+  "date": "2026-10-26",
+  "status": "in_progress",
+  "scope": "Legacy-only hybrid layer-fetch interest, choke/cancel ownership and useful-progress wakeups; final protocol/native audit remains active",
+  "rust": {
+    "passed": 92,
+    "v2TargetPassed": 70,
+    "failed": 0,
+    "ignored": 1,
+    "command": "cargo test --workspace --locked -- --test-threads=1",
+    "log": ".build/v2-legacy-flow-complete-rust.log"
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "format": "PASS",
+    "pythonCompile": "PASS",
+    "gitDiffCheck": "PASS",
+    "twentyOnePatchForwardReconstruction": "PASS",
+    "twentyOnePatchReverseReapply": "PASS"
+  },
+  "behavior": [
+    "Legacy layer connections start uninterested and track whether advertised pieces are still needed, including pieces currently claimed by another peer",
+    "Interest changes independently of choking; it drops when another source supplies the only useful piece and returns on a new useful HAVE",
+    "Duplicate HAVEs and repeated choke state do not wake selection work unnecessarily",
+    "Valid blocks update the local progress timestamp and directly queue the next block; they no longer broadcast per-block wakeups/scans to all workers",
+    "Shared piece acceptance/release wakes affected workers; local availability/choke changes wake their own scheduler",
+    "Idle timer expiry rechecks the latest valid progress timestamp, so useful data is not disconnected by a stale scheduled deadline; keepalives do not change that timestamp",
+    "Choking an outstanding legacy request closes that attempt and releases its canonical claim; late payload is discarded with that connection and replacement fetches restart at the first block"
+  ],
+  "resourceAudit": {
+    "workers": 8,
+    "outstandingBlocksPerWorker": 1,
+    "blockBytes": 16384,
+    "idleUsefulProgressSeconds": 20,
+    "attemptsPerEndpoint": 3,
+    "seenEndpoints": 4096,
+    "pendingEndpoints": 1024,
+    "queuedRejectionRepliesPerPeer": 32,
+    "selection": "Existing candidate scans run on availability/shared piece transitions, not each 16 KiB block. No new cache, selection subsystem or pipeline was introduced."
+  },
+  "causalCases": [
+    {
+      "mode": "interest",
+      "identity": "btih",
+      "result": "PASS",
+      "states": [
+        "interested",
+        "not-interested",
+        "interested"
+      ],
+      "sourceRequests": [
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "observerRequests": [
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "evidence": ".build/legacy-interest-btih-5flzc4at"
+    },
+    {
+      "mode": "choke",
+      "identity": "btih",
+      "result": "PASS",
+      "chokedRequests": [
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        }
+      ],
+      "closedConnections": 1,
+      "healthyRequests": [
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "evidence": ".build/legacy-choke-btih-d6gqijwy"
+    },
+    {
+      "mode": "interest",
+      "identity": "dual",
+      "result": "PASS",
+      "states": [
+        "interested",
+        "not-interested",
+        "interested"
+      ],
+      "sourceRequests": [
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "observerRequests": [
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "evidence": ".build/legacy-interest-dual-at23parg"
+    },
+    {
+      "mode": "choke",
+      "identity": "dual",
+      "result": "PASS",
+      "chokedRequests": [
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        }
+      ],
+      "closedConnections": 1,
+      "healthyRequests": [
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "evidence": ".build/legacy-choke-dual-f68g7xz0"
+    },
+    {
+      "mode": "progress",
+      "identity": "btih",
+      "result": "PASS",
+      "elapsedSeconds": 24.156949333999364,
+      "requests": [
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "evidence": ".build/legacy-progress-7peq2z7o"
+    }
+  ],
+  "btihRegressions": [
+    {
+      "mode": "complete",
+      "identity": "btih",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-btih-complete-d02guasf"
+    },
+    {
+      "mode": "partial",
+      "identity": "btih",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-btih-partial-7h2de5db"
+    },
+    {
+      "mode": "corrupt",
+      "identity": "btih",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-btih-corrupt-41rtij_e"
+    },
+    {
+      "mode": "padding",
+      "identity": "btih",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-btih-padding-1qa16yu2"
+    },
+    {
+      "mode": "private",
+      "identity": "btih",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "45a6b345d79b6e49eb826420b9fb3b742a3215ba",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "evidence": ".build/legacy-layers-btih-private-cdp4c_ep"
+    },
+    {
+      "mode": "inconsistent",
+      "identity": "btih",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "463da230a19ec0571fe00a59a0381e759cba3b2d",
+      "infoHashV2": "53753123a19c814d096f6c84f2e7704ec2fa98391cfdbd5a6347fc10cad61665",
+      "evidence": ".build/legacy-layers-btih-inconsistent-r_b4go8e"
+    },
+    {
+      "mode": "inspect-only",
+      "identity": "btih",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-btih-inspect-only-58t2k_hc"
+    },
+    {
+      "mode": "inspect-unpadded",
+      "identity": "btih",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "3bb8fc4a855ab7fae75912250ce18e51e64526d2",
+      "infoHashV2": "4a71b73ba65d423cc88ab43d56e3464966fcafae6c04a4a6ae98bf8cabee91c9",
+      "evidence": ".build/legacy-layers-btih-inspect-unpadded-5p4yjq4u"
+    }
+  ],
+  "dualRegressions": [
+    {
+      "mode": "complete",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-complete-r66hl5nh"
+    },
+    {
+      "mode": "partial",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-partial-v22ni_e2"
+    },
+    {
+      "mode": "corrupt",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-corrupt-2nmvh675"
+    },
+    {
+      "mode": "padding",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-padding-r3ejs5x0"
+    },
+    {
+      "mode": "private",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "45a6b345d79b6e49eb826420b9fb3b742a3215ba",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "evidence": ".build/legacy-layers-dual-private-tf7lta31"
+    },
+    {
+      "mode": "inconsistent",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "463da230a19ec0571fe00a59a0381e759cba3b2d",
+      "infoHashV2": "53753123a19c814d096f6c84f2e7704ec2fa98391cfdbd5a6347fc10cad61665",
+      "evidence": ".build/legacy-layers-dual-inconsistent-zz3cjcbb"
+    },
+    {
+      "mode": "inspect-only",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-inspect-only-0mm_wjh7"
+    },
+    {
+      "mode": "inspect-unpadded",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "3bb8fc4a855ab7fae75912250ce18e51e64526d2",
+      "infoHashV2": "4a71b73ba65d423cc88ab43d56e3464966fcafae6c04a4a6ae98bf8cabee91c9",
+      "evidence": ".build/legacy-layers-dual-inspect-unpadded-i1m49nyn"
+    }
+  ],
+  "negativeControls": [
+    {
+      "behavior": "Original unconditional interest",
+      "result": "Expected failure: observer became interested before any useful layer piece was advertised",
+      "log": ".build/v2-legacy-flow-before.log"
+    },
+    {
+      "behavior": "Ignoring choke retirement",
+      "result": "Expected failure: client requested more payload after being choked",
+      "log": ".build/v2-legacy-flow-choke-negative.log"
+    },
+    {
+      "behavior": "Using the stale scheduled idle deadline",
+      "result": "Expected failure: duplicate/restarted block requests despite useful progress",
+      "log": ".build/v2-legacy-flow-progress-negative.log"
+    }
+  ],
+  "fixtureCorrections": "Initial fixtures were corrected to use a valid 20-byte peer ID and the requesting thread's socket for delayed replies. The corrected unconditional-interest baseline and all final positive/negative controls are separate logs.",
+  "native": "Not rebuilt. Last native package evidence remains v2-filenames-2026-10-26.json. Final native/transport validation follows the final wire-boundary audit.",
+  "remaining": [
+    "Final hash-request framing versus semantic rejection and meta-version error-priority audit",
+    "Final transport matrix, native package rebuild/smokes and source/conformance evidence; physical/certificate-backed release gates remain separate"
+  ],
+  "sourceSha256": {
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/legacy_layers.rs": "25f0e562a91c6a48506268a418795b3221b230be8d5f768389523567e7617a43",
+    "scripts/v2_legacy_interest.py": "61735fae18df3fcde8404939b9a8ec8a85d3078d7228783b6a49c7c4ee0670db",
+    "vendor/patches/0021-seedhop-legacy-layer-peer-state.patch": "3dd89dd997b49f2859f46d10788b3118a1a4ba1655116e385b216a3624f1f02f"
+  },
+  "logs": [
+    ".build/v2-legacy-flow-after.log",
+    ".build/v2-legacy-flow-before.log",
+    ".build/v2-legacy-flow-btih-regressions.log",
+    ".build/v2-legacy-flow-causal.log",
+    ".build/v2-legacy-flow-check.log",
+    ".build/v2-legacy-flow-choke-negative.log",
+    ".build/v2-legacy-flow-clippy.log",
+    ".build/v2-legacy-flow-complete-independent-fixed.log",
+    ".build/v2-legacy-flow-complete-independent.log",
+    ".build/v2-legacy-flow-complete-rust.log",
+    ".build/v2-legacy-flow-dual-regressions.log",
+    ".build/v2-legacy-flow-final-check.log",
+    ".build/v2-legacy-flow-final-clippy.log",
+    ".build/v2-legacy-flow-final-independent.log",
+    ".build/v2-legacy-flow-fixture-peerid.log",
+    ".build/v2-legacy-flow-patches.log",
+    ".build/v2-legacy-flow-progress-negative.log"
+  ]
+}

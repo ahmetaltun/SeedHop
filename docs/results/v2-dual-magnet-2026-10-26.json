@@ -1,0 +1,2112 @@
+{
+  "date": "2026-10-26",
+  "status": "in_progress",
+  "scope": "Dual-hash hybrid magnet discovery and full commitment enforcement; full protocol objective remains active",
+  "rust": {
+    "passed": 64,
+    "failed": 0,
+    "ignored": 1,
+    "v2TargetPassed": 43,
+    "command": "cargo test --workspace --locked -- --test-threads=1",
+    "log": ".build/v2-dual-magnet-rust.log"
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "format": "PASS",
+    "pythonCompile": "PASS",
+    "vendorForwardReconstruction": "PASS: HEAD plus patches 0005-0011 byte-identical",
+    "vendorReverseReapply": "PASS: all eleven ordered patches byte-identical"
+  },
+  "legacyOnlyDualHashCases": [
+    {
+      "mode": "complete",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-complete-7o2sairj",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 3,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 6,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        }
+      ],
+      "metadataSource": "legacy swarm"
+    },
+    {
+      "mode": "partial",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-partial-_wotfndo",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            2,
+            4,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 6,
+              "begin": 0,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        },
+        {
+          "available": [
+            1,
+            3,
+            5
+          ],
+          "requests": [
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 3,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        }
+      ],
+      "metadataSource": "legacy swarm"
+    },
+    {
+      "mode": "corrupt",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-corrupt-l7o93knn",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": true
+        },
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 3,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 6,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [],
+          "declinedV2": 0,
+          "corrupted": false
+        }
+      ],
+      "metadataSource": "legacy swarm"
+    },
+    {
+      "mode": "padding",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-padding-kbj9ltpo",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": true
+        },
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 3,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 6,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [],
+          "declinedV2": 0,
+          "corrupted": false
+        }
+      ],
+      "metadataSource": "legacy swarm"
+    },
+    {
+      "mode": "private",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "45a6b345d79b6e49eb826420b9fb3b742a3215ba",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "evidence": ".build/legacy-layers-dual-private-pfqrf5ko",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 3,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 6,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        }
+      ],
+      "metadataSource": "legacy swarm"
+    },
+    {
+      "mode": "inconsistent",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "463da230a19ec0571fe00a59a0381e759cba3b2d",
+      "infoHashV2": "53753123a19c814d096f6c84f2e7704ec2fa98391cfdbd5a6347fc10cad61665",
+      "evidence": ".build/legacy-layers-dual-inconsistent-c97zn9v1",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        }
+      ],
+      "metadataSource": "rejected inconsistent commitments"
+    },
+    {
+      "mode": "inspect-only",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/legacy-layers-dual-inspect-only-xqtn7xm7",
+      "legacyPeers": [
+        {
+          "available": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 0,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 0,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 1,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 2,
+              "begin": 16384,
+              "length": 16384
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        }
+      ],
+      "metadataSource": "legacy swarm"
+    },
+    {
+      "mode": "inspect-unpadded",
+      "identity": "dual",
+      "result": "PASS",
+      "bytes": 140012,
+      "infoHashV1": "3bb8fc4a855ab7fae75912250ce18e51e64526d2",
+      "infoHashV2": "4a71b73ba65d423cc88ab43d56e3464966fcafae6c04a4a6ae98bf8cabee91c9",
+      "evidence": ".build/legacy-layers-dual-inspect-unpadded-m6aphou7",
+      "legacyPeers": [
+        {
+          "available": [
+            4,
+            5,
+            6
+          ],
+          "requests": [
+            {
+              "index": 4,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 4,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 0,
+              "length": 16384
+            },
+            {
+              "index": 5,
+              "begin": 16384,
+              "length": 16384
+            },
+            {
+              "index": 6,
+              "begin": 0,
+              "length": 4465
+            }
+          ],
+          "metadata": [
+            0
+          ],
+          "declinedV2": 1,
+          "corrupted": false
+        }
+      ],
+      "metadataSource": "legacy swarm"
+    }
+  ],
+  "v2OnlyDualHashTransportCases": [
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "tcp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-off-magnet-dual-hybrid-he2izqi_",
+      "verifiedPeerSettings": {
+        "encryption": 2,
+        "bittorrent_protocol": 1,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "seedhopAnnounces": [
+        {
+          "time": 45563.837122333,
+          "port": 53070,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 52970,
+          "returnedPorts": [
+            52970
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45563.853539458,
+          "port": 53070,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45563.887041875,
+          "port": 53070,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 140012,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 52970,
+          "returnedPorts": [
+            52970
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45563.893137416,
+          "port": 53070,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 229376,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        }
+      ],
+      "metadataSource": "v2 swarm only",
+      "rc4Observed": false
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "tcp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-tcp-required-magnet-dual-hybrid-_20k_7u0",
+      "verifiedPeerSettings": {
+        "encryption": 1,
+        "bittorrent_protocol": 1,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "seedhopAnnounces": [
+        {
+          "time": 45568.097097916,
+          "port": 53199,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45568.102403375,
+          "port": 53199,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 53138,
+          "returnedPorts": [
+            53138
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45569.109313416,
+          "port": 53199,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45569.109640083,
+          "port": 53199,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53138,
+          "returnedPorts": [
+            53138
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45570.117072916,
+          "port": 53199,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45570.117913125,
+          "port": 53199,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53138,
+          "returnedPorts": [
+            53138
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45571.124819916,
+          "port": 53199,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53138,
+          "returnedPorts": [
+            53138
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45571.125986,
+          "port": 53199,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45572.130225375,
+          "port": 53199,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45572.130593875,
+          "port": 53199,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53138,
+          "returnedPorts": [
+            53138
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45573.138308125,
+          "port": 53199,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53138,
+          "returnedPorts": [
+            53138
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45573.138978625,
+          "port": 53199,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45574.146217458,
+          "port": 53199,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53138,
+          "returnedPorts": [
+            53138
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45574.148326916,
+          "port": 53199,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45575.155493458,
+          "port": 53199,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53138,
+          "returnedPorts": [
+            53138
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45575.156262625,
+          "port": 53199,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45576.164576625,
+          "port": 53199,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53138,
+          "returnedPorts": [
+            53138
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45576.165595458,
+          "port": 53199,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45577.171449041,
+          "port": 53199,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53138,
+          "returnedPorts": [
+            53138
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45577.172467833,
+          "port": 53199,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45578.180328583,
+          "port": 53199,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53138,
+          "returnedPorts": [
+            53138
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45578.182694458,
+          "port": 53199,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45578.425310083,
+          "port": 53199,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 140012,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 53138,
+          "returnedPorts": [
+            53138
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45578.425875666,
+          "port": 53199,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 229376,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        }
+      ],
+      "metadataSource": "v2 swarm only",
+      "rc4Observed": true
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "utp",
+      "encryption": "off",
+      "enginePolicy": "allow",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-off-magnet-dual-hybrid-34iz3rj5",
+      "verifiedPeerSettings": {
+        "encryption": 2,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "seedhopAnnounces": [
+        {
+          "time": 45563.8533775,
+          "port": 53072,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45563.853797916,
+          "port": 53072,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 52989,
+          "returnedPorts": [
+            52989
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45563.910289041,
+          "port": 53072,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 140012,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 52989,
+          "returnedPorts": [
+            52989
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45563.910544291,
+          "port": 53072,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 229376,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        }
+      ],
+      "metadataSource": "v2 swarm only",
+      "rc4Observed": false
+    },
+    {
+      "format": "hybrid",
+      "direction": "magnet-dual",
+      "transport": "utp",
+      "encryption": "required",
+      "enginePolicy": "require",
+      "bytes": 140012,
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-utp-required-magnet-dual-hybrid-gk0cngbl",
+      "verifiedPeerSettings": {
+        "encryption": 1,
+        "bittorrent_protocol": 2,
+        "queueing_enabled": false,
+        "dht": false,
+        "pex": false,
+        "lsd": false,
+        "upnp": false,
+        "max_ratio": -1,
+        "max_seeding_time": -1,
+        "current_network_interface": "lo0",
+        "current_interface_address": "127.0.0.1"
+      },
+      "seedhopAnnounces": [
+        {
+          "time": 45568.5699015,
+          "port": 53213,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45568.571280458,
+          "port": 53213,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 53154,
+          "returnedPorts": [
+            53154
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45569.576264,
+          "port": 53213,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45569.577463291,
+          "port": 53213,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53154,
+          "returnedPorts": [
+            53154
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45570.584322416,
+          "port": 53213,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45570.585989416,
+          "port": 53213,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53154,
+          "returnedPorts": [
+            53154
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45571.594215208,
+          "port": 53213,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53154,
+          "returnedPorts": [
+            53154
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45571.595396166,
+          "port": 53213,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45572.605190333,
+          "port": 53213,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45572.605955958,
+          "port": 53213,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53154,
+          "returnedPorts": [
+            53154
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45573.614706041,
+          "port": 53213,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45573.615563,
+          "port": 53213,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53154,
+          "returnedPorts": [
+            53154
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45574.620467791,
+          "port": 53213,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45574.6210455,
+          "port": 53213,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53154,
+          "returnedPorts": [
+            53154
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45575.632049333,
+          "port": 53213,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53154,
+          "returnedPorts": [
+            53154
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45575.632829666,
+          "port": 53213,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45576.641631208,
+          "port": 53213,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53154,
+          "returnedPorts": [
+            53154
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45576.643150625,
+          "port": 53213,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45577.652404125,
+          "port": 53213,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45577.653132,
+          "port": 53213,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53154,
+          "returnedPorts": [
+            53154
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45578.660352166,
+          "port": 53213,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 53154,
+          "returnedPorts": [
+            53154
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45578.663014,
+          "port": 53213,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 0,
+          "event": "",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45578.914806916,
+          "port": 53213,
+          "infoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac",
+          "left": 140012,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 53154,
+          "returnedPorts": [
+            53154
+          ],
+          "userAgent": "SeedHop/0.1.0"
+        },
+        {
+          "time": 45578.915119875,
+          "port": 53213,
+          "infoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+          "left": 229376,
+          "event": "started",
+          "validInfoHash": true,
+          "returnedPort": 0,
+          "returnedPorts": [],
+          "userAgent": "SeedHop/0.1.0"
+        }
+      ],
+      "metadataSource": "v2 swarm only",
+      "rc4Observed": true
+    }
+  ],
+  "hybridIndependentCases": [
+    {
+      "direction": "download-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-v1-h809tvre",
+      "legacyPayloadRequests": [
+        {
+          "index": 0,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 0,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 3,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 4,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 4,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 6,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 5,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 5,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "v2PayloadRequests": []
+    },
+    {
+      "direction": "download-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-download-mixed-w9qn1x9q",
+      "legacyPayloadRequests": [
+        {
+          "index": 0,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 0,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "v2PayloadRequests": [
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 4465
+        },
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 3,
+          "begin": 0,
+          "length": 10
+        },
+        {
+          "index": 4,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 4,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 6,
+          "begin": 0,
+          "length": 4465
+        },
+        {
+          "index": 5,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 5,
+          "begin": 16384,
+          "length": 16384
+        }
+      ]
+    },
+    {
+      "direction": "magnet-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-mixed-uhov69q0",
+      "legacyPayloadRequests": [
+        {
+          "index": 0,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 0,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "v2PayloadRequests": [
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 4465
+        },
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 3,
+          "begin": 0,
+          "length": 10
+        },
+        {
+          "index": 4,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 4,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 6,
+          "begin": 0,
+          "length": 4465
+        },
+        {
+          "index": 5,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 5,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "v2MerkleRequests": [
+        {
+          "piecesRoot": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "baseLayer": 1,
+          "index": 0,
+          "length": 4,
+          "proofLayers": 1
+        }
+      ]
+    },
+    {
+      "direction": "magnet-v1-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-v1-mixed-aq3syish",
+      "legacyPayloadRequests": [
+        {
+          "index": 0,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 0,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "v2PayloadRequests": [
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 4465
+        },
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 3,
+          "begin": 0,
+          "length": 10
+        },
+        {
+          "index": 4,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 4,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 6,
+          "begin": 0,
+          "length": 4465
+        },
+        {
+          "index": 5,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 5,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "v2MerkleRequests": [
+        {
+          "piecesRoot": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "baseLayer": 1,
+          "index": 0,
+          "length": 4,
+          "proofLayers": 1
+        }
+      ]
+    },
+    {
+      "direction": "magnet-dual-mixed",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-magnet-dual-mixed-llxonf81",
+      "legacyPayloadRequests": [
+        {
+          "index": 0,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 0,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "v2PayloadRequests": [
+        {
+          "index": 2,
+          "begin": 0,
+          "length": 4465
+        },
+        {
+          "index": 1,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 1,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 3,
+          "begin": 0,
+          "length": 10
+        },
+        {
+          "index": 4,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 4,
+          "begin": 16384,
+          "length": 16384
+        },
+        {
+          "index": 6,
+          "begin": 0,
+          "length": 4465
+        },
+        {
+          "index": 5,
+          "begin": 0,
+          "length": 16384
+        },
+        {
+          "index": 5,
+          "begin": 16384,
+          "length": 16384
+        }
+      ],
+      "v2MerkleRequests": [
+        {
+          "piecesRoot": "b53281d323ef7f05fffb9e6033dd871654197fa408e196219ebfaa811dcde8e2",
+          "baseLayer": 1,
+          "index": 0,
+          "length": 4,
+          "proofLayers": 1
+        }
+      ]
+    },
+    {
+      "direction": "upload-v1",
+      "result": "PASS",
+      "bytes": 140012,
+      "v1InfoHash": "8c74ca89495aea3efb1572e433a4d48f0989dae7",
+      "v2InfoHash": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "evidence": ".build/hybrid-dual-upload-v1-1rf1fac6"
+    }
+  ],
+  "hybridHardeningCases": [
+    {
+      "mode": "udp",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-udp-d8cpkx3v"
+    },
+    {
+      "mode": "ipv6",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-ipv6-nwf_kuqs"
+    },
+    {
+      "mode": "ipv6-upload",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-ipv6-upload-en1e04qf"
+    },
+    {
+      "mode": "private",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-private-hrwljwj3"
+    },
+    {
+      "mode": "dht",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-dht-it9tzq3q"
+    },
+    {
+      "mode": "private-dht",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "f0c3656cada1d9790e18b17211ab1413dca3a3191e1b1a4cc832f3a2daf2eb58",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-private-dht-505oh369"
+    },
+    {
+      "mode": "duplicate-metadata",
+      "format": "hybrid",
+      "result": "PASS",
+      "infoHashV2": "45abc8583e339c6d1ce6936aeea0f7d4ffdda2ac6b971dc5c3ecfe94cebb2da8",
+      "qBittorrent": "v5.3.0alpha1",
+      "libtorrent": "2.1.0.0",
+      "evidence": ".build/v2-hardening-duplicate-metadata-37f9y_a1"
+    }
+  ],
+  "rawPeerRejectionCoverage": [
+    "Wrong full SHA-1 while SHA-256 matches",
+    "Wrong full SHA-256 outside the 20-byte wire identifier while SHA-1 matches",
+    "Both digests match a v1-only dictionary: rejected as non-hybrid",
+    "Both digests match a v2-only dictionary: rejected as non-hybrid",
+    "All four reject before any payload (6) or Merkle proof (21) request, files or membership."
+  ],
+  "parserCoverage": [
+    "Conflicting duplicate btih or btmh topics rejected",
+    "Identical duplicates accepted",
+    "Both algorithms retained"
+  ],
+  "specification": {
+    "reference": "https://www.bittorrent.org/beps/bep_0009.html",
+    "requirement": "btih and btmh topics may coexist when they describe the same hybrid torrent"
+  },
+  "defaultTransportMatrix": {
+    "pureV2Cases": 4,
+    "hybridCases": 6,
+    "totalPerTransportCipher": 10,
+    "note": "Older nine-case matrix records remain historical checkpoints."
+  },
+  "remaining": [
+    "Private-flag discovery window during proof acquisition, including cancellation of a second dual-hash lookup once either authenticated dictionary is known private",
+    "BEP 52 peer state/choke/cancellation/hash-serving/filename/resource conformance audit",
+    "Adversarial/transport audit of payload-derived metadata fetching",
+    "Native rebuilt app XPC integration"
+  ],
+  "logs": [
+    ".build/v2-dual-magnet-rust.log",
+    ".build/v2-dual-magnet-targeted.log",
+    ".build/v2-dual-magnet-check.log",
+    ".build/v2-dual-magnet-clippy.log",
+    ".build/v2-dual-magnet-legacy.log",
+    ".build/v2-dual-magnet-tcp.log",
+    ".build/v2-dual-magnet-tcp-encrypted.log",
+    ".build/v2-dual-magnet-utp.log",
+    ".build/v2-dual-magnet-utp-encrypted.log",
+    ".build/v2-dual-magnet-hybrid.log",
+    ".build/v2-dual-magnet-hardening.log",
+    ".build/v2-dual-magnet-patches.log"
+  ],
+  "sourceSha256": {
+    "vendor/rqbit/crates/librqbit/src/session.rs": "2c6662239a2ea4dfe39b6aa1732a32d0b85a4ec5046d04511902ff47569ea8d2",
+    "vendor/rqbit/crates/librqbit/src/peer_info_reader/mod.rs": "627d29b3f21b5b1139d524da12b34257a915ba737cb076377282227b743544d2",
+    "vendor/rqbit/crates/librqbit/src/dht_utils.rs": "bb85f0d4938b91a555afb147504ee8990a02f8c8237dc86c5e6847aa5bcdda9f",
+    "vendor/rqbit/crates/librqbit_core/src/v2.rs": "a5e332f6714791d49599bbedeb90da85c0adc0cf4a74a65c524cdd36a817aff0",
+    "vendor/rqbit/crates/librqbit_core/src/magnet.rs": "b2828ac6b4a074cd2ad2cecaa0da09dcc5a84a82abc19a780e428721351bfcae",
+    "crates/seedhop-core/tests/v2.rs": "510024f05dc1286d318a2fbafa6d9593b8c1ededa113135f6f5fa478392fe17e",
+    "scripts/v2_interop.py": "59b9bb114559500d2318700503b542362ae6ccbeb188e356bb3bc7db30e16b67",
+    "scripts/v2_hybrid_interop.py": "90a0a6b9afc0d0eec2dc277380f867f9a8639c8575b91d36e45ab98360338a46",
+    "scripts/v2_legacy_layers.py": "3f9cf7f7f29d35bb08c41f19ab1651a74b7d8461010b4e1a9d6738d0f8c4245a",
+    "scripts/interop.py": "38d38ebcd71a8feec213e5768761dd59a6fdbb9bab0433a08600e064e3ac649e",
+    "vendor/patches/0011-seedhop-dual-hash-magnets.patch": "245baeb842d936428bc46b60b0363bb4fa05ac53111493fae0eae8036facbe3b"
+  }
+}

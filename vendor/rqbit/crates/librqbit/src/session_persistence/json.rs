@@ -166,6 +166,11 @@ impl JsonSessionPersistenceStore {
             is_paused: torrent.is_paused(),
             is_queued: torrent.is_queued(),
             file_names: torrent.file_names(),
+            file_name_mapping_version: u8::from(
+                torrent
+                    .with_metadata(|m| m.info.info().v2.is_some())
+                    .unwrap_or(false),
+            ),
             file_priorities: torrent.file_priorities(),
             output_folder: torrent.output_folder(),
         };

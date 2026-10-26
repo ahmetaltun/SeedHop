@@ -50,6 +50,7 @@ SeedHop uses the following resolved Rust packages. Upstream source and license f
 | chacha20 | 0.10.2 | MIT OR Apache-2.0 |
 | chardetng | 1.0.0 | Apache-2.0 OR MIT |
 | chrono | 0.4.45 | MIT OR Apache-2.0 |
+| cipher | 0.4.4 | MIT OR Apache-2.0 |
 | cmake | 0.1.58 | MIT OR Apache-2.0 |
 | combine | 4.6.9 | MIT |
 | compression-codecs | 0.4.46 | MIT OR Apache-2.0 |
@@ -62,6 +63,7 @@ SeedHop uses the following resolved Rust packages. Upstream source and license f
 | cpufeatures | 0.3.1 | MIT OR Apache-2.0 |
 | crc32fast | 1.5.3 | MIT OR Apache-2.0 |
 | crossbeam-utils | 0.8.23 | MIT OR Apache-2.0 |
+| crypto-bigint | 0.5.5 | Apache-2.0 OR MIT |
 | crypto-common | 0.1.7 | MIT OR Apache-2.0 |
 | darling | 0.24.1 | MIT |
 | darling_core | 0.24.1 | MIT |
@@ -138,6 +140,7 @@ SeedHop uses the following resolved Rust packages. Upstream source and license f
 | idna_adapter | 1.2.2 | Apache-2.0 OR MIT |
 | indexmap | 1.9.3 | Apache-2.0 OR MIT |
 | indexmap | 2.14.2 | Apache-2.0 OR MIT |
+| inout | 0.1.4 | MIT OR Apache-2.0 |
 | intervaltree | 0.2.7 | MIT |
 | ipnet | 2.12.2 | MIT OR Apache-2.0 |
 | itertools | 0.15.0 | MIT OR Apache-2.0 |
@@ -230,6 +233,7 @@ SeedHop uses the following resolved Rust packages. Upstream source and license f
 | rand_pcg | 0.10.2 | MIT OR Apache-2.0 |
 | rapidhash | 4.5.1 | MIT OR Apache-2.0 |
 | raw-cpuid | 11.6.0 | MIT |
+| rc4 | 0.1.0 | MIT OR Apache-2.0 |
 | redox_syscall | 0.5.18 | MIT |
 | redox_users | 0.5.3 | MIT |
 | ref-cast | 1.0.27 | MIT OR Apache-2.0 |
@@ -330,6 +334,8 @@ SeedHop uses the following resolved Rust packages. Upstream source and license f
 | typenum | 1.20.1 | MIT OR Apache-2.0 |
 | typewit | 1.15.2 | Zlib |
 | unicase | 2.10.0 | MIT OR Apache-2.0 |
+| unicode-casefold | 0.2.0 | MIT OR Apache-2.0 |
+| unicode-normalization | 0.1.26 | (MIT OR Apache-2.0) AND Unicode-3.0 |
 | unicode-ident | 1.0.27 | (MIT OR Apache-2.0) AND Unicode-3.0 |
 | unicode-width | 0.2.2 | MIT OR Apache-2.0 |
 | uniffi | 0.32.2 | MPL-2.0 |
@@ -404,3 +410,11 @@ SeedHop uses the following resolved Rust packages. Upstream source and license f
 | zerovec-derive | 0.11.7 | Unicode-3.0 |
 | zlib-rs | 0.6.8 | Zlib |
 | zmij | 1.0.23 | MIT |
+
+Filename collision detection also uses Unicode 17 `Default_Ignorable_Code_Point`
+data from DerivedCoreProperties.txt, copyright Unicode, Inc. The full Unicode
+license is retained in `vendor/UNICODE-LICENSE.txt` and bundled in Resources.
+
+The published unicode-casefold 0.2.0 crate omits standalone license files.
+Its source attribution and the Apache-2.0 license option used by SeedHop are
+retained in `vendor/licenses/unicode-casefold-0.2.0/` and bundled with the app.

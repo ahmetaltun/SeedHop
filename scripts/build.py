@@ -53,8 +53,8 @@ def main():
     contents = app/"Contents"
     for folder in ["MacOS","Frameworks","Resources","XPCServices/SeedHopEngine.xpc/Contents/MacOS","Library/LaunchAgents"]:
         (contents/folder).mkdir(parents=True,exist_ok=True)
-    for name in ["LICENSE","THIRD_PARTY_NOTICES.md"]:
-        if (ROOT/name).exists(): shutil.copy2(ROOT/name,contents/"Resources"/name)
+    for name in ["LICENSE","THIRD_PARTY_NOTICES.md","vendor/UNICODE-LICENSE.txt"]:
+        if (ROOT/name).exists(): shutil.copy2(ROOT/name,contents/"Resources"/pathlib.Path(name).name)
     license_root=contents/"Resources/ThirdPartyLicenses"
     metadata=json.loads(subprocess.check_output(["cargo","metadata","--offline","--format-version","1"],cwd=ROOT,text=True))
     for package in metadata["packages"]:
@@ -63,6 +63,9 @@ def main():
             if source.is_file() and source.name.upper().startswith(("LICENSE","COPYING","NOTICE")):
                 destination=license_root/(package["name"]+"-"+package["version"])
                 destination.mkdir(parents=True,exist_ok=True); shutil.copy2(source,destination/source.name)
+    supplemental_licenses = ROOT/"vendor/licenses"
+    if supplemental_licenses.is_dir():
+        shutil.copytree(supplemental_licenses, license_root, dirs_exist_ok=True)
     iconset=ROOT/".build/AppIcon.iconset"
     run("swift","-module-cache-path",ROOT/".cache/swift",ROOT/"scripts/Icon.swift",iconset,ROOT/"macOS/Resources/AppIcon.png")
     run("iconutil","-c","icns",iconset,"-o",contents/"Resources/AppIcon.icns")

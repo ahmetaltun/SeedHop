@@ -1,0 +1,96 @@
+{
+  "date": "2026-10-26",
+  "status": "in_progress",
+  "scope": "Owned LSD subscriptions, shared periodic announcement lifetime and public/private swarm integration; full protocol completion remains active",
+  "rust": {
+    "passed": 92,
+    "v2TargetPassed": 70,
+    "failed": 0,
+    "ignored": 1,
+    "command": "cargo test --workspace --locked -- --test-threads=1",
+    "log": ".build/v2-lsd-complete-rust.log"
+  },
+  "lsdUnitGate": {
+    "passed": 3,
+    "failed": 0,
+    "command": "python3 scripts/test_lsd.py",
+    "log": ".build/v2-lsd-after.log",
+    "manifest": ".build/lsd-unit-gate/Cargo.toml",
+    "source": "vendor/rqbit/crates/librqbit_lsd/src/lib.rs",
+    "purpose": "Compile the production library directly through an isolated manifest, reusing root dependency versions/cache without rqbit desktop workspace development dependencies"
+  },
+  "checks": {
+    "cargoCheck": "PASS",
+    "clippyWarningsDenied": "PASS",
+    "isolatedLsdClippyAllTargets": "PASS",
+    "format": "PASS",
+    "pythonCompile": "PASS",
+    "gitDiffCheck": "PASS",
+    "twentyPatchForwardReconstruction": "PASS",
+    "twentyPatchReverseReapply": "PASS"
+  },
+  "behavior": [
+    "Every returned stream owns one subscription ID; adding another stream never replaces its channel and dropping one removes only its own registration",
+    "Received endpoints fan out through independent bounded 1024-entry channels; a full or closed receiver does not block another",
+    "Periodic announcement workers are shared per info hash and port; listen-only subscriptions create no worker",
+    "Dropping the last announcing owner cancels that port worker even when listen-only subscriptions remain",
+    "Periodic sends and replies retain the relevant cancellation token; retiring an announcing owner also cancels a pending reply",
+    "Known private torrents register neither DHT nor LSD peer sources; public pure-v2 and both hybrid identities remain discoverable"
+  ],
+  "runtimeCoverage": [
+    "Independent IPv6 loopback datagram reaches two streams, then the remaining stream after one is dropped",
+    "1100 sequential offers fill one 1024-entry queue while another subscriber receives all endpoints",
+    "Owned Arc lifetime proves one worker for a shared hash/port and release of the actual periodic future after the last announcing owner drops",
+    "Production sessions connect public pure-v2/hybrid offers using the expected wire identities; matching private offers never initiate connections"
+  ],
+  "negativeControls": [
+    {
+      "behavior": "Original subscription replacement and duplicate workers",
+      "result": "Expected failure: first stream returned None and shared-port worker count exceeded one",
+      "log": ".build/v2-lsd-before.log"
+    },
+    {
+      "behavior": "Omitted last-owner cancellation",
+      "result": "Expected failure: periodic announcement task outlived its last owner",
+      "log": ".build/v2-lsd-cancel-negative.log"
+    }
+  ],
+  "buildCorrection": "The isolated gate exposed a v2 core derive import relying on root serde feature unification. It now uses the already-declared serde_derive dependency directly; no new dependency or serialized format was introduced.",
+  "fixtureCorrection": {
+    "diagnosis": "Initial broad run connected its raw encrypted IPv4 fixture to an unrelated specific loopback listener overlapping the reused IPv6 wildcard port. Live socket ownership and thread sampling identified the mismatch. Only the stalled test was terminated; the unrelated service was untouched.",
+    "change": "Raw fixtures prefer IPv6 loopback for the default IPv6 listener and bound handshakes. The hybrid test deliberately keeps an overlapping IPv4 decoy alive on macOS and proves plaintext/encrypted transfers avoid it. Production MSE negotiation already has its own timeout.",
+    "targetedLog": ".build/v2-lsd-loopback-fixture.log",
+    "stalledRun": ".build/v2-lsd-complete-rust-stalled.log",
+    "sample": ".build/v2-lsd-stalled-sample.txt",
+    "cleanRun": ".build/v2-lsd-complete-rust.log"
+  },
+  "native": "Not rebuilt. Last native package evidence is v2-filenames-2026-10-26.json. Rebuild after the remaining legacy-fetch audit.",
+  "remaining": [
+    "Legacy layer-fetch useful interest, choke/cancel and wakeup/progress audit",
+    "Final requirement consistency, transport matrix and native package validation; physical/certificate-backed release gates remain separate"
+  ],
+  "sourceSha256": {
+    "Cargo.lock": "6f056c6547d3d71bcefa44c9df4bd4e954fd2f6c9b223cefbd41792158255e4d",
+    "vendor/rqbit/crates/librqbit_lsd/src/lib.rs": "287a62f9e63c73ecc194eb952001b3006f4abb5b3f37ac467dfa8256200c07a2",
+    "vendor/rqbit/crates/librqbit_core/src/v2.rs": "9585a050a272db7ea913923cbb9f9454a00b037b9b631942147e78193a006a2f",
+    "crates/seedhop-core/tests/v2.rs": "d6842adcd1385f1e7dd108404fee5782f664028f25465ea41242bd3f9e353984",
+    "scripts/test_lsd.py": "031bf3e1751c088f28e71b37fcc3302886f8528f59cd97c9194cc37d25d16199",
+    "vendor/patches/0020-seedhop-lsd-subscription-lifetime.patch": "3428977d4f4d353f2118a7482863f492558f6c3b1e2088dcb88b21637fa27aba"
+  },
+  "logs": [
+    ".build/v2-lsd-after.log",
+    ".build/v2-lsd-before.log",
+    ".build/v2-lsd-cancel-negative.log",
+    ".build/v2-lsd-check.log",
+    ".build/v2-lsd-clippy.log",
+    ".build/v2-lsd-complete-rust-stalled.log",
+    ".build/v2-lsd-complete-rust.log",
+    ".build/v2-lsd-final-check.log",
+    ".build/v2-lsd-final-clippy.log",
+    ".build/v2-lsd-loopback-fixture.log",
+    ".build/v2-lsd-patches.log",
+    ".build/v2-lsd-session.log",
+    ".build/v2-lsd-stalled-sample-command.log",
+    ".build/v2-lsd-unit-clippy.log"
+  ]
+}

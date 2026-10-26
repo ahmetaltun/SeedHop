@@ -1,0 +1,286 @@
+diff --git a/crates/librqbit/src/peer_connection.rs b/crates/librqbit/src/peer_connection.rs
+--- a/crates/librqbit/src/peer_connection.rs
++++ b/crates/librqbit/src/peer_connection.rs
+@@ -45,6 +45,9 @@
+     }
+     fn on_connected(&self, _connection_time: Duration) {}
+     fn should_send_bitfield(&self) -> bool;
++    fn should_unchoke(&self) -> bool {
++        true
++    }
+     fn serialize_bitfield_message_to_buf(&self, buf: &mut [u8]) -> anyhow::Result<usize>;
+     fn on_handshake(&self, handshake: Handshake, ckind: ConnectionKind) -> anyhow::Result<()>;
+     fn on_extended_handshake(
+@@ -438,16 +441,18 @@
+                 trace!("sent bitfield");
+             }
+ 
+-            let len = Message::Unchoke.serialize(&mut *write_buf, &Default::default)?;
+-            with_timeout("writing", rwtimeout, async {
+-                write
+-                    .write_all(&write_buf[..len])
+-                    .await
+-                    .map_err(Error::Write)?;
+-                write.flush().await.map_err(Error::Write)
+-            })
+-            .await?;
+-            trace!("sent unchoke");
++            if self.handler.should_unchoke() {
++                let len = Message::Unchoke.serialize(&mut *write_buf, &Default::default)?;
++                with_timeout("writing", rwtimeout, async {
++                    write
++                        .write_all(&write_buf[..len])
++                        .await
++                        .map_err(Error::Write)?;
++                    write.flush().await.map_err(Error::Write)
++                })
++                .await?;
++                trace!("sent unchoke");
++            }
+ 
+             let mut broadcast_closed = false;
+ 
+diff --git a/crates/librqbit/src/peer_info_reader/legacy_layers.rs b/crates/librqbit/src/peer_info_reader/legacy_layers.rs
+--- a/crates/librqbit/src/peer_info_reader/legacy_layers.rs
++++ b/crates/librqbit/src/peer_info_reader/legacy_layers.rs
+@@ -203,6 +203,9 @@
+     client: String,
+ }
+ impl PeerConnectionHandler for Handler {
++    fn should_unchoke(&self) -> bool {
++        false
++    }
+     fn should_send_bitfield(&self) -> bool {
+         false
+     }
+diff --git a/crates/librqbit/src/peer_info_reader/mod.rs b/crates/librqbit/src/peer_info_reader/mod.rs
+--- a/crates/librqbit/src/peer_info_reader/mod.rs
++++ b/crates/librqbit/src/peer_info_reader/mod.rs
+@@ -125,6 +125,16 @@
+     NotHybrid,
+     #[error("metadata changed after the private dictionary was authenticated")]
+     PrivateDictionary,
++}
++
++#[derive(Debug, thiserror::Error)]
++pub(crate) enum MetadataTransferError {
++    #[error("metadata size {0} is outside 1..=32 MiB")]
++    SizeOutOfBounds(u32),
++    #[error("metadata total_size changed from {expected} to {received}")]
++    SizeChanged { expected: u32, received: u32 },
++    #[error("peer rejected required metadata piece {0}")]
++    Rejected(u32),
+ }
+ 
+ pub(crate) async fn read_metainfo_from_peer(
+@@ -192,8 +202,8 @@
+ 
+ impl HandlerLocked {
+     fn new(metadata_size: u32) -> anyhow::Result<Self> {
+-        if metadata_size > 32 * 1024 * 1024 {
+-            anyhow::bail!("metadata size {} is too big", metadata_size);
++        if metadata_size == 0 || metadata_size > 32 * 1024 * 1024 {
++            return Err(MetadataTransferError::SizeOutOfBounds(metadata_size).into());
+         }
+         let buffer = vec![0u8; metadata_size as usize];
+         let total_pieces: usize = (metadata_size as u64)
+@@ -221,6 +231,13 @@
+         d: &UtMetadataData<ByteBuf>,
+         identity: MetadataIdentity,
+     ) -> anyhow::Result<bool> {
++        if d.total_size() != self.metadata_size {
++            return Err(MetadataTransferError::SizeChanged {
++                expected: self.metadata_size,
++                received: d.total_size(),
++            }
++            .into());
++        }
+         let piece = d.piece();
+         if piece as usize >= self.total_pieces {
+             anyhow::bail!("wrong index");
+@@ -336,6 +353,9 @@
+     fn is_v2(&self) -> bool {
+         self.identity.v2_wire
+     }
++    fn should_unchoke(&self) -> bool {
++        false
++    }
+     fn should_send_bitfield(&self) -> bool {
+         false
+     }
+@@ -360,6 +380,14 @@
+         // Metadata discovery advertises no payload or hash availability. It is
+         // still a v2 peer connection, so requests need an explicit response.
+         match msg {
++            Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Request(index))) => {
++                self.writer_tx
++                    .send(WriterRequest::UtMetadata(UtMetadata::Reject(index)))?;
++                return Ok(());
++            }
++            Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Reject(index))) => {
++                return Err(MetadataTransferError::Rejected(index).into());
++            }
+             Message::HashRequest(request) => {
+                 self.writer_tx
+                     .send(WriterRequest::Message(Message::HashReject(request)))?;
+@@ -457,20 +485,34 @@
+         &self,
+         extended_handshake: &ExtendedHandshake<ByteBuf>,
+     ) -> anyhow::Result<()> {
++        // BEP 10 allows later extension-handshake updates. They must not
++        // allocate a second dictionary or replay all outstanding requests.
++        if let Some(current) = self.locked.read().as_ref() {
++            if let Some(received) = extended_handshake.metadata_size {
++                if received != current.metadata_size {
++                    return Err(MetadataTransferError::SizeChanged {
++                        expected: current.metadata_size,
++                        received,
++                    }
++                    .into());
++                }
++            }
++            return Ok(());
++        }
++        if self.pending_info.lock().is_some() {
++            return Ok(());
++        }
+         let metadata_size = match extended_handshake.metadata_size {
+             Some(metadata_size) => metadata_size,
+             None => anyhow::bail!("peer does not have metadata_size"),
+         };
+ 
+-        if extended_handshake.m.ut_metadata.is_none() {
++        if extended_handshake.m.ut_metadata.is_none_or(|id| id == 0) {
+             anyhow::bail!("peer does not support ut_metadata");
+         }
+ 
+-        self.writer_tx
+-            .send(WriterRequest::Message(Message::Unchoke))?;
+-        self.writer_tx
+-            .send(WriterRequest::Message(Message::Interested))?;
+-
++        // Metadata and Merkle-hash requests are independent of payload
++        // choking. This connection has no payload interest or availability.
+         let inner = HandlerLocked::new(metadata_size)?;
+         let total_pieces = inner.total_pieces;
+ 
+diff --git a/crates/peer_binary_protocol/src/extended/ut_metadata.rs b/crates/peer_binary_protocol/src/extended/ut_metadata.rs
+--- a/crates/peer_binary_protocol/src/extended/ut_metadata.rs
++++ b/crates/peer_binary_protocol/src/extended/ut_metadata.rs
+@@ -33,6 +33,10 @@
+ }
+ 
+ impl<'a> UtMetadataData<ByteBuf<'a>> {
++    pub fn total_size(&self) -> u32 {
++        self.total_size
++    }
++
+     pub fn piece(&self) -> u32 {
+         self.piece
+     }
+@@ -93,6 +97,8 @@
+     Request(u32),
+     Data(UtMetadataData<ByteBuf>),
+     Reject(u32),
++    /// BEP 9 requires unknown message types to be ignored.
++    Unknown(i64),
+ }
+ 
+ impl UtMetadata<ByteBufOwned> {
+@@ -106,6 +112,7 @@
+                 total_size: d.total_size,
+             }),
+             UtMetadata::Reject(r) => UtMetadata::Reject(*r),
++            UtMetadata::Unknown(kind) => UtMetadata::Unknown(*kind),
+         }
+     }
+ }
+@@ -114,16 +121,27 @@
+     pub fn serialize(&self, writer: &mut Cursor<&mut [u8]>) -> Result<(), SerializeError> {
+         #[derive(Serialize)]
+         struct Message {
+-            msg_type: u32,
+-            piece: u32,
++            msg_type: i64,
++            #[serde(skip_serializing_if = "Option::is_none")]
++            piece: Option<u32>,
+             #[serde(skip_serializing_if = "Option::is_none")]
+             total_size: Option<u32>,
+         }
+         match self {
++            UtMetadata::Unknown(kind) => {
++                bencode_serialize_to_writer(
++                    Message {
++                        msg_type: *kind,
++                        piece: None,
++                        total_size: None,
++                    },
++                    writer,
++                )?;
++            }
+             UtMetadata::Request(piece) => {
+                 let message = Message {
+                     msg_type: 0,
+-                    piece: *piece,
++                    piece: Some(*piece),
+                     total_size: None,
+                 };
+                 bencode_serialize_to_writer(message, writer)?
+@@ -131,7 +149,7 @@
+             UtMetadata::Data(d) => {
+                 let message = Message {
+                     msg_type: 1,
+-                    piece: d.piece,
++                    piece: Some(d.piece),
+                     total_size: Some(d.total_size),
+                 };
+                 bencode_serialize_to_writer(message, writer)?;
+@@ -141,7 +159,7 @@
+             UtMetadata::Reject(piece) => {
+                 let message = Message {
+                     msg_type: 2,
+-                    piece: *piece,
++                    piece: Some(*piece),
+                     total_size: None,
+                 };
+                 bencode_serialize_to_writer(message, writer)?;
+@@ -158,12 +176,24 @@
+             total_size: Option<u32>,
+         }
+ 
+-        const MAX_BMSG_SIZE: usize =
+-            b"d8:msg_typei10e5:piecei4294967296e10:total_sizei16384ee".len();
+-        let (contig, is_contig) = match buf.get_contiguous(MAX_BMSG_SIZE.min(buf.len())) {
+-            Some(c) => (c, true),
+-            None => (buf.get()[0], false),
+-        };
++        // Parse the complete first slice: optional future header keys must not
++        // be truncated by a guessed fixed header length. A split header asks
++        // ReadBuf to make the bounded frame contiguous and retry.
++        let [contig, second] = buf.get();
++        let is_contig = second.is_empty();
++        #[derive(serde_derive::Deserialize)]
++        struct Kind {
++            msg_type: i64,
++        }
++        let mut kind_de = BencodeDeserializer::new_from_buf(contig);
++        match Kind::deserialize(&mut kind_de) {
++            Ok(kind) if !(0..=2).contains(&kind.msg_type) => {
++                return Ok(UtMetadata::Unknown(kind.msg_type));
++            }
++            Ok(_) => {}
++            Err(error) if is_contig => return Err(MessageDeserializeError::Bencode(error)),
++            Err(_) => return Err(MessageDeserializeError::NeedContiguous),
++        }
+ 
+         let mut de = BencodeDeserializer::new_from_buf(contig);
+         let message = match UtMetadataMsg::deserialize(&mut de) {
+@@ -211,7 +241,7 @@
+                 }
+                 Ok(UtMetadata::Reject(message.piece))
+             }
+-            other => Err(MessageDeserializeError::UtMetadataTypeUnknown(other)),
++            _ => unreachable!("unknown types returned before decoding known fields"),
+         }
+     }
+ }

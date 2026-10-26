@@ -12,6 +12,12 @@ pub type BF = bitvec::boxed::BitBox<u8, bitvec::order::Msb0>;
 
 pub type PeerHandle = SocketAddr;
 pub type PeerStream = BoxStream<'static, SocketAddr>;
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct TorrentPeer {
+    pub addr: SocketAddr,
+    pub info_hash: librqbit_core::hash_id::Id20,
+}
+pub(crate) type TorrentPeerStream = BoxStream<'static, TorrentPeer>;
 pub type FileInfos = Vec<FileInfo>;
 pub(crate) type FileStorage = Box<dyn TorrentStorage>;
 pub(crate) type FilePriorities = Vec<usize>;

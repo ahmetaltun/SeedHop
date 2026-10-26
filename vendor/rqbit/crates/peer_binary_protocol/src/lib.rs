@@ -204,6 +204,18 @@ impl<'a> Piece<ByteBuf<'a>> {
     pub fn data(&self) -> (&'a [u8], &'a [u8]) {
         (self.block_0.0, self.block_1.0)
     }
+    pub fn prefix(&self, length: usize) -> Option<Self> {
+        if length > self.len() {
+            return None;
+        }
+        let first = length.min(self.block_0.0.len());
+        Some(Self {
+            index: self.index,
+            begin: self.begin,
+            block_0: ByteBuf(&self.block_0.0[..first]),
+            block_1: ByteBuf(&self.block_1.0[..length - first]),
+        })
+    }
 
     pub fn from_data(index: u32, begin: u32, block: &'a [u8]) -> Self {
         Piece {
@@ -447,9 +459,6 @@ impl Message<'_> {
             21..=23 => {
                 check_msg_len!(min 48);
                 let request = HashRequest::decode(buf.consume::<48>().unwrap());
-                if !request.valid() {
-                    return Err(MessageDeserializeError::InvalidHashRequest);
-                }
                 let message = match msg_id {
                     21 | 23 => {
                         check_msg_len!(48);
@@ -460,7 +469,8 @@ impl Message<'_> {
                         }
                     }
                     _ => {
-                        if (msg_len - 48) % 32 != 0 || (msg_len - 48) / 32 > 544 {
+                        if !request.valid() || (msg_len - 48) % 32 != 0 || (msg_len - 48) / 32 > 544
+                        {
                             return Err(MessageDeserializeError::InvalidHashRequest);
                         }
                         let mut hashes = Vec::with_capacity((msg_len - 48) / 32);

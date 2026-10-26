@@ -26,12 +26,13 @@ def tree_root(hashes):
     return hashes[0]
 
 
-def fixture(work, hybrid, announce=None, private=False):
+def fixture(work, hybrid, announce=None, private=False, files=None):
     piece_length = 32768
     # Three real pieces, a short block, an empty file and a shared pieces root.
-    files = [("a.bin", bytes(i % 251 for i in range(70001))),
-             ("docs/b.bin", b"small file"), ("empty", b""),
-             ("same.bin", bytes(i % 251 for i in range(70001)))]
+    if files is None:
+        files = [("a.bin", bytes(i % 251 for i in range(70001))),
+                 ("docs/b.bin", b"small file"), ("empty", b""),
+                 ("same.bin", bytes(i % 251 for i in range(70001)))]
     tree, layers, v1_files, content = {}, {}, [], bytearray()
     for file_index, (path, data) in enumerate(files):
         props = {b"length": len(data)}

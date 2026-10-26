@@ -26,11 +26,23 @@ use super::MY_EXTENDED_UT_METADATA;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub struct PeerExtendedMessageIds {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ut_metadata: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ut_pex: Option<u8>,
 }
 
 impl PeerExtendedMessageIds {
+    /// BEP 10 updates contain changes only; omitted extensions keep their IDs.
+    pub fn apply_update(&mut self, update: Self) {
+        if update.ut_metadata.is_some() {
+            self.ut_metadata = update.ut_metadata;
+        }
+        if update.ut_pex.is_some() {
+            self.ut_pex = update.ut_pex;
+        }
+    }
+
     pub fn my() -> Self {
         Self {
             ut_metadata: Some(MY_EXTENDED_UT_METADATA),
@@ -66,6 +78,7 @@ impl<'a> ExtendedMessage<ByteBuf<'a>> {
             ExtendedMessage::UtMetadata(u) => {
                 let emsg_id = peer_extended_msg_ids()
                     .ut_metadata
+                    .filter(|id| *id != 0)
                     .ok_or(SerializeError::NeedUtMetadata)?;
                 out.write_u8(emsg_id)?;
                 u.serialize(&mut out)?;
@@ -73,6 +86,7 @@ impl<'a> ExtendedMessage<ByteBuf<'a>> {
             ExtendedMessage::UtPex(m) => {
                 let emsg_id = peer_extended_msg_ids()
                     .ut_pex
+                    .filter(|id| *id != 0)
                     .ok_or(SerializeError::NeedPex)?;
                 out.write_u8(emsg_id)?;
                 bencode_serialize_to_writer(m, &mut out)?;

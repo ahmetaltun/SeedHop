@@ -248,6 +248,15 @@ impl ChunkTracker {
             .filter_map(|id| self.lengths.validate_piece_index(id))
     }
 
+    pub(crate) fn needs_any_from(&self, peer: &[u8]) -> bool {
+        self.selected
+            .as_raw_slice()
+            .iter()
+            .zip(self.have.as_bytes())
+            .zip(peer)
+            .any(|((selected, have), peer)| selected & !have & peer != 0)
+    }
+
     pub(crate) fn is_piece_have(&self, id: ValidPieceIndex) -> bool {
         self.have.as_slice()[id.get() as usize]
     }
@@ -263,7 +272,8 @@ impl ChunkTracker {
             return;
         }
         debug!("marking piece={} as broken", index);
-        self.queue_pieces.set(index.get() as usize, true);
+        self.queue_pieces
+            .set(index.get() as usize, self.selected[index.get_usize()]);
         if let Some(s) = self.chunk_status.get_mut(self.lengths.chunk_range(index)) {
             s.fill(false);
         }
