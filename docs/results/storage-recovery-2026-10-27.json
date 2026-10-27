@@ -1,0 +1,753 @@
+{
+  "date": "2026-10-27",
+  "scope": "Product roadmap step 3: durable layout transactions and interrupted-operation recovery",
+  "baseCommit": "a6c3c06e44e9b8fb098b89bd7850c5968fd7be06",
+  "workingTreeChanges": true,
+  "build": {
+    "command": "python3 scripts/build.py --identity -",
+    "passed": true,
+    "signing": "ad-hoc development only",
+    "faultInjectionAbsentFromNormalBundledLibrary": true
+  },
+  "recoveryMatrix": {
+    "scope": "Controlled SIGKILL layout recovery; not physical drive loss or power-loss certification",
+    "fullMatrix": true,
+    "cases": [
+      {
+        "format": "v1",
+        "operation": "relocate",
+        "stage": "journal",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "relocate",
+        "stage": "created",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "relocate",
+        "stage": "copy",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "relocate",
+        "stage": "copied",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "relocate",
+        "stage": "saving",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "relocate",
+        "stage": "commit",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "relocate",
+        "stage": "quarantine",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "relocate",
+        "stage": "cleanup",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "rename",
+        "stage": "journal",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "rename",
+        "stage": "created",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "rename",
+        "stage": "copy",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "rename",
+        "stage": "copied",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "rename",
+        "stage": "saving",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "rename",
+        "stage": "commit",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "rename",
+        "stage": "quarantine",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "rename",
+        "stage": "cleanup",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "relocate",
+        "stage": "journal",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "relocate",
+        "stage": "created",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "relocate",
+        "stage": "copy",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "relocate",
+        "stage": "copied",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "relocate",
+        "stage": "saving",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "relocate",
+        "stage": "commit",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "relocate",
+        "stage": "quarantine",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "relocate",
+        "stage": "cleanup",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "rename",
+        "stage": "journal",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "rename",
+        "stage": "created",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "rename",
+        "stage": "copy",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "rename",
+        "stage": "copied",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "rename",
+        "stage": "saving",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "rename",
+        "stage": "commit",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "rename",
+        "stage": "quarantine",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "rename",
+        "stage": "cleanup",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "relocate",
+        "stage": "journal",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "relocate",
+        "stage": "created",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "relocate",
+        "stage": "copy",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "relocate",
+        "stage": "copied",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "relocate",
+        "stage": "saving",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "relocate",
+        "stage": "commit",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "relocate",
+        "stage": "quarantine",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "relocate",
+        "stage": "cleanup",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "rename",
+        "stage": "journal",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "rename",
+        "stage": "created",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "rename",
+        "stage": "copy",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "rename",
+        "stage": "copied",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "rename",
+        "stage": "saving",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "rename",
+        "stage": "commit",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "rename",
+        "stage": "quarantine",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "rename",
+        "stage": "cleanup",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "relocate",
+        "stage": "copy",
+        "intent": "waiting",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "relocate",
+        "stage": "commit",
+        "intent": "waiting",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "rename",
+        "stage": "copy",
+        "intent": "waiting",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "rename",
+        "stage": "commit",
+        "intent": "waiting",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "relocate",
+        "stage": "copy",
+        "intent": "queued",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "relocate",
+        "stage": "commit",
+        "intent": "queued",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "rename",
+        "stage": "copy",
+        "intent": "queued",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v1",
+        "operation": "rename",
+        "stage": "commit",
+        "intent": "queued",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "case": "edited-copy-retained-and-kept",
+        "passed": true
+      },
+      {
+        "case": "replaced-active-folder-refuses-writes-and-recovers",
+        "passed": true
+      },
+      {
+        "format": "v2",
+        "operation": "relocate",
+        "stage": "journal",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": true,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "relocate",
+        "stage": "copy",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": true,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "rename",
+        "stage": "saving",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": true,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "hybrid",
+        "operation": "rename",
+        "stage": "commit",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": true,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777233
+      },
+      {
+        "format": "v2",
+        "operation": "relocate",
+        "stage": "copy",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777237
+      },
+      {
+        "format": "hybrid",
+        "operation": "relocate",
+        "stage": "commit",
+        "intent": "paused",
+        "passed": true,
+        "legacyFilenameMap": false,
+        "sourceDevice": 16777233,
+        "destinationDevice": 16777237
+      }
+    ],
+    "passed": 64,
+    "crossVolume": true
+  },
+  "rustChecks": [
+    {
+      "suite": "core unit",
+      "tests": 14,
+      "passed": true
+    },
+    {
+      "suite": "management",
+      "tests": 3,
+      "passed": true
+    },
+    {
+      "test": "cancelling_v2_and_hybrid_moves_cleans_completed_and_partial_unselected_copies",
+      "passed": true
+    },
+    {
+      "test": "v2_and_hybrid_layout_changes_keep_identity_bytes_and_running_intent",
+      "passed": true
+    },
+    {
+      "test": "partial_v2_and_hybrid_downloads_continue_after_relocation_and_rename",
+      "passed": true
+    },
+    {
+      "test": "legacy_v2_and_hybrid_sessions_keep_existing_names_and_migrate_once",
+      "passed": true
+    }
+  ],
+  "nativeChecks": {
+    "controlledPresentationRegressions": 21,
+    "menuFocusChecks": 3,
+    "renderedFixtureScreens": 36,
+    "packagedXpcRecovery": "PASS: original location notice; retry retains edited copy; Keep Copies preserves all original bytes, selection and priorities; restart clears resolved record",
+    "packagedXpcManagement": "PASS: import, recheck, priorities, queue, move/rename progress and cancellation, successful changes, exact bytes, restart, removal, shutdown",
+    "visualReview": [
+      "move-recovery-compact-light.png",
+      "move-recovery-dark.png"
+    ]
+  },
+  "staticChecks": {
+    "formatting": true,
+    "clippyWorkspaceAllTargetsAllFeaturesWarningsDenied": true,
+    "diffCheck": true,
+    "pythonCompile": true
+  },
+  "limits": [
+    "Controlled SIGKILL and mounted-image checks do not certify physical drive loss, power failure, sleep/wake, actual login or physical network recovery.",
+    "Missing active/default folders require reconnection; a pending journal refuses startup writes on a replaced active folder.",
+    "Recovery adds hashing reads. Changed or uncertain files are retained; Keep Copies leaves them on disk.",
+    "Unsupported/corrupt records cannot be silently discarded. Binary downgrade has not been separately certified.",
+    "Manual keyboard/VoiceOver acceptance, signing, notarization and release remain open or deferred.",
+    "RSS and remote control remain deferred."
+  ],
+  "sourceSha256": {
+    "Makefile": "6deca6d7b541191b1564ae5413c397e89d8c54e2f068947647095afb909b2512",
+    "crates/seedhop-core/Cargo.toml": "44c020da4f1e59e834e9dc7564ff075380f5077e1279d8aa2bf56f51a1f803d7",
+    "crates/seedhop-core/src/bin/seedhop-lab.rs": "4204274fee1826ee2c6964429afffe4a7903d77ba0d051e8236f6008ba4275be",
+    "crates/seedhop-core/src/file_operation.rs": "6c35caa10fa4c1e6457c128dcab1e912d82ea39d5712e995cdd2a7410de46d2f",
+    "crates/seedhop-core/src/layout_journal.rs": "d7f09582e48473371c0ea68a91cc233445abcbf7d80733f6ceb43d6f3513ca7f",
+    "crates/seedhop-core/src/lib.rs": "3cd57d8df4f603dd2f8af925a5b8ce25ea194ecd266a715c2ac7ad6e03b6fd0a",
+    "crates/seedhop-core/src/management.rs": "0b8c7a3cf530fed77b5f9dbf8c7d034ec22f17cd985730425dc7ef022e18d853",
+    "crates/seedhop-core/src/model.rs": "0200e57b809208fd8aa403b31b670c301590146b5d89661b54ddb6528d1bec34",
+    "crates/seedhop-core/src/storage.rs": "c7dd9955e4adc7bc08afad9d989f7dfa8221a9852b229153428e2a58035c041e",
+    "crates/seedhop-core/src/storage_receipt.rs": "a3538937c9f99b9be9b6ce7c4360ee3acee03f2d2aa94d14203ad7b0399b3b6f",
+    "crates/seedhop-core/tests/management.rs": "1d1e9eaa0c90a79b9a3516d10a7b2dffc509e450a3fd22ba1e1d972ba20293a8",
+    "crates/seedhop-core/tests/v2.rs": "52d4876f6607d495650a90516cb76885ed5e6aba70a18f40b3a17416e8d3ff87",
+    "crates/seedhop-ffi/src/lib.rs": "d034067b1f65072c5fc00ab27336a20da5efb755c5859395f62e1f4b08970334",
+    "macOS/App/EngineClient.swift": "2c0677db9b1b4668253b65bad946e2a18bb8445ab7e7cd683fac5d3deb1dfff1",
+    "macOS/App/EngineSelfTest.swift": "52af8727a8f3ce8ab11922e308f3fc50bf7ee5cade90481f4b77b43b77ab3bc0",
+    "macOS/App/ImportView.swift": "e9bde8f30b2c3a6f7f3d16b621ea04c37e91b357b4b1515a2642948e1faf21de",
+    "macOS/App/LibraryStore.swift": "d74f805465b3bcd6f77fc0ae62a1180bf14ca70ef809f26acd63b38a9690ccfe",
+    "macOS/App/LibraryView.swift": "518f4d564d245d221bcec7fd389adf62f6063180e3c8bccb781e29ac8c89800e",
+    "macOS/App/PreviewFixtures.swift": "59152c26a053f44304d21215e7b6d08d60efd720d1452b9c5a9e7c90d2b8c150",
+    "macOS/App/SeedHopApp.swift": "47695282791cea1f88cb0e13018ef07e69ea45d2c159f34e750933f0bb013d45",
+    "macOS/App/SettingsView.swift": "2a443d74367058e18af9578e37765c631000ddd1dc7823c75be0c5e68d3207cd",
+    "macOS/App/UXSelfTest.swift": "68b4b2ab6fec65f57e66f764a562c302be30b1013fd61ff0f012ac841439cfe7",
+    "macOS/Generated/seedhop_ffi.swift": "c0194b295da5f9b4af947f424ce8d18df25f7504affdc753c5362e988589f19c",
+    "macOS/Host/EngineHost.swift": "3f2e1e729bdf6ef2a2d7ad30bf42d48b1a4336a3f0911c0f4c850ec380e33840",
+    "macOS/Shared/Models.swift": "3b581583ec63b11f50ddf8eee6d81b0599ac9a2310abf5f69ea3084a5d5557ab",
+    "scripts/layout_recovery.py": "564845d7a5a57f76e9b3e841ec764357397562a1b5c7c7cdd21f9c613132950f"
+  },
+  "binarySha256": {
+    ".build/SeedHop.app/Contents/Frameworks/libseedhop_ffi.dylib": "aae742778a2fcdcc7bcb0bb20229139512276ed0b29f17cec6d13de8eab529bd",
+    ".build/SeedHop.app/Contents/MacOS/SeedHop": "3869e6d97e905f8e1a2b9735f3c85c102e96dcae0d663675531ea05925f17c61",
+    ".build/SeedHop.app/Contents/MacOS/SeedHopAgent": "1ab6c32a471b26659d48aa26cfd207e09a2867e8ed3a87d6e58963154474bf59",
+    ".build/SeedHop.app/Contents/XPCServices/SeedHopEngine.xpc/Contents/MacOS/SeedHopEngine": "f84ea1c0762d175d6986c07ed0c3007d3ed5790540dd98f0f9582a9b80ce0ad4",
+    ".build/layout-lab": "8c5760715363c347561c90a8a5035ea5196d831d453447405c4dcbfbbb100b34"
+  },
+  "logSha256": {
+    ".build/layout-build-2026-10-27.log": "60372d2ffb083f1899115f08bccd06b3fdf07631c5c29df407b2976bedc0db23",
+    ".build/layout-clippy-2026-10-27.log": "69292b45d71ae67fa6ef0a9c618b71b0bd544f4dfa6a77888277a46daa94c6c8",
+    ".build/layout-interface-2026-10-27.log": "1e10ede017a0f192a3a7f5ba1300c0d480017d7b118d6f63581db0de882f772a",
+    ".build/layout-legacy-2026-10-27.log": "46a9c20ca77fe8957d4d1977d731215bf468f15f6acd3b60a50b7d50898664e7",
+    ".build/layout-management-2026-10-27.log": "7838566f2d5a299ea568d511e9823acc8172d2bc4d5c9961b1361c2de2e8d56d",
+    ".build/layout-recovery-final64-2026-10-27.log": "8729821e6d0a2b7e67f46c731eeb8603a9dfe5fe84351825a5468b198a4e44a8",
+    ".build/layout-recovery-final64-2026-10-27/results.json": "0808ccd9c6e4014d1666101833fc8a0d628711adb3a48304f0f24a8a48337f0d",
+    ".build/layout-render-2026-10-27.log": "acbee2b84ef1b64c096b20f9d4c3a603500b6cfc5bb3a532baeb9ba6ff590a71",
+    ".build/layout-unit-2026-10-27.log": "0e9f64544a1c8a6233b8439929925f87bb879a3491dc01ac8415ef1004587a24",
+    ".build/layout-ux-2026-10-27.log": "38016b680934aac4165847a313d6fec4bb3b842a53aec9d21c71d36bf46f695d",
+    ".build/layout-v2-cancellation-2026-10-27.log": "c1ac698fefadfadc2ceee10dfa92a57205ae7be0aabd9e1fd2b35a24e7ab2231",
+    ".build/layout-v2-changes-2026-10-27.log": "02f1bb70eb2e5c208bdeca95eff149132bc487ad0143e457d8b5b1edf36cf690",
+    ".build/layout-v2-partial-2026-10-27.log": "bac253c7e8948f2dcfa6cbc3c1e24f0bf2546240e6d24261add006adf427c141",
+    ".build/layout-xpc-management-2026-10-27.log": "5a39202499a5b541d82eb9d24389b80e36b51d9bfe39db40c766772cefab3e66",
+    ".build/layout-xpc-recovery-2026-10-27.log": "00e59c241669f658a6e53cbcea619599384f4bff7f528cb7651484f0ff1f297c"
+  }
+}

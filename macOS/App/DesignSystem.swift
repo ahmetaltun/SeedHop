@@ -39,12 +39,14 @@ struct BrandMark: View {
 }
 struct StateBadge: View {
     let torrent: TorrentItem
+    var presentation: TransferPresentation? = nil
+    private var status: TransferPresentation { presentation ?? TransferPresentation(torrent:torrent) }
     var body: some View {
-        HStack(spacing:5) { Circle().fill(Design.stateColor(torrent.state)).frame(width:5,height:5); Text(torrent.statusLabel).font(.system(size:11,weight:.medium)) }
-            .foregroundStyle(Design.stateColor(torrent.state)).padding(.horizontal,8).padding(.vertical,5)
-            .background(Design.stateColor(torrent.state).opacity(0.075),in:Capsule())
+        HStack(spacing:5) { Circle().fill(Design.stateColor(status.colorState)).frame(width:5,height:5); Text(status.label).font(.system(size:11,weight:.medium)).lineLimit(1) }
+            .foregroundStyle(Design.stateColor(status.colorState)).padding(.horizontal,8).padding(.vertical,5)
+            .background(Design.stateColor(status.colorState).opacity(0.075),in:Capsule())
             .accessibilityElement(children:.ignore)
-            .accessibilityLabel(torrent.statusLabel)
+            .accessibilityLabel(status.accessibleLabel).help(status.detail)
     }
 }
 struct SectionEyebrow: View {
@@ -83,10 +85,12 @@ struct InlineNotice: View {
     var body: some View {
         HStack(alignment:.top,spacing:12) {
             Image(systemName:"exclamationmark.circle.fill").foregroundStyle(.orange)
-            VStack(alignment:.leading,spacing:4) { Text(title).font(.system(size:12,weight:.semibold)); Text(message).font(.system(size:12)).foregroundStyle(.secondary).textSelection(.enabled) }
+            VStack(alignment:.leading,spacing:4) { Text(title).font(.system(size:12,weight:.semibold)); Text(message).font(.system(size:12)).foregroundStyle(.secondary).textSelection(.enabled) }.accessibilityElement(children:.combine)
             Spacer(minLength:4)
             if let retry { Button("Retry",action:retry).controlSize(.small) }
             if let dismiss { Button(action:dismiss) { Image(systemName:"xmark") }.buttonStyle(.plain).accessibilityLabel("Dismiss message") }
         }.padding(14).background(Color.orange.opacity(0.07),in:RoundedRectangle(cornerRadius:10))
+            .accessibilityElement(children:.contain)
+            .announceAccessibility("\(title). \(message)")
     }
 }

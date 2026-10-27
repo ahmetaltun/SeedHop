@@ -23,6 +23,15 @@ import Combine
         destination = UserDefaults.standard.string(forKey:"downloadDirectory") ?? FileManager.default.urls(for:.downloadsDirectory,in:.userDomainMask)[0].path
     }
 
+    /// Native file-table keyboard actions affect captured rows, never another selection.
+    func toggleFiles(_ indices: Set<UInt32>) {
+        guard !adding, !resolving, let preview else { return }
+        let targets = indices.intersection(Set(preview.files.map(\.index)))
+        guard !targets.isEmpty else { return }
+        if targets.isSubset(of:selected) { selected.subtract(targets) }
+        else { selected.formUnion(targets) }
+    }
+
     func resolve(using send: @escaping Send) async {
         guard !resolving, !adding, preview == nil else { return }
         let link = magnet.trimmingCharacters(in:.whitespacesAndNewlines)

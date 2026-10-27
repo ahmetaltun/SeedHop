@@ -24,7 +24,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
 }
 
 @MainActor final class LibraryStore: ObservableObject {
-    @Published var torrents: [TorrentItem] = []
+    @Published var torrents: [TorrentItem] = [] { didSet { reindexTorrents() } }
     @Published var selection = Set<String>()
     @Published var filter: LibraryFilter = .all { didSet { if oldValue != filter { reconcileVisibleSelection() } } }
     @Published var search = "" { didSet { if oldValue != search { reconcileVisibleSelection() } } }
@@ -39,10 +39,18 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     @Published var showRemoval = false
     @Published private(set) var removalTargets: [TorrentItem] = []
     @Published private(set) var busyTransfers = Set<String>()
+    @Published var fileOperation: FileOperationItem? { didSet { rebuildCounts() } }
+    @Published var storageRecovery: StorageRecoveryItem? { didSet { rebuildCounts() } }
+    @Published private(set) var resolvingStorageRecovery = false
+    @Published private(set) var storageRequests = Set<String>()
+    @Published private(set) var cancellingOperations = Set<String>()
     @Published var downloadLimit: UInt32 = 0
     @Published var uploadLimit: UInt32 = 0
     @Published var maxActiveDownloads: UInt32 = 0
     @Published var savingQueue = false
+    @Published var peerEncryption: PeerEncryptionPolicy?
+    @Published var savedPeerEncryption: PeerEncryptionPolicy?
+    @Published private(set) var savingEncryption = false
     @Published var listenPort: UInt16 = 0
     @Published var backgroundEnabled = UserDefaults.standard.bool(forKey:"backgroundEnabled")
     @Published var resumeAtLogin = UserDefaults.standard.bool(forKey:"resumeAtLogin")
@@ -50,13 +58,17 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     @Published var completionNotifications = UserDefaults.standard.object(forKey:"completionNotifications") as? Bool ?? false
     let designPreview: Bool
     let client: any EngineTransport
+    // Derived from the current snapshot, never a second source of transfer state.
+    private var torrentIndices: [String:Int] = [:]
+    private var filterCounts: [LibraryFilter:Int] = [:]
+    private var stateCounts: [String:Int] = [:]
     private var polling: Task<Void,Never>?
     private var reconnect: Task<Void,Never>?
 
     init(designPreview: Bool = false, client: (any EngineTransport)? = nil) {
         self.designPreview = designPreview
         self.client = client ?? EngineClient()
-        if designPreview { torrents = PreviewFixtures.torrents; selection = [torrents[0].id]; connected = true; return }
+        if designPreview { peerEncryption = .allow; savedPeerEncryption = .allow; torrents = PreviewFixtures.torrents; reindexTorrents(); selection = [torrents[0].id]; connected = true; return }
         self.client.onInterruption = { [weak self] in
             guard let self, !self.switching else { return }
             self.connected = false
@@ -64,16 +76,120 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
             self.reconnect = Task { try? await Task.sleep(for:.seconds(2)); if !Task.isCancelled { await self.start() } }
         }
     }
-    var visibleTorrents: [TorrentItem] { torrents.filter { filter.includes($0) && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)) } }
-    var selected: [TorrentItem] { torrents.filter { selection.contains($0.id) } }
-    var downloadRate: UInt64 { torrents.reduce(0) { $0 + $1.downloadRate } }
-    var uploadRate: UInt64 { torrents.reduce(0) { $0 + $1.uploadRate } }
+    private func reindexTorrents() {
+        torrentIndices.removeAll(keepingCapacity:true)
+        torrentIndices.reserveCapacity(torrents.count)
+        for index in torrents.indices { torrentIndices[torrents[index].id] = index }
+        rebuildCounts()
+    }
+    private func rebuildCounts() {
+        let operation = fileOperation, recovery = storageRecovery
+        var counts: [LibraryFilter:Int] = [.all:torrents.count]
+        var states: [String:Int] = [:]
+        for item in torrents {
+            let status = TransferPresentation(torrent:item,operation:operation,recovery:recovery)
+            if status.isActive { counts[.downloading,default:0] += 1 }
+            if status.isSeeding { counts[.seeding,default:0] += 1 }
+            if item.isPaused { counts[.paused,default:0] += 1 }
+            if status.needsAttention { counts[.attention,default:0] += 1 }
+            if item.id != operation?.torrentId { states[item.state,default:0] += 1 }
+        }
+        filterCounts = counts; stateCounts = states
+    }
+    func presentation(_ item: TorrentItem) -> TransferPresentation {
+        TransferPresentation(torrent:item,operation:fileOperation,recovery:storageRecovery,connected:connected)
+    }
+    func includes(_ item: TorrentItem, in filter: LibraryFilter) -> Bool {
+        switch filter {
+        case .attention: return presentation(item).needsAttention
+        case .downloading: return presentation(item).isActive
+        case .seeding: return presentation(item).isSeeding
+        default: return filter.includes(item)
+        }
+    }
+    func count(in filter: LibraryFilter) -> Int { filterCounts[filter,default:0] }
+    var visibleTorrents: [TorrentItem] {
+        let currentFilter = filter, query = search
+        if currentFilter == .all && query.isEmpty { return torrents }
+        return torrents.filter { includes($0,in:currentFilter) && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query)) }
+    }
+    var selected: [TorrentItem] {
+        guard !selection.isEmpty else { return [] }
+        // Keep the original snapshot order. Large/ambiguous selections retain
+        // the original scan, including its behavior for unexpected duplicate IDs.
+        if selection.count > torrents.count / 2 || torrentIndices.count != torrents.count {
+            return torrents.filter { selection.contains($0.id) }
+        }
+        return selection.compactMap { torrentIndices[$0] }.sorted().map { torrents[$0] }
+    }
+    var downloadRate: UInt64 { connected ? torrents.reduce(0) { $0 + $1.downloadRate } : 0 }
+    var uploadRate: UInt64 { connected ? torrents.reduce(0) { $0 + $1.uploadRate } : 0 }
     var totalDownloaded: UInt64 { torrents.reduce(0) { $0 + $1.downloadedBytes } }
     var canActOnSelection: Bool { canChangeTransfers && !selected.isEmpty && selected.allSatisfy { !busyTransfers.contains($0.id) } }
-    var canResumeSelection: Bool { canActOnSelection && selected.contains { $0.isPaused || $0.state == "error" } }
+    func canResumeOrRetry(_ item: TorrentItem) -> Bool {
+        item.state == "error" ? presentation(item).canRetry : item.isPaused && item.state != "checking"
+    }
+    var canResumeSelection: Bool { canActOnSelection && selected.contains(where:canResumeOrRetry) }
     var canPauseSelection: Bool { canActOnSelection && selected.contains { !$0.isPaused } }
-    var canRecheckSelection: Bool { canActOnSelection && selected.allSatisfy { $0.state != "checking" } }
-    var canChangeTransfers: Bool { connected && !switching && !designPreview }
+    func hasPendingCleanup(_ id: String) -> Bool { storageRecovery.map { $0.torrentId.isEmpty || $0.torrentId == id } ?? false }
+    var canRecheckSelection: Bool { canActOnSelection && selected.allSatisfy { $0.state != "checking" && !hasPendingCleanup($0.id) } }
+    var canMoveSelection: Bool { canRecheckSelection && storageRecovery == nil && selected.count == 1 }
+    var canRemoveSelection: Bool { canActOnSelection && selected.allSatisfy { !hasPendingCleanup($0.id) } }
+    func resumeLabel(for items: [TorrentItem]) -> String {
+        let retry = items.contains { $0.state == "error" && presentation($0).canRetry }
+        let resume = items.contains { $0.state != "error" && canResumeOrRetry($0) }
+        return retry ? (resume ? "Resume and Retry" : "Retry") : "Resume"
+    }
+    var resumeActionLabel: String { resumeLabel(for:selected) }
+    var hasUnscopedRecovery: Bool { storageRecovery.map { notice in torrentIndices[notice.torrentId] == nil } ?? false }
+    var activitySummary: String {
+        if !connected { return "Showing the last update. Reconnect for live activity." }
+        if torrents.isEmpty { return storageRecovery == nil ? "A fresh start for your next download." : "Retained files need attention." }
+        var parts = [("downloading", "downloading"), ("waiting", "waiting"), ("queued", "queued"), ("checking", "checking"), ("seeding", "seeding"), ("paused", "paused")].compactMap { state, label -> String? in
+            let count = stateCounts[state,default:0]
+            return count == 0 ? nil : "\(count) \(label)"
+        }
+        if fileOperation != nil { parts.insert("1 file change",at:0) }
+        let attention = count(in:.attention)
+        if attention > 0 { parts.append("\(attention) need attention") }
+        else if hasUnscopedRecovery { parts.append("File cleanup needs attention") }
+        return parts.isEmpty ? "Waiting for a transfer update." : parts.joined(separator:" · ")
+    }
+    var hasFileOperation: Bool { fileOperation != nil || !storageRequests.isEmpty || resolvingStorageRecovery }
+    var canChangeTransfers: Bool { connected && !switching && !designPreview && !hasFileOperation }
+
+    var encryptionRestartPending: Bool { peerEncryption != nil && savedPeerEncryption != nil && peerEncryption != savedPeerEncryption }
+    var canSaveEncryption: Bool { canChangeTransfers && !savingEncryption && savedPeerEncryption != nil }
+    var canRestartForEncryption: Bool { canChangeTransfers && encryptionRestartPending && !savingEncryption && busyTransfers.isEmpty && !savingQueue && !showImport }
+    var connectionPortDescription: String { !connected ? "Unavailable while disconnected" : listenPort == 0 ? "No listening port reported" : "\(listenPort)" }
+    func saveEncryption(_ policy: PeerEncryptionPolicy) {
+        guard canSaveEncryption else { return }
+        savingEncryption = true; error = nil
+        Task {
+            defer { savingEncryption = false }
+            do {
+                var request = EngineRequest(command:"peerEncryption"); request.peerEncryption = policy
+                _ = try await perform(request)
+            } catch { self.error = error.localizedDescription }
+            await refresh()
+        }
+    }
+    func restartForEncryption() {
+        guard canRestartForEncryption else { return }
+        switching = true; polling?.cancel(); reconnect?.cancel(); error = nil
+        let background = backgroundEnabled, loginAtRestart = resumeAtLogin
+        Task {
+            defer { switching = false; beginPolling() }
+            do {
+                // No explicitStop: shutdown persists each transfer's existing pause intent.
+                _ = try await client.send(EngineRequest(command:"shutdown"))
+                client.invalidate(); connected = false
+                apply(try await reconnectAfterHandoff(background:background)); connected = true
+                var login = EngineRequest(command:"login"); login.resumeAtLogin = loginAtRestart
+                _ = try await client.send(login)
+            } catch { self.error = error.localizedDescription }
+        }
+    }
 
     private func reconcileVisibleSelection() {
         let remaining = selection.intersection(Set(visibleTorrents.map(\.id)))
@@ -134,29 +250,39 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         if selection != remainingSelection { selection = remainingSelection }
         if downloadLimit != snapshot.downloadLimit { downloadLimit = snapshot.downloadLimit }
         if uploadLimit != snapshot.uploadLimit { uploadLimit = snapshot.uploadLimit }
+        if peerEncryption != snapshot.peerEncryption { peerEncryption = snapshot.peerEncryption }
+        if savedPeerEncryption != snapshot.savedPeerEncryption { savedPeerEncryption = snapshot.savedPeerEncryption }
         if listenPort != snapshot.listenPort { listenPort = snapshot.listenPort }
         if maxActiveDownloads != snapshot.maxActiveDownloads { maxActiveDownloads = snapshot.maxActiveDownloads }
+        if fileOperation != snapshot.fileOperation { fileOperation = snapshot.fileOperation }
+        if storageRecovery != snapshot.storageRecovery { storageRecovery = snapshot.storageRecovery }
     }
     func perform(_ request: EngineRequest) async throws -> EngineReply {
         guard !designPreview else { throw UserFacingError(message:"This is a design preview with sample data. Launch the app normally for real transfers.") }
+        if hasFileOperation && ["add", "inspect", "pause", "select", "priorities", "queue", "queueMove", "recheck", "retry", "remove", "limits", "peerEncryption"].contains(request.command) {
+            throw UserFacingError(message:"Wait for the current file change to finish, or cancel it, then try again.")
+        }
         return try await client.send(request)
     }
     func toggleSelected(paused: Bool) {
         guard canActOnSelection else { return }
-        let items = selected.filter { paused ? !$0.isPaused : ($0.isPaused || $0.state == "error") }
+        let items = selected.filter { paused ? !$0.isPaused : canResumeOrRetry($0) }
         let ids = Set(items.map(\.id))
         guard !ids.isEmpty else { return }
         error = nil
         busyTransfers.formUnion(ids)
         Task {
             defer { busyTransfers.subtract(ids) }
-            do { for item in items { var r = EngineRequest(command:"pause"); r.id = item.id; r.paused = paused; _ = try await perform(r) } }
+            do { for item in items {
+                var r = EngineRequest(command:!paused && item.state == "error" ? "retry" : "pause")
+                r.id = item.id; r.paused = paused; _ = try await perform(r)
+            } }
             catch { self.error = error.localizedDescription }
             await refresh()
         }
     }
     func requestRemoval() {
-        guard canActOnSelection else { return }
+        guard canRemoveSelection else { return }
         removalTargets = selected
         showRemoval = true
     }
@@ -175,7 +301,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     func removeConfirmed(deleteFiles: Bool) {
         let items = removalTargets
         let ids = Set(items.map(\.id))
-        guard canChangeTransfers, !ids.isEmpty, busyTransfers.isDisjoint(with:ids) else { return }
+        guard canChangeTransfers, !ids.isEmpty, busyTransfers.isDisjoint(with:ids), items.allSatisfy({ !hasPendingCleanup($0.id) }) else { return }
         error = nil
         busyTransfers.formUnion(ids)
         Task {
@@ -200,18 +326,65 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         }
     }
     func setLimits(download: UInt32, upload: UInt32) async throws {
+        guard !hasFileOperation else { throw UserFacingError(message:"Wait for the current file change to finish, then apply limits again.") }
         var r = EngineRequest(command:"limits"); r.downloadLimit = download; r.uploadLimit = upload
         _ = try await perform(r); await refresh()
     }
     func updateTransfer(_ request: EngineRequest) {
         guard let id = request.id, canChangeTransfers, !busyTransfers.contains(id), torrents.contains(where: { $0.id == id }) else { return }
         busyTransfers.insert(id); error = nil
+        let storageChange = ["relocate", "rename"].contains(request.command)
+        if storageChange { storageRequests.insert(id) }
         Task {
-            defer { busyTransfers.remove(id) }
+            defer { busyTransfers.remove(id); storageRequests.remove(id) }
             do { _ = try await perform(request) }
+            catch is CancellationError { /* A confirmed cancellation preserves original files. */ }
             catch { self.error = error.localizedDescription }
             await refresh()
         }
+    }
+    func canRetryTransfer(_ item: TorrentItem) -> Bool {
+        canChangeTransfers && !busyTransfers.contains(item.id) && torrents.contains { $0.id == item.id && presentation($0).canRetry }
+    }
+    func retryTransfer(_ item: TorrentItem) {
+        guard canRetryTransfer(item) else { return }
+        var request = EngineRequest(command:"retry"); request.id = item.id
+        updateTransfer(request)
+    }
+    func canCancelFileOperation(_ operation: FileOperationItem) -> Bool {
+        connected && !switching && !designPreview && fileOperation?.id == operation.id &&
+            fileOperation?.canCancel == true && operation.canCancel && !cancellingOperations.contains(operation.id)
+    }
+    func cancelFileOperation(_ operation: FileOperationItem) {
+        guard canCancelFileOperation(operation) else { return }
+        let id = operation.id
+        error = nil
+        cancellingOperations.insert(id)
+        Task {
+            defer { cancellingOperations.remove(id) }
+            do {
+                var request = EngineRequest(command:"cancelFileOperation"); request.id = id
+                _ = try await perform(request)
+            } catch { self.error = error.localizedDescription }
+            await refresh()
+        }
+    }
+    func resolveStorageRecovery(_ notice: StorageRecoveryItem, keepCopies: Bool) {
+        guard canResolveStorageRecovery(notice),
+              !keepCopies || notice.canKeepCopies else { return }
+        resolvingStorageRecovery = true; error = nil
+        Task {
+            defer { resolvingStorageRecovery = false }
+            do {
+                var request = EngineRequest(command:keepCopies ? "keepRecoveryCopies" : "retryStorageRecovery"); request.id = notice.id
+                _ = try await perform(request)
+            } catch { self.error = error.localizedDescription }
+            await refresh()
+        }
+    }
+    func canResolveStorageRecovery(_ notice: StorageRecoveryItem) -> Bool {
+        connected && !switching && !designPreview && !hasFileOperation && storageRecovery?.id == notice.id &&
+            !torrents.contains { $0.id == notice.torrentId && $0.state == "checking" }
     }
     func setPriority(_ item: TorrentItem, file: FileItem, priority: UInt8) {
         var request = EngineRequest(command:"priorities"); request.id = item.id
@@ -230,12 +403,28 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
     func moveSelectedToFront() {
         guard canActOnSelection, selected.count == 1 else { return }
-        var request = EngineRequest(command:"queueMove"); request.id = selected[0].id; request.queuePosition = 1
+        moveToFront(selected[0])
+    }
+    func moveToFront(_ item: TorrentItem) {
+        var request = EngineRequest(command:"queueMove"); request.id = item.id; request.queuePosition = 1
         updateTransfer(request)
     }
-    func chooseRelocation() {
-        guard canRecheckSelection, selected.count == 1 else { return }
-        let item = selected[0]
+    static func availableRevealDirectory(_ destination: String) -> URL {
+        var folder = URL(fileURLWithPath:destination,isDirectory:true).standardizedFileURL
+        while folder.path != "/" {
+            var directory = ObjCBool(false)
+            if FileManager.default.fileExists(atPath:folder.path,isDirectory:&directory), directory.boolValue { return folder }
+            folder.deleteLastPathComponent()
+        }
+        return folder
+    }
+    func revealDestination(_ item: TorrentItem) {
+        NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:Self.availableRevealDirectory(item.destination).path)
+    }
+    func chooseRelocation(_ target: TorrentItem? = nil) {
+        guard let item = target ?? (selected.count == 1 ? selected.first : nil), canChangeTransfers,
+              storageRecovery == nil, !busyTransfers.contains(item.id), item.state != "checking",
+              torrents.contains(where: { $0.id == item.id }) else { return }
         let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
         panel.canCreateDirectories = true; panel.prompt = "Move Files"; panel.message = "Choose a folder for \(item.name). Files will be verified after moving."
         panel.directoryURL = URL(fileURLWithPath:item.destination)
@@ -246,13 +435,15 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         }
     }
     func requestRename(_ item: TorrentItem, file: FileItem) {
-        guard canChangeTransfers, !busyTransfers.contains(item.id), item.state != "checking", let window = NSApp.keyWindow else { return }
+        guard canChangeTransfers, storageRecovery == nil, !busyTransfers.contains(item.id), item.state != "checking", let window = NSApp.keyWindow else { return }
+        let previousFocus = window.firstResponder
         let alert = NSAlert(); alert.messageText = "Rename File"; alert.informativeText = "Choose a new name for \(URL(fileURLWithPath:file.name).lastPathComponent)."
         alert.addButton(withTitle:"Rename"); alert.addButton(withTitle:"Cancel")
         let input = NSTextField(string:URL(fileURLWithPath:file.name).lastPathComponent)
         input.frame = NSRect(x:0,y:0,width:320,height:24); input.setAccessibilityLabel("New file name"); alert.accessoryView = input
         alert.window.initialFirstResponder = input
         alert.beginSheetModal(for:window) { response in
+            NativeAccessibility.restore(previousFocus,in:window)
             guard response == .alertFirstButtonReturn else { return }
             let name = input.stringValue.trimmingCharacters(in:.whitespacesAndNewlines)
             guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains(":") else { self.error = "Enter a file name without slashes or colons."; return }
@@ -263,7 +454,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         }
     }
     func setBackground(_ enabled: Bool) async {
-        guard !designPreview, !switching else { return }
+        guard !designPreview, !switching, !hasFileOperation, !savingEncryption else { return }
         switching = true; polling?.cancel(); defer { switching = false; beginPolling() }
         let service = SMAppService.agent(plistName:SeedHopIdentity.agentPlist)
         var stoppedCurrent = false
@@ -320,6 +511,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
     func beginImport(magnet: String = "", file: URL? = nil) {
         guard !showImport else { return }
+        guard !hasFileOperation else { error = "Wait for the current file change to finish, or cancel it, then add your torrent."; return }
         incomingMagnet = magnet; incomingFile = file; showImport = true
     }
     func pasteMagnet() { beginImport(magnet:NSPasteboard.general.string(forType:.string) ?? "") }

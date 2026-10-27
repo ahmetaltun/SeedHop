@@ -1,0 +1,222 @@
+{
+  "date": "2026-10-27",
+  "scope": "Roadmap step 5: durable peer encryption preferences and accurate connection details",
+  "baseCommit": "a6c3c06e44e9b8fb098b89bd7850c5968fd7be06",
+  "workingTreeChanges": true,
+  "build": {
+    "command": "python3 scripts/build.py --identity -",
+    "passed": true,
+    "signing": "ad-hoc development only",
+    "log": ".build/settings-build-2026-10-27.log"
+  },
+  "checks": [
+    {
+      "command": "cargo test -p seedhop-core --test settings --test mse --locked",
+      "passed": true,
+      "settingsTests": 4,
+      "existingMseTests": 5,
+      "policies": [
+        "disabled",
+        "allow",
+        "prefer",
+        "require"
+      ],
+      "listenerProof": "Saved Require leaves current plaintext session policy unchanged; after restart bare TCP handshake rejected and encrypted handshake accepted.",
+      "log": ".build/settings-core-2026-10-27.log"
+    },
+    {
+      "command": "cargo test -p seedhop-core --lib --test management --locked",
+      "passed": true,
+      "unitTests": 15,
+      "managementTests": 3,
+      "log": ".build/settings-regressions-2026-10-27.log"
+    },
+    {
+      "command": "SeedHop --verify-ux",
+      "passed": true,
+      "tests": 32,
+      "log": ".build/settings-ux-2026-10-27.log"
+    },
+    {
+      "command": "SeedHop --verify-engine /Users/ahmet/Rust/SeedHop/.build/progress-fixture",
+      "passed": true,
+      "settingsCoverage": [
+        "actual pending-file obstruction rejects save without changing active/saved policy",
+        "save retry distinguishes current and next-start policies",
+        "real foreground XPC shutdown/reconnect activates Require and preserves choices"
+      ],
+      "log": ".build/settings-xpc-2026-10-27.log"
+    },
+    {
+      "command": "SeedHop --verify-interface --output .build/settings-interface.png",
+      "passed": true,
+      "tests": 3,
+      "log": ".build/settings-interface-2026-10-27.log"
+    },
+    {
+      "command": "SeedHop --render-designs --output .build/settings-design",
+      "passed": true,
+      "screens": 52,
+      "log": ".build/settings-design-2026-10-27.log"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
+      "passed": true,
+      "log": ".build/settings-clippy-2026-10-27.log"
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "passed": true
+    },
+    {
+      "command": "git diff --check",
+      "passed": true
+    },
+    {
+      "command": "Check production library excludes layout fault checkpoint marker",
+      "passed": true
+    }
+  ],
+  "validationAdjustment": {
+    "initialRun": ".build/settings-xpc-poll-limit-failure.log",
+    "cause": "Fixed 2000-poll observation limit exhausted during preparation; operation completed before the fixture sent cancellation.",
+    "change": "Bounded 120-second elapsed-time observation window with 5 ms paced polling; final move and rename cancellation both pass.",
+    "productionBehaviorChanged": false
+  },
+  "visuallyReviewed": [
+    "encryption-pending-light.png",
+    "encryption-pending-dark.png",
+    "encryption-error-dark.png",
+    "encryption-offline-dark.png"
+  ],
+  "renderSha256": {
+    "add-dark.png": "e325793c7677f00c399b18df0575c4b67d5f3dee90fe78fd0ccb0f6bb4f726cc",
+    "add-light.png": "20edc498efddbd461441aaf81b0bdd6c4e0c967f58b280f9d9be257d39727a8a",
+    "cleanup-attention-dark.png": "1c392576624b180c1668e970cf82d0cd3786e242f39d91f659bbcdd4b6808437",
+    "cleanup-attention-light.png": "111d9b60657e55577b28bfe6870535d160d8a44e799be44e66fb8f31e26216c8",
+    "cleanup-orphan-dark.png": "8cfa5630a5f2b2a6eb2682a84bd720aceb97e54e2cb989846452bbe1d708411b",
+    "cleanup-orphan-light.png": "466cd87d6cdd879171e83787e468fcf8c016217e1da9250e2f08e45892c9aa93",
+    "compact-dark.png": "36fb4f7bed5f5aac5fda9320a0a820a3082def78e9b6bb1dbb9f3e92eaf221e0",
+    "compact-light.png": "2e22bb4ff79947ca0f4ff86cdf20551f9fd9856facddae4a7e0837982b03d0dc",
+    "contrast-compact-dark.png": "36fb4f7bed5f5aac5fda9320a0a820a3082def78e9b6bb1dbb9f3e92eaf221e0",
+    "contrast-compact-light.png": "2e22bb4ff79947ca0f4ff86cdf20551f9fd9856facddae4a7e0837982b03d0dc",
+    "contrast-library-dark.png": "545b3c07f6a4b63413d49438b113da11b2cc70ec9c09198934f82b8bd7bf196c",
+    "contrast-library-light.png": "eff54a77d79517ffa6daaaee41d1bef2b50b1149f511b9b31d85f6e2e70871e7",
+    "empty-dark.png": "c3d170f6754895f8271ec76ab2e7d6e1fa17b2afd4ff71bf4cd576423f1e0dd7",
+    "empty-light.png": "e7fd9532c6f41cf81e604aa667c45899d95b09805586a7196db5ba8169d848e2",
+    "encryption-error-dark.png": "ca57b431aa1a03fa5bfb8bbedb134cb875dedbdf045da40675f92992487a1ab6",
+    "encryption-error-light.png": "42033e1f58e40db788dd2e88fed915eaa859089cbc00311c8e1b8330acf53c71",
+    "encryption-offline-dark.png": "238a9b860dd08064e6f73f9b71ff3719acd9f98681e9fa77aba2598276f5f5b2",
+    "encryption-offline-light.png": "8841eaf15d0c8241957e8ec100e63af8b50cc8a594d490a3305bd7ea789440c9",
+    "encryption-pending-dark.png": "5b383409f5087e7ebe617696dcd91681accc70fb8858204ec075388b8b9bc07d",
+    "encryption-pending-light.png": "cc2c61d34c2a3e71ef911bfbbcadcfd72966224ef84acd87d86fd4f563c66c21",
+    "file-controls-dark.png": "f0e2e9af7752c1873945612cd49d88d131aa3dfc52f2d57c6f3202bdcb36a94e",
+    "file-controls-light.png": "86870596aa6438bf25ad258bc0c708c54c72f3b42de8cd1aeb6da9cabe637ca2",
+    "files-dark.png": "331d284b41326f551a99694d58135c0a5fb2f0a4e1063c1349129e1600d22575",
+    "files-light.png": "2c45d1eea0b7925776b91f35f12f9a331076700cb13f09d0c334eb97d032d6f7",
+    "filter-dark.png": "3d614344c1937f78a4c0248ddcdfa50af0a7dc7160ce4756763715dc522d15ea",
+    "filter-light.png": "696462a7f1be504265e7e2be82103f31f5058d4e2d54245445dc0dd04a88896a",
+    "library-dark.png": "545b3c07f6a4b63413d49438b113da11b2cc70ec9c09198934f82b8bd7bf196c",
+    "library-light.png": "eff54a77d79517ffa6daaaee41d1bef2b50b1149f511b9b31d85f6e2e70871e7",
+    "move-compact-dark.png": "5e1bb764553537329f7f2f364e825f262e57d68f82e75d791e2eb2c448e2c848",
+    "move-compact-light.png": "792921c97081719382e5d97108a4e2b8dbc3c049581c8cb0d7200f40132e059b",
+    "move-progress-dark.png": "e6662f4597a06011b84c129b59b990ff829cf32c0e88ca105268b64fe58bafa0",
+    "move-progress-light.png": "3ce8d990d8f796c0780d678e9daa75463e5c8dcae549edffeaa13eb177831e22",
+    "move-recovery-compact-dark.png": "8ff63a6dbe299b537df0a5f78868c24c5bdf4cf88f439be279084b5e0f0e3614",
+    "move-recovery-compact-light.png": "37ed7ca2be9774ac63b0aea078ea395cfab98c86d8d8369d3ac8d9601ef7defb",
+    "move-recovery-dark.png": "f4937f7dec84b2d255a4dab76d9667cad60edef1e1577baf39b226805c7a60f1",
+    "move-recovery-light.png": "eeb2b526c76f60118023b792cc18eb7701304d422c7829aa0cdb52acc7995c23",
+    "move-saving-dark.png": "9db4e295c7bda3372cbc4d0299bbd9570de2dc97b8216b4b6609ea393588c353",
+    "move-saving-light.png": "6da0aab97e015ee90594ba9c1136ec6aa79fd600c5883c804db02d644f483f14",
+    "queue-settings-dark.png": "fef80bdd33afe34a8cf4009a56e6de4e91f23382716d927a4884d2d1ff19eedf",
+    "queue-settings-light.png": "bdba51a6eb332e06376023c0bae4771835b0c3e59f3ff90eb5e5370fa8d28464",
+    "recovery-dark.png": "a9da7befb094cb88214c5830c98f22718eb7bb11d27ea30cc8537af4853c1c05",
+    "recovery-light.png": "53771029abdc158bb381cc677c94c878c012fa9c2c165ac0ed22cef287f0f4b6",
+    "selection-dark.png": "cc5c347ee2a26a7e4e8065a8f361154e44f3e22d9926ef5d8e605085e07811db",
+    "selection-light.png": "80dab7bfd674eeebb1c529306314b14afee15d4ca48460c79f525d0b56d4321a",
+    "settings-dark.png": "922a88c36ae151b91d906b57d9190a93fcc0ef7f170cfc904fc5349d7ff04633",
+    "settings-light.png": "323ec0978003358509bd29aa4fcd919384a96d6cf70b9da7339d49db2cb3490f",
+    "transfer-error-dark.png": "0b881ed19e0d3413dd15f1071f33ceadaa115cb6d49003b6423c7a12f83907c8",
+    "transfer-error-light.png": "f26d3a3b90d51a162d9f378bb83ba048061555671df6ae4d2e9fb5e5d571922c",
+    "transfer-stale-dark.png": "9e6b817aace0e0d28150e20ca198356beba40287bb6e0df3474ac4eeb4b0e3ec",
+    "transfer-stale-light.png": "8e20facb40fd961c31d58e219526e7ef1a1c85009b37268b6eea356e8c3904ef",
+    "transfer-states-compact-dark.png": "c8b8ac3ac9f4cf8d3927e99b38c04fb9eb5c259727b6f6926d7b28d7fecbb8df",
+    "transfer-states-compact-light.png": "eac714300e6f2f160ba5346f50b1fc5503a4da6da4a7567703575b2d6fa7db11"
+  },
+  "sourceSha256": {
+    "Cargo.lock": "8bab41e7641539dff76cc6fcefa169b28218fe3b2fcc21ad4a483ec40499d1cc",
+    "Cargo.toml": "b65673dc67b27523d9ee946f573a788cdb66d27ed2beb1b835c6fca446f60cd4",
+    "crates/seedhop-core/Cargo.toml": "780a6adc5e39c80f7962f14371019bae80a38b7eddf943f4e26b68a1074f5c80",
+    "crates/seedhop-core/src/adapter.rs": "696ac3eadd11ec11f90d63a5a011545677d9776567f2812a300a0dffafaa1fa2",
+    "crates/seedhop-core/src/bin/seedhop-lab.rs": "4204274fee1826ee2c6964429afffe4a7903d77ba0d051e8236f6008ba4275be",
+    "crates/seedhop-core/src/connection_settings.rs": "facd42b3d356cf27cb637e7a1f89ee02c661de9f71268d6cb46016e54fa907ed",
+    "crates/seedhop-core/src/file_operation.rs": "6c35caa10fa4c1e6457c128dcab1e912d82ea39d5712e995cdd2a7410de46d2f",
+    "crates/seedhop-core/src/layout_journal.rs": "d7f09582e48473371c0ea68a91cc233445abcbf7d80733f6ceb43d6f3513ca7f",
+    "crates/seedhop-core/src/lib.rs": "4c8cdf77132600a5d475fca75295f5c0165c6e3e71a8ce76fdc3091b701f9385",
+    "crates/seedhop-core/src/management.rs": "0b8c7a3cf530fed77b5f9dbf8c7d034ec22f17cd985730425dc7ef022e18d853",
+    "crates/seedhop-core/src/model.rs": "cef07ce53e7d4593dba9f8db40949aa1b8c539805ee4f7f9aa6741441cf9e68b",
+    "crates/seedhop-core/src/storage.rs": "c7dd9955e4adc7bc08afad9d989f7dfa8221a9852b229153428e2a58035c041e",
+    "crates/seedhop-core/src/storage_receipt.rs": "a3538937c9f99b9be9b6ce7c4360ee3acee03f2d2aa94d14203ad7b0399b3b6f",
+    "crates/seedhop-core/src/v2.rs": "b19d156da78b0fda1ae04e57ba6ec0f72f6ed70fd5a114b47ccf28d97800bc6e",
+    "crates/seedhop-core/tests/faults.rs": "2f08bc5c8d1449065b2193c3a1609bb0bc89453058ab50c7fa3ba2d8046cd67a",
+    "crates/seedhop-core/tests/management.rs": "229c6da28d49b60ac8d83d8280d8618703ed765609d64298fa842e4ea19684ba",
+    "crates/seedhop-core/tests/mse.rs": "f6f53d9814b0b0326a10b0b9e03296b55b89ccec5218a64e905d26bd4ef6a27c",
+    "crates/seedhop-core/tests/recovery.rs": "725a3446d051f29403b1de30c893aa0a2d475adfacf8a8a865f70c7536d877c0",
+    "crates/seedhop-core/tests/settings.rs": "c30ff03c3eae58f44d6780321c0409f46e1c2198f40708ab817b0799cbe0ed59",
+    "crates/seedhop-core/tests/status.rs": "ecaa842dc0913e49a48a29125a292872a208ac33f5aa733bc694005701906c0f",
+    "crates/seedhop-core/tests/support/gated_storage.rs": "7da68cf896709f4928c2e70012de930fbb75a928cbb03d67b43ed683d89cc6be",
+    "crates/seedhop-core/tests/support/mod.rs": "c1440158a18f6ef0cd704eb79433801d52ddf532ca9ea4d552c25488a91bdb01",
+    "crates/seedhop-core/tests/support/volume.rs": "82b59ea4f1c9b8edff1268fb4b4a246ce08d48933557d19825ad9fc5266b297f",
+    "crates/seedhop-core/tests/swarm.rs": "919ae4ad0fa67bcba26c2ed247f0c0807f2c05e4cd4bab6a5669fe3b7c4c0268",
+    "crates/seedhop-core/tests/v2.rs": "52d4876f6607d495650a90516cb76885ed5e6aba70a18f40b3a17416e8d3ff87",
+    "crates/seedhop-ffi/src/bindgen.rs": "f7a2dd11fb370e9595bdfa6c32fc41a9b67a60bbab06ec711cb7a03eb873ffa6",
+    "crates/seedhop-ffi/src/lib.rs": "cc60373908a186e27b0a81504dbfa9e0e0ff27c90d6befaa9e7fd41ead545526",
+    "docs/CONNECTION-SETTINGS.md": "fae482e62ad1910043caf7175a5ddaa49aab6651e8d720341e04e7299fa69851",
+    "docs/PRODUCT-ROADMAP.md": "7e7f79b87cd0749a68fb33a4fd7e9170b1e55fc03803267cfa871d7332bf67ca",
+    "docs/UX-REVIEW.md": "319625330ab94363fad7d9e4d9a2cdccf65333ed524708e38e85e706410f6279",
+    "macOS/App/DesignSystem.swift": "970626d1ca86837ca673780e6e1e5fafe980e227b309bbb0a782e3279ed211ef",
+    "macOS/App/EngineClient.swift": "2c0677db9b1b4668253b65bad946e2a18bb8445ab7e7cd683fac5d3deb1dfff1",
+    "macOS/App/EngineSelfTest.swift": "6307d6ba4e4dd1b648d11207f88ad3761fff3487d0d2b3d7400a4a4bc77c5d44",
+    "macOS/App/ImportSession.swift": "11040ceb2e1bb785288b238bef9edb1d82fc7ed54d9a39ba24eae3a6349452b8",
+    "macOS/App/ImportView.swift": "e9bde8f30b2c3a6f7f3d16b621ea04c37e91b357b4b1515a2642948e1faf21de",
+    "macOS/App/InterfaceSelfTest.swift": "e7545c797b875af667793dea35020b6fa529fb936d39cb371c3b79bca67f8bbf",
+    "macOS/App/LibraryStore.swift": "8f23841d178d5ed14833e2a32910bcf7539726242428ea552fb1a3a804213744",
+    "macOS/App/LibraryView.swift": "7f97d7a01ac0637c09c6f580b60269ad32f9ee58b362eea255dd54f8ce75dad6",
+    "macOS/App/LifecycleSelfTest.swift": "470fb6257a4eb211d78377d3781425e6db7ab3b6fae25a13f351e067e43084d1",
+    "macOS/App/PreviewFixtures.swift": "e791f140da629cfb0baba4b34c7563def53037ba3ccdf5b132428a8917529696",
+    "macOS/App/SeedHopApp.swift": "6e220d3f841523f9a905db6c3ecefde3ce6aff03b450a458fee96dc3b4b4370d",
+    "macOS/App/SettingsView.swift": "f4ace96dc39101b6c2147e85f8cfd0bcc421fa6926b5a44240400112f662b1a8",
+    "macOS/App/TransferPresentation.swift": "5b35b800e301754e47d4c795d923b1e9c27d938fa147e713da935dd52cc075c2",
+    "macOS/App/UXSelfTest.swift": "61a9f015739b4fbed3ee429513af9a2ee50a393977ad2be929c0f274d6bf37f9",
+    "macOS/Host/EngineHost.swift": "74bed6dccaed3b7544a8225091c8f974820626309c14ed073f275653917419e2",
+    "macOS/Host/HostMain.swift": "0047ff4e48865fb39dcce30d75283efbd33745ef2c288f8cba570593a9e8e6a3",
+    "macOS/Shared/Models.swift": "b55cfbb049b0626105216316a831131016fc2b22e689de35d1dcc2e36740520b",
+    "macOS/Shared/Signing.swift": "a541a612abb091f9dc8d65035e8506c34166f72d9531a973da0cdb4aeed514cc",
+    "scripts/build.py": "e4a620cf4075761ecfef235dd2084a686b6ea622d3cee922e89f451de7ccef56"
+  },
+  "sourceSetSha256": "39cf6235d96d1de9568332c1848ff2e6a5cd29a8387e01b8b51bb4fd7fa68816",
+  "binarySha256": {
+    ".build/SeedHop.app/Contents/MacOS/SeedHop": "d67a07d0922fd029a06f5f5eb648e1cff500dbc0a2472c60133fd3440f6619ad",
+    ".build/SeedHop.app/Contents/MacOS/SeedHopAgent": "f8d2a56e6f0fa59a1fa2afe1466330120682d420982bf309daa06da211eed1ae",
+    ".build/SeedHop.app/Contents/XPCServices/SeedHopEngine.xpc/Contents/MacOS/SeedHopEngine": "751a7186e2bb3834eeb61b76bd12ea0ddd4f08f46c1b2665cb830031447e7d66",
+    ".build/SeedHop.app/Contents/Frameworks/libseedhop_ffi.dylib": "9fb9a20d0f493113b4ecf984795087c4c0ea02e5a8916692389bc5de7f88cbb5"
+  },
+  "logSha256": {
+    ".build/settings-build-2026-10-27.log": "367f0bd0ac3deb5588792103d963d10a4a6358906e00df6cfc73684fb3a26063",
+    ".build/settings-core-2026-10-27.log": "fbe4a1b1ca2ee23fd08a73183ecd8a2ccc9836894456e08797120a7e22e4b3dc",
+    ".build/settings-regressions-2026-10-27.log": "48b9dd99547ad79dec384214e7b01c4f7ecf1c33d4d4311fb5ba20d8f528b56b",
+    ".build/settings-clippy-2026-10-27.log": "45a9f7b52feee35d46b0e6391c2ff4701d5a1df5a24d0220d66a475b9ad58043",
+    ".build/settings-ux-2026-10-27.log": "7a0f606e35bc70e41e976da335297259b04522f653228526b423439a12427022",
+    ".build/settings-xpc-2026-10-27.log": "d0f8b24bfa797a37e66cda774691cd7ad3a3a4b119b909c08233f45a7190394f",
+    ".build/settings-interface-2026-10-27.log": "adee1161f27b210ced9f7a574ad26a37c1d29643294cb3afa3863a725e18d02f",
+    ".build/settings-design-2026-10-27.log": "caf37da2abde8b6d162673b2e37484a91a2da4cb3bd49009172f4d281c62c7f8",
+    ".build/settings-xpc-poll-limit-failure.log": "ce0a3cdabab3adf7397cf8f3fe51f969dc53a98971b7d80cc07831e72b528d7d"
+  },
+  "limits": [
+    "New live policy enforcement uses controlled TCP loopback; existing uTP and public-swarm evidence is unchanged.",
+    "Background host restart mode and login preference have controlled UI coverage; packaged settings restart uses foreground XPC.",
+    "Native key-event delivery, pointer walkthrough, VoiceOver, physical login/sleep/wake/network/drive acceptance remain separate gates.",
+    "Historical milestone evidence retains its original source/binary digests.",
+    "RSS, remote control, distribution signing, notarization, and release remain deferred."
+  ]
+}

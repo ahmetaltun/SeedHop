@@ -24,6 +24,154 @@ async fn wait(engine: &Engine, predicate: impl Fn(&Snapshot) -> bool) -> Snapsho
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn copying_can_be_cancelled_without_losing_running_paused_or_queued_intent() {
+    use seedhop_core::CoreError;
+    for intent in ["paused", "waiting", "queued"] {
+        let state = tempfile::tempdir().unwrap();
+        let files = tempfile::tempdir().unwrap();
+        let target = tempfile::tempdir().unwrap();
+        let cfg = config(state.path(), files.path());
+        let engine = Engine::open(cfg.clone()).await.unwrap();
+        if intent == "queued" {
+            engine.set_queue(1).await.unwrap();
+            engine
+                .add(
+                    adapter::create_fixture("blocker", b"not downloaded"),
+                    cfg.download_directory.clone(),
+                    vec![0],
+                    false,
+                    false,
+                )
+                .await
+                .unwrap();
+            wait(&engine, |s| s.torrents[0].state == "waiting").await;
+        }
+        let mut content = vec![7; 64 * 1024 * 1024];
+        let metainfo = adapter::create_fixture("original", &content);
+        // Keep the torrent incomplete, so queue suspension is meaningful.
+        content[0] = 8;
+        std::fs::write(files.path().join("original"), &content).unwrap();
+        let id = engine
+            .add(
+                metainfo,
+                cfg.download_directory.clone(),
+                vec![0],
+                intent == "paused",
+                true,
+            )
+            .await
+            .unwrap();
+        wait(&engine, |s| {
+            s.torrents.iter().any(|t| t.id == id && t.state == intent)
+        })
+        .await;
+        engine
+            .set_file_priorities(id.clone(), vec![2])
+            .await
+            .unwrap();
+        let before = wait(&engine, |s| {
+            s.torrents
+                .iter()
+                .any(|t| t.id == id && t.state == intent && t.queue_position > 0)
+        })
+        .await
+        .torrents
+        .into_iter()
+        .find(|t| t.id == id)
+        .unwrap();
+        let moving = tokio::spawn({
+            let engine = engine.clone();
+            let id = id.clone();
+            let destination = target.path().to_string_lossy().into_owned();
+            async move {
+                if intent == "paused" {
+                    engine.rename_file(id, 0, "renamed".into()).await
+                } else {
+                    engine.relocate(id, destination).await
+                }
+            }
+        });
+        let operation_id = tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                let snapshot = engine.snapshot().unwrap();
+                if let Some(operation) = snapshot.file_operation
+                    && operation.phase == "copying"
+                    && operation.completed_bytes > 0
+                {
+                    assert_eq!(operation.torrent_id, id);
+                    assert_eq!(operation.total_bytes, content.len() as u64);
+                    assert!(operation.completed_bytes <= operation.total_bytes);
+                    if engine.cancel_file_operation(operation.id.clone()).unwrap() {
+                        break operation.id;
+                    }
+                }
+                assert!(
+                    !moving.is_finished(),
+                    "Copy completed before cancellation was observed"
+                );
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(matches!(moving.await.unwrap(), Err(CoreError::Cancelled)));
+        assert!(engine.snapshot().unwrap().file_operation.is_none());
+        assert!(!engine.cancel_file_operation(operation_id.clone()).unwrap());
+        assert_eq!(
+            std::fs::read(files.path().join("original")).unwrap(),
+            content
+        );
+        assert!(!files.path().join("renamed").exists());
+        assert!(!target.path().join("original").exists());
+        let after = engine
+            .snapshot()
+            .unwrap()
+            .torrents
+            .into_iter()
+            .find(|t| t.id == id)
+            .unwrap();
+        assert_eq!(after, before);
+        // An old cancellation ID cannot poison a successful retry.
+        let retry = tokio::spawn({
+            let engine = engine.clone();
+            let id = id.clone();
+            let destination = target.path().to_string_lossy().into_owned();
+            async move { engine.relocate(id, destination).await }
+        });
+        assert!(!engine.cancel_file_operation(operation_id).unwrap());
+        retry.await.unwrap().unwrap();
+        wait(&engine, |s| {
+            s.torrents.iter().any(|t| t.id == id && t.state == intent)
+        })
+        .await;
+        assert_eq!(
+            std::fs::read(target.path().join("original")).unwrap(),
+            content
+        );
+        engine.shutdown().await.unwrap();
+        drop(engine);
+        let engine = Engine::open(cfg).await.unwrap();
+        let restored = wait(&engine, |s| {
+            s.torrents.iter().any(|t| t.id == id && t.state == intent)
+        })
+        .await
+        .torrents
+        .into_iter()
+        .find(|t| t.id == id)
+        .unwrap();
+        assert_eq!(restored.files[0].priority, 2);
+        assert!(restored.files[0].selected);
+        assert_eq!(restored.paused_intent, before.paused_intent);
+        assert_eq!(restored.queue_position, before.queue_position);
+        assert_eq!(
+            restored.destination,
+            target.path().canonicalize().unwrap().to_string_lossy()
+        );
+        engine.shutdown().await.unwrap();
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn queue_caps_reordering_pause_and_completion_survive_restart() {
     let state = tempfile::tempdir().unwrap();
     let files = tempfile::tempdir().unwrap();

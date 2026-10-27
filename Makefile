@@ -1,4 +1,4 @@
-.PHONY: build test lint render interop smoke ux-test interface-test faults v2-test v2-hardening
+.PHONY: build test lint render interop smoke ux-test interface-test faults v2-test v2-hardening layout-recovery performance
 build:
 	python3 scripts/build.py
 test:
@@ -25,3 +25,12 @@ v2-test:
 
 v2-hardening:
 	python3 scripts/v2_hardening.py
+
+layout-recovery:
+	python3 scripts/layout_recovery.py --cross-volume
+
+performance:
+	python3 scripts/build.py --identity -
+	SEEDHOP_PERF_OUTPUT="$(CURDIR)/.build/performance-core-current.json" cargo test -p seedhop-core --test performance --locked -- --ignored --exact library_snapshot_baseline --nocapture
+	.build/SeedHop.app/Contents/MacOS/SeedHop --verify-performance --output "$(CURDIR)/.build/performance-ui-current.json"
+	python3 scripts/check_performance.py --core .build/performance-core-current.json --ui .build/performance-ui-current.json --output .build/performance-budget-current.json

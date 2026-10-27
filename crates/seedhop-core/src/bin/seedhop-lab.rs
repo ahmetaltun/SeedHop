@@ -19,6 +19,141 @@ async fn open_engine(
     Ok(Engine::open_with_peer_encryption(config, peer_encryption()?).await?)
 }
 
+#[cfg(feature = "layout-fault-injection")]
+async fn layout_lab(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+    use std::os::unix::fs::FileExt;
+    let command = args[1].as_str();
+    if command == "layout-inspect" {
+        println!(
+            "{}",
+            serde_json::to_string(&adapter::preview(std::fs::read(&args[2])?)?)?
+        );
+        return Ok(());
+    }
+    let state = args.get(2).ok_or("missing state directory")?.clone();
+    let files = args.get(3).ok_or("missing files directory")?.clone();
+    let engine = open_engine(EngineConfig {
+        state_directory: state,
+        download_directory: files.clone(),
+        allow_network_discovery: false,
+        listen_port: 0,
+    })
+    .await?;
+    if command == "layout-prepare" {
+        let bytes = std::fs::read(args.get(4).ok_or("missing torrent")?)?;
+        let preview = adapter::preview(bytes.clone())?;
+        let intent = args.get(5).map(String::as_str).unwrap_or("paused");
+        let selected = preview.files.last().ok_or("missing files")?.clone();
+        if intent != "paused" {
+            let file = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(PathBuf::from(&files).join(&selected.name))?;
+            let mut byte = [0];
+            file.read_exact_at(&mut byte, 0)?;
+            byte[0] ^= 1;
+            file.write_all_at(&byte, 0)?;
+            file.sync_all()?;
+        }
+        if intent == "queued" {
+            engine.set_queue(1).await?;
+            engine
+                .add(
+                    adapter::create_fixture("queue-blocker", b"not downloaded"),
+                    files.clone(),
+                    vec![0],
+                    false,
+                    false,
+                )
+                .await?;
+        }
+        let id = engine
+            .add(bytes, files, vec![selected.index], intent == "paused", true)
+            .await?;
+        loop {
+            if engine
+                .snapshot()?
+                .torrents
+                .iter()
+                .find(|torrent| torrent.id == id)
+                .is_some_and(|torrent| torrent.state != "checking")
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        let mut priorities = vec![0; preview.files.len()];
+        priorities[selected.index as usize] = 2;
+        engine.set_file_priorities(id, priorities).await?;
+        engine
+            .set_queue(if intent == "queued" { 1 } else { 0 })
+            .await?;
+    } else {
+        let started = Instant::now();
+        while engine
+            .snapshot()?
+            .torrents
+            .iter()
+            .any(|torrent| torrent.state == "checking")
+        {
+            if started.elapsed() > Duration::from_secs(20) {
+                return Err("layout verification timed out".into());
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        if command == "layout-change" {
+            let torrent = engine
+                .snapshot()?
+                .torrents
+                .into_iter()
+                .find(|torrent| torrent.name != "queue-blocker")
+                .ok_or("missing transfer")?;
+            if args.get(5).map(String::as_str) == Some("rename") {
+                engine
+                    .rename_file(
+                        torrent.id,
+                        torrent.files.last().ok_or("missing file")?.index,
+                        "renamed.bin".into(),
+                    )
+                    .await?;
+            } else {
+                engine
+                    .relocate(
+                        torrent.id,
+                        args.get(4).ok_or("missing destination")?.clone(),
+                    )
+                    .await?;
+            }
+        } else if command == "layout-resolve" {
+            let notice = engine
+                .snapshot()?
+                .storage_recovery
+                .ok_or("no recovery notice")?;
+            engine
+                .resolve_storage_recovery(
+                    notice.id,
+                    args.get(4).map(String::as_str) == Some("keep"),
+                )
+                .await?;
+        }
+    }
+    let started = Instant::now();
+    while engine
+        .snapshot()?
+        .torrents
+        .iter()
+        .any(|torrent| torrent.state == "checking")
+    {
+        if started.elapsed() > Duration::from_secs(20) {
+            return Err("layout verification timed out".into());
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    println!("{}", serde_json::to_string(&engine.snapshot()?)?);
+    engine.shutdown().await?;
+    Ok(())
+}
+
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::var_os("SEEDHOP_DIAGNOSTICS").is_some() {
@@ -29,6 +164,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let args: Vec<_> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
+        #[cfg(feature = "layout-fault-injection")]
+        Some(
+            "layout-inspect" | "layout-prepare" | "layout-change" | "layout-status"
+            | "layout-resolve",
+        ) => layout_lab(&args).await?,
         Some(command @ ("inspect-v2" | "verify-v2-piece")) => {
             let path = args.get(2).ok_or("missing torrent")?;
             let file = std::fs::File::open(path)?;

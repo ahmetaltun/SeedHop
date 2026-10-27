@@ -1,0 +1,326 @@
+{
+  "date": "2026-10-27",
+  "scope": "Roadmap step 6: native interaction and accessibility implementation and automated proof",
+  "automatedPortionComplete": true,
+  "manualAcceptanceComplete": false,
+  "stepFullyAccepted": false,
+  "baseCommit": "a6c3c06e44e9b8fb098b89bd7850c5968fd7be06",
+  "workingTreeChanges": true,
+  "build": {
+    "command": "python3 scripts/build.py --identity -",
+    "passed": true,
+    "signing": "ad-hoc development only",
+    "log": ".build/accessibility-build-2026-10-27.log"
+  },
+  "checks": [
+    {
+      "command": "SeedHop --verify-ux",
+      "passed": true,
+      "tests": 34,
+      "newCoverage": [
+        "Captured import-file row toggles preserve other choices and reject unknown rows",
+        "Announcement deduplication and recurrence after clearing"
+      ],
+      "log": ".build/accessibility-ux-2026-10-27.log"
+    },
+    {
+      "command": "SeedHop --verify-interface --output .build/accessibility-interface.png",
+      "passed": true,
+      "tests": 9,
+      "checks": [
+        "Native Command-F search focus",
+        "Native Command-L table focus",
+        "Native Command-0 reopening",
+        "Import magnet field focus",
+        "Import close restores table focus",
+        "Metadata resolves into focused native file table",
+        "Rename input focus and native Cancel restore table focus",
+        "One high-priority error announcement request per occurrence",
+        "Medium-priority phases without per-byte chatter; high-priority recovery"
+      ],
+      "announcementProof": "Development observer captures requests before posting; actual VoiceOver speech/delivery is not asserted.",
+      "log": ".build/accessibility-interface-2026-10-27.log"
+    },
+    {
+      "command": "SeedHop --verify-engine /Users/ahmet/Rust/SeedHop/.build/progress-fixture",
+      "passed": true,
+      "coverage": "Packaged foreground XPC import/recheck, file choices/priorities, queue, cancellation, exact bytes, policy save failure/retry, restart and removal.",
+      "log": ".build/accessibility-xpc-2026-10-27.log"
+    },
+    {
+      "command": "SeedHop --render-designs --output .build/accessibility-design",
+      "passed": true,
+      "screens": 58,
+      "log": ".build/accessibility-design-2026-10-27.log"
+    },
+    {
+      "command": "git diff --check",
+      "passed": true
+    },
+    {
+      "command": "Compare Rust/manifest digests with verified step 5 evidence",
+      "passed": true,
+      "unchangedFiles": 27,
+      "baseline": "docs/results/connection-settings-2026-10-27.json",
+      "testsRerun": false
+    },
+    {
+      "command": "Check bundled library excludes SEEDHOP_LAYOUT_CHECKPOINT",
+      "passed": true
+    }
+  ],
+  "fixtureDesign": {
+    "nativeScene": "Actual library WindowGroup with controlled transport, visibly labeled native test fixture/sample data",
+    "metadataReadiness": "Wait for the actual native file table, then assert first responder; no fixed-delay assumption",
+    "systemSettingsReadOnly": {
+      "fullKeyboardAccess": false,
+      "reduceMotion": false,
+      "increaseContrast": false
+    },
+    "systemSettingsChanged": false,
+    "announcementsDisabledDuringRendering": true
+  },
+  "visuallyReviewed": [
+    "contrast-import-light.png",
+    "contrast-import-dark.png",
+    "contrast-settings-dark.png",
+    "contrast-recovery-light.png"
+  ],
+  "manualAcceptance": [
+    {
+      "area": "Library keyboard",
+      "procedure": "Command-F reaches Search; Return reaches the table; Command-L returns to the table; arrows and selection work during snapshot updates",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Window lifecycle",
+      "procedure": "Close the library while real transfers run; Command-0 reopens it without changing selection or transfer intent",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Import entry/cancel",
+      "procedure": "Command-N opens with Magnet link focused; Tab order reaches file chooser and Cancel; Escape closes and returns focus to the table",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Import metadata",
+      "procedure": "Open a safe torrent fixture; focus reaches Files to download; arrow-row navigation, Space toggling, Tab/Shift-Tab, file toggles, Select/Deselect all, destination, and Add paused work",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Import errors",
+      "procedure": "Invalid magnet and failed metadata read announce the error once; Retry remains reachable; a later recurrence is announced again",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Busy import",
+      "procedure": "During lookup, Cancel works; during add, closing/cancel/input are blocked until the add commits",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "File controls",
+      "procedure": "VoiceOver speaks each filename, checked state, current priority, and contextual Rename action; at least one file stays selected",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Rename",
+      "procedure": "Name is focused/selected; Tab reaches Rename and Cancel; Escape restores prior focus; invalid name is announced; a selection change does not retarget the action",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Move and cancellation",
+      "procedure": "Copied bytes and phase are readable; phase changes announce without per-byte chatter; Cancel targets the current operation; saving is not cancellable",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Recovery",
+      "procedure": "Active folder and retained-copy message are understandable; Retry Cleanup, Keep Extra Copies, and folder actions are reachable; failure remains announced and retryable",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Transfer failure",
+      "procedure": "Typed error guidance, raw details disclosure, Retry, folder inspection, and applicable Move Files actions work from keyboard and pointer",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Settings",
+      "procedure": "Tabs, encryption picker, pending restart, queue, and bandwidth fields have clear names/order; Return and validation focus work; errors are announced",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Settings restart",
+      "procedure": "Restart preserves paused/running intent, selection, host mode, and login preference; failed reconnect keeps the library and pending policy visible",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "VoiceOver navigation",
+      "procedure": "Rotor/groups and reading order expose notices and their action buttons separately; row summaries/progress are not duplicated; announcements neither interrupt excessively nor disappear",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Increase Contrast",
+      "procedure": "Enable the real OS setting; focus, selected rows, disabled controls, notices, and progress remain distinguishable in both appearances",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Reduce Motion",
+      "procedure": "Enable the real OS setting; navigation and live updates remain usable without unnecessary animated movement",
+      "status": "not_run",
+      "observation": null
+    },
+    {
+      "area": "Large content",
+      "procedure": "Long filenames/paths, many files, scrolling, smaller windows, and text size/zoom retain access to every control",
+      "status": "not_run",
+      "observation": null
+    }
+  ],
+  "sourceSha256": {
+    "Cargo.lock": "8bab41e7641539dff76cc6fcefa169b28218fe3b2fcc21ad4a483ec40499d1cc",
+    "Cargo.toml": "b65673dc67b27523d9ee946f573a788cdb66d27ed2beb1b835c6fca446f60cd4",
+    "crates/seedhop-core/Cargo.toml": "780a6adc5e39c80f7962f14371019bae80a38b7eddf943f4e26b68a1074f5c80",
+    "crates/seedhop-core/src/adapter.rs": "696ac3eadd11ec11f90d63a5a011545677d9776567f2812a300a0dffafaa1fa2",
+    "crates/seedhop-core/src/bin/seedhop-lab.rs": "4204274fee1826ee2c6964429afffe4a7903d77ba0d051e8236f6008ba4275be",
+    "crates/seedhop-core/src/connection_settings.rs": "facd42b3d356cf27cb637e7a1f89ee02c661de9f71268d6cb46016e54fa907ed",
+    "crates/seedhop-core/src/file_operation.rs": "6c35caa10fa4c1e6457c128dcab1e912d82ea39d5712e995cdd2a7410de46d2f",
+    "crates/seedhop-core/src/layout_journal.rs": "d7f09582e48473371c0ea68a91cc233445abcbf7d80733f6ceb43d6f3513ca7f",
+    "crates/seedhop-core/src/lib.rs": "4c8cdf77132600a5d475fca75295f5c0165c6e3e71a8ce76fdc3091b701f9385",
+    "crates/seedhop-core/src/management.rs": "0b8c7a3cf530fed77b5f9dbf8c7d034ec22f17cd985730425dc7ef022e18d853",
+    "crates/seedhop-core/src/model.rs": "cef07ce53e7d4593dba9f8db40949aa1b8c539805ee4f7f9aa6741441cf9e68b",
+    "crates/seedhop-core/src/storage.rs": "c7dd9955e4adc7bc08afad9d989f7dfa8221a9852b229153428e2a58035c041e",
+    "crates/seedhop-core/src/storage_receipt.rs": "a3538937c9f99b9be9b6ce7c4360ee3acee03f2d2aa94d14203ad7b0399b3b6f",
+    "crates/seedhop-core/src/v2.rs": "b19d156da78b0fda1ae04e57ba6ec0f72f6ed70fd5a114b47ccf28d97800bc6e",
+    "crates/seedhop-core/tests/faults.rs": "2f08bc5c8d1449065b2193c3a1609bb0bc89453058ab50c7fa3ba2d8046cd67a",
+    "crates/seedhop-core/tests/management.rs": "229c6da28d49b60ac8d83d8280d8618703ed765609d64298fa842e4ea19684ba",
+    "crates/seedhop-core/tests/mse.rs": "f6f53d9814b0b0326a10b0b9e03296b55b89ccec5218a64e905d26bd4ef6a27c",
+    "crates/seedhop-core/tests/recovery.rs": "725a3446d051f29403b1de30c893aa0a2d475adfacf8a8a865f70c7536d877c0",
+    "crates/seedhop-core/tests/settings.rs": "c30ff03c3eae58f44d6780321c0409f46e1c2198f40708ab817b0799cbe0ed59",
+    "crates/seedhop-core/tests/status.rs": "ecaa842dc0913e49a48a29125a292872a208ac33f5aa733bc694005701906c0f",
+    "crates/seedhop-core/tests/support/gated_storage.rs": "7da68cf896709f4928c2e70012de930fbb75a928cbb03d67b43ed683d89cc6be",
+    "crates/seedhop-core/tests/support/mod.rs": "c1440158a18f6ef0cd704eb79433801d52ddf532ca9ea4d552c25488a91bdb01",
+    "crates/seedhop-core/tests/support/volume.rs": "82b59ea4f1c9b8edff1268fb4b4a246ce08d48933557d19825ad9fc5266b297f",
+    "crates/seedhop-core/tests/swarm.rs": "919ae4ad0fa67bcba26c2ed247f0c0807f2c05e4cd4bab6a5669fe3b7c4c0268",
+    "crates/seedhop-core/tests/v2.rs": "52d4876f6607d495650a90516cb76885ed5e6aba70a18f40b3a17416e8d3ff87",
+    "crates/seedhop-ffi/src/bindgen.rs": "f7a2dd11fb370e9595bdfa6c32fc41a9b67a60bbab06ec711cb7a03eb873ffa6",
+    "crates/seedhop-ffi/src/lib.rs": "cc60373908a186e27b0a81504dbfa9e0e0ff27c90d6befaa9e7fd41ead545526",
+    "docs/ACCESSIBILITY-ACCEPTANCE.md": "3ccd33194a905028ccd7a9f22db10f4f39222e94da8b87e9eb0cab26bd53eda2",
+    "docs/PRODUCT-ROADMAP.md": "2c83b65252e0eb23ea077a9dfc22481872b04d23f1a6d4989e5aa41ec9b2c266",
+    "docs/UX-REVIEW.md": "304b58a407f07190ca86bce94da7feb9f10aec4610eb32b6692da5b82c5a0700",
+    "macOS/App/DesignSystem.swift": "a2fe26c6c45e9d7604c8df391939a6e71160b08771d94f0716e0001653832084",
+    "macOS/App/EngineClient.swift": "2c0677db9b1b4668253b65bad946e2a18bb8445ab7e7cd683fac5d3deb1dfff1",
+    "macOS/App/EngineSelfTest.swift": "6307d6ba4e4dd1b648d11207f88ad3761fff3487d0d2b3d7400a4a4bc77c5d44",
+    "macOS/App/ImportSession.swift": "efe84c9e09f41acc819e3a2b2f89cb62089fa6c0363632d2aa7cd7157e1bb726",
+    "macOS/App/ImportView.swift": "ec672fdf37ad5632c326470b85e321e33a9a9ee37cde892d51a83e7775fa354b",
+    "macOS/App/InterfaceSelfTest.swift": "507db02a444fb17d41b8c7326da3c3055b84da72745382e8c32ed630f83d453f",
+    "macOS/App/LibraryStore.swift": "f372158013acce5c8d8bccf17ff9ca01ff7f3578486dff1fcc81a95edb9be207",
+    "macOS/App/LibraryView.swift": "871962e0b5a390f17c56fa83f30d9bebaaf50d7269bfe467d5636aaab0b9c7e8",
+    "macOS/App/LifecycleSelfTest.swift": "470fb6257a4eb211d78377d3781425e6db7ab3b6fae25a13f351e067e43084d1",
+    "macOS/App/NativeAccessibility.swift": "0de93b0819d28e34d0aa1a98408556b79b3919fca63ab75e7f411fff313b6c29",
+    "macOS/App/PreviewFixtures.swift": "0d9e055833af4280b05d711373815b29f8f638360d15bd7bf3bea5a051aeda65",
+    "macOS/App/SeedHopApp.swift": "bde87b8be7dcca03cdf38e46d1bf07172d8c2c2e9b9004c0bb695df180fa3c78",
+    "macOS/App/SettingsView.swift": "382b6c83d9304698f155c380e0a0ce4f4d6f85494a7b471b072b82092126fd94",
+    "macOS/App/TransferPresentation.swift": "5b35b800e301754e47d4c795d923b1e9c27d938fa147e713da935dd52cc075c2",
+    "macOS/App/UXSelfTest.swift": "ed9ca0726235c59c9d947fb5bb3ccc26954e9f3e0c1229f007ddac38b1526f14",
+    "macOS/Host/EngineHost.swift": "74bed6dccaed3b7544a8225091c8f974820626309c14ed073f275653917419e2",
+    "macOS/Host/HostMain.swift": "0047ff4e48865fb39dcce30d75283efbd33745ef2c288f8cba570593a9e8e6a3",
+    "macOS/Shared/Models.swift": "b55cfbb049b0626105216316a831131016fc2b22e689de35d1dcc2e36740520b",
+    "macOS/Shared/Signing.swift": "a541a612abb091f9dc8d65035e8506c34166f72d9531a973da0cdb4aeed514cc",
+    "scripts/build.py": "e4a620cf4075761ecfef235dd2084a686b6ea622d3cee922e89f451de7ccef56"
+  },
+  "sourceSetSha256": "444492fea7f1408297edef414d27e03c2c5fdfd202c419ee770819aed7156deb",
+  "binarySha256": {
+    ".build/SeedHop.app/Contents/MacOS/SeedHop": "649e37357cc2d9ca827ee1411872421c341a18658d3752c7d9a64e362c631185",
+    ".build/SeedHop.app/Contents/MacOS/SeedHopAgent": "6569e2e9da97cba501a1c3490c2ccbfb271cb1c453db2fc5383b3af7f6c8d4eb",
+    ".build/SeedHop.app/Contents/XPCServices/SeedHopEngine.xpc/Contents/MacOS/SeedHopEngine": "07c78501ab905c9dc0e53c094ee7982cc20781505c230a5cce871fce05dae99a",
+    ".build/SeedHop.app/Contents/Frameworks/libseedhop_ffi.dylib": "9fb9a20d0f493113b4ecf984795087c4c0ea02e5a8916692389bc5de7f88cbb5"
+  },
+  "logSha256": {
+    ".build/accessibility-build-2026-10-27.log": "71250a7abbac019f7272290652a52fea719a3d09967aa5a52e5735b7107e5f7d",
+    ".build/accessibility-interface-2026-10-27.log": "f16b6c9cf931997e50af6f8050106ef293e0c604764f802cf0136403e0050d8c",
+    ".build/accessibility-ux-2026-10-27.log": "683a19cedaf0806d844341bc0a90fcc9adce7d12b39cc172caa712ab516ccb05",
+    ".build/accessibility-xpc-2026-10-27.log": "d0f8b24bfa797a37e66cda774691cd7ad3a3a4b119b909c08233f45a7190394f",
+    ".build/accessibility-design-2026-10-27.log": "e0376cd2bb5603046c47064f82a72a569c1d00d7de89af22ee57cab4919b2d28"
+  },
+  "renderSha256": {
+    "add-dark.png": "eca93ea6b2ab43cfa0b590acee71a316b3bd03d677fac490a216a767cba84aed",
+    "add-light.png": "d69e1b63972bbaa15e5ea638e321a2f540507a514f0268694daa37238605fa09",
+    "cleanup-attention-dark.png": "1c392576624b180c1668e970cf82d0cd3786e242f39d91f659bbcdd4b6808437",
+    "cleanup-attention-light.png": "111d9b60657e55577b28bfe6870535d160d8a44e799be44e66fb8f31e26216c8",
+    "cleanup-orphan-dark.png": "8cfa5630a5f2b2a6eb2682a84bd720aceb97e54e2cb989846452bbe1d708411b",
+    "cleanup-orphan-light.png": "466cd87d6cdd879171e83787e468fcf8c016217e1da9250e2f08e45892c9aa93",
+    "compact-dark.png": "36fb4f7bed5f5aac5fda9320a0a820a3082def78e9b6bb1dbb9f3e92eaf221e0",
+    "compact-light.png": "2e22bb4ff79947ca0f4ff86cdf20551f9fd9856facddae4a7e0837982b03d0dc",
+    "contrast-compact-dark.png": "36fb4f7bed5f5aac5fda9320a0a820a3082def78e9b6bb1dbb9f3e92eaf221e0",
+    "contrast-compact-light.png": "2e22bb4ff79947ca0f4ff86cdf20551f9fd9856facddae4a7e0837982b03d0dc",
+    "contrast-import-dark.png": "1595177093c6227cd4f8e302d0319f0e46d1d0068005c77e2c726b2dc23075a5",
+    "contrast-import-light.png": "40212960b52d464dc6add6704f12f0ba1d33bda007ad021e09effddf12f78e82",
+    "contrast-library-dark.png": "545b3c07f6a4b63413d49438b113da11b2cc70ec9c09198934f82b8bd7bf196c",
+    "contrast-library-light.png": "eff54a77d79517ffa6daaaee41d1bef2b50b1149f511b9b31d85f6e2e70871e7",
+    "contrast-recovery-dark.png": "94bf8e5a4a5f4d601c13e5e1b2d613712b2035febbe1111d1403310b65669a68",
+    "contrast-recovery-light.png": "0d3cabcd007d9a543d9f29b086e18d6285d701fa618e761c1fcfcddf3f168061",
+    "contrast-settings-dark.png": "fef80bdd33afe34a8cf4009a56e6de4e91f23382716d927a4884d2d1ff19eedf",
+    "contrast-settings-light.png": "bdba51a6eb332e06376023c0bae4771835b0c3e59f3ff90eb5e5370fa8d28464",
+    "empty-dark.png": "c3d170f6754895f8271ec76ab2e7d6e1fa17b2afd4ff71bf4cd576423f1e0dd7",
+    "empty-light.png": "e7fd9532c6f41cf81e604aa667c45899d95b09805586a7196db5ba8169d848e2",
+    "encryption-error-dark.png": "ca57b431aa1a03fa5bfb8bbedb134cb875dedbdf045da40675f92992487a1ab6",
+    "encryption-error-light.png": "42033e1f58e40db788dd2e88fed915eaa859089cbc00311c8e1b8330acf53c71",
+    "encryption-offline-dark.png": "238a9b860dd08064e6f73f9b71ff3719acd9f98681e9fa77aba2598276f5f5b2",
+    "encryption-offline-light.png": "8841eaf15d0c8241957e8ec100e63af8b50cc8a594d490a3305bd7ea789440c9",
+    "encryption-pending-dark.png": "5b383409f5087e7ebe617696dcd91681accc70fb8858204ec075388b8b9bc07d",
+    "encryption-pending-light.png": "cc2c61d34c2a3e71ef911bfbbcadcfd72966224ef84acd87d86fd4f563c66c21",
+    "file-controls-dark.png": "f0e2e9af7752c1873945612cd49d88d131aa3dfc52f2d57c6f3202bdcb36a94e",
+    "file-controls-light.png": "86870596aa6438bf25ad258bc0c708c54c72f3b42de8cd1aeb6da9cabe637ca2",
+    "files-dark.png": "1595177093c6227cd4f8e302d0319f0e46d1d0068005c77e2c726b2dc23075a5",
+    "files-light.png": "40212960b52d464dc6add6704f12f0ba1d33bda007ad021e09effddf12f78e82",
+    "filter-dark.png": "3d614344c1937f78a4c0248ddcdfa50af0a7dc7160ce4756763715dc522d15ea",
+    "filter-light.png": "696462a7f1be504265e7e2be82103f31f5058d4e2d54245445dc0dd04a88896a",
+    "library-dark.png": "545b3c07f6a4b63413d49438b113da11b2cc70ec9c09198934f82b8bd7bf196c",
+    "library-light.png": "eff54a77d79517ffa6daaaee41d1bef2b50b1149f511b9b31d85f6e2e70871e7",
+    "move-compact-dark.png": "5e1bb764553537329f7f2f364e825f262e57d68f82e75d791e2eb2c448e2c848",
+    "move-compact-light.png": "792921c97081719382e5d97108a4e2b8dbc3c049581c8cb0d7200f40132e059b",
+    "move-progress-dark.png": "e6662f4597a06011b84c129b59b990ff829cf32c0e88ca105268b64fe58bafa0",
+    "move-progress-light.png": "3ce8d990d8f796c0780d678e9daa75463e5c8dcae549edffeaa13eb177831e22",
+    "move-recovery-compact-dark.png": "8ff63a6dbe299b537df0a5f78868c24c5bdf4cf88f439be279084b5e0f0e3614",
+    "move-recovery-compact-light.png": "37ed7ca2be9774ac63b0aea078ea395cfab98c86d8d8369d3ac8d9601ef7defb",
+    "move-recovery-dark.png": "f4937f7dec84b2d255a4dab76d9667cad60edef1e1577baf39b226805c7a60f1",
+    "move-recovery-light.png": "eeb2b526c76f60118023b792cc18eb7701304d422c7829aa0cdb52acc7995c23",
+    "move-saving-dark.png": "9db4e295c7bda3372cbc4d0299bbd9570de2dc97b8216b4b6609ea393588c353",
+    "move-saving-light.png": "6da0aab97e015ee90594ba9c1136ec6aa79fd600c5883c804db02d644f483f14",
+    "queue-settings-dark.png": "fef80bdd33afe34a8cf4009a56e6de4e91f23382716d927a4884d2d1ff19eedf",
+    "queue-settings-light.png": "bdba51a6eb332e06376023c0bae4771835b0c3e59f3ff90eb5e5370fa8d28464",
+    "recovery-dark.png": "a9da7befb094cb88214c5830c98f22718eb7bb11d27ea30cc8537af4853c1c05",
+    "recovery-light.png": "53771029abdc158bb381cc677c94c878c012fa9c2c165ac0ed22cef287f0f4b6",
+    "selection-dark.png": "cc5c347ee2a26a7e4e8065a8f361154e44f3e22d9926ef5d8e605085e07811db",
+    "selection-light.png": "80dab7bfd674eeebb1c529306314b14afee15d4ca48460c79f525d0b56d4321a",
+    "settings-dark.png": "922a88c36ae151b91d906b57d9190a93fcc0ef7f170cfc904fc5349d7ff04633",
+    "settings-light.png": "323ec0978003358509bd29aa4fcd919384a96d6cf70b9da7339d49db2cb3490f",
+    "transfer-error-dark.png": "0b881ed19e0d3413dd15f1071f33ceadaa115cb6d49003b6423c7a12f83907c8",
+    "transfer-error-light.png": "f26d3a3b90d51a162d9f378bb83ba048061555671df6ae4d2e9fb5e5d571922c",
+    "transfer-stale-dark.png": "9e6b817aace0e0d28150e20ca198356beba40287bb6e0df3474ac4eeb4b0e3ec",
+    "transfer-stale-light.png": "8e20facb40fd961c31d58e219526e7ef1a1c85009b37268b6eea356e8c3904ef",
+    "transfer-states-compact-dark.png": "c8b8ac3ac9f4cf8d3927e99b38c04fb9eb5c259727b6f6926d7b28d7fecbb8df",
+    "transfer-states-compact-light.png": "eac714300e6f2f160ba5346f50b1fc5503a4da6da4a7567703575b2d6fa7db11"
+  },
+  "limits": [
+    "Native menu/control callbacks and first responders do not certify physical key-event delivery or pointer workflows.",
+    "Announcement requests and source labels do not certify VoiceOver speech/navigation; bandwidth/chooser focus still has a separate manual walkthrough.",
+    "Real OS contrast/motion toggles, live scrolling and transfer-window reopening remain unperformed manual gates.",
+    "No Rust changes; existing source-identical engine tests remain recorded in step 5 rather than being claimed as rerun here.",
+    "Physical lifecycle, public swarms, distribution signing, notarization, release, RSS and remote control remain separate/deferred."
+  ]
+}

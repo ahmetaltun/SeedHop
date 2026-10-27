@@ -93,6 +93,18 @@ The milestone passes only when transfer integrity, exclusive ownership, persiste
 
 ## Transfer-control follow-up — 2026-10-25
 
+The next product work is sequenced in
+[`docs/PRODUCT-ROADMAP.md`](docs/PRODUCT-ROADMAP.md): storage safety, operation
+progress/cancellation, interrupted-move recovery, actionable status, settings,
+native accessibility, and measured large-library performance. RSS, remote
+control, signing, and release work are deferred by the user on 2026-10-26.
+
+Steps 1–5 and the automated implementation portions of steps 6–7 are recorded in
+that roadmap. Step 6 manual acceptance remains open. Step 7 now has reproducible
+controlled measurements and targeted optimizations; mixed latency repeats and
+an AppKit table-delegate warning leave budget/native stability acceptance open.
+See `docs/PERFORMANCE.md` for unchanged targets, all retained runs, and next checks.
+
 Force Recheck → file priorities → basic queueing → relocation → local renaming
 are implemented with engine, XPC, and native UI coverage. Rechecks and storage
 changes preserve selection and user pause intent; queue suspension is separate

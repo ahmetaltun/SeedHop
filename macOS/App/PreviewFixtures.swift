@@ -45,26 +45,71 @@ enum PreviewFixtures {
             try capture(LibraryView().environmentObject(store),size:NSSize(width:1000,height:700),appearance:appearance,to:output.appendingPathComponent("empty-\(name).png"))
             try capture(ImportView().environmentObject(store),size:NSSize(width:600,height:432),appearance:appearance,to:output.appendingPathComponent("add-\(name).png"))
             try capture(ImportView(preview:PreviewFixtures.importPreview).environmentObject(store),size:NSSize(width:600,height:680),appearance:appearance,to:output.appendingPathComponent("files-\(name).png"))
-            try capture(SettingsView().environmentObject(store),size:NSSize(width:570,height:560),appearance:appearance,to:output.appendingPathComponent("settings-\(name).png"))
+            try capture(SettingsView().environmentObject(store),size:NSSize(width:570,height:660),appearance:appearance,to:output.appendingPathComponent("settings-\(name).png"))
             let controls = LibraryStore(designPreview:true)
             controls.torrents[0].files[0].priority = 2
             controls.maxActiveDownloads = 2
             try capture(LibraryView(inspectorTab:1).environmentObject(controls),size:NSSize(width:1240,height:780),appearance:appearance,to:output.appendingPathComponent("file-controls-\(name).png"))
             try capture(SettingsView(tab:1).environmentObject(controls),size:NSSize(width:570,height:660),appearance:appearance,to:output.appendingPathComponent("queue-settings-\(name).png"))
+            controls.fileOperation = FileOperationItem(id:"sample-move",torrentId:controls.torrents[0].id,kind:"relocate",phase:"copying",completedBytes:420_000_000,totalBytes:1_004_401_240,cancelRequested:false)
+            try capture(LibraryView().environmentObject(controls),size:NSSize(width:1240,height:880),appearance:appearance,to:output.appendingPathComponent("move-progress-\(name).png"))
+            controls.showInspector = false
+            try capture(LibraryView().environmentObject(controls),size:NSSize(width:820,height:680),appearance:appearance,to:output.appendingPathComponent("move-compact-\(name).png"))
+            controls.fileOperation?.phase = "saving"
+            try capture(LibraryView().environmentObject(controls),size:NSSize(width:820,height:680),appearance:appearance,to:output.appendingPathComponent("move-saving-\(name).png"))
+            controls.fileOperation = nil; controls.showInspector = true
+            controls.storageRecovery = StorageRecoveryItem(id:"sample-recovery",torrentId:controls.torrents[0].id,activeLocation:"original",message:"The original location is still active. Extra copies were retained because the destination is unavailable. Reconnect the drive and retry cleanup, or inspect the folders and keep the extra copies.",originalDirectory:controls.downloadDirectory,destinationDirectory:"/Volumes/External/Transfers",canKeepCopies:true)
+            try capture(LibraryView().environmentObject(controls),size:NSSize(width:1240,height:880),appearance:appearance,to:output.appendingPathComponent("move-recovery-\(name).png"))
+            controls.showInspector = false; controls.storageRecovery?.activeLocation = "new"
+            controls.storageRecovery?.message = "The new location is saved. Some original copies changed and were retained. Inspect both folders before retrying cleanup or keeping the extra copies."
+            try capture(LibraryView().environmentObject(controls),size:NSSize(width:820,height:780),appearance:appearance,to:output.appendingPathComponent("move-recovery-compact-\(name).png"))
+            let states = LibraryStore(designPreview:true)
+            states.torrents[0].state = "checking"; states.torrents[0].pausedIntent = true
+            states.torrents[1].state = "queued"; states.torrents[1].queuePosition = 3
+            states.torrents[2].state = "waiting"; states.torrents[2].peers = 4
+            states.torrents[3].state = "error"; states.torrents[3].errorKind = "storage_space"
+            states.torrents[3].error = "Unable to write chunk: No space left on device (os error 28)"
+            for index in 0...3 { states.torrents[index].downloadRate = 0; states.torrents[index].uploadRate = 0 }
+            states.torrents[2].downloadedBytes /= 2
+            states.torrents[3].downloadedBytes = 0; states.torrents[3].peers = 0
+            states.selection = [states.torrents[3].id]
+            try capture(LibraryView().environmentObject(states),size:NSSize(width:1240,height:880),appearance:appearance,to:output.appendingPathComponent("transfer-error-\(name).png"))
+            states.showInspector = false
+            try capture(LibraryView().environmentObject(states),size:NSSize(width:820,height:680),appearance:appearance,to:output.appendingPathComponent("transfer-states-compact-\(name).png"))
+            states.connected = false
+            try capture(LibraryView().environmentObject(states),size:NSSize(width:820,height:680),appearance:appearance,to:output.appendingPathComponent("transfer-stale-\(name).png"))
+            controls.filter = .attention
+            try capture(LibraryView().environmentObject(controls),size:NSSize(width:1000,height:780),appearance:appearance,to:output.appendingPathComponent("cleanup-attention-\(name).png"))
+            controls.torrents = []; controls.selection = []
+            try capture(LibraryView().environmentObject(controls),size:NSSize(width:1000,height:780),appearance:appearance,to:output.appendingPathComponent("cleanup-orphan-\(name).png"))
+            let preferences = LibraryStore(designPreview:true)
+            preferences.peerEncryption = .allow; preferences.savedPeerEncryption = .require
+            preferences.listenPort = 51413
+            try capture(SettingsView(tab:1).environmentObject(preferences),size:NSSize(width:570,height:660),appearance:appearance,to:output.appendingPathComponent("encryption-pending-\(name).png"))
+            preferences.error = "The preference could not be saved. Check library storage access, then choose the policy again."
+            try capture(SettingsView(tab:1).environmentObject(preferences),size:NSSize(width:570,height:660),appearance:appearance,to:output.appendingPathComponent("encryption-error-\(name).png"))
+            preferences.error = nil
+            preferences.connected = false
+            try capture(SettingsView(tab:1).environmentObject(preferences),size:NSSize(width:570,height:660),appearance:appearance,to:output.appendingPathComponent("encryption-offline-\(name).png"))
             let contrastStore = LibraryStore(designPreview:true)
             let contrastAppearance: NSAppearance.Name = name == "dark" ? .accessibilityHighContrastDarkAqua : .accessibilityHighContrastAqua
             try capture(LibraryView().environmentObject(contrastStore),size:NSSize(width:1240,height:780),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-library-\(name).png"))
+            try capture(ImportView(preview:PreviewFixtures.importPreview).environmentObject(contrastStore),size:NSSize(width:600,height:680),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-import-\(name).png"))
+            try capture(SettingsView(tab:1).environmentObject(contrastStore),size:NSSize(width:570,height:660),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-settings-\(name).png"))
+            contrastStore.storageRecovery = StorageRecoveryItem(id:"contrast-recovery",torrentId:contrastStore.torrents[0].id,activeLocation:"original",message:"The original location is active. Reconnect the destination and retry cleanup, or inspect the retained copies.",originalDirectory:contrastStore.downloadDirectory,destinationDirectory:"/Volumes/External/Transfers",canKeepCopies:true)
+            try capture(LibraryView().environmentObject(contrastStore),size:NSSize(width:1240,height:880),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-recovery-\(name).png"))
+            contrastStore.storageRecovery = nil
             contrastStore.showInspector = false
             try capture(LibraryView().environmentObject(contrastStore),size:NSSize(width:820,height:620),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-compact-\(name).png"))
         }
-        print("Rendered 26 fixture screens to \(output.path); library fixtures are explicitly labeled sample data")
+        print("Rendered 58 fixture screens to \(output.path); library fixtures are explicitly labeled sample data")
     }
     private static func capture<V:View>(_ view:V,size:NSSize,appearance:NSAppearance.Name,to url:URL) throws {
         let window = NSWindow(contentRect:NSRect(origin:.zero,size:size),styleMask:[.borderless],backing:.buffered,defer:false)
         window.appearance = NSAppearance(named:appearance)
         let dark = appearance == .darkAqua || appearance == .accessibilityHighContrastDarkAqua
         let contrast = appearance == .accessibilityHighContrastAqua || appearance == .accessibilityHighContrastDarkAqua
-        let host = NSHostingView(rootView:view.preferredColorScheme(contrast ? nil : dark ? .dark : .light))
+        let host = NSHostingView(rootView:view.environment(\.accessibilityAnnouncementsEnabled,false).preferredColorScheme(contrast ? nil : dark ? .dark : .light))
         host.appearance = NSAppearance(named:appearance)
         host.frame = NSRect(origin:.zero,size:size); window.contentView = host
         host.layoutSubtreeIfNeeded()

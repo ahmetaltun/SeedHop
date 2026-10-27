@@ -35,6 +35,14 @@ commit do they remove originals. New paths are verified with torrent hashes;
 running transfers continue automatically. Protocol offsets remain independent
 from local names.
 
+Before suspending transfers or creating target files, moves and renames check
+available destination capacity. The estimate includes present unselected files
+and logical lengths of sparse files; present partial files reserve at least
+their expected final length. Missing source files require no copy space. An
+insufficient-space error reports required and available bytes and asks the user
+to free space or choose another folder. This is an advisory check, not a space
+reservation: allocation can still fail later, using the existing rollback path.
+
 Conflicting targets, invalid indices, traversal, and symlink paths are rejected.
 Descriptor-relative opens and cleanup do not follow symlinks. A failed copy or
 layout save retains original bytes; failed saves restore the old layout. Copies
@@ -42,8 +50,40 @@ require additional free space, even for a local rename. An interruption before
 commit can leave unreferenced target copies; one after commit can leave extra
 originals. These copies are deliberately retained to avoid data loss. Existing
 targets are never overwritten, so leftover copies need inspection before retrying
-that destination. Empty source directories can remain. There is no cancellation
-UI for these operations yet.
+that destination. Empty source directories can remain.
+
+## Progress and cancellation
+
+Moves and copy-based renames publish a unique engine-generated operation ID,
+target torrent, phase, and copied/total bytes through UniFFI and XPC snapshots.
+The library shows progress even when the inspector is closed or another transfer
+is selected. Preparing, copying, saving, verification startup, cleanup, and
+restoration have distinct messages. The copy total uses actual source lengths
+after peer writes are quiesced; it is separate from capacity reservations and
+from torrent hash-verification progress.
+
+Cancel is available while preparing or copying. Copying checks cancellation
+between chunks of at most 1 MiB, including before the first read. An operating
+system read, write, or flush already in progress must return before cancellation
+can finish. Cancellation removes this operation's uncommitted targets, retains
+original files/layout, and restores the existing paused/running/queued intent.
+Cleanup or resume failures are reported rather than hidden as successful
+cancellation.
+
+Entering the saving phase atomically closes cancellation before the new layout
+is saved. Late cancellation returns `false`; an old ID cannot cancel a later
+attempt. The interface removes Cancel during saving and explains that the change
+is finishing. After commit, hash verification is shown in the transfer list
+independently of copied bytes. Conflicting transfer commands, imports, and host
+switches are blocked while the file operation is active; navigation remains
+available. Confirmed cancellation is a typed result, not an operation error.
+
+Operation progress is transient, while moves/renames now have a durable journal.
+Restart reconciles it against the saved session before resuming writes and
+removes only copies with verified ownership and bytes. Changed or uncertain
+files remain, with Retry Cleanup, Keep Extra Copies, and folder inspection actions.
+See [interrupted-operation recovery](STORAGE-RECOVERY.md). Controlled process-crash
+checks do not certify physical drive loss or power loss.
 
 ## Verification
 
@@ -62,12 +102,23 @@ UI for these operations yet.
 - Swift `--verify-ux`: delayed commands, stable targets, duplicate suppression,
   failures/retries, and selection preservation.
 
+The October 26 progress/cancellation follow-up additionally checks bounded copy
+cancellation, the cancellation/save race, paused/running/queued cancellation and
+retry, and v2/hybrid completed/partial copy cleanup with present unselected files.
+The packaged `--verify-engine` test observes copying and cancels both a move and
+a rename over real XPC before exercising successful changes and restart.
+`--verify-ux` covers selection/inspector changes, stale requests, saving-phase
+guards, cancellation failures/retries, and conflicting commands. Portable results
+are in [`results/file-progress-2026-10-26.json`](results/file-progress-2026-10-26.json).
+
 Physical sleep/wake, unplugging, interface loss, and actual logout/login were
 deferred at the user's request. These gates are not closed. Native pointer,
 keyboard, VoiceOver, and very large-library reviews remain manual. Encryption
 and uTP remain separate protocol projects.
 
 Results summary: [`results/file-controls-2026-10-25.json`](results/file-controls-2026-10-25.json).
+That historical summary predates the capacity preflight. The ordered follow-up
+plan and current implementation record are in [`PRODUCT-ROADMAP.md`](PRODUCT-ROADMAP.md).
 
 To rerun the isolated certificate lifecycle fixture when that gate resumes:
 

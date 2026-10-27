@@ -2805,6 +2805,7 @@ dependencies = [
  "libc",
  "librqbit",
  "librqbit-peer-protocol",
+ "nix",
  "rc4",
  "serde",
  "serde_json",

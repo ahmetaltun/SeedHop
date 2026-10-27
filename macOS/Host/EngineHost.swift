@@ -84,7 +84,8 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
                 let request = try JSONDecoder().decode(EngineRequest.self, from: data)
                 guard request.version == SeedHopIdentity.protocolVersion else { throw UserFacingError(message: "The interface and engine versions differ. Restart SeedHop to finish updating.") }
                 response = try self.handle(request)
-            } catch let BridgeError.Operation(message) { response = EngineReply(error:message) }
+            } catch BridgeError.Cancelled { response = EngineReply(cancelled:true) }
+            catch let BridgeError.Operation(message) { response = EngineReply(error:message) }
             catch { response = EngineReply(error: error.localizedDescription) }
             reply((try? JSONEncoder().encode(response)) ?? Data("{\"version\":2,\"error\":\"Could not encode engine response.\"}".utf8))
         }
@@ -118,18 +119,24 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             let p = try core.inspect(requestId: r.requestId, magnet: r.magnet, bytes: r.bytes ?? Data())
             return EngineReply(preview: ImportPreview(id: p.id, name:p.name, totalBytes:p.totalBytes, files:p.files.map(Self.file), torrentBytes:Data(p.torrentBytes)))
         case "cancel": try core.cancel(requestId: r.id ?? r.requestId)
+        case "cancelFileOperation": return EngineReply(cancellationAccepted:try core.cancelFileOperation(operationId:r.id ?? ""))
+        case "retryStorageRecovery", "keepRecoveryCopies": try core.resolveStorageRecovery(id:r.id ?? "",keepCopies:r.command == "keepRecoveryCopies")
         case "add":
             let id = try core.add(bytes:r.bytes ?? Data(), destination:r.destination ?? "", selected:r.selected ?? [], paused:r.paused ?? false, reuse:r.reuse ?? false)
             return EngineReply(id:id)
         case "pause": try core.setPaused(id:r.id ?? "", paused:r.paused ?? true)
         case "select": try core.selectFiles(id:r.id ?? "", indices:r.selected ?? [])
         case "recheck": try core.forceRecheck(id:r.id ?? "")
+        case "retry": try core.retryTransfer(id:r.id ?? "")
         case "priorities": try core.setFilePriorities(id:r.id ?? "", priorities:Data(r.priorities ?? []))
         case "queue": try core.setQueue(maxActive:r.maxActiveDownloads ?? 0)
         case "queueMove": try core.moveInQueue(id:r.id ?? "", position:r.queuePosition ?? 1)
         case "relocate": try core.relocate(id:r.id ?? "", destination:r.destination ?? "")
         case "rename": try core.renameFile(id:r.id ?? "", index:r.fileIndex ?? UInt32.max, name:r.fileName ?? "")
         case "remove": try core.remove(id:r.id ?? "", deleteFiles:r.deleteFiles ?? false)
+        case "peerEncryption":
+            guard let policy = r.peerEncryption else { throw UserFacingError(message:"Choose a supported peer encryption policy.") }
+            try core.setPeerEncryption(policy:policy.rawValue)
         case "limits": try core.setLimits(download:r.downloadLimit ?? 0, upload:r.uploadLimit ?? 0)
         case "login":
             lifecycle.lock(); defer { lifecycle.unlock() }
@@ -145,11 +152,21 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
     }
     static func file(_ f: TransferFile) -> FileItem { FileItem(index:f.index,name:f.name,size:f.size,downloaded:f.downloaded,selected:f.selected,priority:f.priority) }
     static func snapshot(_ s: EngineSnapshot) -> LibrarySnapshot {
-        LibrarySnapshot(protocolVersion:s.protocolVersion, engineVersion:s.engineVersion, instanceId:s.instanceId,
+        var snapshot = LibrarySnapshot(protocolVersion:s.protocolVersion, engineVersion:s.engineVersion, instanceId:s.instanceId,
             listenPort:s.listenPort,downloadLimit:s.downloadLimit,uploadLimit:s.uploadLimit,maxActiveDownloads:s.maxActiveDownloads,torrents:s.torrents.map { t in
                 TorrentItem(id:t.id,name:t.name,state:t.state,totalBytes:t.totalBytes,downloadedBytes:t.downloadedBytes,
                     uploadedBytes:t.uploadedBytes,downloadRate:t.downloadRate,uploadRate:t.uploadRate,peers:t.peers,
-                    destination:t.destination,files:t.files.map(file),trackers:t.trackers,error:t.error,queuePosition:t.queuePosition,pausedIntent:t.pausedIntent)
+                    destination:t.destination,files:t.files.map(file),trackers:t.trackers,error:t.error,queuePosition:t.queuePosition,pausedIntent:t.pausedIntent,errorKind:t.errorKind)
+            },fileOperation:s.fileOperation.map { operation in
+                FileOperationItem(id:operation.id,torrentId:operation.torrentId,kind:operation.kind,
+                    phase:operation.phase,completedBytes:operation.completedBytes,totalBytes:operation.totalBytes,
+                    cancelRequested:operation.cancelRequested)
+            },storageRecovery:s.storageRecovery.map { notice in
+                StorageRecoveryItem(id:notice.id,torrentId:notice.torrentId,activeLocation:notice.activeLocation,message:notice.message,
+                    originalDirectory:notice.originalDirectory,destinationDirectory:notice.destinationDirectory,canKeepCopies:notice.canKeepCopies)
             })
+        snapshot.peerEncryption = PeerEncryptionPolicy(rawValue:s.peerEncryption)
+        snapshot.savedPeerEncryption = PeerEncryptionPolicy(rawValue:s.savedPeerEncryption)
+        return snapshot
     }
 }

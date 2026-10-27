@@ -2,7 +2,14 @@ import SwiftUI
 
 @main struct SeedHopApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @StateObject private var store = LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine") || ProcessInfo.processInfo.arguments.contains("--verify-ux") || ProcessInfo.processInfo.arguments.contains("--verify-interface") || ProcessInfo.processInfo.arguments.contains("--verify-lifecycle"))
+    @StateObject private var store = SeedHopApp.makeStore()
+    @MainActor private static func makeStore() -> LibraryStore {
+        #if SEEDHOP_DEVELOPMENT
+        if ProcessInfo.processInfo.arguments.contains("--verify-performance") { return PerformanceSelfTest.fixtureStore() }
+        if ProcessInfo.processInfo.arguments.contains("--verify-interface") { return UXSelfTest.nativeFixture() }
+        #endif
+        return LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine") || ProcessInfo.processInfo.arguments.contains("--verify-ux") || ProcessInfo.processInfo.arguments.contains("--verify-interface") || ProcessInfo.processInfo.arguments.contains("--verify-lifecycle") || ProcessInfo.processInfo.arguments.contains("--verify-storage-recovery"))
+    }
     var body: some Scene {
         WindowGroup("SeedHop",id:"library") {
             LibraryView().environmentObject(store).onAppear { delegate.store = store }
@@ -13,19 +20,19 @@ import SwiftUI
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing:.newItem) {
-                Button("Add Torrent…") { store.beginImport() }.keyboardShortcut("n")
-                Button("Open Torrent File…") { store.openFiles() }.keyboardShortcut("o")
-                Button("Paste Magnet Link…") { store.pasteMagnet() }.keyboardShortcut("v",modifiers:[.command,.shift])
+                Button("Add Torrent…") { store.beginImport() }.keyboardShortcut("n").disabled(store.hasFileOperation)
+                Button("Open Torrent File…") { store.openFiles() }.keyboardShortcut("o").disabled(store.hasFileOperation)
+                Button("Paste Magnet Link…") { store.pasteMagnet() }.keyboardShortcut("v",modifiers:[.command,.shift]).disabled(store.hasFileOperation)
             }
             LibraryNavigationCommands()
             CommandMenu("Transfers") {
-                Button("Resume Selected") { store.toggleSelected(paused:false) }.keyboardShortcut("r").disabled(!store.canResumeSelection)
+                Button(store.resumeActionLabel + " Selected") { store.toggleSelected(paused:false) }.keyboardShortcut("r").disabled(!store.canResumeSelection)
                 Button("Pause Selected") { store.toggleSelected(paused:true) }.keyboardShortcut(".").disabled(!store.canPauseSelection)
                 Divider()
                 Button("Force Recheck") { store.recheckSelected() }.disabled(!store.canRecheckSelection)
                 Button("Move to Front of Queue") { store.moveSelectedToFront() }.disabled(!store.canActOnSelection || store.selected.count != 1)
-                Button("Move Files…") { store.chooseRelocation() }.disabled(!store.canRecheckSelection || store.selected.count != 1)
-                Button("Remove Selected…") { store.requestRemoval() }.keyboardShortcut(.delete).disabled(!store.canActOnSelection)
+                Button("Move Files…") { store.chooseRelocation() }.disabled(!store.canMoveSelection)
+                Button("Remove Selected…") { store.requestRemoval() }.keyboardShortcut(.delete).disabled(!store.canRemoveSelection)
                 Button("Show Inspector") { store.showInspector.toggle() }.keyboardShortcut("i",modifiers:[.command,.option])
             }
             CommandGroup(before:.appTermination) { Button("Quit and Stop Transfers") { delegate.stopEverything = true; NSApp.terminate(nil) }.keyboardShortcut("q",modifiers:[.command,.option]) }
@@ -67,8 +74,16 @@ struct LibraryNavigationCommands: Commands {
         }
         #endif
         #if SEEDHOP_DEVELOPMENT
+        if ProcessInfo.processInfo.arguments.contains("--verify-storage-recovery") {
+            Task { do { try await EngineSelfTest.runStorageRecovery(); exit(0) } catch { fputs("Storage recovery verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
+            return
+        }
+        if ProcessInfo.processInfo.arguments.contains("--verify-performance") {
+            Task { do { try await PerformanceSelfTest.run(store:{ self.store }); exit(0) } catch { fputs("Performance verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--verify-interface") {
-            Task { do { try await InterfaceSelfTest.run(); exit(0) } catch { fputs("Interface verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
+            Task { do { try await InterfaceSelfTest.run(store:{ self.store }); exit(0) } catch { fputs("Interface verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
             return
         }
         if ProcessInfo.processInfo.arguments.contains("--verify-ux") {

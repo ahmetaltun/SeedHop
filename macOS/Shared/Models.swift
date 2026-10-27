@@ -39,13 +39,67 @@ struct TorrentItem: Codable, Identifiable, Equatable {
     var error: String?
     var queuePosition: UInt32 = 0
     var pausedIntent: Bool? = nil
+    var errorKind: String? = nil
     var progress: Double { totalBytes == 0 ? 0 : min(1, Double(downloadedBytes) / Double(totalBytes)) }
     var isPaused: Bool { pausedIntent ?? (state == "paused") }
     var isActive: Bool { ["downloading", "waiting", "checking", "queued"].contains(state) }
     var statusLabel: String {
-        switch state { case "downloading": return "Downloading"; case "seeding": return "Seeding"; case "paused": return "Paused"; case "queued": return "Queued"; case "checking": return "Verifying files"; case "error": return "Needs attention"; default: return "Waiting for peers" }
+        switch state { case "downloading": return "Downloading"; case "seeding": return "Seeding"; case "paused": return "Paused"; case "queued": return "Queued"; case "checking": return "Checking files"; case "error": return "Needs attention"; case "waiting": return peers == 0 ? "Finding peers" : "Waiting for data"; default: return "Updating status" }
     }
 }
+struct FileOperationItem: Codable, Identifiable, Equatable {
+    var id: String
+    var torrentId: String
+    var kind: String
+    var phase: String
+    var completedBytes: UInt64
+    var totalBytes: UInt64
+    var cancelRequested: Bool
+    var canCancel: Bool { ["preparing", "copying"].contains(phase) && !cancelRequested }
+    var title: String {
+        if cancelRequested && ["preparing", "copying", "restoring"].contains(phase) { return "Cancelling…" }
+        switch phase {
+        case "copying": return kind == "rename" ? "Renaming file…" : "Moving files…"
+        case "saving": return "Saving the new location…"
+        case "verifying": return "Starting file verification…"
+        case "cleaning": return "Removing original copies…"
+        case "restoring": return "Restoring the original location…"
+        default: return "Preparing files…"
+        }
+    }
+    var detail: String {
+        if cancelRequested { return "Your original files will stay in place." }
+        if phase == "copying" { return "\(SizeText.bytes(completedBytes)) of \(SizeText.bytes(totalBytes)) copied" }
+        if phase == "preparing" { return "Checking the destination and available space." }
+        if phase == "restoring" { return "Keeping your original files and transfer settings." }
+        return "Finishing this change. File verification is shown separately in the transfer list."
+    }
+}
+struct StorageRecoveryItem: Codable, Identifiable, Equatable {
+    var id: String
+    var torrentId: String
+    var activeLocation: String
+    var message: String
+    var originalDirectory: String
+    var destinationDirectory: String
+    var canKeepCopies: Bool
+}
+enum PeerEncryptionPolicy: String, Codable, CaseIterable, Identifiable {
+    case disabled, allow, prefer, require
+    var id: String { rawValue }
+    var title: String {
+        switch self { case .disabled: return "Disabled"; case .allow: return "Allow encrypted peers"; case .prefer: return "Prefer encrypted peers"; case .require: return "Require encryption" }
+    }
+    var detail: String {
+        switch self {
+        case .disabled: return "Use plaintext peer connections only. Encrypted-only peers cannot connect."
+        case .allow: return "Accept encrypted peers. Try plaintext first when connecting, then encryption if needed."
+        case .prefer: return "Try encryption first. Plaintext connections are still allowed if encryption fails."
+        case .require: return "Require encrypted peer payloads. Peers that only support plaintext cannot connect, which may reduce available peers."
+        }
+    }
+}
+
 struct LibrarySnapshot: Codable {
     var protocolVersion: UInt32
     var engineVersion: String
@@ -55,6 +109,10 @@ struct LibrarySnapshot: Codable {
     var uploadLimit: UInt32
     var maxActiveDownloads: UInt32 = 0
     var torrents: [TorrentItem]
+    var fileOperation: FileOperationItem? = nil
+    var storageRecovery: StorageRecoveryItem? = nil
+    var peerEncryption: PeerEncryptionPolicy? = nil
+    var savedPeerEncryption: PeerEncryptionPolicy? = nil
 }
 struct ImportPreview: Codable {
     var id: String
@@ -85,6 +143,7 @@ struct EngineRequest: Codable {
     var queuePosition: UInt32?
     var fileIndex: UInt32?
     var fileName: String?
+    var peerEncryption: PeerEncryptionPolicy?
 }
 struct EngineReply: Codable {
     var version = SeedHopIdentity.protocolVersion
@@ -92,8 +151,11 @@ struct EngineReply: Codable {
     var preview: ImportPreview?
     var id: String?
     var error: String?
-    init(snapshot: LibrarySnapshot? = nil, preview: ImportPreview? = nil, id: String? = nil, error: String? = nil) {
+    var cancelled: Bool?
+    var cancellationAccepted: Bool?
+    init(snapshot: LibrarySnapshot? = nil, preview: ImportPreview? = nil, id: String? = nil, error: String? = nil, cancelled: Bool? = nil, cancellationAccepted: Bool? = nil) {
         self.snapshot = snapshot; self.preview = preview; self.id = id; self.error = error
+        self.cancelled = cancelled; self.cancellationAccepted = cancellationAccepted
     }
 }
 struct UserFacingError: LocalizedError {

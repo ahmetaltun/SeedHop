@@ -56,8 +56,8 @@ make render
 ```
 
 Design-preview mode uses labeled sample data and cannot issue transfer commands.
-The renderer writes 26 light/dark main-window, compact, empty, import, file-selection,
-settings, multi-selection, empty-filter, recovery, and high-contrast screenshots under `.build/design/`. It renders app-owned views,
+The renderer writes 36 light/dark main-window, compact, empty, import, file-selection,
+settings, multi-selection, empty-filter, recovery, move-progress, and high-contrast screenshots under `.build/design/`. It renders app-owned views,
 not the user's screen. See [design system](docs/DESIGN.md).
 
 ## Verify
@@ -124,6 +124,18 @@ Encrypted peers, RSS, search, remote control,
 and advanced scheduling remain roadmap work. Force Recheck, file priorities,
 download queue limits/order, relocation, and local renaming are implemented;
 see [file controls and verification](docs/FILE-MANAGEMENT.md).
+
+Moves and local renames show copy progress and support cancellation before saving
+the new layout. Progress remains visible with the inspector closed. Interrupted
+moves and renames recover through a durable journal, preserving uncertain copies
+for inspection. See [storage recovery](docs/STORAGE-RECOVERY.md) and the
+[product roadmap](docs/PRODUCT-ROADMAP.md).
+
+Controlled large-library measurements and targeted optimizations are documented
+in [performance evidence](docs/PERFORMANCE.md). Run `make performance` for the
+real-engine and native sample-library fixtures with fixed latency budgets.
+Budget acceptance remains open for variable 100-row latency and a native
+table-delegate warning; manual interaction acceptance remains separate.
 
 ## License
 

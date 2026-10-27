@@ -49,13 +49,40 @@ pub struct TorrentRecord {
     pub files: Vec<FileRecord>,
     pub trackers: Vec<String>,
     pub error: Option<String>,
+    pub error_kind: Option<String>,
     pub queue_position: u32,
     pub paused_intent: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct FileOperation {
+    pub id: String,
+    pub torrent_id: String,
+    pub kind: String,
+    pub phase: String,
+    pub completed_bytes: u64,
+    pub total_bytes: u64,
+    pub cancel_requested: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageRecovery {
+    pub id: String,
+    pub torrent_id: String,
+    pub active_location: String,
+    pub message: String,
+    pub original_directory: String,
+    pub destination_directory: String,
+    pub can_keep_copies: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Snapshot {
+    pub peer_encryption: String,
+    pub saved_peer_encryption: String,
     pub protocol_version: u32,
     pub engine_version: String,
     pub instance_id: String,
@@ -64,6 +91,8 @@ pub struct Snapshot {
     pub upload_limit: u32,
     pub max_active_downloads: u32,
     pub torrents: Vec<TorrentRecord>,
+    pub file_operation: Option<FileOperation>,
+    pub storage_recovery: Option<StorageRecovery>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

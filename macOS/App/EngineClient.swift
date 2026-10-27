@@ -36,7 +36,9 @@ import ServiceManagement
         return try await withCheckedThrowingContinuation { continuation in
             let box = ReplyOnce(continuation)
             let timeout: TimeInterval = request.command == "inspect" ? 130 : (request.command == "shutdown" ? 40 : 15)
-            if !["relocate", "rename"].contains(request.command) {
+            // Startup may verify retained copies before the engine can reply.
+            // These operations still fail through the XPC error handler.
+            if !["connect", "relocate", "rename", "retryStorageRecovery", "keepRecoveryCopies"].contains(request.command) {
                 DispatchQueue.global().asyncAfter(deadline:.now() + timeout) { box.fail(UserFacingError(message:"The engine took too long to respond. Your library has been preserved.")) }
             }
             let proxy = connection.remoteObjectProxyWithErrorHandler { error in box.fail(error) } as? EngineServiceProtocol
@@ -46,6 +48,7 @@ import ServiceManagement
                     let reply = try JSONDecoder().decode(EngineReply.self,from:response)
                     guard reply.version == SeedHopIdentity.protocolVersion else { throw UserFacingError(message:"Restart SeedHop to finish updating its engine.") }
                     if let error = reply.error { throw UserFacingError(message:error) }
+                    if reply.cancelled == true { throw CancellationError() }
                     box.succeed(reply)
                 } catch { box.fail(error) }
             }

@@ -1,6 +1,7 @@
 use crate::{CoreError, FileRecord, Result, TorrentPreview, TorrentRecord};
 use librqbit::{ManagedTorrent, TorrentStatsState};
 use sha1::{Digest, Sha1};
+use std::collections::HashSet;
 
 pub fn engine_error(error: impl std::fmt::Display) -> CoreError {
     CoreError::Engine(error.to_string())
@@ -70,7 +71,10 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
         TorrentStatsState::Live if down == 0 => "waiting",
         TorrentStatsState::Live => "downloading",
     };
-    let selected = torrent.only_files();
+    // Membership is read once per file; a vector scan makes large selections quadratic.
+    let selected = torrent
+        .only_files()
+        .map(|indices| indices.into_iter().collect::<HashSet<_>>());
     let names = torrent.file_names();
     let priorities = torrent.file_priorities();
     let files = torrent
@@ -97,6 +101,12 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
         .as_ref()
         .map(|v| v.snapshot.peer_stats.live)
         .unwrap_or(0);
+    let error_kind = torrent.with_state(|state| match state {
+        librqbit::ManagedTorrentState::Error(error) => {
+            Some(classify_error(error.as_ref()).to_owned())
+        }
+        _ => None,
+    });
     TorrentRecord {
         id: torrent_id(torrent),
         name: torrent
@@ -118,8 +128,44 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
             .map(|u| u.to_string())
             .collect(),
         error: stats.error,
+        error_kind,
         queue_position: 0,
         paused_intent: torrent.is_paused(),
+    }
+}
+
+// Fatal torrent errors originate in initialization or file writes. Inspect typed
+// causes, never localized text; network timeouts and unknown causes stay generic.
+fn classify_error(mut error: &(dyn std::error::Error + 'static)) -> &'static str {
+    loop {
+        let io = error.downcast_ref::<std::io::Error>();
+        // rqbit uses nix pwritev on Unix; its typed Errno is not an io::Error.
+        let errno = io.and_then(std::io::Error::raw_os_error).or_else(|| {
+            error
+                .downcast_ref::<nix::errno::Errno>()
+                .map(|errno| *errno as i32)
+        });
+        match errno {
+            Some(libc::ENOSPC | libc::EDQUOT) => return "storage_space",
+            Some(libc::EROFS | libc::EACCES | libc::EPERM) => return "storage_permission",
+            Some(libc::ENOENT | libc::ENOTDIR | libc::ENODEV | libc::ESTALE) => {
+                return "storage_missing";
+            }
+            Some(libc::EIO | libc::EFBIG) => return "storage",
+            _ => {}
+        }
+        if let Some(io) = io {
+            match io.kind() {
+                std::io::ErrorKind::PermissionDenied => return "storage_permission",
+                std::io::ErrorKind::NotFound => return "storage_missing",
+                std::io::ErrorKind::WriteZero => return "storage",
+                _ => {}
+            }
+        }
+        let Some(source) = error.source() else {
+            return "transfer";
+        };
+        error = source;
     }
 }
 
@@ -154,4 +200,41 @@ pub fn torrent_id(torrent: &ManagedTorrent) -> String {
         .ok()
         .flatten()
         .unwrap_or_else(|| torrent.info_hash().as_string())
+}
+
+#[cfg(test)]
+mod status_tests {
+    use super::*;
+    #[test]
+    fn storage_causes_survive_context_and_network_errors_stay_generic() {
+        for (errno, expected) in [
+            (libc::ENOSPC, "storage_space"),
+            (libc::EDQUOT, "storage_space"),
+            (libc::EACCES, "storage_permission"),
+            (libc::EROFS, "storage_permission"),
+            (libc::ENOENT, "storage_missing"),
+            (libc::EIO, "storage"),
+        ] {
+            let error = anyhow::Error::new(std::io::Error::from_raw_os_error(errno))
+                .context("file operation failed");
+            assert_eq!(classify_error(error.as_ref()), expected);
+            let unix = anyhow::Error::new(nix::errno::Errno::from_raw(errno))
+                .context("error calling pwritev")
+                .context("error writing chunk");
+            assert_eq!(classify_error(unix.as_ref()), expected);
+        }
+        assert_eq!(
+            classify_error(&std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "network timeout"
+            )),
+            "transfer"
+        );
+        assert_eq!(
+            classify_error(&std::io::Error::other(
+                "disk full words without a typed cause"
+            )),
+            "transfer"
+        );
+    }
 }

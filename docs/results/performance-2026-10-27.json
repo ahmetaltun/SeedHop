@@ -1,0 +1,4935 @@
+{
+  "date": "2026-10-27",
+  "scope": "Roadmap step 7 controlled large-library measurements and targeted optimization",
+  "measurementAndOptimizationImplemented": true,
+  "budgetAcceptanceComplete": false,
+  "nativeInteractionAcceptanceComplete": false,
+  "manualAcceptanceComplete": false,
+  "stepFullyAccepted": false,
+  "releaseCandidate": false,
+  "baseCommit": "a6c3c06e44e9b8fb098b89bd7850c5968fd7be06",
+  "workingTreeChanges": true,
+  "environment": {
+    "model": "MacBookPro18,3",
+    "memoryBytes": 34359738368,
+    "os": "macOS 15.8.1 (24H32)",
+    "architecture": "ARM64",
+    "build": "debug",
+    "hostLoadObservation": {
+      "timing": "After first two final-binary runs; not synchronized with slow samples",
+      "anotherAppRendererCPUPercent": 132.8,
+      "windowServerCPUPercent": 55.8,
+      "causalConclusion": null,
+      "otherApplicationsStopped": false
+    }
+  },
+  "measurement": {
+    "clock": "monotonic wall time",
+    "warmupSamples": 2,
+    "retainedCoreJsonModelUnchangedSamples": 15,
+    "retainedChangingScrollFilterSamples": 9,
+    "p95": "nearest rank; maximum sample for these sample counts",
+    "nativeBoundary": "Includes 1 ms cooperative yield and explicit layout flush; excludes physical frame presentation and XPC transport",
+    "coreFixture": "Real paused engine; discovery disabled; temporary state and destination; setup excluded from timed snapshots",
+    "nativeFixture": "Actual library scene with read-only controlled transport and labeled sample data",
+    "filterNotApplicable": "Single torrent with 10,000 files"
+  },
+  "before": {
+    "core": {
+      "cases": [
+        {
+          "encode": {
+            "medianMs": 1.590042,
+            "p95Ms": 2.053791,
+            "samples": [
+              1.4878339999999999,
+              1.528291,
+              1.532,
+              1.550833,
+              1.5548330000000001,
+              1.555125,
+              1.5647499999999999,
+              1.590042,
+              1.686917,
+              1.6970830000000001,
+              1.749417,
+              1.8745,
+              1.952458,
+              1.971416,
+              2.053791
+            ]
+          },
+          "filesPerTransfer": 1,
+          "linearPositionScanDiagnostic": {
+            "medianMs": 0.050374999999999996,
+            "p95Ms": 0.061042000000000006,
+            "samples": [
+              0.042624999999999996,
+              0.044375,
+              0.044542,
+              0.046333,
+              0.046416,
+              0.046458,
+              0.05025,
+              0.050374999999999996,
+              0.050374999999999996,
+              0.050459,
+              0.055083,
+              0.05625,
+              0.057624999999999996,
+              0.058792000000000004,
+              0.061042000000000006
+            ]
+          },
+          "payloadBytes": 46304,
+          "setupMs": 3171.044292,
+          "snapshot": {
+            "medianMs": 0.572083,
+            "p95Ms": 0.754625,
+            "samples": [
+              0.471209,
+              0.490625,
+              0.490708,
+              0.498042,
+              0.5158330000000001,
+              0.548458,
+              0.555583,
+              0.572083,
+              0.588375,
+              0.5998330000000001,
+              0.599916,
+              0.6361669999999999,
+              0.659541,
+              0.666666,
+              0.754625
+            ]
+          },
+          "transfers": 100
+        },
+        {
+          "encode": {
+            "medianMs": 14.792125,
+            "p95Ms": 15.570666000000001,
+            "samples": [
+              14.520667,
+              14.6195,
+              14.668792,
+              14.715083,
+              14.722417,
+              14.771832999999999,
+              14.777375000000001,
+              14.792125,
+              14.799167,
+              14.855916,
+              14.947917,
+              15.006667,
+              15.059625,
+              15.524083,
+              15.570666000000001
+            ]
+          },
+          "filesPerTransfer": 1,
+          "linearPositionScanDiagnostic": {
+            "medianMs": 4.9730419999999995,
+            "p95Ms": 5.3305419999999994,
+            "samples": [
+              4.807083,
+              4.848624999999999,
+              4.8872919999999995,
+              4.910875,
+              4.91525,
+              4.92175,
+              4.936625,
+              4.9730419999999995,
+              4.982334,
+              4.992624999999999,
+              5.029667,
+              5.059374999999999,
+              5.203625,
+              5.253333,
+              5.3305419999999994
+            ]
+          },
+          "payloadBytes": 461205,
+          "setupMs": 104422.71612499999,
+          "snapshot": {
+            "medianMs": 9.912,
+            "p95Ms": 10.344624999999999,
+            "samples": [
+              9.358125,
+              9.620708,
+              9.621583,
+              9.693292,
+              9.743083,
+              9.813208,
+              9.831916,
+              9.912,
+              9.922833,
+              9.986042000000001,
+              10.019791999999999,
+              10.031875000000001,
+              10.087875,
+              10.112540999999998,
+              10.344624999999999
+            ]
+          },
+          "transfers": 1000
+        },
+        {
+          "encode": {
+            "medianMs": 31.893584000000004,
+            "p95Ms": 62.775917,
+            "samples": [
+              31.235792,
+              31.38975,
+              31.4235,
+              31.471791,
+              31.485084000000004,
+              31.555791,
+              31.725208,
+              31.893584000000004,
+              31.940083,
+              32.111667000000004,
+              32.112500000000004,
+              32.158125000000005,
+              32.315417,
+              32.844832999999994,
+              62.775917
+            ]
+          },
+          "filesPerTransfer": 10000,
+          "linearPositionScanDiagnostic": {
+            "medianMs": 0.001375,
+            "p95Ms": 0.001708,
+            "samples": [
+              0.001166,
+              0.001167,
+              0.00125,
+              0.001333,
+              0.001333,
+              0.001333,
+              0.0013340000000000001,
+              0.001375,
+              0.001375,
+              0.001458,
+              0.001458,
+              0.001458,
+              0.001583,
+              0.001584,
+              0.001708
+            ]
+          },
+          "payloadBytes": 919572,
+          "setupMs": 2794.453833,
+          "snapshot": {
+            "medianMs": 331.097292,
+            "p95Ms": 367.978125,
+            "samples": [
+              325.06675,
+              326.083125,
+              326.178917,
+              327.806583,
+              328.495584,
+              329.897333,
+              330.30883300000005,
+              331.097292,
+              331.16325,
+              332.043208,
+              333.91175,
+              335.17724999999996,
+              359.090708,
+              361.9195,
+              367.978125
+            ]
+          },
+          "transfers": 1
+        }
+      ],
+      "fixture": true,
+      "networkDiscovery": false,
+      "profile": "debug"
+    },
+    "uiPaced": {
+      "cases": [
+        {
+          "changingSnapshotLayout": {
+            "medianMs": 49.160083332935756,
+            "p95Ms": 60.93804166630434,
+            "samplesMs": [
+              48.781666667309764,
+              47.199166666359815,
+              50.75954166659358,
+              50.48866666675167,
+              48.11791666634235,
+              50.07416666649078,
+              48.96866666695132,
+              49.160083332935756,
+              60.93804166630434
+            ]
+          },
+          "checksum": 758234,
+          "filesPerTransfer": 1,
+          "filterClearsHiddenSelection": true,
+          "filterUntilNativeRows": {
+            "medianMs": 46.053416665927216,
+            "p95Ms": 57.21137499949691,
+            "samplesMs": [
+              45.81995833268593,
+              45.45291666636331,
+              54.91154166611523,
+              48.00449999947887,
+              46.053416665927216,
+              56.349583333940245,
+              44.86212499978137,
+              57.21137499949691,
+              44.513833333439834
+            ]
+          },
+          "jsonDecode": {
+            "medianMs": 0.8893750000424916,
+            "p95Ms": 1.0511666669117403,
+            "samplesMs": [
+              1.0214583335255156,
+              0.8765416669120896,
+              0.8846666669342085,
+              0.916250000045693,
+              0.908500000150525,
+              0.8893750000424916,
+              0.878583332450944,
+              0.8750416673137806,
+              0.8789166668066173,
+              0.867041666424484,
+              0.944958333093382,
+              1.0511666669117403,
+              0.893083332812239,
+              0.899500000741682,
+              0.8740000002944726
+            ]
+          },
+          "jsonEncode": {
+            "medianMs": 0.8466249992125086,
+            "p95Ms": 0.8986249995359685,
+            "samplesMs": [
+              0.8810416666165111,
+              0.8292499996969127,
+              0.8306666668431717,
+              0.8634583336970536,
+              0.8466249992125086,
+              0.8747499996388797,
+              0.8390416669499245,
+              0.8341666662090574,
+              0.8738750002521556,
+              0.821541666482517,
+              0.8616666664238437,
+              0.8986249995359685,
+              0.8492083334203926,
+              0.841000000036729,
+              0.8241666664616787
+            ]
+          },
+          "modelReads": {
+            "medianMs": 1.861208333139075,
+            "p95Ms": 1.9640833334051422,
+            "samplesMs": [
+              1.8580000005385955,
+              1.8205000005764305,
+              1.9140833337587537,
+              1.8430000000080327,
+              1.9099999999525608,
+              1.910541666802601,
+              1.8649583334990893,
+              1.8892083335231291,
+              1.8440000003465684,
+              1.8955833338623052,
+              1.9640833334051422,
+              1.861208333139075,
+              1.8472916663085925,
+              1.8427499999233987,
+              1.860833333012124
+            ]
+          },
+          "payloadBytes": 44237,
+          "programmaticScrollLayout": {
+            "medianMs": 11.169125000378699,
+            "p95Ms": 12.159291666648642,
+            "samplesMs": [
+              10.483041666702775,
+              12.156041666457895,
+              10.549291666393401,
+              11.206791666154459,
+              11.169125000378699,
+              11.43154166675231,
+              10.018041666626232,
+              12.159291666648642,
+              10.450166667396843
+            ]
+          },
+          "scrollAnchorStableDuringUpdates": true,
+          "selectionStableDuringUpdates": true,
+          "transfers": 100,
+          "unchangedPublicationsPerSnapshot": 2,
+          "unchangedSnapshotLayout": {
+            "medianMs": 57.05862499962677,
+            "p95Ms": 58.39025000022957,
+            "samplesMs": [
+              56.46437499945023,
+              56.00808333383611,
+              56.49412500042672,
+              57.53745833317225,
+              54.88779166716995,
+              58.39025000022957,
+              57.268291666332516,
+              56.91970833322557,
+              56.46837499989488,
+              57.353375000275264,
+              58.244791666766105,
+              57.9262083329013,
+              57.05862499962677,
+              56.78266666654963,
+              57.66645833318762
+            ]
+          }
+        },
+        {
+          "changingSnapshotLayout": {
+            "medianMs": 142.23687500089,
+            "p95Ms": 147.29016666660755,
+            "samplesMs": [
+              140.2559583339098,
+              142.63304166706803,
+              142.223875000127,
+              147.29016666660755,
+              143.45258333287347,
+              141.3250000005064,
+              142.23687500089,
+              141.5626666666867,
+              144.01949999955832
+            ]
+          },
+          "checksum": 7551536,
+          "filesPerTransfer": 1,
+          "filterClearsHiddenSelection": true,
+          "filterUntilNativeRows": {
+            "medianMs": 129.98791666632314,
+            "p95Ms": 133.03816666666535,
+            "samplesMs": [
+              124.7872500007361,
+              129.98791666632314,
+              120.63616666637245,
+              129.50287500007107,
+              130.79720833320607,
+              131.69162499980303,
+              131.05274999998073,
+              133.03816666666535,
+              129.09562499953608
+            ]
+          },
+          "jsonDecode": {
+            "medianMs": 8.39916666609497,
+            "p95Ms": 8.599374999903375,
+            "samplesMs": [
+              8.496708333950664,
+              8.482791666210687,
+              8.485750000545522,
+              8.345791666215518,
+              8.384458333239309,
+              8.41054166721733,
+              8.127541666908655,
+              8.599374999903375,
+              8.39916666609497,
+              8.305125000333646,
+              8.368625000002794,
+              8.495416665937228,
+              8.22375000007014,
+              8.376541666621051,
+              8.521958333403745
+            ]
+          },
+          "jsonEncode": {
+            "medianMs": 8.275708333712828,
+            "p95Ms": 9.027958332808339,
+            "samplesMs": [
+              8.984458333543444,
+              8.275708333712828,
+              9.027958332808339,
+              8.53958333391347,
+              8.137333334161667,
+              8.205791666114237,
+              8.107541666504403,
+              8.16191666672239,
+              8.566541667278216,
+              8.753958333727496,
+              8.254416667114128,
+              7.969083333591698,
+              8.062583332502982,
+              8.843749999869033,
+              8.924708333324816
+            ]
+          },
+          "modelReads": {
+            "medianMs": 17.333124999822758,
+            "p95Ms": 18.27066666646715,
+            "samplesMs": [
+              18.27066666646715,
+              17.206416666340374,
+              17.199041666572157,
+              18.026250000730215,
+              17.72345833342115,
+              17.29854166660516,
+              17.168000000310712,
+              16.60824999999022,
+              17.48091666649998,
+              17.120999999860942,
+              17.149333333691175,
+              17.413416666386183,
+              17.50654166608001,
+              17.392833333360613,
+              17.333124999822758
+            ]
+          },
+          "payloadBytes": 441138,
+          "programmaticScrollLayout": {
+            "medianMs": 12.380625000332657,
+            "p95Ms": 15.68924999992305,
+            "samplesMs": [
+              10.919291667050857,
+              14.637458332799724,
+              12.040833333230694,
+              13.611874999696738,
+              11.888958333656774,
+              13.129458333423827,
+              12.380625000332657,
+              15.68924999992305,
+              10.796666666465171
+            ]
+          },
+          "scrollAnchorStableDuringUpdates": true,
+          "selectionStableDuringUpdates": true,
+          "transfers": 1000,
+          "unchangedPublicationsPerSnapshot": 2,
+          "unchangedSnapshotLayout": {
+            "medianMs": 129.46708333311108,
+            "p95Ms": 136.29954166663083,
+            "samplesMs": [
+              130.26729166722362,
+              131.5800833335743,
+              136.29954166663083,
+              129.96304166608752,
+              129.87449999945966,
+              130.182916666854,
+              126.57279166614899,
+              131.99524999981804,
+              127.94149999990623,
+              128.9652916666455,
+              129.02633333305857,
+              128.53366666695365,
+              127.56854166673293,
+              129.46708333311108,
+              127.75212499946065
+            ]
+          }
+        },
+        {
+          "changingSnapshotLayout": {
+            "medianMs": 167.22579166707874,
+            "p95Ms": 174.83595833346044,
+            "samplesMs": [
+              166.15233333413926,
+              166.6620416663136,
+              168.7480416667313,
+              164.79129166691564,
+              163.81995833398832,
+              167.22579166707874,
+              171.93262499949924,
+              174.83595833346044,
+              173.36912500013568
+            ]
+          },
+          "checksum": 19905640,
+          "filesPerTransfer": 10000,
+          "filterClearsHiddenSelection": true,
+          "filterUntilNativeRows": {},
+          "jsonDecode": {
+            "medianMs": 22.83224999973754,
+            "p95Ms": 23.470583333619288,
+            "samplesMs": [
+              22.416291667468613,
+              22.40479166721343,
+              22.98383333345555,
+              22.409666667044803,
+              22.714916666700447,
+              22.83224999973754,
+              22.935250000045926,
+              22.538583333698625,
+              23.470583333619288,
+              22.856791666526988,
+              23.20862499982468,
+              22.20258333363745,
+              22.83983333290962,
+              22.434958333178656,
+              22.840083332994254
+            ]
+          },
+          "jsonEncode": {
+            "medianMs": 20.952166666575067,
+            "p95Ms": 23.21037499950762,
+            "samplesMs": [
+              20.806833333153918,
+              20.722416666103527,
+              20.229791666679375,
+              20.53212499959045,
+              20.946000000549247,
+              20.397125000272354,
+              21.03575000001001,
+              20.952166666575067,
+              23.21037499950762,
+              21.37766666692187,
+              20.65929166656133,
+              20.955791666892765,
+              21.695666667255864,
+              22.062541666855395,
+              22.918374999790103
+            ]
+          },
+          "modelReads": {
+            "medianMs": 0.06616666632908164,
+            "p95Ms": 0.07408333294733893,
+            "samplesMs": [
+              0.06616666632908164,
+              0.07408333294733893,
+              0.06908333398314426,
+              0.06841666618129238,
+              0.06554166702699149,
+              0.058416667343408335,
+              0.06829166613897542,
+              0.06283333277679048,
+              0.07329166692215949,
+              0.07308333351829788,
+              0.06450000000768341,
+              0.06608333296753699,
+              0.05654166670865379,
+              0.07399999958579428,
+              0.06533333271363517
+            ]
+          },
+          "payloadBytes": 1170903,
+          "programmaticScrollLayout": {
+            "medianMs": 14.002124999933585,
+            "p95Ms": 60.52524999995512,
+            "samplesMs": [
+              13.796250000268628,
+              60.52524999995512,
+              14.002124999933585,
+              20.877500000096916,
+              12.880833332928887,
+              19.905666667000332,
+              12.003125000774162,
+              20.11658333321975,
+              12.57479166633857
+            ]
+          },
+          "scrollAnchorStableDuringUpdates": true,
+          "selectionStableDuringUpdates": true,
+          "transfers": 1,
+          "unchangedPublicationsPerSnapshot": 2,
+          "unchangedSnapshotLayout": {
+            "medianMs": 89.82474999993428,
+            "p95Ms": 99.07404166733613,
+            "samplesMs": [
+              95.85800000058953,
+              99.07404166733613,
+              88.68566666751576,
+              88.77570833374193,
+              90.30412499942031,
+              89.41287499965256,
+              91.83754166679137,
+              88.16687500075204,
+              88.52879166624916,
+              91.07929166657414,
+              89.82474999993428,
+              90.7290416662363,
+              89.43420833384153,
+              94.7287500002858,
+              89.80033333409665
+            ]
+          }
+        }
+      ],
+      "fixture": true,
+      "measurement": "Monotonic wall time through model work and native layout flush; includes a 1 ms yield, excludes physical frame presentation and XPC transport.",
+      "profile": "debug"
+    },
+    "sourceSHA256": {
+      "Cargo.lock": "8bab41e7641539dff76cc6fcefa169b28218fe3b2fcc21ad4a483ec40499d1cc",
+      "Cargo.toml": "b65673dc67b27523d9ee946f573a788cdb66d27ed2beb1b835c6fca446f60cd4",
+      "crates/seedhop-core/Cargo.toml": "780a6adc5e39c80f7962f14371019bae80a38b7eddf943f4e26b68a1074f5c80",
+      "crates/seedhop-core/src/adapter.rs": "696ac3eadd11ec11f90d63a5a011545677d9776567f2812a300a0dffafaa1fa2",
+      "crates/seedhop-core/src/bin/seedhop-lab.rs": "4204274fee1826ee2c6964429afffe4a7903d77ba0d051e8236f6008ba4275be",
+      "crates/seedhop-core/src/connection_settings.rs": "facd42b3d356cf27cb637e7a1f89ee02c661de9f71268d6cb46016e54fa907ed",
+      "crates/seedhop-core/src/file_operation.rs": "6c35caa10fa4c1e6457c128dcab1e912d82ea39d5712e995cdd2a7410de46d2f",
+      "crates/seedhop-core/src/layout_journal.rs": "d7f09582e48473371c0ea68a91cc233445abcbf7d80733f6ceb43d6f3513ca7f",
+      "crates/seedhop-core/src/lib.rs": "4c8cdf77132600a5d475fca75295f5c0165c6e3e71a8ce76fdc3091b701f9385",
+      "crates/seedhop-core/src/management.rs": "0b8c7a3cf530fed77b5f9dbf8c7d034ec22f17cd985730425dc7ef022e18d853",
+      "crates/seedhop-core/src/model.rs": "cef07ce53e7d4593dba9f8db40949aa1b8c539805ee4f7f9aa6741441cf9e68b",
+      "crates/seedhop-core/src/storage.rs": "c7dd9955e4adc7bc08afad9d989f7dfa8221a9852b229153428e2a58035c041e",
+      "crates/seedhop-core/src/storage_receipt.rs": "a3538937c9f99b9be9b6ce7c4360ee3acee03f2d2aa94d14203ad7b0399b3b6f",
+      "crates/seedhop-core/src/v2.rs": "b19d156da78b0fda1ae04e57ba6ec0f72f6ed70fd5a114b47ccf28d97800bc6e",
+      "crates/seedhop-core/tests/faults.rs": "2f08bc5c8d1449065b2193c3a1609bb0bc89453058ab50c7fa3ba2d8046cd67a",
+      "crates/seedhop-core/tests/management.rs": "229c6da28d49b60ac8d83d8280d8618703ed765609d64298fa842e4ea19684ba",
+      "crates/seedhop-core/tests/mse.rs": "f6f53d9814b0b0326a10b0b9e03296b55b89ccec5218a64e905d26bd4ef6a27c",
+      "crates/seedhop-core/tests/performance.rs": "8331ccfab8dbebf14a5a4d6a800a02091a1c24f990dd8595c3efc9158b959222",
+      "crates/seedhop-core/tests/recovery.rs": "725a3446d051f29403b1de30c893aa0a2d475adfacf8a8a865f70c7536d877c0",
+      "crates/seedhop-core/tests/settings.rs": "c30ff03c3eae58f44d6780321c0409f46e1c2198f40708ab817b0799cbe0ed59",
+      "crates/seedhop-core/tests/status.rs": "ecaa842dc0913e49a48a29125a292872a208ac33f5aa733bc694005701906c0f",
+      "crates/seedhop-core/tests/support/gated_storage.rs": "7da68cf896709f4928c2e70012de930fbb75a928cbb03d67b43ed683d89cc6be",
+      "crates/seedhop-core/tests/support/mod.rs": "c1440158a18f6ef0cd704eb79433801d52ddf532ca9ea4d552c25488a91bdb01",
+      "crates/seedhop-core/tests/support/volume.rs": "82b59ea4f1c9b8edff1268fb4b4a246ce08d48933557d19825ad9fc5266b297f",
+      "crates/seedhop-core/tests/swarm.rs": "919ae4ad0fa67bcba26c2ed247f0c0807f2c05e4cd4bab6a5669fe3b7c4c0268",
+      "crates/seedhop-core/tests/v2.rs": "52d4876f6607d495650a90516cb76885ed5e6aba70a18f40b3a17416e8d3ff87",
+      "crates/seedhop-ffi/src/bindgen.rs": "f7a2dd11fb370e9595bdfa6c32fc41a9b67a60bbab06ec711cb7a03eb873ffa6",
+      "crates/seedhop-ffi/src/lib.rs": "cc60373908a186e27b0a81504dbfa9e0e0ff27c90d6befaa9e7fd41ead545526",
+      "macOS/App/DesignSystem.swift": "a2fe26c6c45e9d7604c8df391939a6e71160b08771d94f0716e0001653832084",
+      "macOS/App/EngineClient.swift": "2c0677db9b1b4668253b65bad946e2a18bb8445ab7e7cd683fac5d3deb1dfff1",
+      "macOS/App/EngineSelfTest.swift": "6307d6ba4e4dd1b648d11207f88ad3761fff3487d0d2b3d7400a4a4bc77c5d44",
+      "macOS/App/ImportSession.swift": "efe84c9e09f41acc819e3a2b2f89cb62089fa6c0363632d2aa7cd7157e1bb726",
+      "macOS/App/ImportView.swift": "ec672fdf37ad5632c326470b85e321e33a9a9ee37cde892d51a83e7775fa354b",
+      "macOS/App/InterfaceSelfTest.swift": "9ad45027753799a9b154ce9fca6c26bc592c0326584aaab16e668928e0c63980",
+      "macOS/App/LibraryStore.swift": "f372158013acce5c8d8bccf17ff9ca01ff7f3578486dff1fcc81a95edb9be207",
+      "macOS/App/LibraryView.swift": "871962e0b5a390f17c56fa83f30d9bebaaf50d7269bfe467d5636aaab0b9c7e8",
+      "macOS/App/LifecycleSelfTest.swift": "470fb6257a4eb211d78377d3781425e6db7ab3b6fae25a13f351e067e43084d1",
+      "macOS/App/NativeAccessibility.swift": "0de93b0819d28e34d0aa1a98408556b79b3919fca63ab75e7f411fff313b6c29",
+      "macOS/App/PerformanceSelfTest.swift": "02018dbd79676915cb15549b05e442b6fa7b54b653357bc853fc82b819d215a9",
+      "macOS/App/PreviewFixtures.swift": "0d9e055833af4280b05d711373815b29f8f638360d15bd7bf3bea5a051aeda65",
+      "macOS/App/SeedHopApp.swift": "b3dfbae47badcd48ed582d1ba579369800da8e713fc1c98cde67a8f172b7e91c",
+      "macOS/App/SettingsView.swift": "382b6c83d9304698f155c380e0a0ce4f4d6f85494a7b471b072b82092126fd94",
+      "macOS/App/TransferPresentation.swift": "5b35b800e301754e47d4c795d923b1e9c27d938fa147e713da935dd52cc075c2",
+      "macOS/App/UXSelfTest.swift": "ed9ca0726235c59c9d947fb5bb3ccc26954e9f3e0c1229f007ddac38b1526f14",
+      "macOS/Host/EngineHost.swift": "74bed6dccaed3b7544a8225091c8f974820626309c14ed073f275653917419e2",
+      "macOS/Host/HostMain.swift": "0047ff4e48865fb39dcce30d75283efbd33745ef2c288f8cba570593a9e8e6a3",
+      "macOS/Shared/Models.swift": "b55cfbb049b0626105216316a831131016fc2b22e689de35d1dcc2e36740520b",
+      "macOS/Shared/Signing.swift": "a541a612abb091f9dc8d65035e8506c34166f72d9531a973da0cdb4aeed514cc"
+    },
+    "binarySHA256": {
+      ".build/SeedHop.app/Contents/MacOS/SeedHop": "d2e829adf804e2d6fea5ebb24f0437bbd67f3c6d8a3990af6747791060969d45",
+      ".build/SeedHop.app/Contents/Frameworks/libseedhop_ffi.dylib": "9fb9a20d0f493113b4ecf984795087c4c0ea02e5a8916692389bc5de7f88cbb5"
+    },
+    "budget": {
+      "budgetDefinition": "docs/PERFORMANCE.md",
+      "checks": [
+        {
+          "name": "core 100/1 snapshot p95 ms",
+          "value": 0.754625,
+          "limit": 5,
+          "passed": true
+        },
+        {
+          "name": "core 100/1 encode p95 ms",
+          "value": 2.053791,
+          "limit": 100,
+          "passed": true
+        },
+        {
+          "name": "core 1000/1 snapshot p95 ms",
+          "value": 10.344624999999999,
+          "limit": 20,
+          "passed": true
+        },
+        {
+          "name": "core 1000/1 encode p95 ms",
+          "value": 15.570666000000001,
+          "limit": 100,
+          "passed": true
+        },
+        {
+          "name": "core 1/10000 snapshot p95 ms",
+          "value": 367.978125,
+          "limit": 25,
+          "passed": false
+        },
+        {
+          "name": "core 1/10000 encode p95 ms",
+          "value": 62.775917,
+          "limit": 100,
+          "passed": true
+        },
+        {
+          "name": "UI 100/1 jsonDecode p95 ms",
+          "value": 1.0511666669117403,
+          "limit": 50,
+          "passed": true
+        },
+        {
+          "name": "UI 100/1 jsonEncode p95 ms",
+          "value": 0.8986249995359685,
+          "limit": 50,
+          "passed": true
+        },
+        {
+          "name": "UI 100/1 modelReads p95 ms",
+          "value": 1.9640833334051422,
+          "limit": 25,
+          "passed": true
+        },
+        {
+          "name": "UI 100/1 unchangedSnapshotLayout p95 ms",
+          "value": 58.39025000022957,
+          "limit": 20,
+          "passed": false
+        },
+        {
+          "name": "UI 100/1 changingSnapshotLayout p95 ms",
+          "value": 60.93804166630434,
+          "limit": 100,
+          "passed": true
+        },
+        {
+          "name": "UI 100/1 programmaticScrollLayout p95 ms",
+          "value": 12.159291666648642,
+          "limit": 50,
+          "passed": true
+        },
+        {
+          "name": "UI 100/1 filter p95 ms",
+          "value": 57.21137499949691,
+          "limit": 100,
+          "passed": true
+        },
+        {
+          "name": "UI 100/1 unchanged publications",
+          "value": 2,
+          "limit": 0,
+          "passed": false
+        },
+        {
+          "name": "UI 100/1 selectionStableDuringUpdates",
+          "passed": true
+        },
+        {
+          "name": "UI 100/1 scrollAnchorStableDuringUpdates",
+          "passed": true
+        },
+        {
+          "name": "UI 100/1 filterClearsHiddenSelection",
+          "passed": true
+        },
+        {
+          "name": "UI 1000/1 jsonDecode p95 ms",
+          "value": 8.599374999903375,
+          "limit": 50,
+          "passed": true
+        },
+        {
+          "name": "UI 1000/1 jsonEncode p95 ms",
+          "value": 9.027958332808339,
+          "limit": 50,
+          "passed": true
+        },
+        {
+          "name": "UI 1000/1 modelReads p95 ms",
+          "value": 18.27066666646715,
+          "limit": 25,
+          "passed": true
+        },
+        {
+          "name": "UI 1000/1 unchangedSnapshotLayout p95 ms",
+          "value": 136.29954166663083,
+          "limit": 20,
+          "passed": false
+        },
+        {
+          "name": "UI 1000/1 changingSnapshotLayout p95 ms",
+          "value": 147.29016666660755,
+          "limit": 125,
+          "passed": false
+        },
+        {
+          "name": "UI 1000/1 programmaticScrollLayout p95 ms",
+          "value": 15.68924999992305,
+          "limit": 50,
+          "passed": true
+        },
+        {
+          "name": "UI 1000/1 filter p95 ms",
+          "value": 133.03816666666535,
+          "limit": 125,
+          "passed": false
+        },
+        {
+          "name": "UI 1000/1 unchanged publications",
+          "value": 2,
+          "limit": 0,
+          "passed": false
+        },
+        {
+          "name": "UI 1000/1 selectionStableDuringUpdates",
+          "passed": true
+        },
+        {
+          "name": "UI 1000/1 scrollAnchorStableDuringUpdates",
+          "passed": true
+        },
+        {
+          "name": "UI 1000/1 filterClearsHiddenSelection",
+          "passed": true
+        },
+        {
+          "name": "UI 1/10000 jsonDecode p95 ms",
+          "value": 23.470583333619288,
+          "limit": 50,
+          "passed": true
+        },
+        {
+          "name": "UI 1/10000 jsonEncode p95 ms",
+          "value": 23.21037499950762,
+          "limit": 50,
+          "passed": true
+        },
+        {
+          "name": "UI 1/10000 modelReads p95 ms",
+          "value": 0.07408333294733893,
+          "limit": 25,
+          "passed": true
+        },
+        {
+          "name": "UI 1/10000 unchangedSnapshotLayout p95 ms",
+          "value": 99.07404166733613,
+          "limit": 20,
+          "passed": false
+        },
+        {
+          "name": "UI 1/10000 changingSnapshotLayout p95 ms",
+          "value": 174.83595833346044,
+          "limit": 125,
+          "passed": false
+        },
+        {
+          "name": "UI 1/10000 programmaticScrollLayout p95 ms",
+          "value": 60.52524999995512,
+          "limit": 50,
+          "passed": false
+        },
+        {
+          "name": "UI 1/10000 unchanged publications",
+          "value": 2,
+          "limit": 0,
+          "passed": false
+        },
+        {
+          "name": "UI 1/10000 selectionStableDuringUpdates",
+          "passed": true
+        },
+        {
+          "name": "UI 1/10000 scrollAnchorStableDuringUpdates",
+          "passed": true
+        }
+      ],
+      "passed": false
+    },
+    "warningOccurrences": 11
+  },
+  "after": {
+    "core": {
+      "cases": [
+        {
+          "encode": {
+            "medianMs": 1.4816250000000002,
+            "p95Ms": 1.5967500000000001,
+            "samples": [
+              1.389625,
+              1.404875,
+              1.410375,
+              1.414625,
+              1.450375,
+              1.4632910000000001,
+              1.481417,
+              1.4816250000000002,
+              1.488416,
+              1.510041,
+              1.52725,
+              1.5353750000000002,
+              1.557375,
+              1.566958,
+              1.5967500000000001
+            ]
+          },
+          "filesPerTransfer": 1,
+          "linearPositionScanDiagnostic": {
+            "medianMs": 0.043584000000000005,
+            "p95Ms": 0.046708,
+            "samples": [
+              0.041708,
+              0.041709,
+              0.041749999999999995,
+              0.041791,
+              0.041958,
+              0.042792,
+              0.043250000000000004,
+              0.043584000000000005,
+              0.044334,
+              0.044375,
+              0.044791,
+              0.045000000000000005,
+              0.0465,
+              0.046583,
+              0.046708
+            ]
+          },
+          "payloadBytes": 46304,
+          "setupMs": 3159.887875,
+          "snapshot": {
+            "medianMs": 0.563041,
+            "p95Ms": 0.6948329999999999,
+            "samples": [
+              0.521667,
+              0.5271250000000001,
+              0.531166,
+              0.531625,
+              0.532042,
+              0.549083,
+              0.552458,
+              0.563041,
+              0.565875,
+              0.567833,
+              0.570459,
+              0.580167,
+              0.6128750000000001,
+              0.67825,
+              0.6948329999999999
+            ]
+          },
+          "transfers": 100
+        },
+        {
+          "encode": {
+            "medianMs": 14.772833,
+            "p95Ms": 16.170459,
+            "samples": [
+              14.348667,
+              14.447167,
+              14.458292,
+              14.485833999999999,
+              14.500834000000001,
+              14.564208,
+              14.703458000000001,
+              14.772833,
+              14.877625,
+              15.229625,
+              15.473832999999999,
+              15.603541,
+              15.787666999999999,
+              16.108082999999997,
+              16.170459
+            ]
+          },
+          "filesPerTransfer": 1,
+          "linearPositionScanDiagnostic": {
+            "medianMs": 4.941125,
+            "p95Ms": 6.325041,
+            "samples": [
+              4.804250000000001,
+              4.837125,
+              4.843875,
+              4.865334,
+              4.878,
+              4.929083,
+              4.936292,
+              4.941125,
+              4.949833,
+              5.028542000000001,
+              5.087833,
+              5.174875,
+              6.04175,
+              6.259042,
+              6.325041
+            ]
+          },
+          "payloadBytes": 461205,
+          "setupMs": 115552.969167,
+          "snapshot": {
+            "medianMs": 10.751959,
+            "p95Ms": 12.837333,
+            "samples": [
+              10.204125,
+              10.369541,
+              10.420625,
+              10.421750000000001,
+              10.605458,
+              10.626750000000001,
+              10.649875,
+              10.751959,
+              10.807666000000001,
+              10.852125000000001,
+              11.472291,
+              11.680125,
+              12.016208,
+              12.033624999999999,
+              12.837333
+            ]
+          },
+          "transfers": 1000
+        },
+        {
+          "encode": {
+            "medianMs": 32.018,
+            "p95Ms": 37.096917,
+            "samples": [
+              31.220375,
+              31.352333,
+              31.361874999999998,
+              31.362583,
+              31.586125,
+              31.682792000000003,
+              32.008167,
+              32.018,
+              32.021125,
+              32.173125,
+              32.593708,
+              32.774834000000006,
+              32.935083,
+              32.979584,
+              37.096917
+            ]
+          },
+          "filesPerTransfer": 10000,
+          "linearPositionScanDiagnostic": {
+            "medianMs": 0.00125,
+            "p95Ms": 0.0015,
+            "samples": [
+              0.000375,
+              0.000625,
+              0.000958,
+              0.001,
+              0.0011250000000000001,
+              0.0012079999999999999,
+              0.00125,
+              0.00125,
+              0.0012920000000000002,
+              0.0013340000000000001,
+              0.001375,
+              0.0014160000000000002,
+              0.0014160000000000002,
+              0.001458,
+              0.0015
+            ]
+          },
+          "payloadBytes": 919572,
+          "setupMs": 2090.2759579999997,
+          "snapshot": {
+            "medianMs": 8.268084,
+            "p95Ms": 9.180416000000001,
+            "samples": [
+              7.92625,
+              8.07325,
+              8.076917,
+              8.170584,
+              8.179084,
+              8.179250000000001,
+              8.218,
+              8.268084,
+              8.326,
+              8.357833,
+              8.581125,
+              8.631416,
+              8.718333999999999,
+              8.9185,
+              9.180416000000001
+            ]
+          },
+          "transfers": 1
+        }
+      ],
+      "fixture": true,
+      "networkDiscovery": false,
+      "profile": "debug"
+    },
+    "nativeRuns": [
+      {
+        "name": "after",
+        "data": {
+          "cases": [
+            {
+              "changingSnapshotLayout": {
+                "medianMs": 42.31012499985809,
+                "p95Ms": 140.17916666671226,
+                "samplesMs": [
+                  41.57854166805919,
+                  42.287416667022626,
+                  41.40762499991979,
+                  42.7383333335456,
+                  43.06204166641692,
+                  140.17916666671226,
+                  42.86195833265083,
+                  41.354375000082655,
+                  42.31012499985809
+                ]
+              },
+              "checksum": 758234,
+              "filesPerTransfer": 1,
+              "filterClearsHiddenSelection": true,
+              "filterUntilNativeRows": {
+                "medianMs": 50.09529166636639,
+                "p95Ms": 51.41354166698875,
+                "samplesMs": [
+                  40.00645833366434,
+                  50.71591666637687,
+                  50.09529166636639,
+                  50.18533333350206,
+                  51.315833332409966,
+                  47.45804166668677,
+                  46.58654166632914,
+                  47.08283333275176,
+                  51.41354166698875
+                ]
+              },
+              "jsonDecode": {
+                "medianMs": 0.9076666665350785,
+                "p95Ms": 1.0199583321082173,
+                "samplesMs": [
+                  0.9612916674086591,
+                  0.8881250014383113,
+                  0.8698333331267349,
+                  0.8548333335056668,
+                  0.8480416654492728,
+                  0.9107916666835081,
+                  0.9010416670207633,
+                  0.9003333325381391,
+                  0.9076666665350785,
+                  1.0199583321082173,
+                  0.8925416677811882,
+                  0.9464583345106803,
+                  0.9742916663526557,
+                  0.9260833339794772,
+                  0.9292499998991843
+                ]
+              },
+              "jsonEncode": {
+                "medianMs": 0.8671249997860286,
+                "p95Ms": 0.8981666669569677,
+                "samplesMs": [
+                  0.850208334668423,
+                  0.8306250001623994,
+                  0.8305416668008547,
+                  0.7958333335409407,
+                  0.8196666676667519,
+                  0.8981666669569677,
+                  0.8292083330161404,
+                  0.8851666661939817,
+                  0.8671249997860286,
+                  0.8714583345863502,
+                  0.8598333333793562,
+                  0.8870000001479639,
+                  0.888749998921412,
+                  0.8883333339326782,
+                  0.8886666673788568
+                ]
+              },
+              "modelReads": {
+                "medianMs": 0.22779166647524107,
+                "p95Ms": 0.24887499967007898,
+                "samplesMs": [
+                  0.23620833417226095,
+                  0.21741666751040611,
+                  0.21825000112585258,
+                  0.23137499920267146,
+                  0.2163333319913363,
+                  0.24020833370741457,
+                  0.21604166613542475,
+                  0.22779166647524107,
+                  0.22916666603123304,
+                  0.21599999854515772,
+                  0.2269583328597946,
+                  0.24887499967007898,
+                  0.23391666763927788,
+                  0.22612500106333755,
+                  0.230541665587225
+                ]
+              },
+              "payloadBytes": 44237,
+              "programmaticScrollLayout": {
+                "medianMs": 11.66854166513076,
+                "p95Ms": 32.79237499918963,
+                "samplesMs": [
+                  10.778083333207178,
+                  13.3229166676756,
+                  11.66854166513076,
+                  11.420666665799217,
+                  32.79237499918963,
+                  13.384416666667676,
+                  11.929833333852002,
+                  11.317833334032912,
+                  10.171166666623321
+                ]
+              },
+              "scrollAnchorStableDuringUpdates": true,
+              "selectionStableDuringUpdates": true,
+              "transfers": 100,
+              "unchangedPublicationsPerSnapshot": 0,
+              "unchangedSnapshotLayout": {
+                "medianMs": 2.1904999994148966,
+                "p95Ms": 2.251583333418239,
+                "samplesMs": [
+                  1.7066666659957264,
+                  2.218249999714317,
+                  2.165666666769539,
+                  2.20416666707024,
+                  2.1904999994148966,
+                  2.2032916658645263,
+                  2.192750000176602,
+                  2.205666665759054,
+                  2.044249999016756,
+                  2.1888749997742707,
+                  2.0173333323327824,
+                  2.251583333418239,
+                  1.8229583329230081,
+                  2.2148333318909863,
+                  1.9653333329188172
+                ]
+              }
+            },
+            {
+              "changingSnapshotLayout": {
+                "medianMs": 63.97712499892805,
+                "p95Ms": 84.59766666783253,
+                "samplesMs": [
+                  60.07929166662507,
+                  63.97712499892805,
+                  64.15087499954097,
+                  61.764750000293134,
+                  65.28029166656779,
+                  64.32166666672856,
+                  62.44245833295281,
+                  62.084249999315944,
+                  84.59766666783253
+                ]
+              },
+              "checksum": 7551536,
+              "filesPerTransfer": 1,
+              "filterClearsHiddenSelection": true,
+              "filterUntilNativeRows": {
+                "medianMs": 63.47145833206014,
+                "p95Ms": 71.6919999995298,
+                "samplesMs": [
+                  63.47145833206014,
+                  61.477666666178266,
+                  71.6919999995298,
+                  60.010708333720686,
+                  60.12054166603775,
+                  71.31908333394676,
+                  60.165249999045045,
+                  68.91833333247632,
+                  69.69529166781285
+                ]
+              },
+              "jsonDecode": {
+                "medianMs": 8.513875000062399,
+                "p95Ms": 8.9202083327109,
+                "samplesMs": [
+                  8.513875000062399,
+                  8.9202083327109,
+                  8.61458333201881,
+                  8.420750000368571,
+                  8.699791666003875,
+                  8.19670833334385,
+                  8.428999999523512,
+                  8.487125000101514,
+                  8.554458334401716,
+                  8.485999998811167,
+                  8.209208332118578,
+                  8.741458332224283,
+                  8.748166666919133,
+                  8.495749998473912,
+                  8.718750001207809
+                ]
+              },
+              "jsonEncode": {
+                "medianMs": 8.340874999703374,
+                "p95Ms": 8.690791666595032,
+                "samplesMs": [
+                  8.015625000552973,
+                  8.5339583329187,
+                  8.094791666735546,
+                  8.690791666595032,
+                  8.538749998479034,
+                  8.139749999827472,
+                  8.231125000747852,
+                  8.383208332816139,
+                  8.588999999119551,
+                  8.351458332981565,
+                  8.10112500039395,
+                  8.494916666677454,
+                  8.093250000456464,
+                  8.148249999067048,
+                  8.340874999703374
+                ]
+              },
+              "modelReads": {
+                "medianMs": 1.8058333334920462,
+                "p95Ms": 2.0558333344524726,
+                "samplesMs": [
+                  1.9729999985429458,
+                  1.816958332710783,
+                  1.97854166617617,
+                  1.7619583341001999,
+                  1.7091666668420658,
+                  1.7212916663993383,
+                  1.7618333331483882,
+                  2.0558333344524726,
+                  1.865124999312684,
+                  1.6977916657197056,
+                  1.9278750005469192,
+                  1.8058333334920462,
+                  1.7859583349491004,
+                  1.8657083328434965,
+                  1.786208333214745
+                ]
+              },
+              "payloadBytes": 441138,
+              "programmaticScrollLayout": {
+                "medianMs": 12.276083334654686,
+                "p95Ms": 13.327083333933842,
+                "samplesMs": [
+                  13.327083333933842,
+                  12.276083334654686,
+                  11.327083333526389,
+                  12.567750000016531,
+                  10.245291667160927,
+                  12.933833333590883,
+                  10.67108333336364,
+                  13.112041666317964,
+                  11.920916667804704
+                ]
+              },
+              "scrollAnchorStableDuringUpdates": true,
+              "selectionStableDuringUpdates": true,
+              "transfers": 1000,
+              "unchangedPublicationsPerSnapshot": 0,
+              "unchangedSnapshotLayout": {
+                "medianMs": 3.063083333472605,
+                "p95Ms": 16.515416666152305,
+                "samplesMs": [
+                  2.9821666666975943,
+                  3.135958333587041,
+                  3.063083333472605,
+                  3.125791667116573,
+                  3.0394166678888723,
+                  3.0492916666844394,
+                  2.9693333326576976,
+                  3.0640833338111406,
+                  3.0550833344022976,
+                  3.0242499997257255,
+                  16.515416666152305,
+                  3.105666666670004,
+                  3.0187083339114906,
+                  3.1377499999507563,
+                  3.1502916681347415
+                ]
+              }
+            },
+            {
+              "changingSnapshotLayout": {
+                "medianMs": 78.47691666574974,
+                "p95Ms": 79.68350000010105,
+                "samplesMs": [
+                  78.98808333266061,
+                  79.55225000114297,
+                  79.68350000010105,
+                  77.73958333382325,
+                  78.56879166683939,
+                  77.60445833264384,
+                  77.57741666682705,
+                  77.418791666787,
+                  78.47691666574974
+                ]
+              },
+              "checksum": 19905640,
+              "filesPerTransfer": 10000,
+              "filterClearsHiddenSelection": null,
+              "filterUntilNativeRows": {},
+              "jsonDecode": {
+                "medianMs": 23.088458332495065,
+                "p95Ms": 23.84350000102131,
+                "samplesMs": [
+                  23.84350000102131,
+                  23.778624999977183,
+                  23.690458332566777,
+                  22.628624999924796,
+                  23.088458332495065,
+                  23.136333333241055,
+                  23.53570833292906,
+                  22.791999999753898,
+                  23.292874999242486,
+                  22.449041667641723,
+                  22.93587500025751,
+                  23.405291665767436,
+                  23.025416667223908,
+                  22.94916666687641,
+                  22.161999999298132
+                ]
+              },
+              "jsonEncode": {
+                "medianMs": 21.283958332787734,
+                "p95Ms": 21.801625000080094,
+                "samplesMs": [
+                  21.767749998616637,
+                  21.576249999270658,
+                  21.659833333615097,
+                  21.07883333337668,
+                  21.66883333302394,
+                  21.16225000099803,
+                  21.283958332787734,
+                  21.801625000080094,
+                  21.349708333218587,
+                  21.233416666291305,
+                  21.305583331923117,
+                  20.18879166644183,
+                  21.23241666595277,
+                  20.90166666675941,
+                  20.706833334770636
+                ]
+              },
+              "modelReads": {
+                "medianMs": 0.061249998907442205,
+                "p95Ms": 0.07374999950116035,
+                "samplesMs": [
+                  0.06795833178330213,
+                  0.07191666736616753,
+                  0.05987499935145024,
+                  0.061249998907442205,
+                  0.06324999958451372,
+                  0.07374999950116035,
+                  0.052583332944777794,
+                  0.06637499973294325,
+                  0.054583333621849306,
+                  0.06337499871733598,
+                  0.05675000102201011,
+                  0.05104166666569654,
+                  0.048624999180901796,
+                  0.06170833330543246,
+                  0.05700000110664405
+                ]
+              },
+              "payloadBytes": 1170903,
+              "programmaticScrollLayout": {
+                "medianMs": 13.13533333268424,
+                "p95Ms": 34.85941666622239,
+                "samplesMs": [
+                  8.367791666387348,
+                  34.85941666622239,
+                  12.372749999485677,
+                  19.105999999737833,
+                  7.955583334478433,
+                  19.883916667822632,
+                  12.718874999336549,
+                  19.253208332884242,
+                  13.13533333268424
+                ]
+              },
+              "scrollAnchorStableDuringUpdates": true,
+              "selectionStableDuringUpdates": true,
+              "transfers": 1,
+              "unchangedPublicationsPerSnapshot": 0,
+              "unchangedSnapshotLayout": {
+                "medianMs": 2.890833333367482,
+                "p95Ms": 2.9954999990877695,
+                "samplesMs": [
+                  2.890833333367482,
+                  2.8755833336617798,
+                  2.2831249989394564,
+                  2.9367083334363997,
+                  2.947458331618691,
+                  2.9244583329273155,
+                  2.9390416657406604,
+                  2.8742499998770654,
+                  2.897458332881797,
+                  2.847249999831547,
+                  2.9701250005018665,
+                  2.9954999990877695,
+                  2.844458333129296,
+                  2.8454999992391095,
+                  2.863874999093241
+                ]
+              }
+            }
+          ],
+          "fixture": true,
+          "measurement": "Monotonic wall time through model work and native layout flush; includes a 1 ms yield, excludes physical frame presentation and XPC transport.",
+          "profile": "debug",
+          "profilingOnly": false
+        },
+        "budget": {
+          "budgetDefinition": "docs/PERFORMANCE.md",
+          "checks": [
+            {
+              "name": "core 100/1 snapshot p95 ms",
+              "value": 0.6948329999999999,
+              "limit": 5,
+              "passed": true
+            },
+            {
+              "name": "core 100/1 encode p95 ms",
+              "value": 1.5967500000000001,
+              "limit": 100,
+              "passed": true
+            },
+            {
+              "name": "core 1000/1 snapshot p95 ms",
+              "value": 12.837333,
+              "limit": 20,
+              "passed": true
+            },
+            {
+              "name": "core 1000/1 encode p95 ms",
+              "value": 16.170459,
+              "limit": 100,
+              "passed": true
+            },
+            {
+              "name": "core 1/10000 snapshot p95 ms",
+              "value": 9.180416000000001,
+              "limit": 25,
+              "passed": true
+            },
+            {
+              "name": "core 1/10000 encode p95 ms",
+              "value": 37.096917,
+              "limit": 100,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 jsonDecode p95 ms",
+              "value": 1.0199583321082173,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 jsonEncode p95 ms",
+              "value": 0.8981666669569677,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 modelReads p95 ms",
+              "value": 0.24887499967007898,
+              "limit": 25,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 unchangedSnapshotLayout p95 ms",
+              "value": 2.251583333418239,
+              "limit": 20,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 changingSnapshotLayout p95 ms",
+              "value": 140.17916666671226,
+              "limit": 100,
+              "passed": false
+            },
+            {
+              "name": "UI 100/1 programmaticScrollLayout p95 ms",
+              "value": 32.79237499918963,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 filter p95 ms",
+              "value": 51.41354166698875,
+              "limit": 100,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 unchanged publications",
+              "value": 0,
+              "limit": 0,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 selectionStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 scrollAnchorStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 filterClearsHiddenSelection",
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 jsonDecode p95 ms",
+              "value": 8.9202083327109,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 jsonEncode p95 ms",
+              "value": 8.690791666595032,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 modelReads p95 ms",
+              "value": 2.0558333344524726,
+              "limit": 25,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 unchangedSnapshotLayout p95 ms",
+              "value": 16.515416666152305,
+              "limit": 20,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 changingSnapshotLayout p95 ms",
+              "value": 84.59766666783253,
+              "limit": 125,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 programmaticScrollLayout p95 ms",
+              "value": 13.327083333933842,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 filter p95 ms",
+              "value": 71.6919999995298,
+              "limit": 125,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 unchanged publications",
+              "value": 0,
+              "limit": 0,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 selectionStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 scrollAnchorStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 filterClearsHiddenSelection",
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 jsonDecode p95 ms",
+              "value": 23.84350000102131,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 jsonEncode p95 ms",
+              "value": 21.801625000080094,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 modelReads p95 ms",
+              "value": 0.07374999950116035,
+              "limit": 25,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 unchangedSnapshotLayout p95 ms",
+              "value": 2.9954999990877695,
+              "limit": 20,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 changingSnapshotLayout p95 ms",
+              "value": 79.68350000010105,
+              "limit": 125,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 programmaticScrollLayout p95 ms",
+              "value": 34.85941666622239,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 unchanged publications",
+              "value": 0,
+              "limit": 0,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 selectionStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 scrollAnchorStableDuringUpdates",
+              "passed": true
+            }
+          ],
+          "passed": false
+        },
+        "budgetExitCode": 1,
+        "nativeFixtureExitCode": 0,
+        "warningOccurrences": 11,
+        "artifacts": [
+          {
+            "path": ".build/performance-ui-after.json",
+            "sha256": "684d4e4ff1eaced4b748fcdaacc39c4c4ce0fedfa7ca1e31809b980c3de02c1c",
+            "bytes": 11865
+          },
+          {
+            "path": ".build/performance-ui-after.log",
+            "sha256": "77c7f5ceb1a343a5e3921b141498e57562825a4f2334fd0743e43674ef4a7633",
+            "bytes": 2539
+          },
+          {
+            "path": ".build/performance-budget-check.json",
+            "sha256": "737b10e2041fb603c3206370b3cc5d28a738306feb7fde1bff6738cecee0d4d6",
+            "bytes": 4700
+          }
+        ]
+      },
+      {
+        "name": "repeat-1",
+        "data": {
+          "cases": [
+            {
+              "changingSnapshotLayout": {
+                "medianMs": 81.22437499696389,
+                "p95Ms": 178.876208334259,
+                "samplesMs": [
+                  71.79720833300962,
+                  61.27533333346946,
+                  74.0442083333619,
+                  126.37504166559665,
+                  170.9036666652537,
+                  141.37279166607186,
+                  178.876208334259,
+                  75.65595833511907,
+                  81.22437499696389
+                ]
+              },
+              "checksum": 758234,
+              "filesPerTransfer": 1,
+              "filterClearsHiddenSelection": true,
+              "filterUntilNativeRows": {
+                "medianMs": 57.62670833428274,
+                "p95Ms": 82.37912499680533,
+                "samplesMs": [
+                  82.37912499680533,
+                  58.76029166392982,
+                  54.62820833417936,
+                  57.62670833428274,
+                  60.549624999111984,
+                  53.846208335016854,
+                  53.177291665633675,
+                  55.70304166758433,
+                  57.904333334590774
+                ]
+              },
+              "jsonDecode": {
+                "medianMs": 0.9554583339195233,
+                "p95Ms": 1.0168333319597878,
+                "samplesMs": [
+                  0.8723333339730743,
+                  0.9291666647186503,
+                  1.0094999997818377,
+                  0.96908333216561,
+                  1.0168333319597878,
+                  0.9318749980593566,
+                  0.9429583333258051,
+                  0.9554583339195233,
+                  0.926833334233379,
+                  0.9266666675102897,
+                  0.9148749995802063,
+                  0.975041668425547,
+                  0.9644999990996439,
+                  0.9618333315302152,
+                  0.958916665695142
+                ]
+              },
+              "jsonEncode": {
+                "medianMs": 0.8909583339118399,
+                "p95Ms": 1.0701250030251686,
+                "samplesMs": [
+                  0.7868749999033753,
+                  0.8784166639088653,
+                  0.8783333360042889,
+                  0.8057083359744865,
+                  0.8464999991701916,
+                  0.9258333338948432,
+                  0.8933333338063676,
+                  0.8605833354522474,
+                  0.9057499992195517,
+                  0.8794166642474011,
+                  0.9485833325015847,
+                  0.9034583308675792,
+                  1.0701250030251686,
+                  0.9087916660064366,
+                  0.8909583339118399
+                ]
+              },
+              "modelReads": {
+                "medianMs": 0.2577916638983879,
+                "p95Ms": 0.3110833313257899,
+                "samplesMs": [
+                  0.259333333815448,
+                  0.22900000112713315,
+                  0.2514166699256748,
+                  0.24212499920395203,
+                  0.2577916638983879,
+                  0.24216666497522965,
+                  0.2817083332047332,
+                  0.24579166711191647,
+                  0.24362499971175566,
+                  0.23050000163493678,
+                  0.3110833313257899,
+                  0.28954166555195116,
+                  0.2946249987871852,
+                  0.28933333305758424,
+                  0.3033333305211272
+                ]
+              },
+              "payloadBytes": 44237,
+              "programmaticScrollLayout": {
+                "medianMs": 19.705000002431916,
+                "p95Ms": 50.822166667785496,
+                "samplesMs": [
+                  36.27754166882369,
+                  24.056875001406297,
+                  14.384625003003748,
+                  14.499083332339069,
+                  14.810583332291571,
+                  19.705000002431916,
+                  15.182125000137603,
+                  43.01666666651727,
+                  50.822166667785496
+                ]
+              },
+              "scrollAnchorStableDuringUpdates": true,
+              "selectionStableDuringUpdates": true,
+              "transfers": 100,
+              "unchangedPublicationsPerSnapshot": 0,
+              "unchangedSnapshotLayout": {
+                "medianMs": 2.259499997308012,
+                "p95Ms": 11.616833333391696,
+                "samplesMs": [
+                  2.2684583309455775,
+                  2.245499999844469,
+                  2.264666669361759,
+                  2.2215833341761027,
+                  2.259499997308012,
+                  1.8949166660604533,
+                  1.871374999609543,
+                  1.700458331470145,
+                  2.257125001051463,
+                  1.354291664029006,
+                  2.266458330268506,
+                  2.27729166726931,
+                  2.6107083322131075,
+                  2.2745416645193473,
+                  11.616833333391696
+                ]
+              }
+            },
+            {
+              "changingSnapshotLayout": {
+                "medianMs": 89.65679166794871,
+                "p95Ms": 94.03229166491656,
+                "samplesMs": [
+                  83.46529166738037,
+                  87.15674999984913,
+                  90.05095833344967,
+                  87.60745833205874,
+                  89.65679166794871,
+                  92.66279166695313,
+                  89.84174999932293,
+                  94.03229166491656,
+                  89.12224999949103
+                ]
+              },
+              "checksum": 7551536,
+              "filesPerTransfer": 1,
+              "filterClearsHiddenSelection": true,
+              "filterUntilNativeRows": {
+                "medianMs": 76.16562499970314,
+                "p95Ms": 97.85412500059465,
+                "samplesMs": [
+                  63.828875001490815,
+                  76.28204166758223,
+                  76.65558333610534,
+                  76.00587500201073,
+                  76.16562499970314,
+                  76.56149999820627,
+                  97.85412500059465,
+                  74.73308333283057,
+                  76.00495833321474
+                ]
+              },
+              "jsonDecode": {
+                "medianMs": 8.54674999936833,
+                "p95Ms": 8.992333332571434,
+                "samplesMs": [
+                  8.330416665558005,
+                  8.922458331653615,
+                  8.94466666795779,
+                  8.992333332571434,
+                  8.67741666661459,
+                  8.288875000289408,
+                  8.40095833336818,
+                  8.379874998354353,
+                  8.500708332576323,
+                  8.54674999936833,
+                  8.525458331860136,
+                  8.765833335928619,
+                  8.342291668668622,
+                  8.725958334252937,
+                  8.892708330677124
+                ]
+              },
+              "jsonEncode": {
+                "medianMs": 8.275541666080244,
+                "p95Ms": 8.70720833336236,
+                "samplesMs": [
+                  8.297416665300261,
+                  8.628499999758787,
+                  8.70720833336236,
+                  8.658333332277834,
+                  8.275541666080244,
+                  8.192833334760508,
+                  8.366874997591367,
+                  8.408625002630288,
+                  8.157124997524079,
+                  8.522375002939953,
+                  8.054583333432674,
+                  8.267749999504304,
+                  8.272374998341547,
+                  8.025458333577262,
+                  8.20995833419147
+                ]
+              },
+              "modelReads": {
+                "medianMs": 1.9835833336401265,
+                "p95Ms": 2.1961666679999325,
+                "samplesMs": [
+                  1.8222083344880957,
+                  1.7119166659540497,
+                  1.8797083321260288,
+                  1.8312499996682163,
+                  2.0382500006235205,
+                  2.040833333012415,
+                  1.8329999984416645,
+                  1.9835833336401265,
+                  2.03233333377284,
+                  2.047666668659076,
+                  1.708458334178431,
+                  2.0026666679768823,
+                  1.814250001189066,
+                  1.9938750010624062,
+                  2.1961666679999325
+                ]
+              },
+              "payloadBytes": 441138,
+              "programmaticScrollLayout": {
+                "medianMs": 15.001708336058073,
+                "p95Ms": 20.726916667626938,
+                "samplesMs": [
+                  14.009874998009764,
+                  15.001708336058073,
+                  15.671333334466908,
+                  13.644375001604203,
+                  13.368041665671626,
+                  15.068833334225928,
+                  20.212125000398373,
+                  13.445125001453562,
+                  20.726916667626938
+                ]
+              },
+              "scrollAnchorStableDuringUpdates": true,
+              "selectionStableDuringUpdates": true,
+              "transfers": 1000,
+              "unchangedPublicationsPerSnapshot": 0,
+              "unchangedSnapshotLayout": {
+                "medianMs": 3.018249997694511,
+                "p95Ms": 3.902458331140224,
+                "samplesMs": [
+                  2.1874583326280117,
+                  2.1685833344236016,
+                  3.902458331140224,
+                  3.4501249974709935,
+                  2.2091666651249398,
+                  3.117666667094454,
+                  2.9988333335495554,
+                  3.018249997694511,
+                  3.13066666785744,
+                  3.090500002144836,
+                  2.9967916671012063,
+                  2.395416668150574,
+                  2.7382916669012047,
+                  3.0620833313150797,
+                  3.0237499995564576
+                ]
+              }
+            },
+            {
+              "changingSnapshotLayout": {
+                "medianMs": 92.85395833285293,
+                "p95Ms": 98.49808333092369,
+                "samplesMs": [
+                  95.20420833359822,
+                  93.32912500030943,
+                  98.49808333092369,
+                  90.2772500012361,
+                  97.89749999981723,
+                  92.85395833285293,
+                  90.21391666829004,
+                  89.64429166735499,
+                  90.5252083321102
+                ]
+              },
+              "checksum": 19905640,
+              "filesPerTransfer": 10000,
+              "filterClearsHiddenSelection": null,
+              "filterUntilNativeRows": {},
+              "jsonDecode": {
+                "medianMs": 22.513583335239673,
+                "p95Ms": 23.53620833309833,
+                "samplesMs": [
+                  23.012541667412734,
+                  22.355000000970904,
+                  22.449541665992,
+                  22.005583330610534,
+                  22.357208334142342,
+                  22.645458331680857,
+                  22.263124999881256,
+                  22.59408333338797,
+                  22.8063333343016,
+                  23.53620833309833,
+                  22.513583335239673,
+                  22.751958331355127,
+                  22.65787500073202,
+                  22.386041666322853,
+                  22.366499997588107
+                ]
+              },
+              "jsonEncode": {
+                "medianMs": 20.942750001267996,
+                "p95Ms": 21.530499998334562,
+                "samplesMs": [
+                  21.329916668037185,
+                  20.47741666683578,
+                  20.82700000028126,
+                  20.50545833117212,
+                  20.481541669141734,
+                  20.791333332454087,
+                  21.311041666194797,
+                  21.276791667332873,
+                  21.530499998334562,
+                  21.117583331943024,
+                  20.84599999943748,
+                  20.942750001267996,
+                  20.9972500015283,
+                  20.484791664785007,
+                  20.95720833312953
+                ]
+              },
+              "modelReads": {
+                "medianMs": 0.05995833271299489,
+                "p95Ms": 0.06950000170036219,
+                "samplesMs": [
+                  0.06950000170036219,
+                  0.048791669541969895,
+                  0.0486250028188806,
+                  0.06275000123423524,
+                  0.06433333328459412,
+                  0.05995833271299489,
+                  0.05829166548210196,
+                  0.048125002649612725,
+                  0.06820833368692547,
+                  0.05833333489135839,
+                  0.060874997870996594,
+                  0.053625000873580575,
+                  0.06837500041001476,
+                  0.058000001445179805,
+                  0.06570833284058608
+                ]
+              },
+              "payloadBytes": 1170903,
+              "programmaticScrollLayout": {
+                "medianMs": 14.64345833301195,
+                "p95Ms": 21.27604166525998,
+                "samplesMs": [
+                  14.64345833301195,
+                  20.158166669716593,
+                  14.28466666766326,
+                  18.68833333355724,
+                  7.367624999460531,
+                  21.27604166525998,
+                  14.392958335520234,
+                  20.34674999958952,
+                  14.63316666558967
+                ]
+              },
+              "scrollAnchorStableDuringUpdates": true,
+              "selectionStableDuringUpdates": true,
+              "transfers": 1,
+              "unchangedPublicationsPerSnapshot": 0,
+              "unchangedSnapshotLayout": {
+                "medianMs": 2.855916667613201,
+                "p95Ms": 2.977958331030095,
+                "samplesMs": [
+                  2.2127083357190713,
+                  2.589041665487457,
+                  2.9590416670544073,
+                  2.89679166598944,
+                  2.845625000190921,
+                  2.8674999994109385,
+                  2.855916667613201,
+                  2.8335416682239156,
+                  2.927291665400844,
+                  2.8815000005124602,
+                  2.843875001417473,
+                  2.9749583336524665,
+                  2.5580000001355074,
+                  2.977958331030095,
+                  2.476583333191229
+                ]
+              }
+            }
+          ],
+          "fixture": true,
+          "measurement": "Monotonic wall time through model work and native layout flush; includes a 1 ms yield, excludes physical frame presentation and XPC transport.",
+          "profile": "debug",
+          "profilingOnly": false
+        },
+        "budget": {
+          "budgetDefinition": "docs/PERFORMANCE.md",
+          "checks": [
+            {
+              "name": "core 100/1 snapshot p95 ms",
+              "value": 0.6948329999999999,
+              "limit": 5,
+              "passed": true
+            },
+            {
+              "name": "core 100/1 encode p95 ms",
+              "value": 1.5967500000000001,
+              "limit": 100,
+              "passed": true
+            },
+            {
+              "name": "core 1000/1 snapshot p95 ms",
+              "value": 12.837333,
+              "limit": 20,
+              "passed": true
+            },
+            {
+              "name": "core 1000/1 encode p95 ms",
+              "value": 16.170459,
+              "limit": 100,
+              "passed": true
+            },
+            {
+              "name": "core 1/10000 snapshot p95 ms",
+              "value": 9.180416000000001,
+              "limit": 25,
+              "passed": true
+            },
+            {
+              "name": "core 1/10000 encode p95 ms",
+              "value": 37.096917,
+              "limit": 100,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 jsonDecode p95 ms",
+              "value": 1.0168333319597878,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 jsonEncode p95 ms",
+              "value": 1.0701250030251686,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 modelReads p95 ms",
+              "value": 0.3110833313257899,
+              "limit": 25,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 unchangedSnapshotLayout p95 ms",
+              "value": 11.616833333391696,
+              "limit": 20,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 changingSnapshotLayout p95 ms",
+              "value": 178.876208334259,
+              "limit": 100,
+              "passed": false
+            },
+            {
+              "name": "UI 100/1 programmaticScrollLayout p95 ms",
+              "value": 50.822166667785496,
+              "limit": 50,
+              "passed": false
+            },
+            {
+              "name": "UI 100/1 filter p95 ms",
+              "value": 82.37912499680533,
+              "limit": 100,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 unchanged publications",
+              "value": 0,
+              "limit": 0,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 selectionStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 scrollAnchorStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 filterClearsHiddenSelection",
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 jsonDecode p95 ms",
+              "value": 8.992333332571434,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 jsonEncode p95 ms",
+              "value": 8.70720833336236,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 modelReads p95 ms",
+              "value": 2.1961666679999325,
+              "limit": 25,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 unchangedSnapshotLayout p95 ms",
+              "value": 3.902458331140224,
+              "limit": 20,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 changingSnapshotLayout p95 ms",
+              "value": 94.03229166491656,
+              "limit": 125,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 programmaticScrollLayout p95 ms",
+              "value": 20.726916667626938,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 filter p95 ms",
+              "value": 97.85412500059465,
+              "limit": 125,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 unchanged publications",
+              "value": 0,
+              "limit": 0,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 selectionStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 scrollAnchorStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 filterClearsHiddenSelection",
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 jsonDecode p95 ms",
+              "value": 23.53620833309833,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 jsonEncode p95 ms",
+              "value": 21.530499998334562,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 modelReads p95 ms",
+              "value": 0.06950000170036219,
+              "limit": 25,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 unchangedSnapshotLayout p95 ms",
+              "value": 2.977958331030095,
+              "limit": 20,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 changingSnapshotLayout p95 ms",
+              "value": 98.49808333092369,
+              "limit": 125,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 programmaticScrollLayout p95 ms",
+              "value": 21.27604166525998,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 unchanged publications",
+              "value": 0,
+              "limit": 0,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 selectionStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 scrollAnchorStableDuringUpdates",
+              "passed": true
+            }
+          ],
+          "passed": false
+        },
+        "budgetExitCode": 1,
+        "nativeFixtureExitCode": 0,
+        "warningOccurrences": 11,
+        "artifacts": [
+          {
+            "path": ".build/performance-ui-repeat-1.json",
+            "sha256": "a2ce21270a5590fbdfbe5eb64c01e9607e32bec421d6254d488e96459ca26df5",
+            "bytes": 11849
+          },
+          {
+            "path": ".build/performance-ui-repeat-1.log",
+            "sha256": "6ba1919b747496c4ba1efc2ae5dbc32e42ad141ddd5bec453ee7c5f3f4ea3a81",
+            "bytes": 2539
+          },
+          {
+            "path": ".build/performance-budget-repeat-1.json",
+            "sha256": "3f02be91c98c11737a83e1a596c0e294533479cebcb65778438ec0b4d45f68bc",
+            "bytes": 4700
+          }
+        ]
+      },
+      {
+        "name": "repeat-2",
+        "data": {
+          "cases": [
+            {
+              "changingSnapshotLayout": {
+                "medianMs": 48.66720833160798,
+                "p95Ms": 57.71979166456731,
+                "samplesMs": [
+                  48.50833333330229,
+                  48.66720833160798,
+                  49.182458333234536,
+                  49.12574999980279,
+                  46.86754166687024,
+                  57.71979166456731,
+                  43.22129166757804,
+                  56.91058333104593,
+                  45.360250001976965
+                ]
+              },
+              "checksum": 758234,
+              "filesPerTransfer": 1,
+              "filterClearsHiddenSelection": true,
+              "filterUntilNativeRows": {
+                "medianMs": 52.986124999733875,
+                "p95Ms": 64.20849999994971,
+                "samplesMs": [
+                  45.02399999910267,
+                  53.21870833358844,
+                  50.09158333632513,
+                  52.986124999733875,
+                  51.899624999350635,
+                  51.26762500003679,
+                  55.878374998428626,
+                  63.58587499926216,
+                  64.20849999994971
+                ]
+              },
+              "jsonDecode": {
+                "medianMs": 0.9423333322047256,
+                "p95Ms": 1.004499998089159,
+                "samplesMs": [
+                  1.0002083363360725,
+                  0.9945416641130578,
+                  0.8998333323688712,
+                  0.9234999997715931,
+                  0.9852500006672926,
+                  0.9423333322047256,
+                  0.9126666664087679,
+                  1.004499998089159,
+                  0.9749583332450129,
+                  0.8592083322582766,
+                  0.9811666641326156,
+                  0.9133749990724027,
+                  0.9172083337034564,
+                  0.8474999995087273,
+                  0.9966249999706633
+                ]
+              },
+              "jsonEncode": {
+                "medianMs": 0.8558333320252132,
+                "p95Ms": 1.000750002276618,
+                "samplesMs": [
+                  0.8558333320252132,
+                  0.9001666658150498,
+                  0.9006666696222965,
+                  1.000750002276618,
+                  0.8395833319809753,
+                  0.8085000008577481,
+                  0.8739999975659885,
+                  0.8163749989762437,
+                  0.8574999992561061,
+                  0.8517083333572373,
+                  0.8486250007990748,
+                  0.8776666654739529,
+                  0.8494166650052648,
+                  0.8974166667030659,
+                  0.8390416696784087
+                ]
+              },
+              "modelReads": {
+                "medianMs": 0.2633333315316122,
+                "p95Ms": 0.3101250003965106,
+                "samplesMs": [
+                  0.28391666637617163,
+                  0.24654166554682888,
+                  0.2550833341956604,
+                  0.2797499982989393,
+                  0.2665833344508428,
+                  0.2654583331604954,
+                  0.2786666664178483,
+                  0.24791666510282084,
+                  0.24599999960628338,
+                  0.3101250003965106,
+                  0.2679999997781124,
+                  0.2555833343649283,
+                  0.2362916675338056,
+                  0.2633333315316122,
+                  0.23674999829381704
+                ]
+              },
+              "payloadBytes": 44237,
+              "programmaticScrollLayout": {
+                "medianMs": 14.444749998801854,
+                "p95Ms": 17.152333333797287,
+                "samplesMs": [
+                  13.521291664801538,
+                  15.914458330371417,
+                  14.005833330884343,
+                  15.153916665440192,
+                  12.7500416674593,
+                  17.152333333797287,
+                  14.510500001051696,
+                  14.444749998801854,
+                  12.899291665235069
+                ]
+              },
+              "scrollAnchorStableDuringUpdates": true,
+              "selectionStableDuringUpdates": true,
+              "transfers": 100,
+              "unchangedPublicationsPerSnapshot": 0,
+              "unchangedSnapshotLayout": {
+                "medianMs": 2.1738750001532026,
+                "p95Ms": 2.3146249986893963,
+                "samplesMs": [
+                  2.3146249986893963,
+                  1.6782916645752266,
+                  2.266125000460306,
+                  2.257749998534564,
+                  2.299666666658595,
+                  2.081999999063555,
+                  1.887291669845581,
+                  1.4890833299432416,
+                  2.1515833359444514,
+                  1.962124999408843,
+                  1.8260416654811706,
+                  2.2508749971166253,
+                  2.2345416655298322,
+                  2.1738750001532026,
+                  2.277666666486766
+                ]
+              }
+            },
+            {
+              "changingSnapshotLayout": {
+                "medianMs": 67.48154166780296,
+                "p95Ms": 91.59333333082031,
+                "samplesMs": [
+                  91.59333333082031,
+                  70.33495833093184,
+                  71.32754166741506,
+                  67.25841666775523,
+                  70.3312083351193,
+                  65.80641666732845,
+                  66.88358333485667,
+                  64.206708331767,
+                  67.48154166780296
+                ]
+              },
+              "checksum": 7551536,
+              "filesPerTransfer": 1,
+              "filterClearsHiddenSelection": true,
+              "filterUntilNativeRows": {
+                "medianMs": 72.32741666666698,
+                "p95Ms": 79.49774999724468,
+                "samplesMs": [
+                  65.83833333206712,
+                  79.49774999724468,
+                  62.73516666624346,
+                  73.59883333265316,
+                  77.30995833480847,
+                  75.54379166685976,
+                  72.32741666666698,
+                  71.96016666784999,
+                  72.27141666589887
+                ]
+              },
+              "jsonDecode": {
+                "medianMs": 8.559666664950782,
+                "p95Ms": 8.887625001079869,
+                "samplesMs": [
+                  8.716000000276836,
+                  8.509416667948244,
+                  8.761833330936497,
+                  8.887625001079869,
+                  8.490541669743834,
+                  8.421041664405493,
+                  8.414791667746613,
+                  8.573666666052304,
+                  8.24816666499828,
+                  8.59183333159308,
+                  8.49637500141398,
+                  8.559666664950782,
+                  8.574791667342652,
+                  8.610416665760567,
+                  8.469625001453096
+                ]
+              },
+              "jsonEncode": {
+                "medianMs": 8.218458333431045,
+                "p95Ms": 8.792124997853534,
+                "samplesMs": [
+                  8.232000000134576,
+                  8.053166668105405,
+                  8.688916666869773,
+                  8.729583336389624,
+                  8.167208332451992,
+                  8.556041666452074,
+                  8.109000002150424,
+                  7.942958331113914,
+                  8.152208334649913,
+                  8.331791665113997,
+                  8.538833335478557,
+                  8.13495833426714,
+                  7.938041668239748,
+                  8.792124997853534,
+                  8.218458333431045
+                ]
+              },
+              "modelReads": {
+                "medianMs": 1.9283333349449094,
+                "p95Ms": 2.308208331669448,
+                "samplesMs": [
+                  1.9861666660290211,
+                  1.9283333349449094,
+                  2.000541666347999,
+                  1.7422499986423645,
+                  1.700625001831213,
+                  1.6857500013429672,
+                  1.8475416654837318,
+                  2.308208331669448,
+                  1.7201666669279803,
+                  1.9784166688623372,
+                  1.9758749986067414,
+                  2.085916668875143,
+                  1.895624998724088,
+                  1.7760833325155545,
+                  1.9925416672776919
+                ]
+              },
+              "payloadBytes": 441138,
+              "programmaticScrollLayout": {
+                "medianMs": 13.919291664933553,
+                "p95Ms": 19.024124998395564,
+                "samplesMs": [
+                  13.658749998285202,
+                  13.901958333008224,
+                  13.919291664933553,
+                  17.679749998933403,
+                  17.240291668713326,
+                  15.751208335132105,
+                  13.122791668138234,
+                  19.024124998395564,
+                  13.058541666396195
+                ]
+              },
+              "scrollAnchorStableDuringUpdates": true,
+              "selectionStableDuringUpdates": true,
+              "transfers": 1000,
+              "unchangedPublicationsPerSnapshot": 0,
+              "unchangedSnapshotLayout": {
+                "medianMs": 3.034666664461838,
+                "p95Ms": 3.325000001495937,
+                "samplesMs": [
+                  3.0197499982023146,
+                  3.0263333319453523,
+                  3.325000001495937,
+                  3.299458334367955,
+                  2.9970416690048296,
+                  3.114166665909579,
+                  3.2174999978451524,
+                  3.021458331204485,
+                  2.727499999309657,
+                  2.5179166659654584,
+                  3.0499583335767966,
+                  3.003458332386799,
+                  3.034666664461838,
+                  3.1161666665866505,
+                  3.139208332868293
+                ]
+              }
+            },
+            {
+              "changingSnapshotLayout": {
+                "medianMs": 83.53387500028475,
+                "p95Ms": 95.11208333424293,
+                "samplesMs": [
+                  81.80570833064849,
+                  95.11208333424293,
+                  83.53387500028475,
+                  80.95766666883719,
+                  83.09449999796925,
+                  83.62275000035879,
+                  82.14662500176928,
+                  85.29329166776733,
+                  85.33645833449555
+                ]
+              },
+              "checksum": 19905640,
+              "filesPerTransfer": 10000,
+              "filterClearsHiddenSelection": null,
+              "filterUntilNativeRows": {},
+              "jsonDecode": {
+                "medianMs": 23.22358333185548,
+                "p95Ms": 23.765624999214197,
+                "samplesMs": [
+                  23.302583333133953,
+                  22.79445833482896,
+                  23.765624999214197,
+                  22.63649999804329,
+                  22.882458331878297,
+                  23.516208333603572,
+                  23.288249998586252,
+                  22.85712500088266,
+                  23.170166667114245,
+                  23.387166667816928,
+                  23.649999999179272,
+                  23.22358333185548,
+                  23.577625001053093,
+                  22.492833333672024,
+                  22.657458332105307
+                ]
+              },
+              "jsonEncode": {
+                "medianMs": 21.25841666929773,
+                "p95Ms": 22.164333331602393,
+                "samplesMs": [
+                  21.175916666834382,
+                  21.25841666929773,
+                  21.471000000019558,
+                  21.25125000020489,
+                  21.757750000688247,
+                  21.825333333254093,
+                  21.328541668481193,
+                  21.056083332950948,
+                  21.719166667026002,
+                  21.202250001806533,
+                  21.000458335038275,
+                  22.164333331602393,
+                  21.761208332463866,
+                  21.185041663557058,
+                  20.592875000147615
+                ]
+              },
+              "modelReads": {
+                "medianMs": 0.061041668232064694,
+                "p95Ms": 0.06562499766005203,
+                "samplesMs": [
+                  0.06499999653897248,
+                  0.04762499884236604,
+                  0.061041668232064694,
+                  0.04875000013271347,
+                  0.061041668232064694,
+                  0.06470833614002913,
+                  0.06183333243825473,
+                  0.06562499766005203,
+                  0.05304166552377865,
+                  0.06262499664444476,
+                  0.05933333159191534,
+                  0.06070833478588611,
+                  0.051208335207775235,
+                  0.06212500011315569,
+                  0.058541667385725304
+                ]
+              },
+              "payloadBytes": 1170903,
+              "programmaticScrollLayout": {
+                "medianMs": 14.416791666008066,
+                "p95Ms": 39.7164583337144,
+                "samplesMs": [
+                  13.43487499980256,
+                  39.7164583337144,
+                  14.416791666008066,
+                  20.059416667209007,
+                  13.258875002065906,
+                  20.178375001705717,
+                  14.12920833536191,
+                  20.22183333247085,
+                  8.2422499981476
+                ]
+              },
+              "scrollAnchorStableDuringUpdates": true,
+              "selectionStableDuringUpdates": true,
+              "transfers": 1,
+              "unchangedPublicationsPerSnapshot": 0,
+              "unchangedSnapshotLayout": {
+                "medianMs": 2.829333330737427,
+                "p95Ms": 2.9935416678199545,
+                "samplesMs": [
+                  2.8558749982039444,
+                  2.8524166664283257,
+                  2.9935416678199545,
+                  2.8847916692029685,
+                  2.939124999102205,
+                  2.4890416643756907,
+                  2.644000000145752,
+                  2.8168333337816875,
+                  2.948125002149027,
+                  2.8280000005906913,
+                  1.9272499994258396,
+                  2.829333330737427,
+                  2.8690416656900197,
+                  2.617416666907957,
+                  2.8103750009904616
+                ]
+              }
+            }
+          ],
+          "fixture": true,
+          "measurement": "Monotonic wall time through model work and native layout flush; includes a 1 ms yield, excludes physical frame presentation and XPC transport.",
+          "profile": "debug",
+          "profilingOnly": false
+        },
+        "budget": {
+          "budgetDefinition": "docs/PERFORMANCE.md",
+          "checks": [
+            {
+              "name": "core 100/1 snapshot p95 ms",
+              "value": 0.6948329999999999,
+              "limit": 5,
+              "passed": true
+            },
+            {
+              "name": "core 100/1 encode p95 ms",
+              "value": 1.5967500000000001,
+              "limit": 100,
+              "passed": true
+            },
+            {
+              "name": "core 1000/1 snapshot p95 ms",
+              "value": 12.837333,
+              "limit": 20,
+              "passed": true
+            },
+            {
+              "name": "core 1000/1 encode p95 ms",
+              "value": 16.170459,
+              "limit": 100,
+              "passed": true
+            },
+            {
+              "name": "core 1/10000 snapshot p95 ms",
+              "value": 9.180416000000001,
+              "limit": 25,
+              "passed": true
+            },
+            {
+              "name": "core 1/10000 encode p95 ms",
+              "value": 37.096917,
+              "limit": 100,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 jsonDecode p95 ms",
+              "value": 1.004499998089159,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 jsonEncode p95 ms",
+              "value": 1.000750002276618,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 modelReads p95 ms",
+              "value": 0.3101250003965106,
+              "limit": 25,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 unchangedSnapshotLayout p95 ms",
+              "value": 2.3146249986893963,
+              "limit": 20,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 changingSnapshotLayout p95 ms",
+              "value": 57.71979166456731,
+              "limit": 100,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 programmaticScrollLayout p95 ms",
+              "value": 17.152333333797287,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 filter p95 ms",
+              "value": 64.20849999994971,
+              "limit": 100,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 unchanged publications",
+              "value": 0,
+              "limit": 0,
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 selectionStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 scrollAnchorStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 100/1 filterClearsHiddenSelection",
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 jsonDecode p95 ms",
+              "value": 8.887625001079869,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 jsonEncode p95 ms",
+              "value": 8.792124997853534,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 modelReads p95 ms",
+              "value": 2.308208331669448,
+              "limit": 25,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 unchangedSnapshotLayout p95 ms",
+              "value": 3.325000001495937,
+              "limit": 20,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 changingSnapshotLayout p95 ms",
+              "value": 91.59333333082031,
+              "limit": 125,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 programmaticScrollLayout p95 ms",
+              "value": 19.024124998395564,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 filter p95 ms",
+              "value": 79.49774999724468,
+              "limit": 125,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 unchanged publications",
+              "value": 0,
+              "limit": 0,
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 selectionStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 scrollAnchorStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 1000/1 filterClearsHiddenSelection",
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 jsonDecode p95 ms",
+              "value": 23.765624999214197,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 jsonEncode p95 ms",
+              "value": 22.164333331602393,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 modelReads p95 ms",
+              "value": 0.06562499766005203,
+              "limit": 25,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 unchangedSnapshotLayout p95 ms",
+              "value": 2.9935416678199545,
+              "limit": 20,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 changingSnapshotLayout p95 ms",
+              "value": 95.11208333424293,
+              "limit": 125,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 programmaticScrollLayout p95 ms",
+              "value": 39.7164583337144,
+              "limit": 50,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 unchanged publications",
+              "value": 0,
+              "limit": 0,
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 selectionStableDuringUpdates",
+              "passed": true
+            },
+            {
+              "name": "UI 1/10000 scrollAnchorStableDuringUpdates",
+              "passed": true
+            }
+          ],
+          "passed": true
+        },
+        "budgetExitCode": 0,
+        "nativeFixtureExitCode": 0,
+        "warningOccurrences": 11,
+        "artifacts": [
+          {
+            "path": ".build/performance-ui-repeat-2.json",
+            "sha256": "5645dddef3d7a5abc2bd7caac48526b4024f057fd174e2323cc3ecf028ef8378",
+            "bytes": 11857
+          },
+          {
+            "path": ".build/performance-ui-repeat-2.log",
+            "sha256": "53b4c9cd486c0fcc8a20aaa80e8c726bfb92d2f9e55fbfd719e399e6e1cf9c9c",
+            "bytes": 2539
+          },
+          {
+            "path": ".build/performance-budget-repeat-2.json",
+            "sha256": "14907e66bb9ed45331ce0e740b095a98a0e669bcc2447fbb305c15270c8b69a1",
+            "bytes": 4697
+          }
+        ]
+      }
+    ],
+    "allRunsMeetBudget": false,
+    "passingRuns": 1,
+    "totalFinalBinaryRuns": 3,
+    "selectionAndScrollStableEveryRun": true,
+    "corePayloadSizesUnchanged": true
+  },
+  "changes": [
+    "Build selected-file HashSet once per snapshot; preserve output order and choice semantics",
+    "Compute file-inspector selected count once per body evaluation",
+    "Suppress identical policy publications",
+    "Rebuild derived filter/state counts and row indices on row/operation/recovery changes; preserve sparse-selection order, current values, and duplicate-ID fallback"
+  ],
+  "diagnostic": {
+    "sample": {
+      "path": ".build/performance-ui-profile.sample",
+      "sha256": "414d0b51340b9a9992c1d8964c06d1ba0b9837ce79714927f480eca670405bff",
+      "bytes": 2293974
+    },
+    "data": {
+      "cases": [
+        {
+          "changingSnapshotLayout": {
+            "medianMs": 58.31533333275729,
+            "p95Ms": 69.82279166641092,
+            "samplesMs": [
+              58.099291666621866,
+              54.41554166645801,
+              56.14637500002573,
+              60.7375833333208,
+              69.82279166641092,
+              60.15654166640161,
+              57.36116666594171,
+              58.82674999975279,
+              58.31533333275729
+            ]
+          },
+          "checksum": 758234,
+          "filesPerTransfer": 1,
+          "filterClearsHiddenSelection": true,
+          "filterUntilNativeRows": {
+            "medianMs": 61.49837500015565,
+            "p95Ms": 76.32912500048405,
+            "samplesMs": [
+              51.83666666653153,
+              74.71425000039744,
+              50.949083333762246,
+              59.464666666826815,
+              48.364333333665854,
+              61.75858333335782,
+              65.97729166696809,
+              61.49837500015565,
+              76.32912500048405
+            ]
+          },
+          "jsonDecode": {
+            "medianMs": 0.9549583328407607,
+            "p95Ms": 1.051375000315602,
+            "samplesMs": [
+              0.9523750004518661,
+              0.9928333338393713,
+              0.9132499999395804,
+              0.9575833337294171,
+              0.9847083329077577,
+              0.9319166665591183,
+              0.9549583328407607,
+              0.9628333336877404,
+              0.9623750001992448,
+              0.9507499999017455,
+              0.9397500007253257,
+              0.9521666670480045,
+              0.9204583329847082,
+              1.051375000315602,
+              0.960208332799084
+            ]
+          },
+          "jsonEncode": {
+            "medianMs": 0.8989583329821471,
+            "p95Ms": 1.0060833337774966,
+            "samplesMs": [
+              0.8732083333597984,
+              0.8587916663600481,
+              0.8458750007775961,
+              0.9035416660481133,
+              0.9801249998417916,
+              0.8816666668280959,
+              1.0060833337774966,
+              0.8989583329821471,
+              0.9312499996667611,
+              0.8927500002755551,
+              0.9677499992903904,
+              0.9112083325817366,
+              0.8909583339118399,
+              0.8988749996206025,
+              0.9464583336011856
+            ]
+          },
+          "modelReads": {
+            "medianMs": 2.0428333336894866,
+            "p95Ms": 2.1335833334887866,
+            "samplesMs": [
+              2.0205833334330237,
+              1.9534583334461786,
+              2.0070833334102645,
+              1.8915416667368845,
+              1.97550000029878,
+              2.0510833337539225,
+              2.071750000141037,
+              2.0487916672209394,
+              2.0413749998624553,
+              2.054666666481353,
+              1.9967083335359348,
+              2.1335833334887866,
+              2.0428333336894866,
+              2.096458332744078,
+              2.0556250001391163
+            ]
+          },
+          "payloadBytes": 44237,
+          "programmaticScrollLayout": {
+            "medianMs": 14.993374999903608,
+            "p95Ms": 21.777875000225322,
+            "samplesMs": [
+              14.72841666691238,
+              14.993374999903608,
+              14.71587499963789,
+              16.419791666521633,
+              15.172750000601809,
+              18.05899999999383,
+              13.429125000584463,
+              21.777875000225322,
+              14.67095833413623
+            ]
+          },
+          "scrollAnchorStableDuringUpdates": true,
+          "selectionStableDuringUpdates": true,
+          "transfers": 100,
+          "unchangedPublicationsPerSnapshot": 0,
+          "unchangedSnapshotLayout": {
+            "medianMs": 2.2909583331056638,
+            "p95Ms": 5.694833333109273,
+            "samplesMs": [
+              1.7438750001019798,
+              3.246916667194455,
+              1.5584999991915538,
+              2.2909583331056638,
+              2.313916666935256,
+              1.4828333332843613,
+              2.5101666660702904,
+              2.299666666658595,
+              2.2893749992363155,
+              5.694833333109273,
+              1.899083333228191,
+              2.313125000000582,
+              2.265833332785405,
+              2.2830416664874065,
+              2.351250000174332
+            ]
+          }
+        },
+        {
+          "changingSnapshotLayout": {
+            "medianMs": 154.25695833346253,
+            "p95Ms": 181.98404166651017,
+            "samplesMs": [
+              152.2158333336847,
+              152.91808333313384,
+              150.84566666610044,
+              161.47766666654206,
+              150.8019166667509,
+              150.8298749995447,
+              145.90104166745732,
+              167.06691666695406,
+              156.6848749998826,
+              153.43412499987608,
+              155.46637500028737,
+              151.1590416666877,
+              153.2452083338285,
+              153.43775000019377,
+              181.2505833340765,
+              165.15875000004598,
+              164.5300000000134,
+              150.28520833311632,
+              148.85479166696314,
+              151.8022916670816,
+              154.5667083328226,
+              153.04899999955524,
+              157.5328333337893,
+              153.0540416670192,
+              153.6584583327567,
+              158.76200000002427,
+              160.75316666592698,
+              160.56495833345252,
+              165.72845833343308,
+              152.23674999924697,
+              150.62216666592576,
+              150.4690000001574,
+              163.1760000000213,
+              158.92299999995885,
+              166.66966666616645,
+              156.33883333339327,
+              156.82570833268983,
+              152.3608333327502,
+              154.12270833348884,
+              153.5832916661093,
+              163.1263333329116,
+              150.81666666719684,
+              151.31649999966612,
+              153.28120833328285,
+              150.85533333331114,
+              152.97845833356405,
+              146.83170833359327,
+              171.39008333288075,
+              156.85541666698555,
+              158.57295833302487,
+              154.67954166615527,
+              160.93395833377144,
+              152.4900416670789,
+              158.72583333384682,
+              149.71049999985553,
+              152.23316666651954,
+              148.21429166659073,
+              152.66483333289216,
+              177.12800000026618,
+              157.93741666675487,
+              971.0348333328511,
+              199.81012500011275,
+              200.57791666658886,
+              212.16966666725057,
+              186.38241666667454,
+              182.182250000551,
+              181.93120833348075,
+              199.61483333372598,
+              177.9962083337523,
+              170.66029166653607,
+              180.50066666637576,
+              177.2943750002014,
+              157.848875000127,
+              154.57412500018108,
+              154.50920833336568,
+              158.5176666658299,
+              161.73683333363442,
+              152.3455833330445,
+              159.2579583339102,
+              158.33166666652687,
+              150.5907083337661,
+              157.4131249999482,
+              168.57662500024162,
+              149.53837499979272,
+              150.28637500017794,
+              168.10183333382156,
+              201.37229166721227,
+              162.58104166718113,
+              156.32404166626657,
+              150.74520833331917,
+              149.27937500033295,
+              166.22395833383052,
+              151.09725000002072,
+              162.12304166674585,
+              157.89154166668595,
+              152.40674999949988,
+              150.92912499949307,
+              157.7836666665462,
+              155.88679166739894,
+              175.05362500014598,
+              156.65325000009034,
+              154.94566666711762,
+              153.14258333364705,
+              158.80354166711186,
+              160.61204166635434,
+              198.38341666581982,
+              153.75741666593967,
+              153.21654166655208,
+              162.98658333289495,
+              151.19687500009604,
+              159.37204166675656,
+              153.8416249995862,
+              153.34029166660912,
+              152.6363749999291,
+              150.9007083332108,
+              157.12629166682746,
+              153.72833333276503,
+              153.76329166610958,
+              172.37512499923469,
+              158.41924999949697,
+              164.28787499989994,
+              154.2777083332112,
+              149.49729166710313,
+              154.19712499988236,
+              153.52354166680016,
+              206.1059583329552,
+              152.55729166619858,
+              160.76516666635143,
+              151.69345833328407,
+              155.31420833303855,
+              152.22179166630667,
+              156.3667083328255,
+              160.87145833353134,
+              158.03633333416656,
+              156.39650000048277,
+              159.55466666582652,
+              149.22004166692204,
+              203.83370833405934,
+              155.6170416661189,
+              154.56508333409147,
+              152.91175000038493,
+              154.9675833330184,
+              158.42395833351475,
+              150.46875000007276,
+              160.01770833372575,
+              149.6551250002085,
+              152.17141666653333,
+              155.08062499975495,
+              153.73958333384508,
+              148.38004166631436,
+              158.4121249998134,
+              151.1498333329655,
+              150.1914583332109,
+              154.1872500001773,
+              151.3847916667146,
+              150.3847499998301,
+              151.52220833351748,
+              163.4598749997167,
+              149.5657499999652,
+              150.58983333346987,
+              160.50766666648997,
+              148.77216666718596,
+              151.0365833328251,
+              155.87208333363378,
+              153.35137500005658,
+              153.91204166644457,
+              154.58912499980215,
+              151.72024999992573,
+              169.438375000027,
+              155.6398333332254,
+              161.9044583330833,
+              155.31650000048103,
+              153.70733333384123,
+              153.15004166677681,
+              166.23766666634765,
+              156.6832083335612,
+              161.15983333384065,
+              151.37483333364798,
+              163.24041666666744,
+              150.59391666727606,
+              148.5800416667189,
+              147.7545416664725,
+              151.7270833337534,
+              150.57595833332016,
+              151.65845833325875,
+              147.77212500030146,
+              148.77554166650953,
+              181.44179166665708,
+              153.08566666590195,
+              150.76399999998102,
+              172.6942916675398,
+              154.44004166693048,
+              154.25695833346253,
+              154.083958334013,
+              153.44412499962345,
+              158.7171250002939,
+              154.72187500017753,
+              153.6812499998632,
+              149.27804166654823,
+              151.76841666652763,
+              153.8849583330375,
+              158.27837500000896,
+              151.18208333296934,
+              152.25412500058155,
+              155.52708333416376,
+              151.32837500004825,
+              148.24124999995547,
+              151.284208333891,
+              156.50929166713468,
+              164.06391666714626,
+              154.91025000028458,
+              149.13683333270455,
+              149.71195833368256,
+              163.62333333290735,
+              152.27891666654614,
+              217.59304166698712,
+              157.77254166641796,
+              154.69725000002654,
+              156.50833333256742,
+              150.0536249996003,
+              152.5518333328364,
+              154.47266666615178,
+              153.57929166748363,
+              163.55012500025623,
+              153.619041667298,
+              153.0409166662139,
+              164.12566666622297,
+              148.54962499975954,
+              158.6167083332839,
+              151.53025000017806,
+              150.61308333315537,
+              150.02524999999878,
+              151.74349999961123,
+              155.61187499952212,
+              153.930541666341,
+              149.22995833330788,
+              158.9645833337272,
+              150.72541666631878,
+              149.8666666666395,
+              157.01683333372785,
+              150.5106666663778,
+              158.39454166689393,
+              148.09979166602716,
+              154.43662500001665,
+              151.25354166593752,
+              150.03100000012637,
+              152.44208333297138,
+              181.98404166651017
+            ]
+          },
+          "checksum": 7551536,
+          "filesPerTransfer": 1,
+          "filterClearsHiddenSelection": true,
+          "filterUntilNativeRows": {
+            "medianMs": 129.14683333292487,
+            "p95Ms": 137.0257083335673,
+            "samplesMs": [
+              128.26308333387715,
+              137.0257083335673,
+              125.26441666705068,
+              127.66329166606738,
+              131.84375000037107,
+              129.14683333292487,
+              129.3249583331999,
+              128.35216666735505,
+              130.14387500061275
+            ]
+          },
+          "jsonDecode": {
+            "medianMs": 8.578750000197033,
+            "p95Ms": 8.946583333454328,
+            "samplesMs": [
+              8.862833333296294,
+              8.441333333394141,
+              8.407916666328674,
+              8.578750000197033,
+              8.579791666306846,
+              8.491291666359757,
+              8.631375000732078,
+              8.946583333454328,
+              8.46350000028906,
+              8.67258333346399,
+              8.341749999999593,
+              8.275416666037927,
+              8.476875000269501,
+              8.6102083332662,
+              8.645750000141561
+            ]
+          },
+          "jsonEncode": {
+            "medianMs": 8.612999999968451,
+            "p95Ms": 8.916083333133429,
+            "samplesMs": [
+              8.599708333349554,
+              8.709166666449164,
+              8.546083333385468,
+              8.170249999238877,
+              8.731958333555667,
+              8.659083333441231,
+              8.474999999634747,
+              8.612999999968451,
+              8.808249999674445,
+              8.57629166694096,
+              8.390083333324583,
+              8.595416667048994,
+              8.889583333257178,
+              8.916083333133429,
+              8.695416667251266
+            ]
+          },
+          "modelReads": {
+            "medianMs": 18.037416666629724,
+            "p95Ms": 18.466833333150134,
+            "samplesMs": [
+              17.971374999433465,
+              18.08841666661465,
+              17.492500000116706,
+              17.75012500002049,
+              18.037416666629724,
+              18.27895833321236,
+              18.05458333274146,
+              18.466833333150134,
+              18.10108333302196,
+              17.827416666477802,
+              17.545791666634614,
+              18.29458333304501,
+              17.322041667284793,
+              18.315166666980076,
+              17.346624999845517
+            ]
+          },
+          "payloadBytes": 441138,
+          "programmaticScrollLayout": {
+            "medianMs": 14.858416667266283,
+            "p95Ms": 35.48866666642425,
+            "samplesMs": [
+              21.94441666597413,
+              16.065750000052503,
+              15.010833333690243,
+              14.858416667266283,
+              14.838999999483349,
+              35.48866666642425,
+              13.669208333340066,
+              13.523416667339916,
+              13.432416666546487
+            ]
+          },
+          "scrollAnchorStableDuringUpdates": true,
+          "selectionStableDuringUpdates": true,
+          "transfers": 1000,
+          "unchangedPublicationsPerSnapshot": 0,
+          "unchangedSnapshotLayout": {
+            "medianMs": 3.0204583335944335,
+            "p95Ms": 3.2592083334748168,
+            "samplesMs": [
+              3.0204583335944335,
+              3.2592083334748168,
+              3.1904166662570788,
+              2.6919583333437913,
+              3.0587083329010056,
+              2.7583333330767346,
+              2.6701249998950516,
+              3.0276666666395613,
+              3.0861666664350196,
+              2.563666666901554,
+              2.4778749993856763,
+              2.676541666915,
+              2.1729999998569838,
+              3.055250000215892,
+              3.0315416670418927
+            ]
+          }
+        },
+        {
+          "changingSnapshotLayout": {
+            "medianMs": 86.22404166726483,
+            "p95Ms": 89.0223333335598,
+            "samplesMs": [
+              85.74537500044244,
+              83.77999999993335,
+              84.21533333330444,
+              85.89983333331475,
+              89.0223333335598,
+              86.32758333351376,
+              86.80045833352779,
+              88.21458333386545,
+              86.22404166726483
+            ]
+          },
+          "checksum": 19905640,
+          "filesPerTransfer": 10000,
+          "filterClearsHiddenSelection": true,
+          "filterUntilNativeRows": {},
+          "jsonDecode": {
+            "medianMs": 23.46212500015099,
+            "p95Ms": 24.242874999799824,
+            "samplesMs": [
+              23.022583333840885,
+              23.46212500015099,
+              24.242874999799824,
+              23.58666666714271,
+              23.34066666662693,
+              23.648041667001962,
+              23.110791666113073,
+              23.343124999883003,
+              22.845416667223617,
+              23.22862500022893,
+              23.783291666404693,
+              23.604666665960394,
+              23.485791666644218,
+              23.52062499994645,
+              22.92424999996001
+            ]
+          },
+          "jsonEncode": {
+            "medianMs": 21.907541667133046,
+            "p95Ms": 22.922458333596296,
+            "samplesMs": [
+              22.119666666185367,
+              22.53654166634078,
+              22.269416666858888,
+              22.296833332802635,
+              22.044791666303354,
+              22.026458333129995,
+              21.615583333186805,
+              21.156041666472447,
+              22.922458333596296,
+              21.88954166649637,
+              21.907541667133046,
+              21.851958334082155,
+              21.553708333158283,
+              21.850208333489718,
+              21.843583333065908
+            ]
+          },
+          "modelReads": {
+            "medianMs": 0.08549999984097667,
+            "p95Ms": 0.0965416666076635,
+            "samplesMs": [
+              0.09262499952455983,
+              0.08362500011571683,
+              0.08549999984097667,
+              0.07841666683816584,
+              0.0965416666076635,
+              0.07966666726133553,
+              0.08908333347790176,
+              0.08829166654322762,
+              0.0842916660985793,
+              0.06975000087550143,
+              0.08241666637331946,
+              0.08904166679712944,
+              0.08016666652110871,
+              0.08654166686028475,
+              0.09395833330927417
+            ]
+          },
+          "payloadBytes": 1170903,
+          "programmaticScrollLayout": {
+            "medianMs": 14.313458333162998,
+            "p95Ms": 36.078083333450195,
+            "samplesMs": [
+              14.14254166684259,
+              36.078083333450195,
+              14.135708333924413,
+              20.37083333289047,
+              13.454624999212683,
+              21.33695833344973,
+              14.313458333162998,
+              19.532750000507804,
+              13.103666666211211
+            ]
+          },
+          "scrollAnchorStableDuringUpdates": true,
+          "selectionStableDuringUpdates": true,
+          "transfers": 1,
+          "unchangedPublicationsPerSnapshot": 0,
+          "unchangedSnapshotLayout": {
+            "medianMs": 2.8175416664453223,
+            "p95Ms": 3.1153749996519764,
+            "samplesMs": [
+              2.378583333666029,
+              2.883208333514631,
+              1.967125000192027,
+              3.0274583332356997,
+              2.849791666449164,
+              3.1153749996519764,
+              2.628874999572872,
+              2.852583333151415,
+              2.7685416671374696,
+              2.697583332519571,
+              2.8175416664453223,
+              2.0578333333105547,
+              2.8722083334287163,
+              2.8122083331254544,
+              2.94870833386085
+            ]
+          }
+        }
+      ],
+      "fixture": true,
+      "measurement": "Monotonic wall time through model work and native layout flush; includes a 1 ms yield, excludes physical frame presentation and XPC transport.",
+      "profile": "debug"
+    },
+    "status": "Intermediate before derived-index optimization; not a standard budget run",
+    "inclusiveStacks": "Selected rows, filter counts, visible rows, activity summary; stacks overlap and are not additive CPU percentages",
+    "initialOptimizationRun": {
+      "cases": [
+        {
+          "changingSnapshotLayout": {
+            "medianMs": 69.04954166657262,
+            "p95Ms": 94.59362500001589,
+            "samplesMs": [
+              66.782833333491,
+              61.361666666925885,
+              69.04954166657262,
+              62.22741666715592,
+              71.08345833330532,
+              63.968250000471016,
+              70.18195833370555,
+              94.59362500001589,
+              90.95329166666488
+            ]
+          },
+          "checksum": 758234,
+          "filesPerTransfer": 1,
+          "filterClearsHiddenSelection": true,
+          "filterUntilNativeRows": {
+            "medianMs": 61.31499999992229,
+            "p95Ms": 73.19479166744713,
+            "samplesMs": [
+              60.70891666604439,
+              65.44120833314082,
+              49.456875000032596,
+              67.75045833364857,
+              53.59950000001845,
+              68.34591666665801,
+              47.692791667032,
+              73.19479166744713,
+              61.31499999992229
+            ]
+          },
+          "jsonDecode": {
+            "medianMs": 0.9238333332177717,
+            "p95Ms": 1.0137083336303476,
+            "samplesMs": [
+              0.881166666658828,
+              0.8407499999520951,
+              0.8313749995068065,
+              0.8252500001617591,
+              0.9749583332450129,
+              0.9066250004252652,
+              1.0137083336303476,
+              0.9753333333719638,
+              0.9045000006153714,
+              0.9270000000469736,
+              0.9443333337912918,
+              0.9238333332177717,
+              1.0062083329103189,
+              0.9823749996940023,
+              0.9136250000665314
+            ]
+          },
+          "jsonEncode": {
+            "medianMs": 0.8603333335486241,
+            "p95Ms": 0.9347500008516363,
+            "samplesMs": [
+              0.8298749999084976,
+              0.8573333334425115,
+              0.7906250002633897,
+              0.8730833333174814,
+              0.9347500008516363,
+              0.8652083333799965,
+              0.9226249994753744,
+              0.8981666669569677,
+              0.8574166658945614,
+              0.9263333331546164,
+              0.8603333335486241,
+              0.9257083338525263,
+              0.8567083332309267,
+              0.8497916669512051,
+              0.8420416670560371
+            ]
+          },
+          "modelReads": {
+            "medianMs": 1.952749999873049,
+            "p95Ms": 2.0529583334791823,
+            "samplesMs": [
+              1.952749999873049,
+              1.822541666115285,
+              1.808958332730981,
+              2.0336666666480596,
+              1.9415416672927677,
+              1.924624999446678,
+              1.9775000000663567,
+              1.9692500000019209,
+              2.0529583334791823,
+              1.945250000062515,
+              1.8932916664198274,
+              1.9231666665291414,
+              1.9721250000657164,
+              2.0166249996691477,
+              2.0051249994139653
+            ]
+          },
+          "payloadBytes": 44237,
+          "programmaticScrollLayout": {
+            "medianMs": 14.359541666635778,
+            "p95Ms": 20.738625000376487,
+            "samplesMs": [
+              13.385541666139034,
+              14.022750000549422,
+              13.999541666635196,
+              20.738625000376487,
+              13.086708333503339,
+              14.359541666635778,
+              17.829208332841517,
+              15.410583333505201,
+              17.44816666632687
+            ]
+          },
+          "scrollAnchorStableDuringUpdates": true,
+          "selectionStableDuringUpdates": true,
+          "transfers": 100,
+          "unchangedPublicationsPerSnapshot": 0,
+          "unchangedSnapshotLayout": {
+            "medianMs": 2.251750000141328,
+            "p95Ms": 8.672333333379356,
+            "samplesMs": [
+              2.231541667242709,
+              2.251750000141328,
+              1.8169166669395054,
+              2.280166666423611,
+              2.0552500000121654,
+              2.2989166664046934,
+              2.091208333695249,
+              8.672333333379356,
+              1.4378750001924345,
+              2.2613750006712507,
+              1.7987916671700077,
+              2.2562083331649774,
+              2.279333333717659,
+              2.255416667139798,
+              1.8656250003914465
+            ]
+          }
+        },
+        {
+          "changingSnapshotLayout": {
+            "medianMs": 172.59429166642803,
+            "p95Ms": 185.92891666685318,
+            "samplesMs": [
+              165.4012083336056,
+              180.7492916659612,
+              178.49320833374804,
+              167.49545833317825,
+              172.59429166642803,
+              185.92891666685318,
+              167.83970833330386,
+              170.1808333336885,
+              175.32466666671098
+            ]
+          },
+          "checksum": 7551536,
+          "filesPerTransfer": 1,
+          "filterClearsHiddenSelection": true,
+          "filterUntilNativeRows": {
+            "medianMs": 139.60995833349443,
+            "p95Ms": 158.06095833340805,
+            "samplesMs": [
+              158.06095833340805,
+              142.02958333316928,
+              132.32008333307022,
+              141.47187500020664,
+              136.5091666666558,
+              141.2866666669288,
+              139.60995833349443,
+              138.63058333390654,
+              134.58566666668048
+            ]
+          },
+          "jsonDecode": {
+            "medianMs": 8.503083333380346,
+            "p95Ms": 8.799999999610009,
+            "samplesMs": [
+              8.773833333179937,
+              8.799999999610009,
+              8.52945833321428,
+              8.519875000274624,
+              8.503083333380346,
+              8.432749999883526,
+              8.330583333190589,
+              8.485625000503205,
+              8.359791666407546,
+              8.46200000069075,
+              8.695999999872583,
+              8.789791666458768,
+              8.420874999501393,
+              8.65425000029063,
+              8.38591666706634
+            ]
+          },
+          "jsonEncode": {
+            "medianMs": 8.702958332833077,
+            "p95Ms": 9.285250000175438,
+            "samplesMs": [
+              8.903791666853067,
+              8.829916666400095,
+              8.725249999770313,
+              8.702958332833077,
+              8.337916666278034,
+              8.268374999715888,
+              8.18858333332173,
+              8.779875000072934,
+              8.585708333157527,
+              8.877291666067322,
+              8.522000000084518,
+              8.850583333696704,
+              8.303208333927614,
+              9.285250000175438,
+              8.350458333552524
+            ]
+          },
+          "modelReads": {
+            "medianMs": 17.44700000017474,
+            "p95Ms": 18.793208333590883,
+            "samplesMs": [
+              18.246374999762338,
+              17.136458332970506,
+              18.793208333590883,
+              17.97879166679195,
+              17.13612500043382,
+              17.44700000017474,
+              17.142583333225048,
+              17.69187499940017,
+              17.333624999992026,
+              17.545583333230752,
+              18.18379166707018,
+              17.682166666418198,
+              17.42670833300508,
+              17.09412499985774,
+              17.42016666685231
+            ]
+          },
+          "payloadBytes": 441138,
+          "programmaticScrollLayout": {
+            "medianMs": 14.25458333324059,
+            "p95Ms": 20.513583333922725,
+            "samplesMs": [
+              13.489208333339775,
+              15.663458333619928,
+              14.25458333324059,
+              13.955375000477943,
+              13.772958332992857,
+              14.540333333570743,
+              13.61137499952747,
+              14.740583333150425,
+              20.513583333922725
+            ]
+          },
+          "scrollAnchorStableDuringUpdates": true,
+          "selectionStableDuringUpdates": true,
+          "transfers": 1000,
+          "unchangedPublicationsPerSnapshot": 0,
+          "unchangedSnapshotLayout": {
+            "medianMs": 3.054291666558129,
+            "p95Ms": 3.2400833333667833,
+            "samplesMs": [
+              2.2696666665069642,
+              3.0671250005980255,
+              3.05037500038452,
+              2.8902916665174416,
+              2.358124999773281,
+              2.9875833324695122,
+              3.054291666558129,
+              3.048874999876716,
+              3.2400833333667833,
+              3.0888333340044483,
+              3.1021666663946235,
+              2.1958750003250316,
+              3.079000000070664,
+              3.091333333941293,
+              3.156541666612611
+            ]
+          }
+        },
+        {
+          "changingSnapshotLayout": {
+            "medianMs": 91.52908333362575,
+            "p95Ms": 100.9518749997369,
+            "samplesMs": [
+              90.17833333291492,
+              92.2669166675405,
+              91.52908333362575,
+              89.52041666634614,
+              90.65370833286579,
+              100.9518749997369,
+              95.35400000004302,
+              88.41745833342429,
+              92.39662499931
+            ]
+          },
+          "checksum": 19905640,
+          "filesPerTransfer": 10000,
+          "filterClearsHiddenSelection": true,
+          "filterUntilNativeRows": {},
+          "jsonDecode": {
+            "medianMs": 22.932083333216724,
+            "p95Ms": 23.55095833354426,
+            "samplesMs": [
+              23.260583333467366,
+              22.932083333216724,
+              23.493833333304792,
+              22.671083333079878,
+              22.755291666726407,
+              22.37891666663927,
+              23.516791667134385,
+              22.591791666854988,
+              22.856749999846215,
+              23.55095833354426,
+              22.980791666668665,
+              23.106916666620236,
+              23.052958333209972,
+              22.723541666891833,
+              22.688666665999335
+            ]
+          },
+          "jsonEncode": {
+            "medianMs": 21.50649999930465,
+            "p95Ms": 21.765249999589287,
+            "samplesMs": [
+              21.66579166714655,
+              21.50649999930465,
+              21.765249999589287,
+              20.555708333631628,
+              21.698708333133254,
+              21.110083333041985,
+              21.539833333008573,
+              21.628208332913346,
+              21.2856666666994,
+              21.137708333299088,
+              21.324291666132922,
+              21.737958332778362,
+              21.36658333347441,
+              21.059499999864784,
+              21.50900000015099
+            ]
+          },
+          "modelReads": {
+            "medianMs": 0.08395833265240071,
+            "p95Ms": 0.0976250003077439,
+            "samplesMs": [
+              0.0808750000942382,
+              0.08712500039109727,
+              0.0797916673036525,
+              0.06949999988137279,
+              0.0713333329258603,
+              0.08762499965087045,
+              0.0871666670718696,
+              0.07454166643583449,
+              0.08908333347790176,
+              0.07666666715522297,
+              0.09583333394402871,
+              0.08395833265240071,
+              0.09666666664998047,
+              0.0976250003077439,
+              0.07833333256712649
+            ]
+          },
+          "payloadBytes": 1170903,
+          "programmaticScrollLayout": {
+            "medianMs": 14.48533333314117,
+            "p95Ms": 22.838666665847995,
+            "samplesMs": [
+              14.48533333314117,
+              19.62774999992689,
+              13.886333333175571,
+              20.02249999986816,
+              13.74016666704847,
+              22.838666665847995,
+              12.605416666701785,
+              19.291958333269577,
+              12.846333333072835
+            ]
+          },
+          "scrollAnchorStableDuringUpdates": true,
+          "selectionStableDuringUpdates": true,
+          "transfers": 1,
+          "unchangedPublicationsPerSnapshot": 0,
+          "unchangedSnapshotLayout": {
+            "medianMs": 2.8878749999421416,
+            "p95Ms": 3.0664166661154013,
+            "samplesMs": [
+              2.8821249998145504,
+              2.8138333327660803,
+              2.9964999994263053,
+              2.710833333367191,
+              2.9409166672849096,
+              2.806458333907358,
+              2.8989166667088284,
+              2.892000000429107,
+              2.8878749999421416,
+              2.9433749996314873,
+              1.9002499993803212,
+              2.883875000406988,
+              2.8357083328955923,
+              3.0664166661154013,
+              2.932208333731978
+            ]
+          }
+        }
+      ],
+      "fixture": true,
+      "measurement": "Monotonic wall time through model work and native layout flush; includes a 1 ms yield, excludes physical frame presentation and XPC transport.",
+      "profile": "debug"
+    },
+    "exploratoryUnpacedBaseline": {
+      "cases": [
+        {
+          "changingSnapshotLayout": {
+            "medianMs": 57.080499999756285,
+            "p95Ms": 59.64237500029412,
+            "samplesMs": [
+              55.328999999801454,
+              58.98133333266742,
+              57.080499999756285,
+              58.58283333327563,
+              54.978625000330794,
+              59.64237500029412,
+              55.57204166689189,
+              58.66612499994517,
+              54.943458333582385
+            ]
+          },
+          "checksum": 758234,
+          "filesPerTransfer": 1,
+          "filterClearsHiddenSelection": true,
+          "filterUntilNativeRows": {
+            "medianMs": 46.355083333764924,
+            "p95Ms": 47.66237499916315,
+            "samplesMs": [
+              47.06675000034011,
+              46.78116666673304,
+              44.56562500035943,
+              44.152375000521715,
+              46.633958333586634,
+              46.06016666639334,
+              47.66237499916315,
+              45.021041666586825,
+              46.355083333764924
+            ]
+          },
+          "jsonDecode": {
+            "medianMs": 0.9503333330940222,
+            "p95Ms": 1.0490000004210742,
+            "samplesMs": [
+              0.9772500006874907,
+              0.9405833334312774,
+              0.9468333337281365,
+              0.8757083332966431,
+              0.8787916667643003,
+              0.9932083339663222,
+              1.0490000004210742,
+              0.9485833334110794,
+              0.8745416662350181,
+              0.9624166668800171,
+              0.9404583333889605,
+              1.025583334012481,
+              0.9919583335431525,
+              0.9902916663122596,
+              0.9503333330940222
+            ]
+          },
+          "jsonEncode": {
+            "medianMs": 0.860833333717892,
+            "p95Ms": 1.030374999572814,
+            "samplesMs": [
+              0.8664166662128991,
+              0.8509583331033355,
+              0.8497916669512051,
+              0.8455416673314176,
+              0.838333333376795,
+              0.8552499994038953,
+              1.030374999572814,
+              0.8340833337570075,
+              0.852708333695773,
+              0.8680416667630197,
+              1.0053333335235948,
+              0.8688333327881992,
+              0.9118333327933215,
+              0.860833333717892,
+              0.8627916668046964
+            ]
+          },
+          "modelReads": {
+            "medianMs": 1.8840833336071228,
+            "p95Ms": 2.0545833331198082,
+            "samplesMs": [
+              1.9246250003561727,
+              1.920333333146118,
+              1.8559166664999793,
+              1.8607916663313517,
+              1.8452499998602434,
+              1.8707500003074529,
+              2.036249999946449,
+              1.868958333034243,
+              1.8907916664829827,
+              1.8840833336071228,
+              1.9491249995553517,
+              1.916999999593827,
+              1.849166666943347,
+              2.0545833331198082,
+              1.8547083336670767
+            ]
+          },
+          "payloadBytes": 44237,
+          "programmaticScrollLayout": {
+            "medianMs": 12.64229166736186,
+            "p95Ms": 16.14625000001979,
+            "samplesMs": [
+              12.64229166736186,
+              12.895541666694044,
+              12.393166666697653,
+              13.893791666305333,
+              16.14625000001979,
+              13.371416666814184,
+              11.48041666692734,
+              12.144000000262167,
+              12.619333333532268
+            ]
+          },
+          "scrollAnchorStableDuringUpdates": true,
+          "selectionStableDuringUpdates": true,
+          "transfers": 100,
+          "unchangedPublicationsPerSnapshot": 2,
+          "unchangedSnapshotLayout": {
+            "medianMs": 64.12300000010873,
+            "p95Ms": 77.21070833304111,
+            "samplesMs": [
+              77.21070833304111,
+              71.3354999998046,
+              65.92174999968847,
+              73.4215000002223,
+              59.921916666098696,
+              63.2282500000656,
+              64.12300000010873,
+              63.49862499973824,
+              60.82912500005477,
+              62.533041666938516,
+              64.1450833336421,
+              63.68541666688543,
+              60.59479166651727,
+              64.59937499948865,
+              64.2050416663551
+            ]
+          }
+        },
+        {
+          "changingSnapshotLayout": {
+            "medianMs": 162.54854166618316,
+            "p95Ms": 174.52749999938533,
+            "samplesMs": [
+              167.25662499993632,
+              158.81804166656366,
+              174.52749999938533,
+              158.64550000060262,
+              162.54854166618316,
+              162.91499999988446,
+              160.68029166672204,
+              164.83662500013452,
+              158.50795833284792
+            ]
+          },
+          "checksum": 7551536,
+          "filesPerTransfer": 1,
+          "filterClearsHiddenSelection": true,
+          "filterUntilNativeRows": {
+            "medianMs": 119.82641666600102,
+            "p95Ms": 136.08641666633048,
+            "samplesMs": [
+              119.82641666600102,
+              122.44116666715854,
+              118.97729166685167,
+              118.17141666688258,
+              120.10150000060094,
+              117.55187500057218,
+              136.08641666633048,
+              121.56412500007718,
+              119.71008333330246
+            ]
+          },
+          "jsonDecode": {
+            "medianMs": 8.550083332920622,
+            "p95Ms": 8.76737500038871,
+            "samplesMs": [
+              8.349291666490899,
+              8.610958333520102,
+              8.592500000304426,
+              8.44962500013935,
+              8.76737500038871,
+              8.39004166664381,
+              8.59829166711279,
+              8.501041666931997,
+              8.443583333246352,
+              8.550083332920622,
+              8.675208333443152,
+              8.413083333834948,
+              8.654666667098354,
+              8.43129166696599,
+              8.573791666094621
+            ]
+          },
+          "jsonEncode": {
+            "medianMs": 8.301500000015949,
+            "p95Ms": 8.984666666947305,
+            "samplesMs": [
+              8.049000000028173,
+              8.076833332779643,
+              8.799541666121513,
+              8.301500000015949,
+              8.950624999670254,
+              8.029833333239367,
+              8.878833333255898,
+              8.692541666277975,
+              8.706583333150775,
+              8.221250000133296,
+              8.984666666947305,
+              8.169166666448291,
+              8.184749999600172,
+              8.038541666792298,
+              8.59829166711279
+            ]
+          },
+          "modelReads": {
+            "medianMs": 16.88433333310968,
+            "p95Ms": 17.543083333293907,
+            "samplesMs": [
+              16.95824999933393,
+              16.799166666714882,
+              16.7760416661622,
+              16.853416666890553,
+              17.543083333293907,
+              17.016833333400427,
+              16.88433333310968,
+              16.87637499981065,
+              16.795125000498956,
+              16.984249999950407,
+              16.78787499986356,
+              16.916583333113522,
+              17.115374999775668,
+              16.8767499999376,
+              17.003333333377668
+            ]
+          },
+          "payloadBytes": 441138,
+          "programmaticScrollLayout": {
+            "medianMs": 13.202791666117264,
+            "p95Ms": 13.78562499940017,
+            "samplesMs": [
+              11.839083333143208,
+              13.227541666310572,
+              11.870666667164187,
+              13.78562499940017,
+              12.186333332465438,
+              13.251791667244106,
+              12.365749999844411,
+              13.202791666117264,
+              13.217083333984192
+            ]
+          },
+          "scrollAnchorStableDuringUpdates": true,
+          "selectionStableDuringUpdates": true,
+          "transfers": 1000,
+          "unchangedPublicationsPerSnapshot": 2,
+          "unchangedSnapshotLayout": {
+            "medianMs": 139.94437500059576,
+            "p95Ms": 160.65279166650726,
+            "samplesMs": [
+              140.5700416671607,
+              145.4962500001784,
+              141.91141666651674,
+              139.47566666683997,
+              140.83604166626174,
+              140.49549999981537,
+              160.32787499989354,
+              138.30583333310642,
+              139.94437500059576,
+              138.6282499997833,
+              139.9057916669335,
+              137.07504166632134,
+              160.65279166650726,
+              139.30987499952607,
+              139.0567499993267
+            ]
+          }
+        },
+        {
+          "changingSnapshotLayout": {
+            "medianMs": 173.32024999996065,
+            "p95Ms": 192.7185416670909,
+            "samplesMs": [
+              172.46920833349577,
+              176.36600000059843,
+              173.43258333312406,
+              192.7185416670909,
+              171.73137499958102,
+              169.80808333300956,
+              171.09200000049896,
+              173.32024999996065,
+              187.6879999999801
+            ]
+          },
+          "checksum": 19905640,
+          "filesPerTransfer": 10000,
+          "filterClearsHiddenSelection": true,
+          "filterUntilNativeRows": {},
+          "jsonDecode": {
+            "medianMs": 22.588958333471965,
+            "p95Ms": 23.224583334013005,
+            "samplesMs": [
+              22.935250000045926,
+              22.638000000370084,
+              22.925000000213913,
+              22.904500000549888,
+              22.343999999975495,
+              22.588958333471965,
+              22.510624999995343,
+              22.479333333649265,
+              22.86320833263744,
+              23.224583334013005,
+              22.706875000039872,
+              22.431958333072544,
+              22.364291667145153,
+              22.46941666726343,
+              22.25020833338931
+            ]
+          },
+          "jsonEncode": {
+            "medianMs": 20.72041666633595,
+            "p95Ms": 21.864666666260746,
+            "samplesMs": [
+              21.633250000377302,
+              21.43879166669649,
+              21.072666666441364,
+              20.479374999922584,
+              20.232541666700854,
+              21.864666666260746,
+              20.58874999966065,
+              20.72041666633595,
+              21.855291666724952,
+              20.45766666651616,
+              20.795791667296726,
+              20.04354166729172,
+              21.738041666139907,
+              20.505333332948794,
+              20.519541666544683
+            ]
+          },
+          "modelReads": {
+            "medianMs": 0.06791666692151921,
+            "p95Ms": 0.10737499997048872,
+            "samplesMs": [
+              0.06812499941588612,
+              0.06895833303133259,
+              0.06558333279826911,
+              0.06225000015547266,
+              0.05762499949923949,
+              0.07895833277871134,
+              0.10737499997048872,
+              0.07679166628804523,
+              0.07662500047445064,
+              0.06791666692151921,
+              0.06766666683688527,
+              0.05995833362248959,
+              0.06362499971146462,
+              0.06395833315764321,
+              0.06924999979673885
+            ]
+          },
+          "payloadBytes": 1170903,
+          "programmaticScrollLayout": {
+            "medianMs": 13.753791666204052,
+            "p95Ms": 19.916666667086247,
+            "samplesMs": [
+              13.753791666204052,
+              19.916666667086247,
+              12.066541667081765,
+              19.198999999389343,
+              12.141583333686867,
+              19.258416666161793,
+              12.633249999453255,
+              18.44187500046246,
+              12.252041667125013
+            ]
+          },
+          "scrollAnchorStableDuringUpdates": true,
+          "selectionStableDuringUpdates": true,
+          "transfers": 1,
+          "unchangedPublicationsPerSnapshot": 2,
+          "unchangedSnapshotLayout": {
+            "medianMs": 93.4474166660948,
+            "p95Ms": 101.25183333366294,
+            "samplesMs": [
+              93.19533333382424,
+              97.3483750003652,
+              94.63641666661715,
+              92.1792083327091,
+              101.25183333366294,
+              91.71566666736908,
+              92.038166666498,
+              96.29158333336818,
+              94.44399999938469,
+              92.18770833285816,
+              92.58291666719742,
+              97.70112499973038,
+              92.99270833344053,
+              93.4474166660948,
+              94.24699999999575
+            ]
+          }
+        }
+      ],
+      "fixture": true,
+      "measurement": "Monotonic wall time through model work and native layout flush; includes a 1 ms yield, excludes physical frame presentation and XPC transport.",
+      "profile": "debug"
+    }
+  },
+  "openFindings": [
+    {
+      "id": "UI-PERF-001",
+      "status": "Open",
+      "observation": "11 NSTableView delegate reentrancy warnings in paced baseline and every final-binary run",
+      "message": "WARNING: Application performed a reentrant operation in its NSTableView delegate. This warning will become an assert in the future.",
+      "cause": null,
+      "next": "Trace exact callback and resolve or establish a verified harness-only boundary before native interaction acceptance"
+    },
+    {
+      "id": "UI-PERF-002",
+      "status": "Open",
+      "observation": "Two final-binary runs exceed 100 ms 100-row changing-layout budget; one also exceeds 50 ms scroll budget",
+      "cause": null,
+      "next": "Record stable host load and profile slow phase; preserve original budgets and all runs"
+    },
+    {
+      "id": "MANUAL",
+      "status": "Not run",
+      "scope": "Physical keyboard/pointer, VoiceOver, OS accessibility preferences, real-library scrolling/reopening, physical lifecycle, public swarms; see manual acceptance matrix"
+    }
+  ],
+  "checks": [
+    {
+      "command": "cargo test -p seedhop-core --lib --test management --test settings --test status --locked",
+      "exitCode": 0,
+      "executedTests": 23,
+      "log": ".build/performance-regressions-rust.log",
+      "ignored": "One real disk-full status test; not rerun for this change"
+    },
+    {
+      "command": "cargo test -p seedhop-core --test performance --locked",
+      "exitCode": 0,
+      "executedTests": 1,
+      "log": ".build/performance-membership-regression.log",
+      "ignored": "Large timed benchmark is explicitly invoked separately"
+    },
+    {
+      "command": "cargo test -p seedhop-core --test v2 partial_v2_and_hybrid_downloads_continue_after_relocation_and_rename --locked",
+      "exitCode": 0,
+      "executedTests": 1,
+      "log": ".build/performance-v2-regression.log"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
+      "exitCode": 0,
+      "log": ".build/performance-clippy.log"
+    },
+    {
+      "command": "SeedHop --verify-ux",
+      "exitCode": 0,
+      "executedTests": 36,
+      "log": ".build/performance-ux-final.log"
+    },
+    {
+      "command": "SeedHop --verify-interface --output .build/performance-interface.png",
+      "exitCode": 0,
+      "executedTests": 9,
+      "log": ".build/performance-interface.log"
+    },
+    {
+      "command": "SeedHop --verify-engine <isolated fixture path>",
+      "exitCode": 0,
+      "log": ".build/performance-xpc.log",
+      "scope": "Packaged foreground XPC, cancellation, settings retry/restart, choices, queue, relocation/rename, exact bytes, shutdown"
+    },
+    {
+      "command": "SeedHop --render-designs --output .build/performance-design",
+      "exitCode": 0,
+      "renderedFixtures": 58,
+      "log": ".build/performance-design.log",
+      "visualReview": "Representative contrast-recovery-light.png checked after optimization"
+    },
+    {
+      "command": "python3 scripts/build.py --identity -",
+      "exitCode": 0,
+      "log": ".build/performance-build-final.log",
+      "signing": "ad-hoc development only; deep strict signature verification passed"
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    {
+      "command": "Inspect bundled Rust library for SEEDHOP_LAYOUT_CHECKPOINT",
+      "passed": true,
+      "scope": "Fault injection checkpoint absent"
+    }
+  ],
+  "regressionBuildBoundary": "Native interface/XPC/render suites used the optimized production data flow before the final benchmark-report-only fields changed. Final build and UX suite pass; final performance repeats use the final binary. No production code changed between those native suites and final build.",
+  "deferred": [
+    "RSS",
+    "remote control",
+    "distribution signing",
+    "notarization",
+    "release"
+  ],
+  "reproduction": "make performance; checker exits nonzero on any missed fixed target",
+  "finalSourceSHA256": {
+    "crates/seedhop-core/Cargo.toml": "780a6adc5e39c80f7962f14371019bae80a38b7eddf943f4e26b68a1074f5c80",
+    "crates/seedhop-core/src/adapter.rs": "f82ddd8d98b3629f2584893cccb3ead9b64579720f63196cac75c39dbeb4dcc7",
+    "crates/seedhop-core/src/bin/seedhop-lab.rs": "4204274fee1826ee2c6964429afffe4a7903d77ba0d051e8236f6008ba4275be",
+    "crates/seedhop-core/src/connection_settings.rs": "facd42b3d356cf27cb637e7a1f89ee02c661de9f71268d6cb46016e54fa907ed",
+    "crates/seedhop-core/src/file_operation.rs": "6c35caa10fa4c1e6457c128dcab1e912d82ea39d5712e995cdd2a7410de46d2f",
+    "crates/seedhop-core/src/layout_journal.rs": "d7f09582e48473371c0ea68a91cc233445abcbf7d80733f6ceb43d6f3513ca7f",
+    "crates/seedhop-core/src/lib.rs": "4c8cdf77132600a5d475fca75295f5c0165c6e3e71a8ce76fdc3091b701f9385",
+    "crates/seedhop-core/src/management.rs": "0b8c7a3cf530fed77b5f9dbf8c7d034ec22f17cd985730425dc7ef022e18d853",
+    "crates/seedhop-core/src/model.rs": "cef07ce53e7d4593dba9f8db40949aa1b8c539805ee4f7f9aa6741441cf9e68b",
+    "crates/seedhop-core/src/storage.rs": "c7dd9955e4adc7bc08afad9d989f7dfa8221a9852b229153428e2a58035c041e",
+    "crates/seedhop-core/src/storage_receipt.rs": "a3538937c9f99b9be9b6ce7c4360ee3acee03f2d2aa94d14203ad7b0399b3b6f",
+    "crates/seedhop-core/src/v2.rs": "b19d156da78b0fda1ae04e57ba6ec0f72f6ed70fd5a114b47ccf28d97800bc6e",
+    "crates/seedhop-core/tests/faults.rs": "2f08bc5c8d1449065b2193c3a1609bb0bc89453058ab50c7fa3ba2d8046cd67a",
+    "crates/seedhop-core/tests/management.rs": "229c6da28d49b60ac8d83d8280d8618703ed765609d64298fa842e4ea19684ba",
+    "crates/seedhop-core/tests/mse.rs": "f6f53d9814b0b0326a10b0b9e03296b55b89ccec5218a64e905d26bd4ef6a27c",
+    "crates/seedhop-core/tests/performance.rs": "8bba99cecffda3de114f1db61c3fda342c8d10a4bc4d976f01c5556bef2905f6",
+    "crates/seedhop-core/tests/recovery.rs": "725a3446d051f29403b1de30c893aa0a2d475adfacf8a8a865f70c7536d877c0",
+    "crates/seedhop-core/tests/settings.rs": "c30ff03c3eae58f44d6780321c0409f46e1c2198f40708ab817b0799cbe0ed59",
+    "crates/seedhop-core/tests/status.rs": "ecaa842dc0913e49a48a29125a292872a208ac33f5aa733bc694005701906c0f",
+    "crates/seedhop-core/tests/support/gated_storage.rs": "7da68cf896709f4928c2e70012de930fbb75a928cbb03d67b43ed683d89cc6be",
+    "crates/seedhop-core/tests/support/mod.rs": "c1440158a18f6ef0cd704eb79433801d52ddf532ca9ea4d552c25488a91bdb01",
+    "crates/seedhop-core/tests/support/volume.rs": "82b59ea4f1c9b8edff1268fb4b4a246ce08d48933557d19825ad9fc5266b297f",
+    "crates/seedhop-core/tests/swarm.rs": "919ae4ad0fa67bcba26c2ed247f0c0807f2c05e4cd4bab6a5669fe3b7c4c0268",
+    "crates/seedhop-core/tests/v2.rs": "52d4876f6607d495650a90516cb76885ed5e6aba70a18f40b3a17416e8d3ff87",
+    "crates/seedhop-ffi/Cargo.toml": "9f3db3b519015d7d9e422af29a3d2b5387a5db2bccd19e6fd3e0418c9309372a",
+    "crates/seedhop-ffi/src/bindgen.rs": "f7a2dd11fb370e9595bdfa6c32fc41a9b67a60bbab06ec711cb7a03eb873ffa6",
+    "crates/seedhop-ffi/src/lib.rs": "cc60373908a186e27b0a81504dbfa9e0e0ff27c90d6befaa9e7fd41ead545526",
+    "macOS/App/DesignSystem.swift": "a2fe26c6c45e9d7604c8df391939a6e71160b08771d94f0716e0001653832084",
+    "macOS/App/EngineClient.swift": "2c0677db9b1b4668253b65bad946e2a18bb8445ab7e7cd683fac5d3deb1dfff1",
+    "macOS/App/EngineSelfTest.swift": "6307d6ba4e4dd1b648d11207f88ad3761fff3487d0d2b3d7400a4a4bc77c5d44",
+    "macOS/App/ImportSession.swift": "efe84c9e09f41acc819e3a2b2f89cb62089fa6c0363632d2aa7cd7157e1bb726",
+    "macOS/App/ImportView.swift": "ec672fdf37ad5632c326470b85e321e33a9a9ee37cde892d51a83e7775fa354b",
+    "macOS/App/InterfaceSelfTest.swift": "9ad45027753799a9b154ce9fca6c26bc592c0326584aaab16e668928e0c63980",
+    "macOS/App/LibraryStore.swift": "79d1670e90b10133052f9f0f7d714167acfa9c9a1b34445e0c615bb598ae4ddf",
+    "macOS/App/LibraryView.swift": "52a9b3e195eb03d5f28cd57c8126a95f9c43dd1bb4b6a21f42aec60477c5fb85",
+    "macOS/App/LifecycleSelfTest.swift": "470fb6257a4eb211d78377d3781425e6db7ab3b6fae25a13f351e067e43084d1",
+    "macOS/App/NativeAccessibility.swift": "0de93b0819d28e34d0aa1a98408556b79b3919fca63ab75e7f411fff313b6c29",
+    "macOS/App/PerformanceSelfTest.swift": "fb6b20d664cd48e579a6753bf1dcc649959acf514d2fadc18211f2ae69e024a7",
+    "macOS/App/PreviewFixtures.swift": "0d9e055833af4280b05d711373815b29f8f638360d15bd7bf3bea5a051aeda65",
+    "macOS/App/SeedHopApp.swift": "38c747ef7d2365505c2ed5eeb26e0fab9ae1d5d39c8366b63c4f522b58d23a3f",
+    "macOS/App/SettingsView.swift": "382b6c83d9304698f155c380e0a0ce4f4d6f85494a7b471b072b82092126fd94",
+    "macOS/App/TransferPresentation.swift": "5b35b800e301754e47d4c795d923b1e9c27d938fa147e713da935dd52cc075c2",
+    "macOS/App/UXSelfTest.swift": "c3e419c24ae3a04c7786e1031420a2a12d7224d9dc6b7167ad8d55ee5c58654e",
+    "macOS/Generated/seedhop_ffi.swift": "f38a4877369fea30414d900cc65060e889aa3ad1d9c2e1ea9e85da26a64646bb",
+    "macOS/Host/EngineHost.swift": "74bed6dccaed3b7544a8225091c8f974820626309c14ed073f275653917419e2",
+    "macOS/Host/HostMain.swift": "0047ff4e48865fb39dcce30d75283efbd33745ef2c288f8cba570593a9e8e6a3",
+    "macOS/Shared/Models.swift": "b55cfbb049b0626105216316a831131016fc2b22e689de35d1dcc2e36740520b",
+    "macOS/Shared/Signing.swift": "a541a612abb091f9dc8d65035e8506c34166f72d9531a973da0cdb4aeed514cc",
+    "Cargo.toml": "b65673dc67b27523d9ee946f573a788cdb66d27ed2beb1b835c6fca446f60cd4",
+    "Cargo.lock": "8bab41e7641539dff76cc6fcefa169b28218fe3b2fcc21ad4a483ec40499d1cc",
+    "Makefile": "5c60a8cf467d510ab5e883a4e3607dc0de9df23e475cf701541276af6dce321e",
+    "README.md": "ee887083d505c718d11f7b311c9327578e2c4d4eee1dafda693a2afdf9a54656",
+    "PLAN.md": "8ad70583c7969977a0db76d716cb9299bcd975502eb7a4bf9716a596c79f4205",
+    "scripts/check_performance.py": "a0812e0439de305ad50fae8fd6f6f1a0ca52adf44dfc64dd7940dd65399f5b87",
+    "scripts/build.py": "e4a620cf4075761ecfef235dd2084a686b6ea622d3cee922e89f451de7ccef56",
+    "docs/PERFORMANCE.md": "1ddef7bc70a8d3101facf3e277160f9ba5dd4999fd4a384902353646b60c12f4",
+    "docs/PRODUCT-ROADMAP.md": "0e7e3125766394b9bdba6a1bb9a1b91a38fd5e8053a2d2566af85f9b914fda92",
+    "docs/UX-REVIEW.md": "49f916bafe71d4f5279a5308afe63e8a7ca1ac50e0b5cfac6ca2dfa5d83a067b",
+    "docs/ACCESSIBILITY-ACCEPTANCE.md": "182b3de879417ed172db6c48e296870d0b98ad92e74f495cf7b064098b22ab9a"
+  },
+  "finalBinarySHA256": {
+    ".build/SeedHop.app/Contents/MacOS/SeedHop": "6313db2ae1a1608526bce343007bed38e807cab2e6713c35da0d65fb072257f8",
+    ".build/SeedHop.app/Contents/Frameworks/libseedhop_ffi.dylib": "8157682c2c5758ca4cc8542d6ee4bf1fe275bc4f23e03af6850350f40813e461"
+  },
+  "localArtifacts": [
+    {
+      "path": ".build/performance-build-after.log",
+      "sha256": "40455fb2a27219000821952a7f41cdd928374f6362de6e3cc44a7ea79a1e95c0",
+      "bytes": 5454
+    },
+    {
+      "path": ".build/performance-build-before.log",
+      "sha256": "e1d6b38d32503a6a9793e9912e665ac9d6f3f11aaa625a92a950396e26264ccc",
+      "bytes": 5454
+    },
+    {
+      "path": ".build/performance-build-final.log",
+      "sha256": "2bdedf6d3380b7d0dc749e59a87a1b2e4f50a0d1a749e7d03748fb1750b7a992",
+      "bytes": 5454
+    },
+    {
+      "path": ".build/performance-build-profile.log",
+      "sha256": "17a111ad5bc3ac9d611c9438c70ff78ea4893c4b826b4aa37eb514c9d9786cb7",
+      "bytes": 5454
+    },
+    {
+      "path": ".build/performance-clippy.log",
+      "sha256": "b07d01cff47d20272745ca12097460cc37696712b8c1f45ff0982c0f3813c8f9",
+      "bytes": 207
+    },
+    {
+      "path": ".build/performance-core-after.log",
+      "sha256": "97b5c0d73a6fbbcde828a9b189993671e4dec2bacb4f9c81bd7f1e5b4ebce1a0",
+      "bytes": 1081
+    },
+    {
+      "path": ".build/performance-core-before.log",
+      "sha256": "33e5b84ec24b6feb013665488de0f05836a909267e737f1dae2aef5ca1212708",
+      "bytes": 1081
+    },
+    {
+      "path": ".build/performance-design.log",
+      "sha256": "0540e4d57b65b728d88174bd5b0aea32556f6598ca9f8ecddfa7a0cc9872e850",
+      "bytes": 136
+    },
+    {
+      "path": ".build/performance-interface.log",
+      "sha256": "d2cc788ed7e88a1d60905a3b5f62d30bc0c3cedeae8d6da33256f13ecb8cbf35",
+      "bytes": 1091
+    },
+    {
+      "path": ".build/performance-membership-regression.log",
+      "sha256": "b64f385b9e8ed58439cd39c2df9eeb3230d86da89fa7a93e4ad93aa10fbc61d5",
+      "bytes": 538
+    },
+    {
+      "path": ".build/performance-regressions-rust.log",
+      "sha256": "b8c614dbb71085115a06b1822f28c3323eef1dfb123b15c7f1f9b0361fe7487a",
+      "bytes": 3102
+    },
+    {
+      "path": ".build/performance-sample.log",
+      "sha256": "018e06fcf51234d71769950b79a009b4b46595c154ca63d097d9113a54f0b6f0",
+      "bytes": 238
+    },
+    {
+      "path": ".build/performance-ui-after.log",
+      "sha256": "77c7f5ceb1a343a5e3921b141498e57562825a4f2334fd0743e43674ef4a7633",
+      "bytes": 2539
+    },
+    {
+      "path": ".build/performance-ui-before-unpaced.log",
+      "sha256": "556d011d2e868bbc2cc202be9ec06cbbe8a2388f868c8d1fc11548e5493376e4",
+      "bytes": 2542
+    },
+    {
+      "path": ".build/performance-ui-before.log",
+      "sha256": "e67d48dfb6cf77de16b438b0b47bb721327d6b9f9d230b48bdc6ce1ced41928d",
+      "bytes": 2539
+    },
+    {
+      "path": ".build/performance-ui-initial-after.log",
+      "sha256": "19a6e654ac7b77021ac6dbafaee051c75a2f384df67a44af9244e1f5c083ea4c",
+      "bytes": 2540
+    },
+    {
+      "path": ".build/performance-ui-profile.log",
+      "sha256": "bb4d238360d18520dac053b8ec5d309daf8538c8e674c020211afa585fa38897",
+      "bytes": 2582
+    },
+    {
+      "path": ".build/performance-ui-repeat-1.log",
+      "sha256": "6ba1919b747496c4ba1efc2ae5dbc32e42ad141ddd5bec453ee7c5f3f4ea3a81",
+      "bytes": 2539
+    },
+    {
+      "path": ".build/performance-ui-repeat-2.log",
+      "sha256": "53b4c9cd486c0fcc8a20aaa80e8c726bfb92d2f9e55fbfd719e399e6e1cf9c9c",
+      "bytes": 2539
+    },
+    {
+      "path": ".build/performance-ux-final.log",
+      "sha256": "0bb45634a79adac283c9e57a2778aad13f791362b864632086d8bf3e4f52bd5a",
+      "bytes": 2889
+    },
+    {
+      "path": ".build/performance-ux.log",
+      "sha256": "0bb45634a79adac283c9e57a2778aad13f791362b864632086d8bf3e4f52bd5a",
+      "bytes": 2889
+    },
+    {
+      "path": ".build/performance-v2-regression.log",
+      "sha256": "a20c8678c67986dd228ba1c492241967da2a129e685378598440d7115411a219",
+      "bytes": 413
+    },
+    {
+      "path": ".build/performance-xpc.log",
+      "sha256": "d0f8b24bfa797a37e66cda774691cd7ad3a3a4b119b909c08233f45a7190394f",
+      "bytes": 510
+    },
+    {
+      "path": ".build/performance-core-before.json",
+      "sha256": "647e4de1a8eca77b55182811d115a21fbc727cd7b133945ad29a85d956bc8f42",
+      "bytes": 4744
+    },
+    {
+      "path": ".build/performance-core-after.json",
+      "sha256": "41b656bc1903414f06b728be02847de9e43e2042aafe12764fd66170db082bc7",
+      "bytes": 4708
+    }
+  ],
+  "renderSHA256": {
+    ".build/performance-design/add-dark.png": "eca93ea6b2ab43cfa0b590acee71a316b3bd03d677fac490a216a767cba84aed",
+    ".build/performance-design/add-light.png": "d69e1b63972bbaa15e5ea638e321a2f540507a514f0268694daa37238605fa09",
+    ".build/performance-design/cleanup-attention-dark.png": "1c392576624b180c1668e970cf82d0cd3786e242f39d91f659bbcdd4b6808437",
+    ".build/performance-design/cleanup-attention-light.png": "111d9b60657e55577b28bfe6870535d160d8a44e799be44e66fb8f31e26216c8",
+    ".build/performance-design/cleanup-orphan-dark.png": "8cfa5630a5f2b2a6eb2682a84bd720aceb97e54e2cb989846452bbe1d708411b",
+    ".build/performance-design/cleanup-orphan-light.png": "466cd87d6cdd879171e83787e468fcf8c016217e1da9250e2f08e45892c9aa93",
+    ".build/performance-design/compact-dark.png": "36fb4f7bed5f5aac5fda9320a0a820a3082def78e9b6bb1dbb9f3e92eaf221e0",
+    ".build/performance-design/compact-light.png": "2e22bb4ff79947ca0f4ff86cdf20551f9fd9856facddae4a7e0837982b03d0dc",
+    ".build/performance-design/contrast-compact-dark.png": "36fb4f7bed5f5aac5fda9320a0a820a3082def78e9b6bb1dbb9f3e92eaf221e0",
+    ".build/performance-design/contrast-compact-light.png": "2e22bb4ff79947ca0f4ff86cdf20551f9fd9856facddae4a7e0837982b03d0dc",
+    ".build/performance-design/contrast-import-dark.png": "1595177093c6227cd4f8e302d0319f0e46d1d0068005c77e2c726b2dc23075a5",
+    ".build/performance-design/contrast-import-light.png": "40212960b52d464dc6add6704f12f0ba1d33bda007ad021e09effddf12f78e82",
+    ".build/performance-design/contrast-library-dark.png": "545b3c07f6a4b63413d49438b113da11b2cc70ec9c09198934f82b8bd7bf196c",
+    ".build/performance-design/contrast-library-light.png": "eff54a77d79517ffa6daaaee41d1bef2b50b1149f511b9b31d85f6e2e70871e7",
+    ".build/performance-design/contrast-recovery-dark.png": "94bf8e5a4a5f4d601c13e5e1b2d613712b2035febbe1111d1403310b65669a68",
+    ".build/performance-design/contrast-recovery-light.png": "0d3cabcd007d9a543d9f29b086e18d6285d701fa618e761c1fcfcddf3f168061",
+    ".build/performance-design/contrast-settings-dark.png": "fef80bdd33afe34a8cf4009a56e6de4e91f23382716d927a4884d2d1ff19eedf",
+    ".build/performance-design/contrast-settings-light.png": "bdba51a6eb332e06376023c0bae4771835b0c3e59f3ff90eb5e5370fa8d28464",
+    ".build/performance-design/empty-dark.png": "c3d170f6754895f8271ec76ab2e7d6e1fa17b2afd4ff71bf4cd576423f1e0dd7",
+    ".build/performance-design/empty-light.png": "e7fd9532c6f41cf81e604aa667c45899d95b09805586a7196db5ba8169d848e2",
+    ".build/performance-design/encryption-error-dark.png": "ca57b431aa1a03fa5bfb8bbedb134cb875dedbdf045da40675f92992487a1ab6",
+    ".build/performance-design/encryption-error-light.png": "42033e1f58e40db788dd2e88fed915eaa859089cbc00311c8e1b8330acf53c71",
+    ".build/performance-design/encryption-offline-dark.png": "238a9b860dd08064e6f73f9b71ff3719acd9f98681e9fa77aba2598276f5f5b2",
+    ".build/performance-design/encryption-offline-light.png": "8841eaf15d0c8241957e8ec100e63af8b50cc8a594d490a3305bd7ea789440c9",
+    ".build/performance-design/encryption-pending-dark.png": "5b383409f5087e7ebe617696dcd91681accc70fb8858204ec075388b8b9bc07d",
+    ".build/performance-design/encryption-pending-light.png": "cc2c61d34c2a3e71ef911bfbbcadcfd72966224ef84acd87d86fd4f563c66c21",
+    ".build/performance-design/file-controls-dark.png": "f0e2e9af7752c1873945612cd49d88d131aa3dfc52f2d57c6f3202bdcb36a94e",
+    ".build/performance-design/file-controls-light.png": "86870596aa6438bf25ad258bc0c708c54c72f3b42de8cd1aeb6da9cabe637ca2",
+    ".build/performance-design/files-dark.png": "1595177093c6227cd4f8e302d0319f0e46d1d0068005c77e2c726b2dc23075a5",
+    ".build/performance-design/files-light.png": "40212960b52d464dc6add6704f12f0ba1d33bda007ad021e09effddf12f78e82",
+    ".build/performance-design/filter-dark.png": "3d614344c1937f78a4c0248ddcdfa50af0a7dc7160ce4756763715dc522d15ea",
+    ".build/performance-design/filter-light.png": "696462a7f1be504265e7e2be82103f31f5058d4e2d54245445dc0dd04a88896a",
+    ".build/performance-design/library-dark.png": "545b3c07f6a4b63413d49438b113da11b2cc70ec9c09198934f82b8bd7bf196c",
+    ".build/performance-design/library-light.png": "eff54a77d79517ffa6daaaee41d1bef2b50b1149f511b9b31d85f6e2e70871e7",
+    ".build/performance-design/move-compact-dark.png": "5e1bb764553537329f7f2f364e825f262e57d68f82e75d791e2eb2c448e2c848",
+    ".build/performance-design/move-compact-light.png": "792921c97081719382e5d97108a4e2b8dbc3c049581c8cb0d7200f40132e059b",
+    ".build/performance-design/move-progress-dark.png": "e6662f4597a06011b84c129b59b990ff829cf32c0e88ca105268b64fe58bafa0",
+    ".build/performance-design/move-progress-light.png": "3ce8d990d8f796c0780d678e9daa75463e5c8dcae549edffeaa13eb177831e22",
+    ".build/performance-design/move-recovery-compact-dark.png": "8ff63a6dbe299b537df0a5f78868c24c5bdf4cf88f439be279084b5e0f0e3614",
+    ".build/performance-design/move-recovery-compact-light.png": "37ed7ca2be9774ac63b0aea078ea395cfab98c86d8d8369d3ac8d9601ef7defb",
+    ".build/performance-design/move-recovery-dark.png": "f4937f7dec84b2d255a4dab76d9667cad60edef1e1577baf39b226805c7a60f1",
+    ".build/performance-design/move-recovery-light.png": "eeb2b526c76f60118023b792cc18eb7701304d422c7829aa0cdb52acc7995c23",
+    ".build/performance-design/move-saving-dark.png": "9db4e295c7bda3372cbc4d0299bbd9570de2dc97b8216b4b6609ea393588c353",
+    ".build/performance-design/move-saving-light.png": "6da0aab97e015ee90594ba9c1136ec6aa79fd600c5883c804db02d644f483f14",
+    ".build/performance-design/queue-settings-dark.png": "fef80bdd33afe34a8cf4009a56e6de4e91f23382716d927a4884d2d1ff19eedf",
+    ".build/performance-design/queue-settings-light.png": "bdba51a6eb332e06376023c0bae4771835b0c3e59f3ff90eb5e5370fa8d28464",
+    ".build/performance-design/recovery-dark.png": "a9da7befb094cb88214c5830c98f22718eb7bb11d27ea30cc8537af4853c1c05",
+    ".build/performance-design/recovery-light.png": "53771029abdc158bb381cc677c94c878c012fa9c2c165ac0ed22cef287f0f4b6",
+    ".build/performance-design/selection-dark.png": "cc5c347ee2a26a7e4e8065a8f361154e44f3e22d9926ef5d8e605085e07811db",
+    ".build/performance-design/selection-light.png": "80dab7bfd674eeebb1c529306314b14afee15d4ca48460c79f525d0b56d4321a",
+    ".build/performance-design/settings-dark.png": "922a88c36ae151b91d906b57d9190a93fcc0ef7f170cfc904fc5349d7ff04633",
+    ".build/performance-design/settings-light.png": "323ec0978003358509bd29aa4fcd919384a96d6cf70b9da7339d49db2cb3490f",
+    ".build/performance-design/transfer-error-dark.png": "0b881ed19e0d3413dd15f1071f33ceadaa115cb6d49003b6423c7a12f83907c8",
+    ".build/performance-design/transfer-error-light.png": "f26d3a3b90d51a162d9f378bb83ba048061555671df6ae4d2e9fb5e5d571922c",
+    ".build/performance-design/transfer-stale-dark.png": "9e6b817aace0e0d28150e20ca198356beba40287bb6e0df3474ac4eeb4b0e3ec",
+    ".build/performance-design/transfer-stale-light.png": "8e20facb40fd961c31d58e219526e7ef1a1c85009b37268b6eea356e8c3904ef",
+    ".build/performance-design/transfer-states-compact-dark.png": "c8b8ac3ac9f4cf8d3927e99b38c04fb9eb5c259727b6f6926d7b28d7fecbb8df",
+    ".build/performance-design/transfer-states-compact-light.png": "eac714300e6f2f160ba5346f50b1fc5503a4da6da4a7567703575b2d6fa7db11"
+  },
+  "checkerValidation": {
+    "originalBaselineRejected": true,
+    "diagnosticProfileRejected": true,
+    "finalRepeat2Passed": true,
+    "doesNotOverrideFailuresInOtherRuns": true
+  }
+}

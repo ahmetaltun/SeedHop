@@ -19,6 +19,87 @@ impl QueueConfig {
 }
 
 impl Engine {
+    async fn refresh_storage_recovery(&self) -> Result<()> {
+        let state = self.state_directory.clone();
+        let recovery = tokio::task::spawn_blocking(move || crate::layout_journal::recover(&state))
+            .await
+            .map_err(adapter::engine_error)?;
+        *self.storage_recovery.lock().unwrap() = recovery;
+        Ok(())
+    }
+
+    pub async fn resolve_storage_recovery(&self, id: String, keep_copies: bool) -> Result<()> {
+        let _operation = self.operations.write().await;
+        self.ready()?;
+        let notice = self
+            .storage_recovery
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| CoreError::InvalidInput("There is no pending file cleanup.".into()))?;
+        if notice.id != id || (keep_copies && !notice.can_keep_copies) {
+            return Err(CoreError::InvalidInput(
+                "Refresh the recovery notice and try again.".into(),
+            ));
+        }
+        let handle = self.handle(&notice.torrent_id).ok();
+        if let Some(handle) = &handle {
+            handle.quiesce().map_err(adapter::engine_error)?;
+        }
+        let state = self.state_directory.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            crate::layout_journal::retry(&state, &id, keep_copies)
+        })
+        .await
+        .map_err(adapter::engine_error)?;
+        match result {
+            Ok(result) => {
+                *self.storage_recovery.lock().unwrap() = result.notice;
+                if let Some((torrent_id, layout)) = result.active_layout {
+                    let handle = self.handle(&torrent_id)?;
+                    handle
+                        .replace_storage_layout(layout.root.clone(), layout.names)
+                        .map_err(adapter::engine_error)?;
+                    storage::validate_destination(
+                        &layout.root,
+                        &adapter::record(&handle)
+                            .files
+                            .into_iter()
+                            .map(|file| file.name)
+                            .collect::<Vec<_>>(),
+                    )?;
+                    self.session
+                        .force_recheck(&handle)
+                        .await
+                        .map_err(adapter::engine_error)?;
+                } else if let Some(handle) = handle {
+                    // Keep uncertain layouts quiesced and visibly in error.
+                    handle
+                        .replace_storage_layout(handle.output_folder(), handle.file_names())
+                        .map_err(adapter::engine_error)?;
+                }
+                Ok(())
+            }
+            Err(error) => {
+                if let Some(handle) = handle {
+                    self.session
+                        .set_queued(&handle, handle.is_queued())
+                        .await
+                        .map_err(adapter::engine_error)?;
+                }
+                Err(error)
+            }
+        }
+    }
+
+    /// Cancellation must not wait for the mutation lock held by the copy.
+    /// IDs originate in the engine, so an old request cannot cancel a retry.
+    pub fn cancel_file_operation(&self, operation_id: String) -> Result<bool> {
+        self.ready()?;
+        let operation = self.file_operation.lock().unwrap().clone();
+        Ok(operation.is_some_and(|operation| operation.cancel(&operation_id)))
+    }
+
     pub async fn set_file_priorities(&self, id: String, priorities: Vec<u8>) -> Result<()> {
         let _operation = self.operations.write().await;
         self.ready()?;
@@ -161,6 +242,29 @@ impl Engine {
         root: PathBuf,
         rename: Option<(u32, String)>,
     ) -> Result<()> {
+        let operation = crate::file_operation::Guard::begin(
+            &self.file_operation,
+            adapter::torrent_id(&handle),
+            if rename.is_some() {
+                "rename"
+            } else {
+                "relocate"
+            },
+        );
+        self.perform_layout(handle, root, rename, operation.control.clone())
+            .await
+    }
+
+    async fn perform_layout(
+        &self,
+        handle: std::sync::Arc<librqbit::ManagedTorrent>,
+        root: PathBuf,
+        rename: Option<(u32, String)>,
+        operation: std::sync::Arc<crate::file_operation::Control>,
+    ) -> Result<()> {
+        if self.storage_recovery.lock().unwrap().is_some() {
+            return Err(CoreError::Storage("A previous file change needs attention. Retry cleanup or keep its extra copies before moving more files.".into()));
+        }
         let record = adapter::record(&handle);
         let old_root = handle.output_folder();
         let old_names = handle.file_names();
@@ -218,37 +322,87 @@ impl Engine {
                 ));
             }
         }
+        // Reject insufficient space before changing transfer state or creating
+        // targets. Later allocation failures still use the copy rollback path.
+        storage::preflight_copy(
+            &old_root,
+            &changed
+                .iter()
+                .map(|(file, _)| (file.name.as_str(), file.size))
+                .collect::<Vec<_>>(),
+            &root,
+        )?;
+        operation.advance(0)?;
         handle.quiesce().map_err(adapter::engine_error)?;
+        // Materialize any legacy filename mapping before recording the old
+        // layout. A pre-commit crash must match the saved layout exactly.
+        if let Err(error) = self.session.try_update_persistence_metadata(&handle).await {
+            let _ = self.session.set_queued(&handle, handle.is_queued()).await;
+            return Err(adapter::engine_error(error));
+        }
         let copied = tokio::task::spawn_blocking({
             let old_root = old_root.clone();
             let root = root.clone();
             let files: Vec<_> = changed
                 .iter()
-                .map(|(f, t)| (f.name.clone(), (*t).clone()))
+                .map(|(f, t)| (f.name.clone(), (*t).clone(), f.size))
                 .collect();
+            let operation = operation.clone();
+            let state = self.state_directory.clone();
+            let original = crate::layout_journal::Layout { root: old_root.clone(), names: old_names.clone() };
+            let destination = crate::layout_journal::Layout { root: root.clone(), names: names.clone() };
+            let torrent_id = record.id.clone();
             move || {
-                let mut copied = Vec::new();
-                for (source, target) in files {
-                    match storage::copy_exclusive(&old_root, &source, &root, &target) {
-                        Ok(true) => copied.push((source, target)),
-                        Ok(false) => {}
+                // Re-estimate after quiescing so progress measures the actual
+                // bytes copied, independently of the partial-file reservation.
+                operation.advance(0)?;
+                let total = storage::preflight_copy(
+                    &old_root,
+                    &files
+                        .iter()
+                        .map(|(name, _, size)| (name.as_str(), *size))
+                        .collect::<Vec<_>>(),
+                    &root,
+                )?;
+                operation.copying(total)?;
+                let mut journal = crate::layout_journal::Journal::begin(&state, operation.snapshot().id, torrent_id, original, destination, files.iter().map(|(source, target, _)| (source.clone(), target.clone())).collect())?;
+                for (index, (source, target, _)) in files.into_iter().enumerate() {
+                    match storage::copy_exclusive(
+                        &old_root,
+                        &source,
+                        &root,
+                        &target,
+                        &mut |bytes| { if bytes > 0 { crate::layout_journal::checkpoint("copy"); } operation.advance(bytes) },
+                        &mut |event| journal.copied(&state, index, event),
+                    ) {
+                        Ok(_) => {}
                         Err(error) => {
-                            for (_, target) in &copied {
-                                let _ = storage::remove_relative(&root, target);
-                            }
+                            journal.complete(&state, false).map_err(|cleanup| CoreError::Storage(format!("{error} Original files are still active. Some copies were retained: {cleanup}")))?;
                             return Err(error);
                         }
                     }
                 }
-                Ok(copied)
+                if let Err(error) = operation.saving() {
+                    journal.complete(&state, false).map_err(|cleanup| CoreError::Storage(format!("{error} Original files are still active. Some copies were retained: {cleanup}")))?;
+                    return Err(error);
+                }
+                crate::layout_journal::checkpoint("saving");
+                Ok(journal)
             }
         })
         .await
-        .map_err(adapter::engine_error)?;
+        .map_err(adapter::engine_error)
+        .and_then(|result| result);
         let copied = match copied {
             Ok(copied) => copied,
             Err(error) => {
-                let _ = self.session.set_queued(&handle, handle.is_queued()).await;
+                operation.phase("restoring");
+                self.refresh_storage_recovery().await?;
+                if let Err(restore) = self.session.set_queued(&handle, handle.is_queued()).await {
+                    return Err(CoreError::Storage(format!(
+                        "{error} Your original files are unchanged, but resuming the transfer failed: {restore}. Retry Resume."
+                    )));
+                }
                 return Err(error);
             }
         };
@@ -256,25 +410,48 @@ impl Engine {
             .replace_storage_layout(root.clone(), names)
             .map_err(adapter::engine_error)?;
         if let Err(error) = self.session.try_update_persistence_metadata(&handle).await {
-            handle
-                .replace_storage_layout(old_root.clone(), old_names)
-                .map_err(adapter::engine_error)?;
-            // The old database and source bytes remain authoritative on failure.
-            let _ = self.session.force_recheck(&handle).await;
-            for (_, target) in &copied {
-                let _ = storage::remove_relative(&root, target);
+            operation.phase("restoring");
+            if matches!(copied.authority(&self.state_directory), Ok(false)) {
+                handle
+                    .replace_storage_layout(old_root.clone(), old_names)
+                    .map_err(adapter::engine_error)?;
+                let _ = self.session.try_update_persistence_metadata(&handle).await;
             }
-            return Err(adapter::engine_error(error));
+            // A failed flush may already have renamed the database. Recovery
+            // uses its saved layout and retains copies if authority is unclear.
+            self.refresh_storage_recovery().await?;
+            if self
+                .storage_recovery
+                .lock()
+                .unwrap()
+                .as_ref()
+                .is_none_or(|notice| notice.active_location != "unknown")
+            {
+                let _ = self.session.force_recheck(&handle).await;
+            }
+            let error = adapter::engine_error(error);
+            return Err(error);
         }
+        crate::layout_journal::checkpoint("commit");
+        // The durable new layout is the commit point. Interrupted cleanup may
+        // leave extra originals, but can never leave the library without bytes.
+        operation.phase("cleaning");
+        let state = self.state_directory.clone();
+        let cleanup = tokio::task::spawn_blocking(move || copied.complete(&state, true))
+            .await
+            .map_err(adapter::engine_error)?;
+        if cleanup.is_err() {
+            self.refresh_storage_recovery().await?;
+        }
+        operation.phase("verifying");
         self.session
             .force_recheck(&handle)
             .await
             .map_err(adapter::engine_error)?;
-        // The durable new layout is the commit point. Interrupted cleanup may
-        // leave extra originals, but can never leave the library without bytes.
-        for (source, _) in &copied {
-            storage::remove_relative(&old_root, source)?;
-        }
-        Ok(())
+        cleanup.map_err(|error| {
+            CoreError::Storage(format!(
+                "The new location is saved and active. Some original copies were retained: {error}"
+            ))
+        })
     }
 }

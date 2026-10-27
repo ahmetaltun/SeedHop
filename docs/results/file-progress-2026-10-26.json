@@ -1,0 +1,127 @@
+{
+  "date": "2026-10-26",
+  "scope": "Product roadmap step 2: file operation progress and graceful cancellation",
+  "baseCommit": "a6c3c06e44e9b8fb098b89bd7850c5968fd7be06",
+  "workingTreeChanges": true,
+  "build": {
+    "command": "python3 scripts/build.py --identity -",
+    "passed": true,
+    "signing": "ad-hoc development only"
+  },
+  "checks": [
+    {
+      "command": "cargo test -p seedhop-core --lib --locked",
+      "passed": true,
+      "tests": 7
+    },
+    {
+      "command": "cargo test -p seedhop-core --test management --locked",
+      "passed": true,
+      "tests": 3
+    },
+    {
+      "command": "cargo test -p seedhop-core --test v2 cancelling_v2_and_hybrid_moves --locked",
+      "passed": true,
+      "tests": 1,
+      "formats": [
+        "v2",
+        "hybrid"
+      ]
+    },
+    {
+      "command": "cargo test -p seedhop-core --test v2 layout_changes_keep_identity_bytes_and_running_intent --locked",
+      "passed": true,
+      "tests": 1
+    },
+    {
+      "command": "cargo test -p seedhop-core --test v2 partial_v2_and_hybrid_downloads_continue_after_relocation_and_rename --locked",
+      "passed": true,
+      "tests": 1
+    },
+    {
+      "command": "SeedHop --verify-ux",
+      "passed": true,
+      "tests": 19,
+      "log": ".build/file-progress-ux.log"
+    },
+    {
+      "command": "SeedHop --verify-engine .build/progress-fixture",
+      "passed": true,
+      "copyCancellationCases": [
+        "relocate",
+        "rename"
+      ],
+      "log": ".build/file-progress-xpc.log"
+    },
+    {
+      "command": "SeedHop --verify-interface",
+      "passed": true,
+      "tests": 3,
+      "log": ".build/file-progress-interface.log"
+    },
+    {
+      "command": "SeedHop --render-designs --output .build/design",
+      "passed": true,
+      "screens": 32,
+      "log": ".build/file-progress-render.log"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --locked -- -D warnings",
+      "passed": true
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "passed": true
+    },
+    {
+      "command": "git diff --check",
+      "passed": true
+    }
+  ],
+  "visualReview": [
+    "move-compact-light.png",
+    "move-progress-dark.png",
+    "move-saving-dark.png"
+  ],
+  "testAdjustment": "Initial 128 MiB XPC copy completed too quickly for reliable cancellation. A 512 MiB disposable sparse extension made both real XPC cancellation cases observable; production cancellation semantics were unchanged.",
+  "limits": [
+    "Cancellation waits for any in-flight OS I/O or flush to return.",
+    "Operation state is transient. Durable transaction journaling remains step 3.",
+    "No physical drive, sleep/wake, interface-loss, actual login, manual keyboard, or VoiceOver acceptance is claimed.",
+    "Signing, notarization, release, RSS, and remote control remain deferred."
+  ],
+  "sourceSha256": {
+    "crates/seedhop-core/src/file_operation.rs": "6c35caa10fa4c1e6457c128dcab1e912d82ea39d5712e995cdd2a7410de46d2f",
+    "crates/seedhop-core/src/lib.rs": "a0bfd8d32be75fb9846c74ce31b22723c87ef6601e0165cd5cdb0fcc21bef4dd",
+    "crates/seedhop-core/src/management.rs": "da4c0027f6595b7e3428ed2d4488bedf2e88b0f8572672a9928563b66d417b10",
+    "crates/seedhop-core/src/model.rs": "7d56356da5ae165bf3306b2475ed92fd3793753738bd6f10ce1cbae4c3e8c8b8",
+    "crates/seedhop-core/src/storage.rs": "7f09ca3125eef781b91ce71773e87b17020c5fad352588f3b676c633bb39d020",
+    "crates/seedhop-core/tests/management.rs": "8fb2a75394a39b28625f4280ee09f3fe7a041abd6e2790af97c7cd687ff45802",
+    "crates/seedhop-core/tests/v2.rs": "dce37f182455316560f9f0ad3323f3653751496d0a33c3420721d195eb99a491",
+    "crates/seedhop-ffi/src/lib.rs": "0bf9276039cd7a0ad3afc9d60d436c9984452e909c0805a53319bf371c2c46df",
+    "macOS/App/EngineClient.swift": "4a9be67beecf3a729737da9eac23838b328d389aa5e78f2b701139bbeb9377cc",
+    "macOS/App/EngineSelfTest.swift": "02598fa470f32d00db726ae0e0e9d3cb65fcb3ae20a5862c18274c38a464215d",
+    "macOS/App/ImportView.swift": "e9bde8f30b2c3a6f7f3d16b621ea04c37e91b357b4b1515a2642948e1faf21de",
+    "macOS/App/LibraryStore.swift": "d09cce5fd24593115278c1e35191cd73b62612234ef209c45214886c4d1c78a5",
+    "macOS/App/LibraryView.swift": "9dcb65790d12d80006838e0a55b80a32fb8466f026fc52ca8db8538fd59be828",
+    "macOS/App/PreviewFixtures.swift": "ec57d36687ff32c54bdbc4f3b94ea74dc4e66dafd7185fdf64658f327681dc26",
+    "macOS/App/SeedHopApp.swift": "41126910d47c34b037ce46d49ecd13d31dbc6485f8505743041e03b3610f9c50",
+    "macOS/App/SettingsView.swift": "2a443d74367058e18af9578e37765c631000ddd1dc7823c75be0c5e68d3207cd",
+    "macOS/App/UXSelfTest.swift": "bc22c1ac758e199b81362db3ced79f16af6a8c02e5dbcdb1a127d1b0381b07f0",
+    "macOS/Generated/seedhop_ffi.swift": "e17ac01b305f45e5fda4903adc4d09a9fbd3fc0960a6a708b475689145163a1d",
+    "macOS/Host/EngineHost.swift": "00da1d679754c03f061686c7691b593c9b1e781f0141c05576a37a0aa746ccb5",
+    "macOS/Shared/Models.swift": "85c93e12e88a4a130be6848fe8981f012e7df538b02586c6a53d8056955e82df"
+  },
+  "binarySha256": {
+    ".build/SeedHop.app/Contents/MacOS/SeedHop": "c4466ee7a4f51be7b1918d12764678ca692d658049b770044b8cd8fa34efd674",
+    ".build/SeedHop.app/Contents/MacOS/SeedHopAgent": "0e588a7db70230853f8ba8b9d968aba5f3073c3edbb74bf1eb2f4dd80f99b3d1",
+    ".build/SeedHop.app/Contents/XPCServices/SeedHopEngine.xpc/Contents/MacOS/SeedHopEngine": "38426b1291c0f2c139f781ce5368d2dfaca89b9680b78980bc0839671c9ca8d2",
+    ".build/SeedHop.app/Contents/Frameworks/libseedhop_ffi.dylib": "e818f8afd7d9f9da2e199d3059d4318365a287278025d4d67def0aeecc40af3f"
+  },
+  "logSha256": {
+    ".build/file-progress-ux.log": "cfa6aad0475ad3760015f5028cee0113e6275428f363a6fcd3be0807243ea2e1",
+    ".build/file-progress-xpc.log": "5a39202499a5b541d82eb9d24389b80e36b51d9bfe39db40c766772cefab3e66",
+    ".build/file-progress-interface.log": "35f94f64d7a5c3a8253094e5a5a88fbd04dced366ad4ef447ab8c194e2fa64de",
+    ".build/file-progress-render.log": "d40c38668ef6b052214569f7b3eacfc8ec8ef95d0197e349f8ee355693a3474d"
+  }
+}

@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+layout-fault-injection = []
+
 [dependencies]
 librqbit.workspace = true
 tokio.workspace = true
@@ -12,14 +15,15 @@ serde_json.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 libc.workspace = true
+nix = { version = "0.30", default-features = false }
 url = "2"
 sha1 = "0.10"
+sha2 = "0.10"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 anyhow = "1"
 crypto-bigint = { version = "=0.5.5", default-features = false }
 rc4 = "=0.1.0"
-sha2 = "0.10"
 librqbit-peer-protocol = { path = "../../vendor/rqbit/crates/peer_binary_protocol" }
 tempfile = "3"

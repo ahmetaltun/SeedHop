@@ -2500,6 +2500,96 @@ async fn recovery_swarm(hybrid: bool) -> support::Swarm {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn cancelling_v2_and_hybrid_moves_cleans_completed_and_partial_unselected_copies() {
+    for hybrid in [false, true] {
+        let state = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let target = tempfile::tempdir().unwrap();
+        let cfg = engine_config(state.path(), downloads.path());
+        let data = vec![
+            ("a-unselected", vec![2; 32768]),
+            ("b-selected", vec![3; 64 * 1024 * 1024]),
+        ];
+        let metadata = encode(&if hybrid {
+            hybrid_files(&data, 32768, false)
+        } else {
+            fixture(&data, 32768)
+        });
+        let preview = seedhop_core::adapter::preview(metadata.clone()).unwrap();
+        for (file, (_, bytes)) in preview.files.iter().zip(&data) {
+            let path = downloads.path().join(&file.name);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, bytes).unwrap();
+        }
+        let engine = seedhop_core::Engine::open(cfg.clone()).await.unwrap();
+        let id = engine
+            .add(
+                metadata,
+                cfg.download_directory.clone(),
+                vec![1],
+                true,
+                true,
+            )
+            .await
+            .unwrap();
+        settled(&engine).await;
+        engine
+            .set_file_priorities(id.clone(), vec![0, 2])
+            .await
+            .unwrap();
+        let before = settled(&engine).await;
+        let moving = tokio::spawn({
+            let engine = engine.clone();
+            let id = id.clone();
+            let destination = target.path().to_string_lossy().into_owned();
+            async move { engine.relocate(id, destination).await }
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            loop {
+                if let Some(operation) = engine.snapshot().unwrap().file_operation
+                    && operation.phase == "copying"
+                    && operation.completed_bytes > 32768
+                    && engine.cancel_file_operation(operation.id).unwrap()
+                {
+                    break;
+                }
+                assert!(
+                    !moving.is_finished(),
+                    "Copy completed before cancellation was observed"
+                );
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(matches!(
+            moving.await.unwrap(),
+            Err(seedhop_core::CoreError::Cancelled)
+        ));
+        assert_eq!(settled(&engine).await, before);
+        for (file, (_, bytes)) in preview.files.iter().zip(&data) {
+            assert_eq!(
+                std::fs::read(downloads.path().join(&file.name)).unwrap(),
+                *bytes
+            );
+            assert!(!target.path().join(&file.name).exists());
+        }
+        engine.shutdown().await.unwrap();
+        drop(engine);
+        let engine = seedhop_core::Engine::open(cfg).await.unwrap();
+        let restored = settled(&engine).await;
+        assert_eq!(restored.id, id);
+        assert_eq!(restored.destination, before.destination);
+        assert_eq!(restored.state, "paused");
+        assert!(restored.paused_intent);
+        assert!(!restored.files[0].selected && restored.files[1].selected);
+        assert_eq!(restored.files[0].priority, 0);
+        assert_eq!(restored.files[1].priority, 2);
+        engine.shutdown().await.unwrap();
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn v2_and_hybrid_layout_changes_keep_identity_bytes_and_running_intent() {
     for hybrid in [false, true] {
         let swarm = recovery_swarm(hybrid).await;
@@ -3464,6 +3554,14 @@ async fn legacy_v2_and_hybrid_sessions_keep_existing_names_and_migrate_once() {
                 .collect::<Vec<_>>(),
             old
         );
+        // A journaled rename must first materialize the legacy map so either
+        // side of an interrupted transaction has a recognizable saved layout.
+        engine
+            .rename_file(id.clone(), renamed as u32, "kept-again.bin".into())
+            .await
+            .unwrap();
+        old[renamed] = "kept-again.bin".into();
+        support::wait_for(&engine, |t| t.state == "paused").await;
         engine.force_recheck(id.clone()).await.unwrap();
         let checked = support::wait_for(&engine, |t| t.state == "paused").await;
         assert_eq!(checked.downloaded_bytes, preview.total_bytes);

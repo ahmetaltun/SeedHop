@@ -1,5 +1,116 @@
 # Milestone 0 UX review follow-up
 
+## Large-library performance follow-up — 2026-10-27
+
+Controlled 100/1,000-row and 10,000-file fixtures now measure real native layout,
+filtering, programmatic scrolling, and update stability. Identical snapshots
+publish nothing; derived counts and sparse selected-row reads use invalidated
+indices while preserving current values and snapshot order. The file inspector
+computes selected count once per body evaluation. Thirty-six controlled Swift
+regressions, nine native checks, packaged XPC, and all 58 rendered fixtures pass.
+
+Budget acceptance remains open: only one of three final-binary runs passes all
+37 checks. Two runs exceed the 100-row changing-layout budget; one also exceeds
+its scroll budget. All retained runs preserve selection and scroll anchors.
+AppKit emits a table-delegate reentrancy warning in both baseline and final
+stress fixtures; no cause has been established. Trace that warning and latency
+spikes before accepting native interaction stability. See `PERFORMANCE.md` and
+`results/performance-2026-10-27.json`. Physical/manual acceptance remains open.
+
+## Native interaction and accessibility follow-up — 2026-10-27
+
+Inline errors, transfer guidance, recovery, and bandwidth validation now request
+AppKit accessibility announcements. Identical mounted-notice updates are
+suppressed; clearing and later repeating an error permits another request.
+File phases use medium priority without announcing byte updates. File selection,
+priority, and rename controls expose contextual names/values. Import uses a
+native table with arrow-row navigation and captured-row Space toggling; metadata
+focus and import/rename focus return have native first-responder checks.
+
+All 34 controlled Swift regressions and nine native checks pass, along with the
+packaged XPC regression and ad-hoc build. The native fixture uses the actual
+library scene with controlled transport and waits for asynchronous metadata
+readiness. It observes announcement requests instead of interrupting assistive
+speech. The renderer produces 58 fixtures, including light/dark high-contrast
+import, settings, and recovery; representative new screens were visually reviewed.
+
+Full step 6 acceptance remains open. Physical keyboard/pointer input, VoiceOver
+speech/navigation, real OS accessibility preferences, live scrolling, and live
+transfer window reopening remain unperformed manual checks. Every such check is
+marked Not run in `ACCESSIBILITY-ACCEPTANCE.md`; source labels and native menu
+callbacks do not substitute for those observations. Evidence is recorded in
+`results/accessibility-2026-10-27.json`.
+
+## Connection-settings follow-up — 2026-10-27
+
+Settings expose four existing peer-encryption policies with separate saved and
+active values, explicit restart behavior, and failure feedback at the top of the
+window. Controlled restart retains transfer choices, selection, background mode,
+and login preference. Rejected shutdown or failed reconnect leaves the library
+and pending preference available for retry. Connection details name TCP/uTP and
+v1/v2/hybrid, hide stale active ports, and explain reachability limits.
+
+All 32 controlled Swift regressions, packaged XPC settings save failure/retry and
+policy activation after restart, and three native menu/focus checks pass. The
+renderer produces 52 fixtures, including light/dark pending, error, and offline
+settings. Representative settings screens were visually reviewed. Native input,
+VoiceOver, and physical background/login lifecycle remain separate gates. See
+`CONNECTION-SETTINGS.md` and `results/connection-settings-2026-10-27.json`.
+
+## Transfer-state follow-up — 2026-10-27
+
+Rows and the inspector distinguish finding peers from connected peers waiting for
+activity. Queue positions, checked/copied/downloaded progress, typed file-error
+guidance, captured Retry actions, stale snapshots, and cleanup attention now share
+one presentation. Error progress is unknown rather than zero percent. Orphan
+cleanup remains visible without a matching row. Retry preserves saved pause
+intent and download queue admission.
+
+All 27 controlled presentation regressions, packaged foreground XPC, and three
+native menu/focus checks pass. The renderer produces 46 fixtures, with
+representative light/dark error, compact state, stale snapshot, and orphan cleanup
+screens visually inspected. Native input and VoiceOver acceptance remain manual.
+See `TRANSFER-STATUS.md` and `results/transfer-status-2026-10-27.json`.
+
+## File-recovery follow-up — 2026-10-27
+
+Interrupted moves/renames now publish persistent cleanup notices with the active
+location, Retry Cleanup, Keep Extra Copies, and folder inspection. Actions capture
+the journal ID, suppress duplicates, retain the notice after failure, and reject
+stale notices. Recovery buttons wait for the affected transfer's verification to
+finish; Retry can itself start verification before Keep Copies becomes available.
+
+All 21 controlled presentation regressions and three native menu/focus checks pass.
+Real packaged XPC checks prove that retry retains an edited copy, Keep Copies
+preserves original bytes and choices, and restart clears the resolved notice.
+The renderer produces 36 fixtures; compact light and expanded dark recovery cards
+were visually reviewed. Physical keyboard, VoiceOver, and live scrolling remain
+separate manual acceptance work. See `STORAGE-RECOVERY.md` and
+`results/storage-recovery-2026-10-27.json` for scope and retained evidence.
+
+## File-operation progress follow-up — 2026-10-26
+
+The library now shows move/rename phases and copied bytes in a persistent card
+above the transfer list. The card remains visible after selection changes or
+closing the inspector. Cancel targets the engine-generated operation ID; saving
+removes that action. Conflicting commands are disabled or rejected with retry
+guidance. Hash verification remains distinct from copying.
+
+All 19 controlled presentation regressions pass, including cancellation target
+capture, duplicate suppression, retry after failure, stale cancellation,
+non-cancellable saving, and preserving selection/choices. Three native menu/focus
+checks also pass. These are automated presentation and app-owned menu tests,
+not physical keyboard or VoiceOver acceptance. The packaged engine fixture
+separately proves real XPC copy progress and cancellation of moves and renames.
+
+The renderer now produces 32 fixture screens, including light/dark expanded and
+compact copying states and compact saving states. Visual review replaced an
+invisible rendered native progress indicator with the existing app-owned
+`TransferProgress` component. Portable evidence is recorded in
+`results/file-progress-2026-10-26.json`.
+
+## Earlier review evidence
+
 This pass reviews source, executable presentation behavior, real foreground-XPC
 import behavior, and rendered app-owned views. It does not automate system input
 or certify a VoiceOver walkthrough. The controlled transport is used only by

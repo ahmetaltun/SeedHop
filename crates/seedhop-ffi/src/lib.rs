@@ -4,8 +4,16 @@ uniffi::setup_scaffolding!();
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum BridgeError {
+    #[error("The operation was cancelled.")]
+    Cancelled,
     #[error("{message}")]
     Operation { message: String },
+}
+fn layout_error(error_value: seedhop_core::CoreError) -> BridgeError {
+    match error_value {
+        seedhop_core::CoreError::Cancelled => BridgeError::Cancelled,
+        other => error(other),
+    }
 }
 fn error(e: impl std::fmt::Display) -> BridgeError {
     BridgeError::Operation {
@@ -49,6 +57,7 @@ pub struct Transfer {
     pub files: Vec<TransferFile>,
     pub trackers: Vec<String>,
     pub error: Option<String>,
+    pub error_kind: Option<String>,
     pub queue_position: u32,
     pub paused_intent: bool,
 }
@@ -68,13 +77,64 @@ impl From<seedhop_core::TorrentRecord> for Transfer {
             files: t.files.into_iter().map(Into::into).collect(),
             trackers: t.trackers,
             error: t.error,
+            error_kind: t.error_kind,
             queue_position: t.queue_position,
             paused_intent: t.paused_intent,
         }
     }
 }
 #[derive(uniffi::Record)]
+pub struct FileOperationProgress {
+    pub id: String,
+    pub torrent_id: String,
+    pub kind: String,
+    pub phase: String,
+    pub completed_bytes: u64,
+    pub total_bytes: u64,
+    pub cancel_requested: bool,
+}
+impl From<seedhop_core::FileOperation> for FileOperationProgress {
+    fn from(operation: seedhop_core::FileOperation) -> Self {
+        Self {
+            id: operation.id,
+            torrent_id: operation.torrent_id,
+            kind: operation.kind,
+            phase: operation.phase,
+            completed_bytes: operation.completed_bytes,
+            total_bytes: operation.total_bytes,
+            cancel_requested: operation.cancel_requested,
+        }
+    }
+}
+
+#[derive(uniffi::Record)]
+pub struct StorageRecoveryNotice {
+    pub id: String,
+    pub torrent_id: String,
+    pub active_location: String,
+    pub message: String,
+    pub original_directory: String,
+    pub destination_directory: String,
+    pub can_keep_copies: bool,
+}
+impl From<seedhop_core::StorageRecovery> for StorageRecoveryNotice {
+    fn from(notice: seedhop_core::StorageRecovery) -> Self {
+        Self {
+            id: notice.id,
+            torrent_id: notice.torrent_id,
+            active_location: notice.active_location,
+            message: notice.message,
+            original_directory: notice.original_directory,
+            destination_directory: notice.destination_directory,
+            can_keep_copies: notice.can_keep_copies,
+        }
+    }
+}
+
+#[derive(uniffi::Record)]
 pub struct EngineSnapshot {
+    pub peer_encryption: String,
+    pub saved_peer_encryption: String,
     pub protocol_version: u32,
     pub engine_version: String,
     pub instance_id: String,
@@ -83,6 +143,8 @@ pub struct EngineSnapshot {
     pub upload_limit: u32,
     pub max_active_downloads: u32,
     pub torrents: Vec<Transfer>,
+    pub file_operation: Option<FileOperationProgress>,
+    pub storage_recovery: Option<StorageRecoveryNotice>,
 }
 #[derive(uniffi::Record)]
 pub struct MetadataPreview {
@@ -153,10 +215,18 @@ impl EngineBridge {
             runtime: Mutex::new(Some(runtime)),
         }))
     }
+    pub fn set_peer_encryption(&self, policy: String) -> Result<(), BridgeError> {
+        let (core, runtime) = self.handles()?;
+        runtime
+            .block_on(core.set_peer_encryption(policy))
+            .map_err(error)
+    }
     pub fn snapshot(&self) -> Result<EngineSnapshot, BridgeError> {
         let (core, _) = self.handles()?;
         let s = core.snapshot().map_err(error)?;
         Ok(EngineSnapshot {
+            peer_encryption: s.peer_encryption,
+            saved_peer_encryption: s.saved_peer_encryption,
             protocol_version: s.protocol_version,
             engine_version: s.engine_version,
             instance_id: s.instance_id,
@@ -165,6 +235,8 @@ impl EngineBridge {
             upload_limit: s.upload_limit,
             torrents: s.torrents.into_iter().map(Into::into).collect(),
             max_active_downloads: s.max_active_downloads,
+            file_operation: s.file_operation.map(Into::into),
+            storage_recovery: s.storage_recovery.map(Into::into),
         })
     }
     pub fn inspect(
@@ -213,6 +285,10 @@ impl EngineBridge {
         let (core, rt) = self.handles()?;
         rt.block_on(core.force_recheck(id)).map_err(error)
     }
+    pub fn retry_transfer(&self, id: String) -> Result<(), BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.retry_transfer(id)).map_err(error)
+    }
     pub fn set_file_priorities(&self, id: String, priorities: Vec<u8>) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;
         rt.block_on(core.set_file_priorities(id, priorities))
@@ -228,11 +304,25 @@ impl EngineBridge {
     }
     pub fn relocate(&self, id: String, destination: String) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;
-        rt.block_on(core.relocate(id, destination)).map_err(error)
+        rt.block_on(core.relocate(id, destination))
+            .map_err(layout_error)
     }
     pub fn rename_file(&self, id: String, index: u32, name: String) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;
         rt.block_on(core.rename_file(id, index, name))
+            .map_err(layout_error)
+    }
+    pub fn cancel_file_operation(&self, operation_id: String) -> Result<bool, BridgeError> {
+        let (core, _) = self.handles()?;
+        core.cancel_file_operation(operation_id).map_err(error)
+    }
+    pub fn resolve_storage_recovery(
+        &self,
+        id: String,
+        keep_copies: bool,
+    ) -> Result<(), BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.resolve_storage_recovery(id, keep_copies))
             .map_err(error)
     }
     pub fn remove(&self, id: String, delete_files: bool) -> Result<(), BridgeError> {

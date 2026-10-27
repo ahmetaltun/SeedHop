@@ -1,7 +1,11 @@
 pub mod adapter;
+mod connection_settings;
+mod file_operation;
+mod layout_journal;
 mod management;
 mod model;
 pub mod storage;
+mod storage_receipt;
 pub mod v2;
 use librqbit::{AddTorrent, AddTorrentOptions, Session, SessionOptions, SessionPersistenceConfig};
 pub use model::*;
@@ -22,10 +26,14 @@ pub const PROTOCOL_VERSION: u32 = 2;
 /// Owns library state. The FFI host retains this lease until its runtime has stopped.
 pub struct Engine {
     session: Arc<Session>,
+    active_peer_encryption: librqbit::EncryptionPolicy,
+    connection_settings: Mutex<connection_settings::ConnectionSettings>,
     lease: storage::LibraryLease,
     state_directory: PathBuf,
     instance_id: String,
     operations: RwLock<()>,
+    file_operation: Mutex<Option<Arc<file_operation::Control>>>,
+    storage_recovery: Mutex<Option<StorageRecovery>>,
     resolving: Mutex<HashMap<String, tokio::sync::watch::Sender<bool>>>,
     stopping: AtomicBool,
     queue: Mutex<management::QueueConfig>,
@@ -33,21 +41,39 @@ pub struct Engine {
 
 impl Engine {
     pub async fn open(config: EngineConfig) -> Result<Arc<Self>> {
-        Self::open_with_peer_encryption(config, librqbit::EncryptionPolicy::default()).await
+        Self::open_with_policy_override(config, None).await
     }
 
     pub async fn open_with_peer_encryption(
         config: EngineConfig,
         peer_encryption: librqbit::EncryptionPolicy,
     ) -> Result<Arc<Self>> {
+        Self::open_with_policy_override(config, Some(peer_encryption)).await
+    }
+
+    async fn open_with_policy_override(
+        config: EngineConfig,
+        override_policy: Option<librqbit::EncryptionPolicy>,
+    ) -> Result<Arc<Self>> {
         let dir = PathBuf::from(&config.state_directory);
         let lease = storage::LibraryLease::acquire(&dir)?;
+        let connection_settings = connection_settings::ConnectionSettings::load(&dir)?;
+        let peer_encryption = override_policy.unwrap_or(connection_settings.peer_encryption);
         let downloads = PathBuf::from(&config.download_directory);
         storage::validate_destination(&downloads, &[])?;
         let session_dir = dir.join("session");
         std::fs::create_dir_all(&session_dir).map_err(storage::io_error)?;
         // Preserve unreadable state in place. Never overwrite it with an empty session.
         let session_path = session_dir.join("session.json");
+        // Resolve interrupted layouts while the lease is exclusive and before
+        // Session restoration can open files or resume any peer writes.
+        let storage_recovery = tokio::task::spawn_blocking({
+            let dir = dir.clone();
+            move || layout_journal::recover(&dir)
+        })
+        .await
+        .map_err(adapter::engine_error)?;
+        layout_journal::ensure_active_root(&dir)?;
         if session_path.exists() {
             let data = std::fs::read(&session_path).map_err(storage::io_error)?;
             let value: serde_json::Value = serde_json::from_slice(&data)
@@ -187,10 +213,14 @@ impl Engine {
             .map_err(adapter::engine_error)?;
         let engine = Arc::new(Self {
             session,
+            active_peer_encryption: peer_encryption,
+            connection_settings: Mutex::new(connection_settings),
             lease,
             state_directory: dir,
             instance_id: uuid::Uuid::new_v4().to_string(),
             operations: RwLock::new(()),
+            file_operation: Mutex::new(None),
+            storage_recovery: Mutex::new(storage_recovery),
             resolving: Mutex::new(HashMap::new()),
             stopping: AtomicBool::new(false),
             queue: Mutex::new(queue),
@@ -236,6 +266,11 @@ impl Engine {
                 .unwrap_or(0);
         }
         Ok(Snapshot {
+            peer_encryption: connection_settings::name(self.active_peer_encryption).into(),
+            saved_peer_encryption: connection_settings::name(
+                self.connection_settings.lock().unwrap().peer_encryption,
+            )
+            .into(),
             protocol_version: PROTOCOL_VERSION,
             engine_version: "librqbit 9.0.1 + SeedHop patches".into(),
             instance_id: self.instance_id.clone(),
@@ -254,6 +289,13 @@ impl Engine {
                 .unwrap_or(0),
             torrents,
             max_active_downloads: queue.max_active,
+            file_operation: self
+                .file_operation
+                .lock()
+                .unwrap()
+                .as_ref()
+                .map(|operation| operation.snapshot()),
+            storage_recovery: self.storage_recovery.lock().unwrap().clone(),
         })
     }
 
@@ -453,7 +495,49 @@ impl Engine {
         let _operation = self.operations.write().await;
         self.ready()?;
         let handle = self.handle(&id)?;
-        let record = adapter::record(&handle);
+        self.validate_recheck_destination(&handle)?;
+        self.session
+            .force_recheck(&handle)
+            .await
+            .map_err(adapter::engine_error)
+    }
+
+    /// Retrying an error retains pause intent and re-enters queue admission.
+    /// A delayed retry for a transfer that has recovered is a harmless no-op.
+    pub async fn retry_transfer(&self, id: String) -> Result<()> {
+        let _operation = self.operations.write().await;
+        self.ready()?;
+        let handle = self.handle(&id)?;
+        if !matches!(handle.stats().state, librqbit::TorrentStatsState::Error) {
+            return Ok(());
+        }
+        if self
+            .storage_recovery
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|notice| notice.torrent_id == id || notice.torrent_id.is_empty())
+        {
+            return Err(CoreError::Storage(
+                "Resolve the retained-file cleanup before retrying this transfer.".into(),
+            ));
+        }
+        self.validate_recheck_destination(&handle)?;
+        if !handle.is_paused() && self.queue.lock().unwrap().max_active > 0 {
+            self.session
+                .set_queued(&handle, true)
+                .await
+                .map_err(adapter::engine_error)?;
+        }
+        self.session
+            .force_recheck(&handle)
+            .await
+            .map_err(adapter::engine_error)?;
+        self.reconcile_queue().await
+    }
+
+    fn validate_recheck_destination(&self, handle: &Arc<librqbit::ManagedTorrent>) -> Result<()> {
+        let record = adapter::record(handle);
         let root = Path::new(&record.destination);
         if !root.is_dir() {
             return Err(CoreError::Storage(format!(
@@ -469,15 +553,23 @@ impl Engine {
                 .map(|f| f.name.clone())
                 .collect::<Vec<_>>(),
         )?;
-        self.session
-            .force_recheck(&handle)
-            .await
-            .map_err(adapter::engine_error)
+        Ok(())
     }
 
     pub async fn remove(&self, id: String, delete_files: bool) -> Result<()> {
         let _operation = self.operations.write().await;
         self.ready()?;
+        if self
+            .storage_recovery
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|notice| notice.torrent_id == id)
+        {
+            return Err(CoreError::Storage(
+                "Resolve this transfer's pending file cleanup before removing it.".into(),
+            ));
+        }
         let handle = self.handle(&id)?;
         let record = adapter::record(&handle);
         storage::validate_destination(

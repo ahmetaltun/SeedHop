@@ -1,0 +1,322 @@
+{
+  "date": "2026-10-27",
+  "scope": "Roadmap step 4: accurate transfer states and actionable recovery",
+  "baseCommit": "a6c3c06e44e9b8fb098b89bd7850c5968fd7be06",
+  "workingTreeChanges": true,
+  "build": {
+    "command": "python3 scripts/build.py --identity -",
+    "passed": true,
+    "signing": "ad-hoc development only",
+    "log": ".build/transfer-status-build-2026-10-27.log"
+  },
+  "checks": [
+    {
+      "command": "cargo test -p seedhop-core --lib --test status --locked",
+      "passed": true,
+      "tests": 16,
+      "ignored": 1,
+      "log": ".build/transfer-status-core-2026-10-27.log"
+    },
+    {
+      "command": "cargo test -p seedhop-core --lib --test status --test management --locked",
+      "passed": true,
+      "tests": 19,
+      "ignored": 1,
+      "log": ".build/transfer-status-regressions-2026-10-27.log"
+    },
+    {
+      "command": "python3 scripts/faults.py",
+      "passed": true,
+      "controlledTests": 3,
+      "realEnospcTests": 2,
+      "retryIntentCases": [
+        "paused",
+        "running"
+      ],
+      "priority": 2,
+      "exactPayloadBytes": 2097152,
+      "mountedImageMiB": 32,
+      "detached": true,
+      "runResult": ".build/faults-shbcp2jv/result.json",
+      "log": ".build/transfer-status-faults-2026-10-27.log"
+    },
+    {
+      "command": "SeedHop --verify-ux",
+      "passed": true,
+      "tests": 27,
+      "log": ".build/transfer-status-ux-2026-10-27.log"
+    },
+    {
+      "command": "SeedHop --verify-engine /Users/ahmet/Rust/SeedHop/.build/progress-fixture",
+      "passed": true,
+      "retryCoverage": "Healthy paused transfer; delayed Retry is a no-op through XPC. Real failure/retry covered in Rust on disposable HFS+.",
+      "log": ".build/transfer-status-xpc-2026-10-27.log"
+    },
+    {
+      "command": "SeedHop --verify-interface --output .build/transfer-status-interface.png",
+      "passed": true,
+      "tests": 3,
+      "log": ".build/transfer-status-interface-2026-10-27.log"
+    },
+    {
+      "command": "SeedHop --render-designs --output .build/transfer-status-design",
+      "passed": true,
+      "screens": 46,
+      "log": ".build/transfer-status-design-2026-10-27.log"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
+      "passed": true,
+      "log": ".build/transfer-status-clippy-2026-10-27.log"
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "passed": true
+    },
+    {
+      "command": "git diff --check",
+      "passed": true
+    },
+    {
+      "command": "Check bundled libseedhop_ffi.dylib excludes SEEDHOP_LAYOUT_CHECKPOINT",
+      "passed": true
+    }
+  ],
+  "faultRunner": {
+    "started_at": "2026-10-27T08:52:23.976824+00:00",
+    "platform": "macOS-15.8.1-arm64-arm-64bit-Mach-O",
+    "volume_size_mib": 32,
+    "checks": [
+      {
+        "name": "controlled-recovery",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "seedhop-core",
+          "--test",
+          "faults",
+          "--locked",
+          "--",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "seconds": 27.983,
+        "log": ".build/faults-shbcp2jv/controlled-recovery.log"
+      },
+      {
+        "name": "create-image",
+        "command": [
+          "hdiutil",
+          "create",
+          "-size",
+          "32m",
+          "-fs",
+          "HFS+",
+          "-volname",
+          "SeedHopFaults",
+          "/Users/ahmet/Rust/SeedHop/.build/faults-shbcp2jv/faults.dmg"
+        ],
+        "exit_code": 0,
+        "seconds": 1.027,
+        "log": ".build/faults-shbcp2jv/create-image.log"
+      },
+      {
+        "name": "attach-image",
+        "command": [
+          "hdiutil",
+          "attach",
+          "-nobrowse",
+          "-mountpoint",
+          "/Users/ahmet/Rust/SeedHop/.build/faults-shbcp2jv/volume",
+          "/Users/ahmet/Rust/SeedHop/.build/faults-shbcp2jv/faults.dmg"
+        ],
+        "exit_code": 0,
+        "seconds": 0.154,
+        "log": ".build/faults-shbcp2jv/attach-image.log"
+      },
+      {
+        "name": "real-disk-full",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "seedhop-core",
+          "--test",
+          "faults",
+          "--locked",
+          "real_disk_full_payload_and_state_writes_recover",
+          "--",
+          "--ignored",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "seconds": 1.554,
+        "log": ".build/faults-shbcp2jv/real-disk-full.log"
+      },
+      {
+        "name": "real-disk-full-retry",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "seedhop-core",
+          "--test",
+          "status",
+          "--locked",
+          "real_disk_full_retry_preserves_intent_queue_choices_and_destination",
+          "--",
+          "--ignored",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "seconds": 3.328,
+        "log": ".build/faults-shbcp2jv/real-disk-full-retry.log"
+      },
+      {
+        "name": "detach-image",
+        "command": [
+          "hdiutil",
+          "detach",
+          "/Users/ahmet/Rust/SeedHop/.build/faults-shbcp2jv/volume"
+        ],
+        "exit_code": 0,
+        "seconds": 0.131,
+        "log": ".build/faults-shbcp2jv/detach-image.log"
+      }
+    ],
+    "passed": true,
+    "finished_at": "2026-10-27T08:52:58.176119+00:00"
+  },
+  "visuallyReviewed": [
+    "transfer-error-light.png",
+    "transfer-error-dark.png",
+    "transfer-states-compact-dark.png",
+    "transfer-stale-light.png",
+    "cleanup-orphan-dark.png"
+  ],
+  "renderSha256": {
+    "add-dark.png": "e325793c7677f00c399b18df0575c4b67d5f3dee90fe78fd0ccb0f6bb4f726cc",
+    "add-light.png": "20edc498efddbd461441aaf81b0bdd6c4e0c967f58b280f9d9be257d39727a8a",
+    "cleanup-attention-dark.png": "1c392576624b180c1668e970cf82d0cd3786e242f39d91f659bbcdd4b6808437",
+    "cleanup-attention-light.png": "111d9b60657e55577b28bfe6870535d160d8a44e799be44e66fb8f31e26216c8",
+    "cleanup-orphan-dark.png": "8cfa5630a5f2b2a6eb2682a84bd720aceb97e54e2cb989846452bbe1d708411b",
+    "cleanup-orphan-light.png": "466cd87d6cdd879171e83787e468fcf8c016217e1da9250e2f08e45892c9aa93",
+    "compact-dark.png": "36fb4f7bed5f5aac5fda9320a0a820a3082def78e9b6bb1dbb9f3e92eaf221e0",
+    "compact-light.png": "2e22bb4ff79947ca0f4ff86cdf20551f9fd9856facddae4a7e0837982b03d0dc",
+    "contrast-compact-dark.png": "36fb4f7bed5f5aac5fda9320a0a820a3082def78e9b6bb1dbb9f3e92eaf221e0",
+    "contrast-compact-light.png": "2e22bb4ff79947ca0f4ff86cdf20551f9fd9856facddae4a7e0837982b03d0dc",
+    "contrast-library-dark.png": "545b3c07f6a4b63413d49438b113da11b2cc70ec9c09198934f82b8bd7bf196c",
+    "contrast-library-light.png": "eff54a77d79517ffa6daaaee41d1bef2b50b1149f511b9b31d85f6e2e70871e7",
+    "empty-dark.png": "c3d170f6754895f8271ec76ab2e7d6e1fa17b2afd4ff71bf4cd576423f1e0dd7",
+    "empty-light.png": "e7fd9532c6f41cf81e604aa667c45899d95b09805586a7196db5ba8169d848e2",
+    "file-controls-dark.png": "f0e2e9af7752c1873945612cd49d88d131aa3dfc52f2d57c6f3202bdcb36a94e",
+    "file-controls-light.png": "86870596aa6438bf25ad258bc0c708c54c72f3b42de8cd1aeb6da9cabe637ca2",
+    "files-dark.png": "331d284b41326f551a99694d58135c0a5fb2f0a4e1063c1349129e1600d22575",
+    "files-light.png": "2c45d1eea0b7925776b91f35f12f9a331076700cb13f09d0c334eb97d032d6f7",
+    "filter-dark.png": "3d614344c1937f78a4c0248ddcdfa50af0a7dc7160ce4756763715dc522d15ea",
+    "filter-light.png": "696462a7f1be504265e7e2be82103f31f5058d4e2d54245445dc0dd04a88896a",
+    "library-dark.png": "545b3c07f6a4b63413d49438b113da11b2cc70ec9c09198934f82b8bd7bf196c",
+    "library-light.png": "eff54a77d79517ffa6daaaee41d1bef2b50b1149f511b9b31d85f6e2e70871e7",
+    "move-compact-dark.png": "5e1bb764553537329f7f2f364e825f262e57d68f82e75d791e2eb2c448e2c848",
+    "move-compact-light.png": "792921c97081719382e5d97108a4e2b8dbc3c049581c8cb0d7200f40132e059b",
+    "move-progress-dark.png": "e6662f4597a06011b84c129b59b990ff829cf32c0e88ca105268b64fe58bafa0",
+    "move-progress-light.png": "3ce8d990d8f796c0780d678e9daa75463e5c8dcae549edffeaa13eb177831e22",
+    "move-recovery-compact-dark.png": "8ff63a6dbe299b537df0a5f78868c24c5bdf4cf88f439be279084b5e0f0e3614",
+    "move-recovery-compact-light.png": "37ed7ca2be9774ac63b0aea078ea395cfab98c86d8d8369d3ac8d9601ef7defb",
+    "move-recovery-dark.png": "f4937f7dec84b2d255a4dab76d9667cad60edef1e1577baf39b226805c7a60f1",
+    "move-recovery-light.png": "eeb2b526c76f60118023b792cc18eb7701304d422c7829aa0cdb52acc7995c23",
+    "move-saving-dark.png": "9db4e295c7bda3372cbc4d0299bbd9570de2dc97b8216b4b6609ea393588c353",
+    "move-saving-light.png": "6da0aab97e015ee90594ba9c1136ec6aa79fd600c5883c804db02d644f483f14",
+    "queue-settings-dark.png": "ad1ed9e9447e75b2040fe688f6674f72a09b507b1534bd1f2e8a01428945c730",
+    "queue-settings-light.png": "897d85f86d5c7d99fca77fff422d4d56083f022dc89fd4f97bd18cc3956bfba7",
+    "recovery-dark.png": "a9da7befb094cb88214c5830c98f22718eb7bb11d27ea30cc8537af4853c1c05",
+    "recovery-light.png": "53771029abdc158bb381cc677c94c878c012fa9c2c165ac0ed22cef287f0f4b6",
+    "selection-dark.png": "cc5c347ee2a26a7e4e8065a8f361154e44f3e22d9926ef5d8e605085e07811db",
+    "selection-light.png": "80dab7bfd674eeebb1c529306314b14afee15d4ca48460c79f525d0b56d4321a",
+    "settings-dark.png": "0fb89dfa901fbbb3c7e8e8e17fc2cb53bcad0858f4682eeea1633cc59c99b366",
+    "settings-light.png": "0016193a86117db33dfd382b3b077b98c4640ac8de4ff64ded01d88c9e368f0c",
+    "transfer-error-dark.png": "0b881ed19e0d3413dd15f1071f33ceadaa115cb6d49003b6423c7a12f83907c8",
+    "transfer-error-light.png": "f26d3a3b90d51a162d9f378bb83ba048061555671df6ae4d2e9fb5e5d571922c",
+    "transfer-stale-dark.png": "9e6b817aace0e0d28150e20ca198356beba40287bb6e0df3474ac4eeb4b0e3ec",
+    "transfer-stale-light.png": "8e20facb40fd961c31d58e219526e7ef1a1c85009b37268b6eea356e8c3904ef",
+    "transfer-states-compact-dark.png": "c8b8ac3ac9f4cf8d3927e99b38c04fb9eb5c259727b6f6926d7b28d7fecbb8df",
+    "transfer-states-compact-light.png": "eac714300e6f2f160ba5346f50b1fc5503a4da6da4a7567703575b2d6fa7db11"
+  },
+  "sourceSha256": {
+    "Cargo.lock": "8bab41e7641539dff76cc6fcefa169b28218fe3b2fcc21ad4a483ec40499d1cc",
+    "Cargo.toml": "b65673dc67b27523d9ee946f573a788cdb66d27ed2beb1b835c6fca446f60cd4",
+    "crates/seedhop-core/Cargo.toml": "780a6adc5e39c80f7962f14371019bae80a38b7eddf943f4e26b68a1074f5c80",
+    "crates/seedhop-core/src/adapter.rs": "696ac3eadd11ec11f90d63a5a011545677d9776567f2812a300a0dffafaa1fa2",
+    "crates/seedhop-core/src/bin/seedhop-lab.rs": "4204274fee1826ee2c6964429afffe4a7903d77ba0d051e8236f6008ba4275be",
+    "crates/seedhop-core/src/file_operation.rs": "6c35caa10fa4c1e6457c128dcab1e912d82ea39d5712e995cdd2a7410de46d2f",
+    "crates/seedhop-core/src/layout_journal.rs": "d7f09582e48473371c0ea68a91cc233445abcbf7d80733f6ceb43d6f3513ca7f",
+    "crates/seedhop-core/src/lib.rs": "af111c9f474e95b37f0b8f1ecbab56a8a51fde38ad40a640d640fa8d03c0d7f9",
+    "crates/seedhop-core/src/management.rs": "0b8c7a3cf530fed77b5f9dbf8c7d034ec22f17cd985730425dc7ef022e18d853",
+    "crates/seedhop-core/src/model.rs": "cee3e7012c50603b78ff939ca604c95f77cf72a53237e860a122612d7bf39b82",
+    "crates/seedhop-core/src/storage.rs": "c7dd9955e4adc7bc08afad9d989f7dfa8221a9852b229153428e2a58035c041e",
+    "crates/seedhop-core/src/storage_receipt.rs": "a3538937c9f99b9be9b6ce7c4360ee3acee03f2d2aa94d14203ad7b0399b3b6f",
+    "crates/seedhop-core/src/v2.rs": "b19d156da78b0fda1ae04e57ba6ec0f72f6ed70fd5a114b47ccf28d97800bc6e",
+    "crates/seedhop-core/tests/faults.rs": "2f08bc5c8d1449065b2193c3a1609bb0bc89453058ab50c7fa3ba2d8046cd67a",
+    "crates/seedhop-core/tests/management.rs": "229c6da28d49b60ac8d83d8280d8618703ed765609d64298fa842e4ea19684ba",
+    "crates/seedhop-core/tests/mse.rs": "f6f53d9814b0b0326a10b0b9e03296b55b89ccec5218a64e905d26bd4ef6a27c",
+    "crates/seedhop-core/tests/recovery.rs": "725a3446d051f29403b1de30c893aa0a2d475adfacf8a8a865f70c7536d877c0",
+    "crates/seedhop-core/tests/status.rs": "ecaa842dc0913e49a48a29125a292872a208ac33f5aa733bc694005701906c0f",
+    "crates/seedhop-core/tests/support/gated_storage.rs": "7da68cf896709f4928c2e70012de930fbb75a928cbb03d67b43ed683d89cc6be",
+    "crates/seedhop-core/tests/support/mod.rs": "c1440158a18f6ef0cd704eb79433801d52ddf532ca9ea4d552c25488a91bdb01",
+    "crates/seedhop-core/tests/support/volume.rs": "82b59ea4f1c9b8edff1268fb4b4a246ce08d48933557d19825ad9fc5266b297f",
+    "crates/seedhop-core/tests/swarm.rs": "919ae4ad0fa67bcba26c2ed247f0c0807f2c05e4cd4bab6a5669fe3b7c4c0268",
+    "crates/seedhop-core/tests/v2.rs": "52d4876f6607d495650a90516cb76885ed5e6aba70a18f40b3a17416e8d3ff87",
+    "crates/seedhop-ffi/src/bindgen.rs": "f7a2dd11fb370e9595bdfa6c32fc41a9b67a60bbab06ec711cb7a03eb873ffa6",
+    "crates/seedhop-ffi/src/lib.rs": "304c460fe9ed238564b17c8767f32df66f9966867dd4fcb19212f3b2c36e2cf3",
+    "docs/PRODUCT-ROADMAP.md": "94f76675f4af7fba3759359ca35932f9ef9fb1e12880d42cbaf38106b90feca5",
+    "docs/TRANSFER-STATUS.md": "6d0c9695f5836899c65924b1b153661f295b754144ae9542e4ea7b6a6d6ea5a6",
+    "docs/UX-REVIEW.md": "2ac64f84af8fd35335888c4305c745005d5dc3c7831ee5ebf3eb4158c7f340b7",
+    "macOS/App/DesignSystem.swift": "970626d1ca86837ca673780e6e1e5fafe980e227b309bbb0a782e3279ed211ef",
+    "macOS/App/EngineClient.swift": "2c0677db9b1b4668253b65bad946e2a18bb8445ab7e7cd683fac5d3deb1dfff1",
+    "macOS/App/EngineSelfTest.swift": "d2ef4e27ebf69532e1f067357f6360ba3db7e051d81b9375d0b3ead3df389d54",
+    "macOS/App/ImportSession.swift": "11040ceb2e1bb785288b238bef9edb1d82fc7ed54d9a39ba24eae3a6349452b8",
+    "macOS/App/ImportView.swift": "e9bde8f30b2c3a6f7f3d16b621ea04c37e91b357b4b1515a2642948e1faf21de",
+    "macOS/App/InterfaceSelfTest.swift": "e7545c797b875af667793dea35020b6fa529fb936d39cb371c3b79bca67f8bbf",
+    "macOS/App/LibraryStore.swift": "564d5b5d9097567bc1e3f465593722cc54aadca3b3b272eb99ba4dcc0a6361da",
+    "macOS/App/LibraryView.swift": "7f97d7a01ac0637c09c6f580b60269ad32f9ee58b362eea255dd54f8ce75dad6",
+    "macOS/App/LifecycleSelfTest.swift": "470fb6257a4eb211d78377d3781425e6db7ab3b6fae25a13f351e067e43084d1",
+    "macOS/App/PreviewFixtures.swift": "3814cd6f466fef24d2ba2c75160f0caae7f3a95e0d09bda27f1ccbc5465af5fa",
+    "macOS/App/SeedHopApp.swift": "6e220d3f841523f9a905db6c3ecefde3ce6aff03b450a458fee96dc3b4b4370d",
+    "macOS/App/SettingsView.swift": "2a443d74367058e18af9578e37765c631000ddd1dc7823c75be0c5e68d3207cd",
+    "macOS/App/TransferPresentation.swift": "5b35b800e301754e47d4c795d923b1e9c27d938fa147e713da935dd52cc075c2",
+    "macOS/App/UXSelfTest.swift": "68229891ec5036929cb11f4d092c8eab56e149c81f92f6f8e41db6c96af3c498",
+    "macOS/Host/EngineHost.swift": "bafedae72c6bbd1c3eacdf828b2045500a200d06198316b37053be6687da5d6d",
+    "macOS/Host/HostMain.swift": "0047ff4e48865fb39dcce30d75283efbd33745ef2c288f8cba570593a9e8e6a3",
+    "macOS/Shared/Models.swift": "6dbe2811f1a7a25475b4db49758ac511d4837109b19e1f826f0cf503e6cab985",
+    "macOS/Shared/Signing.swift": "a541a612abb091f9dc8d65035e8506c34166f72d9531a973da0cdb4aeed514cc",
+    "scripts/build.py": "e4a620cf4075761ecfef235dd2084a686b6ea622d3cee922e89f451de7ccef56",
+    "scripts/faults.py": "cbef369a6494ec7cd506318a20f2596cae72f2c85eeb1e50754d0144208f4d60"
+  },
+  "sourceSetSha256": "9572aa6d6aa4c36ad61bb057066a9b1e5361cd2850d30c9e00d9a642c2b475d8",
+  "binarySha256": {
+    ".build/SeedHop.app/Contents/MacOS/SeedHop": "b73e828c7dc1b50e03a31ec951e08d8c549e906620c9a5080d6507b53d315027",
+    ".build/SeedHop.app/Contents/MacOS/SeedHopAgent": "9ca3314cf68c7f25c9a2499c9a58f01aa472f963e5f5c9c3b0cae005c7bcf92e",
+    ".build/SeedHop.app/Contents/XPCServices/SeedHopEngine.xpc/Contents/MacOS/SeedHopEngine": "a9e3942bc15472e50bc5f3e9f9468d5b44ab5faa4c8c38fb1da018ea2d3a296c",
+    ".build/SeedHop.app/Contents/Frameworks/libseedhop_ffi.dylib": "78c98b53d4ab6cf618d954e67b7d258aaabb7e7f9e928c6a9d790477be9b30a6"
+  },
+  "logSha256": {
+    ".build/transfer-status-build-2026-10-27.log": "f8540ca16ac3b1b021e3c6570ec710dd1e7fbb6dd0dc0209baf06a43bfe021aa",
+    ".build/transfer-status-core-2026-10-27.log": "151867aa9b1621700b67cc832355ab7f6865a0e2480b51e10f4971bd860afde3",
+    ".build/transfer-status-regressions-2026-10-27.log": "4661ce1536ad2c8c50cd05cc8f0e4ba611b413258160a58e2e4ea192db210cc5",
+    ".build/transfer-status-faults-2026-10-27.log": "7fe2ecc9a27f71968252db06c8acb3bede7c8d3727b567dc6e9a134131d699fe",
+    ".build/transfer-status-clippy-2026-10-27.log": "1f7d5ce9a04f236d01686757400a36bb610550600cf6698315c6258bbaa9a54d",
+    ".build/transfer-status-ux-2026-10-27.log": "43a01d5beb9fd90abb17682fdf59f571779fbd2e75a1735bd5c2642f567cdb2f",
+    ".build/transfer-status-xpc-2026-10-27.log": "7ce4de9b310e84bc0fe6d7eed347d716bc45eb96aba7a828f08ed6d6fb4e157c",
+    ".build/transfer-status-interface-2026-10-27.log": "72fe9d28dfe45474079eeae7d69ca878f2dc957043f3ae8d4678c98342b5e81d",
+    ".build/transfer-status-design-2026-10-27.log": "8880cfdb00e8dbe26532e46981671fd69edc975bfb1be79a16f9c5cccb759546"
+  },
+  "limits": [
+    "Typed permission/device classifications have unit coverage; real new failure/retry integration uses ENOSPC.",
+    "Native key-event delivery, pointer walkthrough, VoiceOver, physical lifecycle, and public-swarm acceptance remain separate gates.",
+    "Older milestone results retain their original source and binary digests.",
+    "RSS, remote control, distribution signing, notarization, and release remain deferred."
+  ]
+}

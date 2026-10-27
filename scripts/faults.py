@@ -64,6 +64,10 @@ def main():
             "cargo", "test", "-p", "seedhop-core", "--test", "faults", "--locked",
             "real_disk_full_payload_and_state_writes_recover", "--", "--ignored", "--exact", "--nocapture",
         ], env={**os.environ, "SEEDHOP_FAULT_VOLUME": str(mount)})
+        execute("real-disk-full-retry", [
+            "cargo", "test", "-p", "seedhop-core", "--test", "status", "--locked",
+            "real_disk_full_retry_preserves_intent_queue_choices_and_destination", "--", "--ignored", "--exact", "--nocapture",
+        ], env={**os.environ, "SEEDHOP_FAULT_VOLUME": str(mount)})
         report["passed"] = True
     finally:
         if mounted:
