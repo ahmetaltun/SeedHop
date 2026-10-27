@@ -387,9 +387,24 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
             !torrents.contains { $0.id == notice.torrentId && $0.state == "checking" }
     }
     func setPriority(_ item: TorrentItem, file: FileItem, priority: UInt8) {
-        var request = EngineRequest(command:"priorities"); request.id = item.id
-        request.priorities = item.files.map { $0.index == file.index ? priority : $0.priority }
+        setPriorities(torrentID:item.id,indices:[file.index],priority:priority)
+    }
+    func setPriorities(torrentID: String, indices: Set<UInt32>, priority: UInt8) {
+        guard priority <= 2, !indices.isEmpty,
+              let item = torrents.first(where:{ $0.id == torrentID }), item.state != "checking",
+              indices.isSubset(of:Set(item.files.map(\.index))) else { return }
+        var request = EngineRequest(command:"priorities"); request.id = torrentID
+        request.priorities = item.files.map { indices.contains($0.index) ? priority : $0.priority }
         updateTransfer(request)
+    }
+    func setFilesIncluded(torrentID: String, indices: Set<UInt32>, included: Bool) {
+        guard !indices.isEmpty, let item = torrents.first(where:{ $0.id == torrentID }),
+              item.state != "checking", indices.isSubset(of:Set(item.files.map(\.index))) else { return }
+        let previous = Set(item.files.filter(\.selected).map(\.index))
+        let next = included ? previous.union(indices) : previous.subtracting(indices)
+        guard next != previous else { return }
+        guard !next.isEmpty else { error = "Keep at least one file included."; return }
+        setFileSelection(item,indices:Array(next))
     }
     func setQueueLimit(_ value: UInt32) {
         guard canChangeTransfers, !savingQueue else { return }

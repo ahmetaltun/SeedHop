@@ -129,6 +129,52 @@ import Combine
             try await eventually { store.busyTransfers.isEmpty }
             try expect(store.torrents[0].files[0].priority == 2 && store.torrents[0].files.map(\.selected) == item.files.map(\.selected),"Priority changed selection")
         }
+        try await check("File outline groups paths, filters ancestors, and retains stable identities") {
+            var files = PreviewFixtures.files
+            files.append(FileItem(index:4,name:"Subs/Italian/SDH.ita.HI.srt",size:98_000,downloaded:0,selected:false))
+            files.append(FileItem(index:5,name:"Subs/日本語.srt",size:52_000,downloaded:0,selected:true))
+            let session = TorrentFilesSession(files:files)
+            try expect(session.tree.nodes["folder:Subs"]?.indices == [4,5],"Folder did not aggregate descendants")
+            try expect(session.tree.matchingKeys("sdh") == ["file:4","folder:Subs","folder:Subs/Italian"],"Search lost ancestors or included unrelated files")
+            session.selection = ["folder:Subs","file:0"]; session.expanded = ["folder:Subs"]
+            session.query = "sdh"
+            try expect(session.selection == ["folder:Subs"] && session.tree.targets(session.selection,query:session.query).isEmpty,"Filtered folder could mutate hidden descendants")
+            session.query = ""; session.selection = ["file:4"]
+            let original = session.tree
+            files[4].downloaded = 100; session.update(files)
+            try expect(session.tree === original && session.selection == ["file:4"],"Progress rebuilt the hierarchy or lost selection")
+            files[4].name = "Subs/Italian/Renamed.srt"; session.update(files)
+            try expect(session.tree !== original && session.selection == ["file:4"] && session.expanded == ["folder:Subs"],"Rename lost file identity or unrelated expansion")
+            try expect(session.tree.targets(["folder:Subs","file:4"],query:"") == [4,5],"Overlapping folder/file selection duplicated targets")
+        }
+        try await check("Batch file commands use the current snapshot and protect the last included file") {
+            let (store, peer) = library(); peer.hold = ["priorities","select"]
+            let item = store.torrents[0]
+            peer.torrents[0].files[1].priority = 0; peer.torrents[0].files[3].selected = false
+            await store.refresh()
+            store.setPriorities(torrentID:item.id,indices:[0,3],priority:2)
+            try await eventually { peer.pending.count == 1 }
+            try expect(peer.pending[0].request.priorities == [2,0,1,2],"Batch priority overwrote an untargeted current priority")
+            store.selection = [store.torrents[1].id]
+            peer.releaseFirst(); try await eventually { store.busyTransfers.isEmpty }
+            try expect(!store.torrents[0].files[3].selected,"Priority included a skipped file")
+            store.setFilesIncluded(torrentID:item.id,indices:[0,1,2],included:false)
+            try expect(peer.pending.isEmpty && store.error == "Keep at least one file included.","Batch skip removed all included files")
+            store.setFilesIncluded(torrentID:item.id,indices:[1,2],included:false)
+            try await eventually { peer.pending.count == 1 }
+            try expect(peer.pending[0].request.id == item.id && peer.pending[0].request.selected == [0],"Batch inclusion used a changed torrent selection")
+            peer.releaseFirst(error:UserFacingError(message:"Could not save file choices"))
+            try await eventually { store.busyTransfers.isEmpty }
+            try expect(store.torrents[0].files.filter(\.selected).count == 3,"Failed batch changed confirmed inclusion")
+            store.setFilesIncluded(torrentID:item.id,indices:[1,2],included:false)
+            try await eventually { peer.pending.count == 1 }; peer.releaseFirst()
+            try await eventually { store.busyTransfers.isEmpty }
+            try expect(store.torrents[0].files.filter(\.selected).map(\.index) == [0],"Batch inclusion retry did not persist")
+            peer.torrents[0].state = "checking"; await store.refresh()
+            store.setPriorities(torrentID:item.id,indices:[0],priority:0)
+            store.setFilesIncluded(torrentID:item.id,indices:[1],included:true)
+            try expect(peer.pending.isEmpty,"Checking allowed a file mutation")
+        }
         try await check("Queue limits report failure, retry, and capture reorder targets") {
             let (store, peer) = library(); peer.hold = ["queue", "queueMove"]
             store.setQueueLimit(1); store.setQueueLimit(2)

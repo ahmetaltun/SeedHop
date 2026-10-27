@@ -19,6 +19,16 @@ enum PreviewFixtures {
         TorrentItem(id:String(repeating:"0",count:38)+id,name:name,state:state,totalBytes:total,downloadedBytes:downloaded,uploadedBytes:state == "seeding" ? total * 2 : 41_000_000,downloadRate:down,uploadRate:up,peers:peers,destination:NSHomeDirectory()+"/Downloads",files:files.isEmpty ? [FileItem(index:0,name:name,size:total,downloaded:downloaded,selected:true)] : files,trackers:["udp://tracker.example.org:1337/announce"],error:nil)
     }
     static var importPreview: ImportPreview { ImportPreview(id:"sample",name:"Big Buck Bunny — Open Movie",totalBytes:1_004_401_240,files:files,torrentBytes:Data()) }
+    static var filesInspector: TorrentItem {
+        var item = torrents[0]
+        item.files = [
+            FileItem(index:0,name:"Big.Buck.Bunny.2026.1080p.WEBRip.x264.AAC5.1-[Open.Movie].mp4",size:1_950_000_000,downloaded:819_000_000,selected:true),
+            FileItem(index:1,name:"Open Movie - Official site.jpg",size:39_000,downloaded:0,selected:false),
+            FileItem(index:2,name:"Open Movie - Read me.txt",size:848,downloaded:0,selected:false),
+            FileItem(index:3,name:"Subs/SDH.ita.HI.srt",size:98_000,downloaded:0,selected:false)
+        ]
+        return item
+    }
 }
 
 @MainActor enum DesignRenderer {
@@ -50,6 +60,21 @@ enum PreviewFixtures {
             controls.torrents[0].files[0].priority = 2
             controls.maxActiveDownloads = 2
             try capture(LibraryView(inspectorTab:1).environmentObject(controls),size:NSSize(width:1240,height:780),appearance:appearance,to:output.appendingPathComponent("file-controls-\(name).png"))
+            for width in [250,280,360] {
+                let sample = LibraryStore(designPreview:true); sample.torrents = [PreviewFixtures.filesInspector]
+                let item = sample.torrents[0], session = TorrentFilesSession(files:item.files)
+                session.expanded = ["folder:Subs"]; session.selection = ["file:0"]
+                try capture(TorrentFilesView(torrent:item,session:session).environmentObject(sample),size:NSSize(width:width,height:520),appearance:appearance,to:output.appendingPathComponent("files-inspector-\(width)-\(name).png"))
+            }
+            let fileSample = PreviewFixtures.filesInspector
+            let searchedFiles = TorrentFilesSession(files:fileSample.files); searchedFiles.query = "ita"
+            try capture(TorrentFilesView(torrent:fileSample,session:searchedFiles).environmentObject(controls),size:NSSize(width:280,height:520),appearance:appearance,to:output.appendingPathComponent("files-search-\(name).png"))
+            searchedFiles.query = "no matching file"
+            try capture(TorrentFilesView(torrent:fileSample,session:searchedFiles).environmentObject(controls),size:NSSize(width:250,height:520),appearance:appearance,to:output.appendingPathComponent("files-no-results-\(name).png"))
+            controls.connected = false; searchedFiles.query = ""
+            try capture(TorrentFilesView(torrent:fileSample,session:searchedFiles).environmentObject(controls),size:NSSize(width:280,height:520),appearance:appearance,to:output.appendingPathComponent("files-offline-\(name).png"))
+            controls.connected = true
+            try capture(TorrentFilesView(torrent:fileSample,session:searchedFiles).environmentObject(controls),size:NSSize(width:280,height:520),appearance:name == "dark" ? .accessibilityHighContrastDarkAqua : .accessibilityHighContrastAqua,to:output.appendingPathComponent("files-contrast-\(name).png"))
             try capture(SettingsView(tab:1).environmentObject(controls),size:NSSize(width:570,height:660),appearance:appearance,to:output.appendingPathComponent("queue-settings-\(name).png"))
             controls.fileOperation = FileOperationItem(id:"sample-move",torrentId:controls.torrents[0].id,kind:"relocate",phase:"copying",completedBytes:420_000_000,totalBytes:1_004_401_240,cancelRequested:false)
             try capture(LibraryView().environmentObject(controls),size:NSSize(width:1240,height:880),appearance:appearance,to:output.appendingPathComponent("move-progress-\(name).png"))
@@ -102,7 +127,7 @@ enum PreviewFixtures {
             contrastStore.showInspector = false
             try capture(LibraryView().environmentObject(contrastStore),size:NSSize(width:820,height:620),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-compact-\(name).png"))
         }
-        print("Rendered 58 fixture screens to \(output.path); library fixtures are explicitly labeled sample data")
+        print("Rendered 72 fixture screens to \(output.path); library fixtures are explicitly labeled sample data")
     }
     private static func capture<V:View>(_ view:V,size:NSSize,appearance:NSAppearance.Name,to url:URL) throws {
         let window = NSWindow(contentRect:NSRect(origin:.zero,size:size),styleMask:[.borderless],backing:.buffered,defer:false)

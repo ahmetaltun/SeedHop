@@ -63,6 +63,13 @@ also leave budget acceptance open (UI-PERF-002). See `PERFORMANCE.md` and
 
 ## Manual acceptance matrix
 
+The Files inspector redesign adds controlled native evidence for outline
+selection, expansion, Space dispatch, checkbox callbacks, search ancestors,
+context-menu Rename focus restoration, and last-included-file readability.
+See `FILES-INSPECTOR-REDESIGN.md` and
+`results/files-inspector-2026-10-27.json`. These checks do not close the manual
+rows below; VoiceOver reading order and speech still require a live walkthrough.
+
 Status on 2026-10-27: **not run** for every row below. No physical keyboard,
 pointer, VoiceOver speech, or OS accessibility preference was changed or certified
 by this implementation pass. Record observer, machine/OS, build digest, date,
@@ -76,7 +83,7 @@ actual behavior, and exact failures when executing these checks.
 | Import metadata | Open a safe torrent fixture; focus reaches Files to download; arrow-row navigation, Space toggling, Tab/Shift-Tab, file toggles, Select/Deselect all, destination, and Add paused work | Not run |
 | Import errors | Invalid magnet and failed metadata read announce the error once; Retry remains reachable; a later recurrence is announced again | Not run |
 | Busy import | During lookup, Cancel works; during add, closing/cancel/input are blocked until the add commits | Not run |
-| File controls | VoiceOver speaks each filename, checked state, current priority, and contextual Rename action; at least one file stays selected | Not run |
+| File controls | Outline hierarchy, download inclusion versus row selection, mixed folders, scoped search, shared priority/actions, and Rename work with keyboard and VoiceOver; at least one file stays included | Not run |
 | Rename | Name is focused/selected; Tab reaches Rename and Cancel; Escape restores prior focus; invalid name is announced; a selection change does not retarget the action | Not run |
 | Move and cancellation | Copied bytes and phase are readable; phase changes announce without per-byte chatter; Cancel targets the current operation; saving is not cancellable | Not run |
 | Recovery | Active folder and retained-copy message are understandable; Retry Cleanup, Keep Extra Copies, and folder actions are reachable; failure remains announced and retryable | Not run |

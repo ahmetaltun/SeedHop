@@ -37,8 +37,26 @@ selection changes. In-flight changes display saving feedback and prevent
 overlapping writes to the same transfer.
 
 Empty, no-results, connecting, switching, and error states have explicit copy
-and actions. File lists use lazy stacks. Polling pauses when the library window
+and actions. Torrent-details files use a virtualized native outline. Import file
+selection keeps its existing native table. Polling pauses when the library window
 is hidden; byte values are formatted for the user's locale.
+
+The Files inspector uses compact 44-point rows with file-type icons, one-line
+middle-truncated names, size, and available progress. Real folders use native
+disclosure and mixed-state download checkboxes. Row selection is independent
+from inclusion. Each row has a subdued priority pop-up beside its secondary
+metadata, available without selecting the row. A shared Actions menu supports
+batch changes and Rename; context menus mirror the actions.
+The last included file disables only its checkbox, retaining readable text.
+File search retains matching ancestors and never changes download inclusion.
+Filtered folders cannot mutate hidden descendants. Per-torrent search,
+selection, and expansion survive inspector/tab navigation during the window
+session. Files scroll independently beneath a compact transfer summary, leaving
+search and actions stationary. Selection and operation status share a fixed-height
+footer, so notices never move the file viewport. The last-file explanation stays
+in checkbox help and file details. Checkbox, icon, and disclosure align with the
+filename line, rather than the center of the two-line row. See `FILES-INSPECTOR-REDESIGN.md` for the full
+interaction contract and acceptance boundary.
 
 ## Import
 
@@ -75,9 +93,10 @@ search cancellation. Escape cancels metadata lookup while an import is resolving
 
 ## Visual QA
 
-`make render` produces 26 light/dark fixture screens, including multi-selection,
+`make render` produces 72 fixture screens across light/dark appearances, including multi-selection,
 empty-filter, connection-recovery states, the file-priority/rename inspector,
-queue settings, and four high-contrast library layouts.
+queue settings, four high-contrast library layouts, and narrow Files outlines,
+file search, empty results, offline files, and high-contrast Files layouts.
 Sample transfers are
 available only through explicit design-preview mode. These renders verify
 layout and typography; they do not prove VoiceOver navigation, live keyboard

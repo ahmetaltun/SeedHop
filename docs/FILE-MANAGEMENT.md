@@ -27,6 +27,31 @@ and native menus, file inspector, and transfer settings.
   torrent metadata or protocol identity. New paths survive restart, recheck,
   relocation, seeding, and removal with file deletion.
 
+### Files inspector — 2026-10-27
+
+The details Files tab now uses a compact native folder outline, distinct row selection
+and download inclusion, direct per-row priority pop-ups, shared Actions menus,
+context actions, and scoped path search. Row priority does not require selection;
+the Actions menu supports batch priority changes. Low/Normal/High priorities support selected files and folder
+descendants in one command using the current confirmed snapshot. Changing
+priority does not include skipped files. Folder inclusion is one selection
+command and cannot exclude the final included file. While searching, folder
+changes are unavailable; individual matching files remain actionable.
+
+Rename remains a single-file operation using the existing sheet, transaction,
+progress, cancellation, and recovery behavior. Folder rename, batch rename,
+per-file opening, and Quick Look are outside this change. Checking suppresses
+normal progress percentages; errors show progress unavailable, and disconnected
+data is explicitly last known. Numeric progress derives from the engine's
+per-file have-byte snapshot, not a new filesystem verification pass.
+
+The design plan and verification record are in `FILES-INSPECTOR-REDESIGN.md`.
+Checkboxes, icons, and disclosure indicators align with each filename line.
+Operation messages and search counts use a fixed-height footer; selecting the
+last included file never inserts a notice above the list or moves its viewport.
+Controlled native callbacks and rendered fixtures do not certify physical input
+or VoiceOver speech; those manual acceptance gates remain separate.
+
 ## Storage transactions
 
 Moves and renames quiesce peer writes, copy into exclusively created target

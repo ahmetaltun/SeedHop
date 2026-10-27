@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-27",
+  "scope": "Torrent-details Files inspector; Swift UI and existing-command store helpers only",
+  "build": {
+    "command": "make build",
+    "result": "passed",
+    "signing": "ad-hoc development",
+    "deepStrictSignatureVerification": "passed",
+    "binarySha256": "ef4497d7f2ac70e24217f440b6b6323e2bea75511d5736c7df04a8214dccd1d4"
+  },
+  "ux": {
+    "command": ".build/SeedHop.app/Contents/MacOS/SeedHop --verify-ux",
+    "result": "passed",
+    "checks": 38
+  },
+  "native": {
+    "command": ".build/SeedHop.app/Contents/MacOS/SeedHop --verify-interface --output .build/files-interface.png",
+    "result": "passed",
+    "checks": 16,
+    "largeOutline": [
+      {
+        "files": 1000,
+        "materializedCells": 9,
+        "elapsedMsIncluding1200MsLayoutWaits": 1270,
+        "budgetMs": 5000
+      },
+      {
+        "files": 10000,
+        "materializedCells": 9,
+        "elapsedMsIncluding1200MsLayoutWaits": 1232,
+        "budgetMs": 5000
+      }
+    ],
+    "systemPreferencesChanged": false,
+    "physicalInputCertified": false,
+    "voiceOverSpeechCertified": false,
+    "newAssertions": [
+      "44-point rows align checkbox/icon/filename centers",
+      "Priority changes without row selection",
+      "Priority menu items survive progress updates",
+      "Viewport position and height stay constant across selection/search/last-file restrictions/operation status"
+    ]
+  },
+  "render": {
+    "command": ".build/SeedHop.app/Contents/MacOS/SeedHop --render-designs --output .build/design",
+    "result": "passed",
+    "screens": 72,
+    "inspected": [
+      "file-controls-light.png",
+      "files-inspector-280-light.png",
+      "files-inspector-250-dark.png",
+      "files-contrast-light.png",
+      "files-no-results-dark.png"
+    ]
+  },
+  "sourceSha256": {
+    "macOS/App/TorrentFilesView.swift": "d931153bc7278d5096e5d74434f1454d094de5f65cbb51413be3b30eafb1df3d",
+    "macOS/App/LibraryView.swift": "c0b29b1fd86678c126215727103eb02269374bd1e5b7ffcd51a8e1ff540549c3",
+    "macOS/App/LibraryStore.swift": "bd9dd154c8056059395e96405964e4461c3fa094c5db5fcf0df77cc26772ab37",
+    "macOS/App/PreviewFixtures.swift": "79d4bae25ec820e65551aba64285a371858dd2e722cecdda5c3aaa3153609da3",
+    "macOS/App/UXSelfTest.swift": "482c987f046d987a4ff51e42a0d1b94668a188e1641878eba5532b9598ab0a1c",
+    "macOS/App/InterfaceSelfTest.swift": "b9c9bf977d166ad5079f5d34e7d60809aa9b1355f23d24facbae82f4028cf0c3"
+  },
+  "logSha256": {
+    ".build/files-build.log": "7dcd555cde39b975e2139c01aca5ddea39f04f4363912605b41a72ee606f4ca0",
+    ".build/files-ux.log": "e89a19f37ae4dbf2c683c66a7ddb3897fd893da1e783d68df9908aeb9de7a839",
+    ".build/files-interface.log": "88f6a9a49963cc74f2dfcc8f2ea7165cad6cfa6e64b0cc1054a19c665e13533a",
+    ".build/files-render.log": "fd11365cab2c63ef30506e33f241c567556c9a6210aee164d8fc05cc678b4c00"
+  },
+  "remainingManual": [
+    "Physical keyboard and pointer walkthrough",
+    "VoiceOver reading order and speech",
+    "Deep-hierarchy live scrolling",
+    "Actual OS accessibility preference changes",
+    "Live-transfer rename and cancellation through the new outline"
+  ],
+  "limits": [
+    "Controlled fixture timings do not close whole-library performance gates",
+    "No Rust or XPC protocol changes",
+    "No engine, physical lifecycle, or distribution release certification"
+  ],
+  "revision": "Compact row correction after live user review"
+}

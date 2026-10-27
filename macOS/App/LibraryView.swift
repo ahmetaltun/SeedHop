@@ -14,6 +14,7 @@ struct LibraryView: View {
     @EnvironmentObject var store: LibraryStore
     @State private var sortOrder = [KeyPathComparator(\TorrentItem.name)]
     @State private var inspectorTab = 0
+    @StateObject private var fileSessions = TorrentFilesSessions()
     @FocusState private var searchFocused: Bool
     @FocusState private var transfersFocused: Bool
     @State private var dropTargeted = false
@@ -277,6 +278,21 @@ struct LibraryView: View {
             if store.selected.count > 1 { multipleSelectionInspector }
             else if let item = store.selected.first {
                 let status = store.presentation(item)
+                if inspectorTab == 1 {
+                    VStack(alignment:.leading,spacing:10) {
+                        HStack(alignment:.top,spacing:8) {
+                            Image(systemName:Design.symbol(item.name)).foregroundStyle(.secondary)
+                            Text(item.name).font(.system(size:13,weight:.semibold)).lineLimit(2).help(item.name)
+                                .accessibilityLabel(item.name)
+                        }
+                        StateBadge(torrent:item,presentation:status)
+                        if let progress = status.progress { TransferProgress(value:progress).accessibilityLabel(status.progressTitle) }
+                        inspectorTabs
+                    }.padding(14)
+                    Divider()
+                    TorrentFilesView(torrent:item,session:fileSessions.session(for:item))
+                        .frame(maxWidth:.infinity,maxHeight:.infinity)
+                } else {
                 ScrollView {
                     VStack(alignment:.leading,spacing:22) {
                         VStack(alignment:.leading,spacing:13) {
@@ -298,15 +314,15 @@ struct LibraryView: View {
                             Button("Move to Front of Queue") { store.moveToFront(item) }.disabled(!store.canChangeTransfers || store.busyTransfers.contains(item.id))
                         }
                         if status.isError && !status.hasRecovery { transferFailure(item,status:status) }
-                        Picker("Details",selection:$inspectorTab) { Text("Overview").tag(0); Text("Files").tag(1); Text("Trackers").tag(2) }.pickerStyle(.segmented).labelsHidden()
+                        inspectorTabs
                         if inspectorTab == 0 { overview(item) }
-                        else if inspectorTab == 1 { files(item) }
                         else {
                             VStack(alignment:.leading,spacing:10) { SectionEyebrow(title:"Trackers"); if item.trackers.isEmpty { Text("No trackers are listed for this transfer.").font(.system(size:11)).foregroundStyle(.secondary) }; ForEach(item.trackers,id:\.self) { Text(redactTracker($0)).font(.system(size:10,design:.monospaced)).textSelection(.enabled) } }
                         }
                     }.padding(20)
                 }
                 Spacer(minLength:0)
+                }
                 Divider()
                 HStack {
                     Button { if item.state == "error" { store.retryTransfer(item) } else { store.toggleSelected(paused:!item.isPaused) } } label: { Label(item.state == "error" ? "Retry" : item.isPaused ? "Resume" : "Pause",systemImage:item.state == "error" ? "arrow.clockwise" : item.isPaused ? "play" : "pause").frame(maxWidth:.infinity) }.buttonStyle(.bordered).controlSize(.large).disabled(item.state == "error" ? !store.canRetryTransfer(item) : item.isPaused ? !store.canResumeSelection : !store.canPauseSelection)
@@ -354,30 +370,8 @@ struct LibraryView: View {
         }
     }
     private func detail(_ label: String, _ value: String) -> some View { HStack { Text(label).foregroundStyle(.secondary); Spacer(); Text(value).monospacedDigit() }.font(.system(size:11)) }
-    private func files(_ t: TorrentItem) -> some View {
-        let selectedCount = t.files.filter(\.selected).count
-        return LazyVStack(alignment:.leading,spacing:12) {
-            SectionEyebrow(title:"\(t.files.count) files")
-            if store.busyTransfers.contains(t.id) { HStack { ProgressView().controlSize(.small); Text("Updating transfer…").font(.system(size:11)).foregroundStyle(.secondary) } }
-            ForEach(t.files) { file in
-                VStack(alignment:.leading,spacing:6) {
-                Toggle(isOn:Binding(get:{file.selected},set:{ selected in var indices = Set(t.files.filter(\.selected).map(\.index)); if selected { indices.insert(file.index) } else { indices.remove(file.index) }; store.setFileSelection(t,indices:Array(indices)) })) {
-                    VStack(alignment:.leading,spacing:4) { Text(file.name).font(.system(size:11)).lineLimit(2); Text(SizeText.bytes(file.size)).font(.system(size:10)).foregroundStyle(.secondary) }
-                }.toggleStyle(.checkbox).accessibilityLabel("Download \(file.name)").accessibilityHint(selectedCount == 1 && file.selected ? "At least one file must stay selected." : "\(SizeText.bytes(file.size))").disabled(!store.canChangeTransfers || store.busyTransfers.contains(t.id) || t.state == "checking" || (selectedCount == 1 && file.selected))
-                HStack {
-                    Menu {
-                        Button("Low") { store.setPriority(t,file:file,priority:0) }
-                        Button("Normal") { store.setPriority(t,file:file,priority:1) }
-                        Button("High") { store.setPriority(t,file:file,priority:2) }
-                    } label: {
-                        Text(file.priority == 0 ? "Low" : file.priority == 2 ? "High" : "Normal").font(.system(size:11))
-                    }.menuStyle(.borderlessButton).accessibilityLabel("Priority for \(file.name)").accessibilityValue(file.priority == 0 ? "Low" : file.priority == 2 ? "High" : "Normal").frame(width:95)
-                    Spacer()
-                    Button("Rename…") { store.requestRename(t,file:file) }.buttonStyle(.borderless).font(.system(size:10)).accessibilityLabel("Rename \(file.name)").disabled(store.storageRecovery != nil)
-                }.padding(.leading,18).disabled(!store.canChangeTransfers || store.busyTransfers.contains(t.id) || t.state == "checking")
-                }
-            }
-        }
+    private var inspectorTabs: some View {
+        Picker("Details",selection:$inspectorTab) { Text("Overview").tag(0); Text("Files").tag(1); Text("Trackers").tag(2) }.pickerStyle(.segmented).labelsHidden()
     }
     private func redactTracker(_ raw: String) -> String {
         guard let url = URL(string:raw) else { return "Tracker" }

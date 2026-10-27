@@ -63,7 +63,138 @@ import AppKit
         }
         print("PASS: Dismissing import returns focus to the native transfer table.")
         try await verifyControlledSheets(store:store,window:reopened)
+        try await verifyFilesOutline()
         print("Native key-event delivery, VoiceOver speech, live-transfer reopening, and scrolling remain manual acceptance checks.")
+    }
+
+    private static func verifyFilesOutline() async throws {
+        let store = UXSelfTest.nativeFixture(), item = store.torrents[0]
+        let session = TorrentFilesSession(files:item.files)
+        let window = NSWindow(contentRect:NSRect(x:0,y:0,width:280,height:520),styleMask:[.titled],backing:.buffered,defer:false)
+        window.isReleasedWhenClosed = false; window.title = "Files inspector · native fixture"
+        window.contentView = NSHostingView(rootView:FilesInterfaceFixture(store:store,session:session))
+        window.makeKeyAndOrderFront(nil)
+        defer { window.close() }
+        try await settle()
+        guard let outline = descendants(window.contentView).compactMap({ $0 as? NSOutlineView }).first else {
+            throw UserFacingError(message:"Files inspector did not create a native outline")
+        }
+        guard let folder = session.tree.nodes["folder:Artwork"], let file = session.tree.nodes["file:0"] else {
+            throw UserFacingError(message:"Files outline fixture nodes unavailable")
+        }
+        guard let viewport = outline.enclosingScrollView else { throw UserFacingError(message:"Files viewport unavailable") }
+        let originalViewport = viewport.convert(viewport.bounds,to:nil)
+        func expectStableViewport() throws {
+            let current = viewport.convert(viewport.bounds,to:nil)
+            guard abs(current.minY-originalViewport.minY) < 0.5, abs(current.height-originalViewport.height) < 0.5 else {
+                throw UserFacingError(message:"File selection or status shifted the Files viewport")
+            }
+        }
+        let initialRow = outline.row(forItem:file)
+        guard let initialCell = outline.view(atColumn:0,row:initialRow,makeIfNecessary:true),
+              let popup = initialCell.subviews.compactMap({ $0 as? NSPopUpButton }).first,
+              let initialCheck = initialCell.subviews.compactMap({ $0 as? NSButton }).first(where:{ !($0 is NSPopUpButton) }),
+              let name = initialCell.subviews.compactMap({ $0 as? NSTextField }).first(where:{ $0.stringValue == file.name }),
+              let icon = initialCell.subviews.compactMap({ $0 as? NSImageView }).first,
+              popup.isEnabled, session.selection.isEmpty,
+              abs(initialCheck.frame.midY-name.frame.midY) < 0.5, abs(icon.frame.midY-name.frame.midY) < 0.5,
+              outline.rowHeight == 44 else { throw UserFacingError(message:"Compact row controls are misaligned or priority requires row selection") }
+        popup.selectItem(withTag:2)
+        NSApp.sendAction(popup.action!,to:popup.target,from:popup); try await settle()
+        guard UXSelfTest.nativeRequests.last(where:{ $0.command == "priorities" })?.priorities == [2,1,1,1], session.selection.isEmpty else {
+            throw UserFacingError(message:"Row priority changed selection or targeted the wrong file")
+        }
+        try expectStableViewport()
+        outline.expandItem(folder); try await settle()
+        guard session.expanded.contains(folder.key), outline.numberOfRows == 5 else {
+            throw UserFacingError(message:"Native expansion did not expose the folder's file")
+        }
+        let row = outline.row(forItem:file)
+        outline.selectRowIndexes(IndexSet(integer:row),byExtendingSelection:false)
+        window.makeFirstResponder(outline); try await settle()
+        guard session.selection == [file.key], window.firstResponder === outline else {
+            throw UserFacingError(message:"Native file selection did not retain keyboard focus")
+        }
+        try expectStableViewport()
+        if let menu = outline.menu {
+            menu.delegate?.menuNeedsUpdate?(menu)
+            guard let rename = menu.items.firstIndex(where:{ $0.title == "Rename…" }) else { throw UserFacingError(message:"File context menu omitted Rename") }
+            menu.performActionForItem(at:rename); try await settle()
+            guard let sheet = window.attachedSheet,
+                  let editor = sheet.firstResponder as? NSTextView, editor.isFieldEditor,
+                  let input = editor.delegate as? NSTextField, input.stringValue == file.name,
+                  let cancel = descendants(sheet.contentView).compactMap({ $0 as? NSButton }).first(where:{ $0.title == "Cancel" }) else {
+                throw UserFacingError(message:"File outline Rename did not capture its selected file")
+            }
+            cancel.performClick(nil); try await settle()
+            guard window.firstResponder === outline else { throw UserFacingError(message:"Rename did not restore outline focus") }
+        }
+        guard let space = NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:window.windowNumber,context:nil,characters:" ",charactersIgnoringModifiers:" ",isARepeat:false,keyCode:49) else {
+            throw UserFacingError(message:"Could not construct controlled Space event")
+        }
+        outline.keyDown(with:space); try await settle()
+        guard let request = UXSelfTest.nativeRequests.last(where:{ $0.command == "select" }),
+              request.id == item.id, request.selected == [1,2,3], session.selection == [file.key] else {
+            throw UserFacingError(message:"Space changed row selection or submitted wrong download targets")
+        }
+        guard let cell = outline.view(atColumn:0,row:row,makeIfNecessary:true),
+              let checkbox = descendants(cell).compactMap({ $0 as? NSButton }).first else {
+            throw UserFacingError(message:"Native file checkbox unavailable")
+        }
+        checkbox.performClick(nil); try await settle()
+        guard UXSelfTest.nativeRequests.last(where:{ $0.command == "select" })?.selected == [0,1,2,3], session.selection == [file.key] else {
+            throw UserFacingError(message:"Native checkbox changed selection or submitted wrong inclusion")
+        }
+        let tree = session.tree
+        let priorityMenuItem = popup.itemArray.first
+        store.torrents[0].files[0].downloaded += 100; try await settle()
+        guard session.tree === tree, outline.isItemExpanded(folder), window.firstResponder === outline,
+              popup.itemArray.first === priorityMenuItem else {
+            throw UserFacingError(message:"Progress update rebuilt the outline or lost expansion/focus")
+        }
+        session.query = "Poster"; try await settle()
+        try expectStableViewport()
+        guard outline.numberOfRows == 2, session.selection.isEmpty else {
+            throw UserFacingError(message:"File search failed to retain ancestors or clear hidden selection")
+        }
+        session.query = ""; try await settle()
+        guard outline.isItemExpanded(folder) else { throw UserFacingError(message:"Clearing search lost saved folder expansion") }
+        store.torrents[0].files = store.torrents[0].files.map { file in var value = file; value.selected = file.index == 0; return value }
+        try await settle()
+        let finalRow = outline.row(forItem:file)
+        guard let cell = outline.view(atColumn:0,row:finalRow,makeIfNecessary:true),
+              let checkbox = descendants(cell).compactMap({ $0 as? NSButton }).first,
+              !checkbox.isEnabled,
+              descendants(cell).compactMap({ $0 as? NSTextField }).contains(where:{ $0.stringValue == file.name && $0.isEnabled }) else {
+            throw UserFacingError(message:"Last included file did not retain readable text with a disabled checkbox")
+        }
+        print("PASS: Native file outline expands, selects, handles controlled Space and checkbox clicks, filters ancestors, and preserves focus across progress updates.")
+        print("PASS: File context-menu Rename captures the selected filename and Cancel restores outline focus.")
+        print("PASS: Last included file disables only its checkbox; the filename remains enabled.")
+        outline.selectRowIndexes(IndexSet(integer:finalRow),byExtendingSelection:false); try await settle()
+        try expectStableViewport()
+        store.fileOperation = FileOperationItem(id:"files-layout",torrentId:item.id,kind:"rename",phase:"copying",completedBytes:1,totalBytes:100,cancelRequested:false)
+        try await settle(); try expectStableViewport()
+        store.fileOperation = nil; try await settle(); try expectStableViewport()
+        print("PASS: 44-point rows align checkbox, icon, and filename; row priority works without selection.")
+        print("PASS: Selection, search, last-file restriction, and operation status preserve the Files viewport frame.")
+        for count in [1_000,10_000] {
+            let files = PerformanceSelfTest.fixture(1,files:count).torrents[0].files
+            let started = ProcessInfo.processInfo.systemUptime
+            store.torrents[0].files = files; try await settle()
+            if let folder = session.tree.roots.first { outline.expandItem(folder) }
+            try await settle()
+            let identity = session.tree
+            store.torrents[0].files[0].downloaded += 1; try await settle()
+            guard session.tree === identity, outline.numberOfRows == count + 1 else {
+                throw UserFacingError(message:"Large file outline lost hierarchy or rebuilt it for byte updates")
+            }
+            let cells = descendants(outline).filter { $0 is NSTableCellView }.count
+            guard cells < 100 else { throw UserFacingError(message:"Large file outline did not virtualize native cells") }
+            let elapsed = Int((ProcessInfo.processInfo.systemUptime-started)*1000)
+            guard elapsed < 5_000 else { throw UserFacingError(message:"\(count)-file outline exceeded the controlled 5 s budget: \(elapsed) ms including layout waits") }
+            print("PASS: \(count)-file native outline, \(cells) materialized cells, \(elapsed) ms including three 400 ms layout waits.")
+        }
     }
 
     private static func verifyControlledSheets(store: LibraryStore, window: NSWindow) async throws {
@@ -189,6 +320,14 @@ import AppKit
             throw UserFacingError(message:"Could not encode the native navigation fixture")
         }
         try png.write(to:url)
+    }
+}
+
+private struct FilesInterfaceFixture: View {
+    @ObservedObject var store: LibraryStore
+    @ObservedObject var session: TorrentFilesSession
+    var body: some View {
+        if let item = store.torrents.first { TorrentFilesView(torrent:item,session:session).environmentObject(store) }
     }
 }
 #endif
