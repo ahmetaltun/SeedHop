@@ -250,7 +250,11 @@ struct LibraryView: View {
             Divider()
             Button("Show in Finder") { if let item = store.torrents.first(where:{ ids.contains($0.id) }) { NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:item.destination) } }.disabled(ids.isEmpty)
             Button("Remove…",role:.destructive) { store.selection = ids; store.requestRemoval() }.disabled(!canAct(on:ids) || ids.contains(where:store.hasPendingCleanup))
-        } primaryAction: { ids in store.selection = ids; store.showInspector = true }
+        } primaryAction: { ids in
+            guard !ids.isEmpty else { return }
+            store.selection = ids
+            store.toggleSelected(paused:store.canPauseSelection)
+        }
     }
     private var emptyState: some View {
         VStack(spacing:0) {
@@ -273,67 +277,109 @@ struct LibraryView: View {
     }
     private var inspector: some View {
         VStack(alignment:.leading,spacing:0) {
-            HStack { SectionEyebrow(title:"Transfer details"); Spacer(); Button { store.showInspector = false } label: { Image(systemName:"xmark").font(.system(size:10)) }.buttonStyle(.plain).foregroundStyle(.secondary).accessibilityLabel("Close inspector") }.padding(20)
+            HStack {
+                Text("Transfer details").font(.system(size:12,weight:.semibold))
+                Spacer()
+                Button { store.showInspector = false } label: {
+                    Image(systemName:"xmark").font(.system(size:11,weight:.medium)).frame(width:24,height:24)
+                }.buttonStyle(.plain).foregroundStyle(.secondary)
+                    .help("Close transfer details").accessibilityLabel("Close inspector")
+            }.padding(.horizontal,14).padding(.vertical,8)
             Divider()
             if store.selected.count > 1 { multipleSelectionInspector }
             else if let item = store.selected.first {
                 let status = store.presentation(item)
+                inspectorSummary(item,status:status)
+                inspectorTabs.padding(.horizontal,14).padding(.bottom,12)
+                Divider()
                 if inspectorTab == 1 {
-                    VStack(alignment:.leading,spacing:10) {
-                        HStack(alignment:.top,spacing:8) {
-                            Image(systemName:Design.symbol(item.name)).foregroundStyle(.secondary)
-                            Text(item.name).font(.system(size:13,weight:.semibold)).lineLimit(2).help(item.name)
-                                .accessibilityLabel(item.name)
-                        }
-                        StateBadge(torrent:item,presentation:status)
-                        if let progress = status.progress { TransferProgress(value:progress).accessibilityLabel(status.progressTitle) }
-                        inspectorTabs
-                    }.padding(14)
-                    Divider()
                     TorrentFilesView(torrent:item,session:fileSessions.session(for:item))
                         .frame(maxWidth:.infinity,maxHeight:.infinity)
                 } else {
-                ScrollView {
-                    VStack(alignment:.leading,spacing:22) {
-                        VStack(alignment:.leading,spacing:13) {
-                            Image(systemName:Design.symbol(item.name)).font(.system(size:29,weight:.ultraLight)).foregroundStyle(Design.green).frame(width:60,height:65).background(Design.green.opacity(0.07),in:RoundedRectangle(cornerRadius:13))
-                            Text(item.name).font(.system(size:16,weight:.semibold,design:.rounded)).textSelection(.enabled).fixedSize(horizontal:false,vertical:true)
-                            StateBadge(torrent:item,presentation:status)
-                            if !status.isError || status.hasRecovery {
-                                Text(status.detail).font(.system(size:11)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
-                            }
-                        }
-                        if let progress = status.progress {
-                            VStack(alignment:.leading,spacing:10) {
-                                HStack { Text(status.progressTitle).foregroundStyle(.secondary); Spacer(); Text("\(Int(progress * 100))%").fontWeight(.medium).monospacedDigit() }.font(.system(size:11))
-                                TransferProgress(value:progress).accessibilityLabel(status.progressTitle)
-                                Text("\(SizeText.bytes(status.completedBytes)) of \(SizeText.bytes(status.totalBytes))").font(.system(size:10)).foregroundStyle(.secondary)
-                            }
-                        }
-                        if status.isQueued {
-                            Button("Move to Front of Queue") { store.moveToFront(item) }.disabled(!store.canChangeTransfers || store.busyTransfers.contains(item.id))
-                        }
-                        if status.isError && !status.hasRecovery { transferFailure(item,status:status) }
-                        inspectorTabs
-                        if inspectorTab == 0 { overview(item) }
-                        else {
-                            VStack(alignment:.leading,spacing:10) { SectionEyebrow(title:"Trackers"); if item.trackers.isEmpty { Text("No trackers are listed for this transfer.").font(.system(size:11)).foregroundStyle(.secondary) }; ForEach(item.trackers,id:\.self) { Text(redactTracker($0)).font(.system(size:10,design:.monospaced)).textSelection(.enabled) } }
-                        }
-                    }.padding(20)
-                }
-                Spacer(minLength:0)
+                    ScrollView {
+                        VStack(alignment:.leading,spacing:14) {
+                            if inspectorTab == 0 { overview(item) }
+                            else { trackers(item) }
+                        }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
+                    }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
                 }
                 Divider()
-                HStack {
-                    Button { if item.state == "error" { store.retryTransfer(item) } else { store.toggleSelected(paused:!item.isPaused) } } label: { Label(item.state == "error" ? "Retry" : item.isPaused ? "Resume" : "Pause",systemImage:item.state == "error" ? "arrow.clockwise" : item.isPaused ? "play" : "pause").frame(maxWidth:.infinity) }.buttonStyle(.bordered).controlSize(.large).disabled(item.state == "error" ? !store.canRetryTransfer(item) : item.isPaused ? !store.canResumeSelection : !store.canPauseSelection)
-                    Button { store.revealDestination(item) } label: { Image(systemName:"folder") }.controlSize(.large).help("Show the destination or its closest available parent in Finder").accessibilityLabel("Show transfer folder in Finder")
-                }.padding(16)
+                HStack(spacing:8) {
+                    Button { if item.state == "error" { store.retryTransfer(item) } else { store.toggleSelected(paused:!item.isPaused) } } label: {
+                        Label(item.state == "error" ? "Retry" : item.isPaused ? "Resume" : "Pause",systemImage:item.state == "error" ? "arrow.clockwise" : item.isPaused ? "play.fill" : "pause.fill").frame(maxWidth:.infinity)
+                    }.buttonStyle(.bordered).disabled(item.state == "error" ? !store.canRetryTransfer(item) : item.isPaused ? !store.canResumeSelection : !store.canPauseSelection)
+                    Button { store.revealDestination(item) } label: { Image(systemName:"folder").frame(width:24) }
+                        .help("Show the destination or its closest available parent in Finder").accessibilityLabel("Show transfer folder in Finder")
+                }.controlSize(.regular).padding(12)
             } else {
                 Spacer()
                 VStack(spacing:12) { Image(systemName:"sidebar.right").font(.system(size:29,weight:.ultraLight)); Text("A closer look").font(.system(size:15,weight:.medium,design:.rounded)); Text("Select a transfer to see its\nprogress, files, and details.").font(.system(size:11)).multilineTextAlignment(.center) }.foregroundStyle(.secondary).frame(maxWidth:.infinity)
                 Spacer()
             }
-        }.background(Design.card.opacity(0.55))
+        }.background(Design.card)
+    }
+    private func inspectorSummary(_ item: TorrentItem, status: TransferPresentation) -> some View {
+        VStack(alignment:.leading,spacing:10) {
+            HStack(alignment:.top,spacing:10) {
+                Image(systemName:Design.symbol(item.name)).font(.system(size:18,weight:.regular))
+                    .foregroundStyle(Design.green).frame(width:36,height:36)
+                    .background(Design.green.opacity(0.08),in:RoundedRectangle(cornerRadius:8))
+                    .accessibilityHidden(true)
+                Text(item.name).font(.system(size:13,weight:.semibold)).lineLimit(2)
+                    .frame(maxWidth:.infinity,minHeight:36,alignment:.topLeading)
+                    .textSelection(.enabled).help(item.name).accessibilityLabel(item.name)
+            }
+            HStack(alignment:.firstTextBaseline,spacing:8) {
+                StateBadge(torrent:item,presentation:status)
+                Spacer(minLength:0)
+                if let progress = status.progress {
+                    Text("\(Int(progress * 100))%")
+                        .font(.system(size:12,weight:.semibold)).monospacedDigit()
+                }
+            }
+            if let progress = status.progress {
+                VStack(alignment:.leading,spacing:6) {
+                    TransferProgress(value:progress).accessibilityLabel(status.progressTitle)
+                    HStack(spacing:4) {
+                        Text(status.progressTitle)
+                        Spacer(minLength:0)
+                        Text("\(SizeText.bytes(status.completedBytes)) of \(SizeText.bytes(status.totalBytes))").monospacedDigit()
+                    }.font(.system(size:10)).foregroundStyle(.secondary)
+                }
+            }
+            if !status.isError || status.hasRecovery {
+                Text(status.detail).font(.system(size:11)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal:false,vertical:true)
+            }
+            if status.isQueued {
+                Button("Move to Front of Queue") { store.moveToFront(item) }
+                    .controlSize(.small).disabled(!store.canChangeTransfers || store.busyTransfers.contains(item.id))
+            }
+            if status.isError && !status.hasRecovery {
+                // Keep recovery reachable without letting long diagnostics displace the tab content.
+                ScrollView { transferFailure(item,status:status) }.frame(maxHeight:160)
+            }
+        }.padding(14)
+    }
+    private func trackers(_ item: TorrentItem) -> some View {
+        VStack(alignment:.leading,spacing:10) {
+            HStack {
+                Text("Trackers").font(.system(size:13,weight:.semibold))
+                Spacer()
+                Text("\(item.trackers.count)").font(.system(size:11)).monospacedDigit().foregroundStyle(.secondary)
+            }
+            if item.trackers.isEmpty {
+                Text("No trackers are listed for this transfer.").font(.system(size:11)).foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(item.trackers.enumerated()),id:\.offset) { _, tracker in
+                    HStack(alignment:.top,spacing:8) {
+                        Image(systemName:"network").foregroundStyle(.secondary).accessibilityHidden(true)
+                        Text(redactTracker(tracker)).textSelection(.enabled).fixedSize(horizontal:false,vertical:true)
+                    }.font(.system(size:11)).frame(maxWidth:.infinity,alignment:.leading)
+                        .padding(10).background(Design.line.opacity(0.5),in:RoundedRectangle(cornerRadius:7))
+                }
+            }
+        }
     }
     private func transferFailure(_ item: TorrentItem, status: TransferPresentation) -> some View {
         VStack(alignment:.leading,spacing:10) {
@@ -354,18 +400,18 @@ struct LibraryView: View {
     }
     private func overview(_ t: TorrentItem) -> some View {
         let status = store.presentation(t)
-        return VStack(alignment:.leading,spacing:17) {
-            SectionEyebrow(title:"Activity")
+        return VStack(alignment:.leading,spacing:10) {
+            Text("Activity").font(.system(size:13,weight:.semibold))
             detail(status.progressTitle,status.progress == nil ? "—" : SizeText.bytes(status.completedBytes))
             detail("Uploaded",["downloading", "waiting", "seeding"].contains(t.state) ? SizeText.bytes(t.uploadedBytes) : "—")
             detail(store.connected ? "Connected peers" : "Last known peers","\(t.peers)")
             detail("Share ratio",status.progressTitle != "Downloaded" || t.downloadedBytes == 0 || !["downloading", "waiting", "seeding"].contains(t.state) ? "—" : String(format:"%.2f",Double(t.uploadedBytes)/Double(t.downloadedBytes)))
             Divider()
-            SectionEyebrow(title:"Location")
+            Text("Location").font(.system(size:12,weight:.semibold))
             Label(URL(fileURLWithPath:t.destination).lastPathComponent,systemImage:"folder").font(.system(size:11))
             Text(t.destination.replacingOccurrences(of:NSHomeDirectory(),with:"~")).font(.system(size:10)).foregroundStyle(.secondary).textSelection(.enabled).fixedSize(horizontal:false,vertical:true)
             Divider()
-            SectionEyebrow(title:"Info hash")
+            Text("Info hash").font(.system(size:12,weight:.semibold))
             Text(t.id).font(.system(size:9,design:.monospaced)).foregroundStyle(.secondary).textSelection(.enabled).lineLimit(3)
         }
     }

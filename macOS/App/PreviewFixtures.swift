@@ -60,6 +60,13 @@ enum PreviewFixtures {
             controls.torrents[0].files[0].priority = 2
             controls.maxActiveDownloads = 2
             try capture(LibraryView(inspectorTab:1).environmentObject(controls),size:NSSize(width:1240,height:780),appearance:appearance,to:output.appendingPathComponent("file-controls-\(name).png"))
+            let inspectorSample = LibraryStore(designPreview:true)
+            inspectorSample.torrents = [PreviewFixtures.filesInspector]
+            inspectorSample.torrents[0].name = "Open Movie Collection (2026) [1080p] [WEBRip] [5.1] — Complete Edition"
+            inspectorSample.selection = [inspectorSample.torrents[0].id]
+            for tab in 0...2 {
+                try capture(LibraryView(inspectorTab:tab).environmentObject(inspectorSample),size:NSSize(width:1000,height:620),appearance:appearance,to:output.appendingPathComponent("transfer-details-\(tab)-\(name).png"))
+            }
             for width in [250,280,360] {
                 let sample = LibraryStore(designPreview:true); sample.torrents = [PreviewFixtures.filesInspector]
                 let item = sample.torrents[0], session = TorrentFilesSession(files:item.files)
@@ -127,7 +134,7 @@ enum PreviewFixtures {
             contrastStore.showInspector = false
             try capture(LibraryView().environmentObject(contrastStore),size:NSSize(width:820,height:620),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-compact-\(name).png"))
         }
-        print("Rendered 72 fixture screens to \(output.path); library fixtures are explicitly labeled sample data")
+        print("Rendered 78 fixture screens to \(output.path); library fixtures are explicitly labeled sample data")
     }
     private static func capture<V:View>(_ view:V,size:NSSize,appearance:NSAppearance.Name,to url:URL) throws {
         let window = NSWindow(contentRect:NSRect(origin:.zero,size:size),styleMask:[.borderless],backing:.buffered,defer:false)
