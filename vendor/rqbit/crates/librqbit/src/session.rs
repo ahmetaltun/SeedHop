@@ -128,6 +128,7 @@ pub struct Session {
     cancellation_token: CancellationToken,
     // SeedHop: await session-owned tasks instead of guessing at shutdown latency.
     shutdown_tasks: parking_lot::Mutex<Vec<tokio::task::JoinHandle<()>>>,
+    shutdown_task_failed: std::sync::atomic::AtomicBool,
     _cancellation_token_drop_guard: DropGuard,
 
     // Runtime settings
@@ -564,6 +565,7 @@ fn torrent_file_from_info_bytes(
 
 pub(crate) struct CheckedIncomingConnection {
     pub kind: ConnectionKind,
+    pub encrypted: bool,
     pub addr: SocketAddr,
     pub reader: BoxAsyncReadVectored,
     pub writer: BoxAsyncWrite,
@@ -826,6 +828,7 @@ impl Session {
                 _cancellation_token_drop_guard: token.clone().drop_guard(),
                 cancellation_token: token,
                 shutdown_tasks: parking_lot::Mutex::new(Vec::new()),
+                shutdown_task_failed: std::sync::atomic::AtomicBool::new(false),
                 announce_port: listen_result.as_ref().and_then(|l| l.announce_port),
                 listen_addr: listen_result.as_ref().map(|l| l.addr),
                 default_storage_factory: opts.default_storage_factory,
@@ -1010,6 +1013,7 @@ impl Session {
         .await
         .context("incoming MSE/peer handshake timed out")??;
         let stream_key = negotiated.info_hash;
+        let encrypted = negotiated.encrypted;
         if stream_key.is_some() {
             debug!(
                 rc4 = negotiated.encrypted,
@@ -1064,6 +1068,7 @@ impl Session {
         Ok((
             live,
             CheckedIncomingConnection {
+                encrypted,
                 addr,
                 reader,
                 writer,
@@ -1156,7 +1161,27 @@ impl Session {
         fut: impl std::future::Future<Output = anyhow::Result<()>> + Send + 'static,
     ) {
         let task = spawn_with_cancel(span, name, self.cancellation_token.clone(), fut);
-        self.shutdown_tasks.lock().push(task);
+        self.track_task(task);
+    }
+
+    /// Retain task ownership until shutdown, including live torrent generations
+    /// that have since been paused, rechecked, or removed from the database.
+    pub(crate) fn track_task(&self, task: tokio::task::JoinHandle<()>) {
+        let mut tasks = self.shutdown_tasks.lock();
+        if tasks.len() >= 128 {
+            let mut pending = Vec::with_capacity(tasks.len());
+            for existing in tasks.drain(..) {
+                if existing.is_finished() {
+                    if let Some(Err(_)) = existing.now_or_never() {
+                        self.shutdown_task_failed.store(true, Ordering::Relaxed);
+                    }
+                } else {
+                    pending.push(existing);
+                }
+            }
+            *tasks = pending;
+        }
+        tasks.push(task);
     }
 
     pub(crate) fn rs(&self) -> Option<tracing::Id> {
@@ -1186,11 +1211,23 @@ impl Session {
             }
         }
         self.cancellation_token.cancel();
-        let tasks = std::mem::take(&mut *self.shutdown_tasks.lock());
-        for task in tasks {
-            task.await
-                .context("session task panicked during shutdown")?;
+        // Joining a parent can register further child tasks. Drain until all
+        // generations have completed, never holding the registry lock over await.
+        loop {
+            let tasks = std::mem::take(&mut *self.shutdown_tasks.lock());
+            if tasks.is_empty() {
+                break;
+            }
+            for task in tasks {
+                if task.await.is_err() {
+                    self.shutdown_task_failed.store(true, Ordering::Relaxed);
+                }
+            }
         }
+        anyhow::ensure!(
+            !self.shutdown_task_failed.load(Ordering::Relaxed),
+            "session task panicked during shutdown"
+        );
         Ok(())
     }
 
@@ -1538,6 +1575,10 @@ impl Session {
             let peer_opts = self.merge_peer_opts(opts.peer_opts);
             let metadata = Arc::new(metadata);
             let minfo = Arc::new(ManagedTorrentShared {
+                payload_counters: Default::default(),
+                tracker_observations: Default::default(),
+                tracker_event_sequence: Default::default(),
+                tracker_events: Default::default(),
                 id,
                 span,
                 info_hash,
@@ -2364,6 +2405,63 @@ struct PeerRxTorrentInfo {
 }
 
 impl tracker_comms::TorrentStatsProvider for PeerRxTorrentInfo {
+    fn observe(&self, observation: tracker_comms::TrackerObservation) {
+        self.session.with_torrents(|torrents| {
+            for (_, mt) in torrents {
+                let matches = mt.info_hash() == self.info_hash
+                    || mt
+                        .with_metadata(|m| m.v1_info_hash == self.info_hash)
+                        .unwrap_or(false);
+                if matches {
+                    let key = format!(
+                        "{}|{}|{}",
+                        self.info_hash.as_string(),
+                        observation.url,
+                        observation.endpoint.as_deref().unwrap_or("")
+                    );
+                    let mut observations = mt.shared().tracker_observations.write();
+                    // A resolved UDP endpoint supersedes its DNS-only placeholder.
+                    if observation.endpoint.is_some() {
+                        let root = format!("{}|{}|", self.info_hash.as_string(), observation.url);
+                        observations.remove(&root);
+                    }
+                    let mut value = observation.clone();
+                    if value.state == "contacting" || value.state == "resolving" {
+                        if let Some((_, prior)) = observations.get(&key) {
+                            value.last_announce = prior.last_announce;
+                            value.message = prior.message.clone();
+                            value.peers = prior.peers;
+                            value.seeds = prior.seeds;
+                            value.leechers = prior.leechers;
+                        }
+                    }
+                    if matches!(value.state.as_str(), "error" | "warning") {
+                        let sequence = mt
+                            .shared()
+                            .tracker_event_sequence
+                            .fetch_add(1, Ordering::Relaxed)
+                            + 1;
+                        let timestamp = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        let mut events = mt.shared().tracker_events.lock();
+                        events.push_back((
+                            sequence,
+                            timestamp,
+                            value.url.clone(),
+                            value.state.clone(),
+                        ));
+                        while events.len() > 200 {
+                            events.pop_front();
+                        }
+                    }
+                    observations.insert(key, (self.info_hash.as_string(), value));
+                    break;
+                }
+            }
+        });
+    }
     fn get(&self) -> tracker_comms::TrackerCommsStats {
         let mt = self.session.with_torrents(|torrents| {
             for (_, mt) in torrents {

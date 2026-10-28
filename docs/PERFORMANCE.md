@@ -1,5 +1,49 @@
 # Controlled large-library performance
 
+## Workspace follow-up — 2026-10-28
+
+Current evidence is retained in
+[power-user-workspace-2026-10-28.json](results/power-user-workspace-2026-10-28.json).
+The earlier step-7 measurements below remain historical evidence.
+
+The workspace retains all original latency budgets and adds 1,000-peer and
+100-tracker fixtures. Final runs 31–33 use one debug binary. They report zero
+native table reentrancy warnings, zero publications for unchanged library
+snapshots, stable native selection, and stable scroll anchors. The compact
+workspace shows 16 full 28-point rows at 1280×800; comfortable rows have a
+40-point pitch. Native pane and column persistence checks pass.
+
+- **UI-PERF-001:** resolved in these controlled stress runs. The transfer table
+  uses fixed native heights aligned with SwiftUI's minimum row height, avoiding
+  the estimated-height cache reentrancy. Physical input remains a separate gate.
+- **UI-PERF-002:** the earlier changing-layout misses do not recur in these runs.
+  The 100-row changing-layout p95 values are 53.57, 50.75, and 51.85 ms, against
+  the unchanged 100 ms budget.
+- **UI-PERF-003:** remains open. Focused 100-row filtering has p95 values of
+  99.80, 103.31, and 101.88 ms against 100 ms. Run 31 passes all 43 applicable
+  checks; runs 32 and 33 each miss this one check. Do not claim overall
+  performance acceptance from the passing run alone.
+
+The filter measurement begins with the native search field focused and the
+restored table/selection settled. Toolbar expansion and restoration of the
+previous query are setup, outside the filter timer. The timer still includes
+model mutation, native row changes, and layout flushes. Every earlier failed or
+incomplete run is retained with its methodology notes; no budget was relaxed.
+Native-highlight assertions were added after they exposed a binding issue across
+hosting boundaries. The final table restores highlights by torrent identity
+without letting restoration change the model's captured command targets.
+
+Split panes accept their proposed workspace size instead of recursively measuring
+hosted table constraints. Transfer samples no longer force split relayout.
+Filter matching is reused until inputs change, and filtering plus hidden-selection
+cleanup publishes one mutation. Native widths remain fixed, with horizontal
+scrolling when columns exceed the viewport. These changes retain the native
+command, focus, file-control, and recovery regressions.
+
+Physical scrolling, frame presentation, large diagnostic XPC transport latency,
+VoiceOver, actual accessibility settings, and representative-user tasks remain
+separate acceptance gates. See [WORKSPACE-USABILITY.md](WORKSPACE-USABILITY.md).
+
 Roadmap step 7 measures debug-build engine snapshots and the real native library
 scene with clearly labeled sample data. It does not certify public swarms,
 physical scrolling, compositor frame rate, or a user's real library.
@@ -115,7 +159,7 @@ stacks overlap and are not independent CPU percentages. No formatter cache or
 new persistence layer was added. Queue-position scanning remains a diagnostic
 measurement because the real snapshot already meets its budget.
 
-### Open findings and next acceptance work
+### Historical open findings and next acceptance work — 2026-10-27
 
 - **UI-PERF-001:** baseline and every final native stress run emit 11 occurrences
   of `WARNING: Application performed a reentrant operation in its NSTableView delegate. This warning will become an assert in the future.`

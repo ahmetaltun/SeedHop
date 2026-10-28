@@ -61,6 +61,11 @@ import Foundation
         var limits=EngineRequest(command:"limits"); limits.downloadLimit=250_000; limits.uploadLimit=50_000
         _=try await client.send(limits)
         guard let snapshot=try await client.send(EngineRequest(command:"snapshot")).snapshot,snapshot.torrents.count==1,snapshot.torrents[0].id==id,snapshot.downloadLimit==250_000 else { throw UserFacingError(message:"Snapshot did not reflect saved commands") }
+        var detailsRequest = EngineRequest(command:"torrentDetails"); detailsRequest.id = id; detailsRequest.section = "general"
+        guard let details = try await client.send(detailsRequest).details,
+              details.torrentId == id, details.instanceId == snapshot.instanceId, details.format == "v1",
+              details.v1Hash == id, details.v2Hash == nil, details.sessionDownloaded == 0,
+              snapshot.torrents[0].networkDownloadedBytes == 0 else { throw UserFacingError(message:"Typed XPC diagnostics lost identity or invented traffic") }
         // Wait for the initial hash before issuing the explicit recheck.
         try await waitForPaused(client, id:id)
         let content = try Data(contentsOf:fixture.appendingPathComponent("seedhop-fixture.bin"))
@@ -117,7 +122,7 @@ import Foundation
         var remove=EngineRequest(command:"remove"); remove.id=id; remove.deleteFiles=false
         _=try await client.send(remove)
         _=try await client.send(EngineRequest(command:"shutdown")); client.invalidate()
-        print("PASS: XPC requirement, protocol v2, import, Force Recheck, stale Retry preserves paused choices, policy save failure and retry, policy activation after restart, priorities, queue, live file progress, move/rename cancellation, stale cancellation, rename, relocation, exact bytes, restart, paused selection, removal, shutdown")
+        print("PASS: XPC requirement, protocol v\(SeedHopIdentity.protocolVersion), typed diagnostics, import, Force Recheck, stale Retry preserves paused choices, policy save failure and retry, policy activation after restart, priorities, queue, live file progress, move/rename cancellation, stale cancellation, rename, relocation, exact bytes, restart, paused selection, removal, shutdown")
     }
     private static func verifyFileCancellation(_ client: EngineClient, id: String, source: URL, content: Data, scratch: URL) async throws {
         let destination = scratch.appendingPathComponent("cancelled-move")

@@ -10,6 +10,10 @@ BitTorrent v1/v2 engine, authenticated XPC, and recovery tests.
 not a notarized public release. See [validation status](docs/VALIDATION.md) for
 the distinction between implemented behavior and verified acceptance criteria.
 
+The power-user workspace adds compact configurable rows, a bottom details pane,
+peer/tracker diagnostics, persistent payload totals, and redacted diagnostic
+export. See [workspace behavior and validation](docs/POWER-USER-WORKSPACE.md).
+
 ## Build and run
 
 Requires Xcode 26.3 command-line tools, Python 3.12+, and Rustup.
@@ -56,8 +60,8 @@ make render
 ```
 
 Design-preview mode uses labeled sample data and cannot issue transfer commands.
-The renderer writes 36 light/dark main-window, compact, empty, import, file-selection,
-settings, multi-selection, empty-filter, recovery, move-progress, and high-contrast screenshots under `.build/design/`. It renders app-owned views,
+The renderer writes light/dark main-window, compact, empty, import, file-selection,
+settings, multi-selection, empty-filter, recovery, move-progress, and high-contrast screenshots under `.build/design/`. Workspace fixtures cover all five details tabs at minimum, desktop, and wide sizes, plus comfortable density. It renders app-owned views,
 not the user's screen. See [design system](docs/DESIGN.md).
 
 ## Verify
@@ -120,7 +124,7 @@ separate opt-ins. Downloads are stored in your chosen folder; library state is
 under `~/Library/Application Support/SeedHop`. The app does not enable a local
 HTTP control server. [BitTorrent v2 support](docs/BITTORRENT-V2.md) includes pure-v2
 and hybrid transfers, seeding, magnets, file selection, and SHA-256 restart checks.
-Encrypted peers, RSS, search, remote control,
+RSS, search, remote control,
 and advanced scheduling remain roadmap work. Force Recheck, file priorities,
 download queue limits/order, relocation, and local renaming are implemented;
 see [file controls and verification](docs/FILE-MANAGEMENT.md).

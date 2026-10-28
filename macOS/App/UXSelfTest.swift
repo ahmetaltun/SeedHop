@@ -1,5 +1,6 @@
 #if SEEDHOP_DEVELOPMENT
 import Foundation
+import AppKit
 import Combine
 
 /// Deterministic presentation-model regressions; this does not certify native input or VoiceOver.
@@ -601,6 +602,65 @@ import Combine
             try expect(preview.count(in:.all) == PreviewFixtures.torrents.count && preview.selected.first?.id == PreviewFixtures.torrents.first?.id,"Design fixture indexes were not initialized")
         }
 
+        try await check("Tracker and state filters clear hidden selection without changing transfer intent") {
+            let (store, peer) = library(); peer.torrents[0].trackers = ["https://one.example.org/private?token=secret"]
+            peer.torrents[1].trackers = ["udp://two.example.org:80/announce"]
+            peer.torrents[0].state = "queued"; peer.torrents[1].state = "checking"; await store.refresh()
+            let choices = store.torrents.map { $0.files }
+            store.selection = [store.torrents[0].id]
+            var filterPublications = 0
+            let filterObserver = store.objectWillChange.sink { filterPublications += 1 }
+            store.trackerHost = "two.example.org"
+            filterObserver.cancel()
+            try expect(filterPublications == 1,"Filtering and hidden-selection cleanup published separate intermediate states")
+            try expect(store.selection.isEmpty && store.visibleTorrents.map(\.id) == [store.torrents[1].id],"Tracker filtering retained hidden targets or matched credentials")
+            store.clearFilters(); store.filter = .queued
+            try expect(store.visibleTorrents.allSatisfy { $0.state == "queued" },"Queue filter included nonqueued rows")
+            store.filter = .checking
+            try expect(store.visibleTorrents.allSatisfy { $0.state == "checking" } && store.torrents.map { $0.files } == choices,"Checking filter changed file choices")
+            let checkingID = store.torrents[1].id
+            peer.torrents[1].state = "paused"; await store.refresh()
+            try expect(!store.visibleTorrents.contains { $0.id == checkingID },"Live state updates retained cached filter membership")
+            store.clearFilters(); store.search = store.torrents[0].name
+            let name = store.torrents[0].name
+            try expect(store.visibleTorrents.contains { $0.name == name },"Name filter lost its match")
+            peer.torrents[0].name = "Changed name"; await store.refresh()
+            try expect(!store.visibleTorrents.contains { $0.name == name },"Renamed rows retained cached name matches")
+        }
+        try await check("Traffic ratio uses payload bytes and diagnostic export omits private values") {
+            let (store, _) = library(); var item = store.torrents[0]
+            item.networkDownloadedBytes = 100; item.networkUploadedBytes = 50; item.downloadedBytes = 900
+            try expect(item.shareRatio == 0.5,"Ratio used verified file progress")
+            item.networkDownloadedBytes = 0; try expect(item.shareRatio == nil,"Zero-download ratio claimed a value")
+            item.destination = "/private/secret-folder"; item.trackers = ["https://user:pass@tracker.example/secret-passkey"]
+            var value = PreviewFixtures.diagnostics(item,section:"trackers")
+            value.peers = [PeerDetails(id:"secret-peer",endpoint:"192.0.2.123:51413",client:"client",state:"live",transport:"tcp",encrypted:false,incoming:false,downloaded:1,uploaded:2)]
+            store.details = value
+            let text = store.diagnosticReport(item)
+            try expect(!text.isEmpty && !["secret-folder","secret-passkey","192.0.2.123",item.id,"user:pass"].contains(where:text.contains),"Diagnostic export exposed identifying data")
+        }
+        try await check("Late details cannot replace a new selection and hidden details stop polling") {
+            let (store, peer) = library(); await store.refresh(); store.showInspector = true
+            let item = store.torrents[0]; store.selection = [item.id]; peer.hold = ["torrentDetails"]
+            let window = NSWindow(contentRect:NSRect(x:0,y:0,width:800,height:560),styleMask:[.titled],backing:.buffered,defer:false)
+            window.isReleasedWhenClosed = false; window.title = "SeedHop"; window.orderFront(nil)
+            defer { window.close() }
+            let task = Task { await store.watchDetails(id:item.id,section:"peers",allPeers:false) }
+            try await eventually { peer.pending.count == 1 }
+            store.selection = [store.torrents[1].id]
+            var value = PreviewFixtures.diagnostics(item,section:"peers"); value.instanceId = "fixture"
+            peer.releaseFirst(reply:EngineReply(details:value)); task.cancel(); await task.value
+            try expect(store.details == nil,"A late response populated the next transfer")
+            store.selection = [item.id]; store.showInspector = false
+            let before = peer.commands("torrentDetails").count
+            await store.watchDetails(id:item.id,section:"peers",allPeers:false)
+            try expect(peer.commands("torrentDetails").count == before,"Hidden details polled the engine")
+            store.showInspector = true; peer.hold = []; peer.missingDetails = true
+            let missing = Task { await store.watchDetails(id:item.id,section:"peers",allPeers:false) }
+            try await eventually { store.detailsError != nil }; missing.cancel(); await missing.value
+            try expect(store.connected && store.detailsError?.contains("did not return") == true,"Missing details disconnected the library or left a permanent loading state")
+        }
+
         print("PASS: \(passed) UX presentation regressions using a controlled transport. Native pointer, keyboard, and VoiceOver walkthroughs remain manual.")
     }
 
@@ -648,6 +708,7 @@ import Combine
     var connections: [Bool] = []
     var stopped = false
     var failConnect = false
+    var missingDetails = false
     func connect(background: Bool) throws {
         connections.append(background)
         if failConnect { throw UserFacingError(message:"Engine connection unavailable.") }
@@ -672,6 +733,11 @@ import Combine
         case "connect", "snapshot":
             if request.command == "connect" && stopped { peerEncryption = savedPeerEncryption; stopped = false }
             return EngineReply(snapshot:LibrarySnapshot(protocolVersion:UInt32(SeedHopIdentity.protocolVersion),engineVersion:"test",instanceId:"fixture",listenPort:0,downloadLimit:0,uploadLimit:0,maxActiveDownloads:maxActiveDownloads,torrents:torrents,fileOperation:fileOperation,storageRecovery:storageRecovery,peerEncryption:peerEncryption,savedPeerEncryption:savedPeerEncryption))
+        case "torrentDetails":
+            guard !missingDetails, let item = torrents.first(where:{ $0.id == request.id }) else { return EngineReply() }
+            var details = PreviewFixtures.diagnostics(item,section:request.section ?? "general")
+            details.instanceId = "fixture"
+            return EngineReply(details:details)
         case "shutdown": stopped = true
         case "peerEncryption": savedPeerEncryption = request.peerEncryption
         case "retryStorageRecovery", "keepRecoveryCopies": storageRecovery = nil

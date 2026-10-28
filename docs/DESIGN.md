@@ -23,10 +23,13 @@ for headlines and large metrics, and monospaced digits for changing values.
 
 ## Main window
 
-A quiet navigation rail leads into a configurable, sortable native table.
-Rates and download totals sit above the library. The inspector contains
-overview, file-selection, and tracker information. Tracker credentials are not
-displayed. Columns can be resized, reordered, hidden, and restored through the
+A hideable navigation rail leads into a configurable, sortable native table.
+Compact rows target 28 points, with an optional 40-point comfortable density.
+Rates and engine connectivity sit in the bottom status bar. A resizable bottom
+pane contains General, Files, Peers, Trackers, and Activity tabs. Tracker
+credentials are not displayed. Global notices use a fixed-height strip with
+Review access to recovery details. See `POWER-USER-WORKSPACE.md` for protocol,
+accounting, diagnostic privacy, and acceptance details. Columns can be resized, reordered, hidden, and restored through the
 native header customization menu. Selection uses stable info hashes.
 
 Explicit search and filter changes clear selections that are no longer visible;
@@ -41,11 +44,10 @@ and actions. Torrent-details files use a virtualized native outline. Import file
 selection keeps its existing native table. Polling pauses when the library window
 is hidden; byte values are formatted for the user's locale.
 
-The Files inspector uses compact 44-point rows with file-type icons, one-line
-middle-truncated names, size, and available progress. Real folders use native
+The Files tab uses compact 28-point rows with file-type icons and aligned
+Name, Size, Progress, and Priority columns. Names use middle truncation. Real folders use native
 disclosure and mixed-state download checkboxes. Row selection is independent
-from inclusion. Each row has a subdued priority pop-up beside its secondary
-metadata, available without selecting the row. A shared Actions menu supports
+from inclusion. Each row has a subdued priority pop-up in its own column, available without selecting the row. A shared Actions menu supports
 batch changes and Rename; context menus mirror the actions.
 The last included file disables only its checkbox, retaining readable text.
 File search retains matching ancestors and never changes download inclusion.
@@ -54,8 +56,7 @@ selection, and expansion survive inspector/tab navigation during the window
 session. Files scroll independently beneath a compact transfer summary, leaving
 search and actions stationary. Selection and operation status share a fixed-height
 footer, so notices never move the file viewport. The last-file explanation stays
-in checkbox help and file details. Checkbox, icon, and disclosure align with the
-filename line, rather than the center of the two-line row. See `FILES-INSPECTOR-REDESIGN.md` for the full
+in checkbox help and file details. Checkbox, icon, and disclosure align with the single filename line. See `FILES-INSPECTOR-REDESIGN.md` for the full
 interaction contract and acceptance boundary.
 
 ## Import
@@ -93,7 +94,7 @@ search cancellation. Escape cancels metadata lookup while an import is resolving
 
 ## Visual QA
 
-`make render` produces 72 fixture screens across light/dark appearances, including multi-selection,
+`make render` produces fixture screens across light/dark appearances, including all five workspace tabs at minimum, desktop, and wide sizes, comfortable density, multi-selection,
 empty-filter, connection-recovery states, the file-priority/rename inspector,
 queue settings, four high-contrast library layouts, and narrow Files outlines,
 file search, empty results, offline files, and high-contrast Files layouts.

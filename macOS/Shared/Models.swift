@@ -10,7 +10,7 @@ enum SeedHopIdentity {
     #endif
     static let foreground = app + ".engine"
     static let background = app + ".agent"
-    static let protocolVersion = 2
+    static let protocolVersion = 3
     static let agentPlist = background + ".plist"
 }
 
@@ -40,6 +40,22 @@ struct TorrentItem: Codable, Identifiable, Equatable {
     var queuePosition: UInt32 = 0
     var pausedIntent: Bool? = nil
     var errorKind: String? = nil
+    var networkDownloadedBytes: UInt64? = nil
+    var networkUploadedBytes: UInt64? = nil
+    var addedAt: UInt64? = nil
+    var completedAt: UInt64? = nil
+    var etaSeconds: UInt64? = nil
+    var selectedBytes: UInt64? = nil
+    var fullBytes: UInt64 { files.isEmpty ? totalBytes : files.reduce(0) { $0 + $1.size } }
+    var remainingBytes: UInt64 { (selectedBytes ?? totalBytes) > downloadedBytes ? (selectedBytes ?? totalBytes) - downloadedBytes : 0 }
+    var shareRatio: Double? { guard let down = networkDownloadedBytes, down > 0, let up = networkUploadedBytes else { return nil }; return Double(up) / Double(down) }
+    var sortableStatus: String { statusLabel }
+    var sortableRatio: Double { shareRatio ?? -1 }
+    var sortableETA: UInt64 { etaSeconds ?? UInt64.max }
+    var sortableAdded: UInt64 { addedAt ?? 0 }
+    var sortableCompleted: UInt64 { completedAt ?? 0 }
+    var sortableDownloaded: UInt64 { networkDownloadedBytes ?? 0 }
+    var sortableUploaded: UInt64 { networkUploadedBytes ?? 0 }
     var progress: Double { totalBytes == 0 ? 0 : min(1, Double(downloadedBytes) / Double(totalBytes)) }
     var isPaused: Bool { pausedIntent ?? (state == "paused") }
     var isActive: Bool { ["downloading", "waiting", "checking", "queued"].contains(state) }
@@ -101,6 +117,7 @@ enum PeerEncryptionPolicy: String, Codable, CaseIterable, Identifiable {
 }
 
 struct LibrarySnapshot: Codable {
+    var statisticsWarning: String? = nil
     var protocolVersion: UInt32
     var engineVersion: String
     var instanceId: String
@@ -144,6 +161,8 @@ struct EngineRequest: Codable {
     var fileIndex: UInt32?
     var fileName: String?
     var peerEncryption: PeerEncryptionPolicy?
+    var section: String?
+    var allPeers: Bool?
 }
 struct EngineReply: Codable {
     var version = SeedHopIdentity.protocolVersion
@@ -153,9 +172,10 @@ struct EngineReply: Codable {
     var error: String?
     var cancelled: Bool?
     var cancellationAccepted: Bool?
-    init(snapshot: LibrarySnapshot? = nil, preview: ImportPreview? = nil, id: String? = nil, error: String? = nil, cancelled: Bool? = nil, cancellationAccepted: Bool? = nil) {
+    var details: TorrentDetails?
+    init(snapshot: LibrarySnapshot? = nil, preview: ImportPreview? = nil, id: String? = nil, error: String? = nil, cancelled: Bool? = nil, cancellationAccepted: Bool? = nil, details: TorrentDetails? = nil) {
         self.snapshot = snapshot; self.preview = preview; self.id = id; self.error = error
-        self.cancelled = cancelled; self.cancellationAccepted = cancellationAccepted
+        self.cancelled = cancelled; self.cancellationAccepted = cancellationAccepted; self.details = details
     }
 }
 struct UserFacingError: LocalizedError {
@@ -173,4 +193,69 @@ enum SizeText {
         return formatter.string(fromByteCount: Int64(clamping: value))
     }
     static func rate(_ value: UInt64) -> String { value == 0 ? "—" : bytes(value) + "/s" }
+}
+
+struct PeerDetails: Codable, Identifiable, Equatable {
+    var id: String
+    var endpoint: String
+    var client: String?
+    var state: String
+    var transport: String?
+    var encrypted: Bool?
+    var incoming: Bool?
+    var downloaded: UInt64
+    var uploaded: UInt64
+}
+struct TrackerDetails: Codable, Identifiable, Equatable {
+    var id: String
+    var address: String
+    var endpoint: String?
+    var hash: String
+    var state: String
+    var message: String?
+    var lastAnnounce: UInt64?
+    var nextAnnounce: UInt64?
+    var peers: UInt64?
+    var seeds: UInt64?
+    var leechers: UInt64?
+}
+struct TorrentDetails: Codable, Equatable {
+    var torrentId: String
+    var instanceId: String
+    var observedAt: UInt64
+    var section: String
+    var format: String
+    var `private`: Bool
+    var v1Hash: String?
+    var v2Hash: String?
+    var dht: Bool
+    var pex: Bool
+    var localDiscovery: Bool
+    var sessionDownloaded: UInt64
+    var sessionUploaded: UInt64
+    var seedingSeconds: UInt64?
+    var peers: [PeerDetails]
+    var trackers: [TrackerDetails]
+    var events: [DiagnosticEvent]? = nil
+}
+struct DiagnosticEvent: Codable, Equatable { var sequence: UInt64; var timestamp: UInt64; var message: String }
+struct TrafficSample: Identifiable {
+    var id: Date
+    var download: UInt64
+    var upload: UInt64
+}
+struct TransferEvent: Identifiable {
+    var id = UUID()
+    var date = Date()
+    var message: String
+}
+struct PeerRate: Equatable {
+    var download: UInt64 = 0
+    var upload: UInt64 = 0
+}
+
+/// Keep render and acceptance-fixture preferences separate from the user's workspace.
+enum WorkspacePreferences {
+    static let isFixture = ProcessInfo.processInfo.arguments.contains { $0.hasPrefix("--verify-") || ["--render-designs","--design-preview"].contains($0) }
+    static let defaults: UserDefaults = isFixture ? UserDefaults(suiteName:"app.seedhop.workspace-fixtures")! : .standard
 }

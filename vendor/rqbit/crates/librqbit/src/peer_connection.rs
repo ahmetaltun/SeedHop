@@ -49,6 +49,7 @@ pub trait PeerConnectionHandler {
         true
     }
     fn serialize_bitfield_message_to_buf(&self, buf: &mut [u8]) -> anyhow::Result<usize>;
+    fn on_encryption(&self, _encrypted: bool) {}
     fn on_handshake(&self, handshake: Handshake, ckind: ConnectionKind) -> anyhow::Result<()>;
     fn on_extended_handshake(
         &self,
@@ -201,6 +202,7 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
         self.handler
             .on_handshake(handshake, incoming.kind)
             .map_err(Error::Anyhow)?;
+        self.handler.on_encryption(incoming.encrypted);
 
         self.manage_peer(ManagePeerArgs {
             handshake_supports_extended,
@@ -227,12 +229,14 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
         BoxAsyncWrite,
         ReadBuf,
         Handshake,
+        bool,
     )> {
         use tokio::io::AsyncWriteExt;
         let handshake =
             Handshake::new(self.info_hash, self.peer_id).with_v2(self.handler.supports_v2());
         let mut bytes = [0; 68];
         let _ = handshake.serialize_unchecked_len(&mut bytes);
+        let mut payload_encrypted = false;
         if encrypted {
             let negotiated = with_timeout("MSE negotiation", rwtimeout, async {
                 let _permit = self
@@ -251,6 +255,7 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
                 .await?)
             })
             .await?;
+            payload_encrypted = negotiated.encrypted;
             debug!(kind=%ckind, rc4=negotiated.encrypted, "MSE outgoing negotiation completed");
             read = Box::new(negotiated.read.into_vectored_compat());
             write = Box::new(negotiated.write);
@@ -273,7 +278,7 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
         if h.peer_id == self.peer_id {
             return Err(Error::ConnectingToOurselves);
         }
-        Ok((ckind, read, write, read_buf, h))
+        Ok((ckind, read, write, read_buf, h, payload_encrypted))
     }
 
     pub async fn manage_peer_outgoing(
@@ -349,7 +354,7 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
                 }
             }
         }
-        let (ckind, read, write, read_buf, h) =
+        let (ckind, read, write, read_buf, h, payload_encrypted) =
             connected.ok_or_else(|| last_error.unwrap_or(Error::ConnectDisabled))?;
         let write_buf = Box::new([0u8; MAX_MSG_LEN]);
         self.handler.on_connected(now.elapsed());
@@ -362,6 +367,7 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
                 "connected",
             );
             self.handler.on_handshake(h, ckind).map_err(Error::Anyhow)?;
+            self.handler.on_encryption(payload_encrypted);
 
             self.manage_peer(ManagePeerArgs {
                 handshake_supports_extended,

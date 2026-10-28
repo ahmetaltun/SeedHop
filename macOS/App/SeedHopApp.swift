@@ -8,7 +8,7 @@ import SwiftUI
         if ProcessInfo.processInfo.arguments.contains("--verify-performance") { return PerformanceSelfTest.fixtureStore() }
         if ProcessInfo.processInfo.arguments.contains("--verify-interface") { return UXSelfTest.nativeFixture() }
         #endif
-        return LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine") || ProcessInfo.processInfo.arguments.contains("--verify-ux") || ProcessInfo.processInfo.arguments.contains("--verify-interface") || ProcessInfo.processInfo.arguments.contains("--verify-lifecycle") || ProcessInfo.processInfo.arguments.contains("--verify-storage-recovery"))
+        return LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--verify-workspace-layout") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine") || ProcessInfo.processInfo.arguments.contains("--verify-ux") || ProcessInfo.processInfo.arguments.contains("--verify-interface") || ProcessInfo.processInfo.arguments.contains("--verify-lifecycle") || ProcessInfo.processInfo.arguments.contains("--verify-storage-recovery"))
     }
     var body: some Scene {
         WindowGroup("SeedHop",id:"library") {
@@ -33,7 +33,7 @@ import SwiftUI
                 Button("Move to Front of Queue") { store.moveSelectedToFront() }.disabled(!store.canActOnSelection || store.selected.count != 1)
                 Button("Move Files…") { store.chooseRelocation() }.disabled(!store.canMoveSelection)
                 Button("Remove Selected…") { store.requestRemoval() }.keyboardShortcut(.delete).disabled(!store.canRemoveSelection)
-                Button("Show Inspector") { store.showInspector.toggle() }.keyboardShortcut("i",modifiers:[.command,.option])
+                Button("Show Details") { store.showInspector.toggle() }.keyboardShortcut("i",modifiers:[.command,.option])
             }
             CommandGroup(before:.appTermination) { Button("Quit and Stop Transfers") { delegate.stopEverything = true; NSApp.terminate(nil) }.keyboardShortcut("q",modifiers:[.command,.option]) }
         }
@@ -50,6 +50,7 @@ struct LibraryNavigationCommands: Commands {
             Button("Focus Transfer List") { librarySearch?.focusTransfers() }.keyboardShortcut("l").disabled(librarySearch == nil)
         }
         CommandGroup(after:.windowArrangement) {
+            Button("Toggle Sidebar") { librarySearch?.toggleSidebar?() }.keyboardShortcut("s",modifiers:[.command,.option]).disabled(librarySearch?.toggleSidebar == nil)
             Button("Show Library") { openWindow(id:"library") }.keyboardShortcut("0")
         }
     }
@@ -80,6 +81,10 @@ struct LibraryNavigationCommands: Commands {
         }
         if ProcessInfo.processInfo.arguments.contains("--verify-performance") {
             Task { do { try await PerformanceSelfTest.run(store:{ self.store }); exit(0) } catch { fputs("Performance verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
+            return
+        }
+        if ProcessInfo.processInfo.arguments.contains("--verify-workspace-layout") {
+            Task { do { try await InterfaceSelfTest.verifyWorkspaceLayout(); exit(0) } catch { fputs("Workspace layout verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
             return
         }
         if ProcessInfo.processInfo.arguments.contains("--verify-interface") {

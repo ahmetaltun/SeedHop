@@ -221,6 +221,24 @@ impl EngineBridge {
             .block_on(core.set_peer_encryption(policy))
             .map_err(error)
     }
+    pub fn snapshot_json(&self) -> Result<String, BridgeError> {
+        serde_json::to_string(&self.handles()?.0.snapshot().map_err(error)?).map_err(error)
+    }
+    pub fn torrent_details(
+        &self,
+        id: String,
+        section: String,
+        all_peers: bool,
+    ) -> Result<String, BridgeError> {
+        serde_json::to_string(
+            &self
+                .handles()?
+                .0
+                .torrent_details(id, section, all_peers)
+                .map_err(error)?,
+        )
+        .map_err(error)
+    }
     pub fn snapshot(&self) -> Result<EngineSnapshot, BridgeError> {
         let (core, _) = self.handles()?;
         let s = core.snapshot().map_err(error)?;

@@ -10,7 +10,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Weak;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use anyhow::Context;
@@ -182,6 +182,13 @@ impl TorrentMetadata {
     }
 }
 
+/// Network payload totals retained across live, paused, and checking states.
+#[derive(Default)]
+pub struct PayloadCounters {
+    pub downloaded: AtomicU64,
+    pub uploaded: AtomicU64,
+}
+
 /// Common information about torrent shared among all possible states.
 ///
 // The reason it's not inlined into ManagedTorrent is to break the Arc cycle:
@@ -189,6 +196,12 @@ impl TorrentMetadata {
 // of stuff, but it shouldn't access the state.
 pub struct ManagedTorrentShared {
     pub id: TorrentId,
+    pub payload_counters: PayloadCounters,
+    pub tracker_event_sequence: AtomicU64,
+    pub tracker_events: parking_lot::Mutex<std::collections::VecDeque<(u64, u64, String, String)>>,
+    pub tracker_observations: parking_lot::RwLock<
+        std::collections::HashMap<String, (String, tracker_comms::TrackerObservation)>,
+    >,
     pub info_hash: Id20,
     pub(crate) spawner: BlockingSpawner,
     pub trackers: HashSet<url::Url>,
@@ -446,7 +459,8 @@ impl ManagedTorrent {
                     let span = t.shared().span.clone();
                     let token = token.clone();
 
-                    spawn_with_cancel(
+                    let task_owner = session.clone();
+                    let task = spawn_with_cancel(
                         debug_span!(parent: span.clone(), "initialize_and_start"),
                         "initialize_and_start",
                         token.clone(),
@@ -492,6 +506,7 @@ impl ManagedTorrent {
                             }
                         },
                     );
+                    task_owner.track_task(task);
                     Ok(())
                 }
                 ManagedTorrentState::Paused(_) => {
@@ -770,8 +785,9 @@ fn spawn_fatal_errors_receiver(
     let span = state.shared.span.clone();
     let id = state.shared.id;
     let info_hash = state.shared.info_hash;
+    let task_owner = state.shared.session.upgrade();
     let state = Arc::downgrade(state);
-    spawn_with_cancel::<&'static str>(
+    let task = spawn_with_cancel::<&'static str>(
         debug_span!(parent: span, "fatal_errors_receiver"),
         "fatal_errors_receiver",
         token,
@@ -792,6 +808,9 @@ fn spawn_fatal_errors_receiver(
             Ok(())
         },
     );
+    if let Some(session) = task_owner {
+        session.track_task(task);
+    }
 }
 
 fn spawn_peer_adder(live: &Arc<TorrentStateLive>, mut peer_rx: TorrentPeerStream) {

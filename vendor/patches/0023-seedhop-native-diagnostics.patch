@@ -1,0 +1,951 @@
+diff --git a/crates/librqbit/src/lib.rs b/crates/librqbit/src/lib.rs
+index 06ed610..84ec7dc 100644
+--- a/crates/librqbit/src/lib.rs
++++ b/crates/librqbit/src/lib.rs
+@@ -127,3 +127,6 @@ pub fn try_increase_nofile_limit() -> anyhow::Result<u64> {
+ }
+ 
+ pub use librqbit_core::v2;
++
++// Read-only peer diagnostics used by native frontends.
++pub use torrent_state::live::peer::stats::snapshot::{PeerStatsFilter, PeerStatsFilterState};
+diff --git a/crates/librqbit/src/peer_connection.rs b/crates/librqbit/src/peer_connection.rs
+index 650b6d8..9926561 100644
+--- a/crates/librqbit/src/peer_connection.rs
++++ b/crates/librqbit/src/peer_connection.rs
+@@ -49,6 +49,7 @@ pub trait PeerConnectionHandler {
+         true
+     }
+     fn serialize_bitfield_message_to_buf(&self, buf: &mut [u8]) -> anyhow::Result<usize>;
++    fn on_encryption(&self, _encrypted: bool) {}
+     fn on_handshake(&self, handshake: Handshake, ckind: ConnectionKind) -> anyhow::Result<()>;
+     fn on_extended_handshake(
+         &self,
+@@ -201,6 +202,7 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
+         self.handler
+             .on_handshake(handshake, incoming.kind)
+             .map_err(Error::Anyhow)?;
++        self.handler.on_encryption(incoming.encrypted);
+ 
+         self.manage_peer(ManagePeerArgs {
+             handshake_supports_extended,
+@@ -227,12 +229,14 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
+         BoxAsyncWrite,
+         ReadBuf,
+         Handshake,
++        bool,
+     )> {
+         use tokio::io::AsyncWriteExt;
+         let handshake =
+             Handshake::new(self.info_hash, self.peer_id).with_v2(self.handler.supports_v2());
+         let mut bytes = [0; 68];
+         let _ = handshake.serialize_unchecked_len(&mut bytes);
++        let mut payload_encrypted = false;
+         if encrypted {
+             let negotiated = with_timeout("MSE negotiation", rwtimeout, async {
+                 let _permit = self
+@@ -251,6 +255,7 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
+                 .await?)
+             })
+             .await?;
++            payload_encrypted = negotiated.encrypted;
+             debug!(kind=%ckind, rc4=negotiated.encrypted, "MSE outgoing negotiation completed");
+             read = Box::new(negotiated.read.into_vectored_compat());
+             write = Box::new(negotiated.write);
+@@ -273,7 +278,7 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
+         if h.peer_id == self.peer_id {
+             return Err(Error::ConnectingToOurselves);
+         }
+-        Ok((ckind, read, write, read_buf, h))
++        Ok((ckind, read, write, read_buf, h, payload_encrypted))
+     }
+ 
+     pub async fn manage_peer_outgoing(
+@@ -349,7 +354,7 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
+                 }
+             }
+         }
+-        let (ckind, read, write, read_buf, h) =
++        let (ckind, read, write, read_buf, h, payload_encrypted) =
+             connected.ok_or_else(|| last_error.unwrap_or(Error::ConnectDisabled))?;
+         let write_buf = Box::new([0u8; MAX_MSG_LEN]);
+         self.handler.on_connected(now.elapsed());
+@@ -362,6 +367,7 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
+                 "connected",
+             );
+             self.handler.on_handshake(h, ckind).map_err(Error::Anyhow)?;
++            self.handler.on_encryption(payload_encrypted);
+ 
+             self.manage_peer(ManagePeerArgs {
+                 handshake_supports_extended,
+diff --git a/crates/librqbit/src/session.rs b/crates/librqbit/src/session.rs
+index 19d2032..85f4f12 100644
+--- a/crates/librqbit/src/session.rs
++++ b/crates/librqbit/src/session.rs
+@@ -128,6 +128,7 @@ pub struct Session {
+     cancellation_token: CancellationToken,
+     // SeedHop: await session-owned tasks instead of guessing at shutdown latency.
+     shutdown_tasks: parking_lot::Mutex<Vec<tokio::task::JoinHandle<()>>>,
++    shutdown_task_failed: std::sync::atomic::AtomicBool,
+     _cancellation_token_drop_guard: DropGuard,
+ 
+     // Runtime settings
+@@ -564,6 +565,7 @@ fn torrent_file_from_info_bytes(
+ 
+ pub(crate) struct CheckedIncomingConnection {
+     pub kind: ConnectionKind,
++    pub encrypted: bool,
+     pub addr: SocketAddr,
+     pub reader: BoxAsyncReadVectored,
+     pub writer: BoxAsyncWrite,
+@@ -826,6 +828,7 @@ impl Session {
+                 _cancellation_token_drop_guard: token.clone().drop_guard(),
+                 cancellation_token: token,
+                 shutdown_tasks: parking_lot::Mutex::new(Vec::new()),
++                shutdown_task_failed: std::sync::atomic::AtomicBool::new(false),
+                 announce_port: listen_result.as_ref().and_then(|l| l.announce_port),
+                 listen_addr: listen_result.as_ref().map(|l| l.addr),
+                 default_storage_factory: opts.default_storage_factory,
+@@ -1010,6 +1013,7 @@ impl Session {
+         .await
+         .context("incoming MSE/peer handshake timed out")??;
+         let stream_key = negotiated.info_hash;
++        let encrypted = negotiated.encrypted;
+         if stream_key.is_some() {
+             debug!(
+                 rc4 = negotiated.encrypted,
+@@ -1064,6 +1068,7 @@ impl Session {
+         Ok((
+             live,
+             CheckedIncomingConnection {
++                encrypted,
+                 addr,
+                 reader,
+                 writer,
+@@ -1156,7 +1161,27 @@ impl Session {
+         fut: impl std::future::Future<Output = anyhow::Result<()>> + Send + 'static,
+     ) {
+         let task = spawn_with_cancel(span, name, self.cancellation_token.clone(), fut);
+-        self.shutdown_tasks.lock().push(task);
++        self.track_task(task);
++    }
++
++    /// Retain task ownership until shutdown, including live torrent generations
++    /// that have since been paused, rechecked, or removed from the database.
++    pub(crate) fn track_task(&self, task: tokio::task::JoinHandle<()>) {
++        let mut tasks = self.shutdown_tasks.lock();
++        if tasks.len() >= 128 {
++            let mut pending = Vec::with_capacity(tasks.len());
++            for existing in tasks.drain(..) {
++                if existing.is_finished() {
++                    if let Some(Err(_)) = existing.now_or_never() {
++                        self.shutdown_task_failed.store(true, Ordering::Relaxed);
++                    }
++                } else {
++                    pending.push(existing);
++                }
++            }
++            *tasks = pending;
++        }
++        tasks.push(task);
+     }
+ 
+     pub(crate) fn rs(&self) -> Option<tracing::Id> {
+@@ -1186,11 +1211,23 @@ impl Session {
+             }
+         }
+         self.cancellation_token.cancel();
+-        let tasks = std::mem::take(&mut *self.shutdown_tasks.lock());
+-        for task in tasks {
+-            task.await
+-                .context("session task panicked during shutdown")?;
++        // Joining a parent can register further child tasks. Drain until all
++        // generations have completed, never holding the registry lock over await.
++        loop {
++            let tasks = std::mem::take(&mut *self.shutdown_tasks.lock());
++            if tasks.is_empty() {
++                break;
++            }
++            for task in tasks {
++                if task.await.is_err() {
++                    self.shutdown_task_failed.store(true, Ordering::Relaxed);
++                }
++            }
+         }
++        anyhow::ensure!(
++            !self.shutdown_task_failed.load(Ordering::Relaxed),
++            "session task panicked during shutdown"
++        );
+         Ok(())
+     }
+ 
+@@ -1538,6 +1575,10 @@ impl Session {
+             let peer_opts = self.merge_peer_opts(opts.peer_opts);
+             let metadata = Arc::new(metadata);
+             let minfo = Arc::new(ManagedTorrentShared {
++                payload_counters: Default::default(),
++                tracker_observations: Default::default(),
++                tracker_event_sequence: Default::default(),
++                tracker_events: Default::default(),
+                 id,
+                 span,
+                 info_hash,
+@@ -2364,6 +2405,63 @@ struct PeerRxTorrentInfo {
+ }
+ 
+ impl tracker_comms::TorrentStatsProvider for PeerRxTorrentInfo {
++    fn observe(&self, observation: tracker_comms::TrackerObservation) {
++        self.session.with_torrents(|torrents| {
++            for (_, mt) in torrents {
++                let matches = mt.info_hash() == self.info_hash
++                    || mt
++                        .with_metadata(|m| m.v1_info_hash == self.info_hash)
++                        .unwrap_or(false);
++                if matches {
++                    let key = format!(
++                        "{}|{}|{}",
++                        self.info_hash.as_string(),
++                        observation.url,
++                        observation.endpoint.as_deref().unwrap_or("")
++                    );
++                    let mut observations = mt.shared().tracker_observations.write();
++                    // A resolved UDP endpoint supersedes its DNS-only placeholder.
++                    if observation.endpoint.is_some() {
++                        let root = format!("{}|{}|", self.info_hash.as_string(), observation.url);
++                        observations.remove(&root);
++                    }
++                    let mut value = observation.clone();
++                    if value.state == "contacting" || value.state == "resolving" {
++                        if let Some((_, prior)) = observations.get(&key) {
++                            value.last_announce = prior.last_announce;
++                            value.message = prior.message.clone();
++                            value.peers = prior.peers;
++                            value.seeds = prior.seeds;
++                            value.leechers = prior.leechers;
++                        }
++                    }
++                    if matches!(value.state.as_str(), "error" | "warning") {
++                        let sequence = mt
++                            .shared()
++                            .tracker_event_sequence
++                            .fetch_add(1, Ordering::Relaxed)
++                            + 1;
++                        let timestamp = std::time::SystemTime::now()
++                            .duration_since(std::time::UNIX_EPOCH)
++                            .unwrap_or_default()
++                            .as_secs();
++                        let mut events = mt.shared().tracker_events.lock();
++                        events.push_back((
++                            sequence,
++                            timestamp,
++                            value.url.clone(),
++                            value.state.clone(),
++                        ));
++                        while events.len() > 200 {
++                            events.pop_front();
++                        }
++                    }
++                    observations.insert(key, (self.info_hash.as_string(), value));
++                    break;
++                }
++            }
++        });
++    }
+     fn get(&self) -> tracker_comms::TrackerCommsStats {
+         let mt = self.session.with_torrents(|torrents| {
+             for (_, mt) in torrents {
+diff --git a/crates/librqbit/src/torrent_state/live/mod.rs b/crates/librqbit/src/torrent_state/live/mod.rs
+index 1c1dca8..c1bab08 100644
+--- a/crates/librqbit/src/torrent_state/live/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/mod.rs
+@@ -354,7 +354,10 @@ impl TorrentStateLive {
+         name: impl Into<Cow<'static, str>>,
+         fut: impl std::future::Future<Output = crate::Result<()>> + Send + 'static,
+     ) {
+-        spawn_with_cancel(span, name, self.cancellation_token.clone(), fut);
++        let task = spawn_with_cancel(span, name, self.cancellation_token.clone(), fut);
++        if let Some(session) = self.shared.session.upgrade() {
++            session.track_task(task);
++        }
+     }
+ 
+     pub fn down_speed_estimator(&self) -> &SpeedEstimator {
+@@ -1238,6 +1241,14 @@ impl PeerConnectionHandler for &'_ PeerHandler {
+         Ok(len)
+     }
+ 
++    fn on_encryption(&self, encrypted: bool) {
++        self.state
++            .peers
++            .with_live_mut(self.addr, "record negotiated encryption", |peer| {
++                peer.encrypted = Some(encrypted);
++            });
++    }
++
+     fn on_handshake(&self, handshake: Handshake, ckind: ConnectionKind) -> anyhow::Result<()> {
+         self.wire_v2.store(
+             handshake.info_hash == self.state.shared.info_hash
+@@ -1255,6 +1266,11 @@ impl PeerConnectionHandler for &'_ PeerHandler {
+     }
+ 
+     fn on_uploaded_bytes(&self, bytes: u32) {
++        self.state
++            .shared
++            .payload_counters
++            .uploaded
++            .fetch_add(bytes as u64, Ordering::Relaxed);
+         self.counters
+             .uploaded_bytes
+             .fetch_add(bytes as u64, Ordering::Relaxed);
+@@ -1309,7 +1325,7 @@ impl PeerConnectionHandler for &'_ PeerHandler {
+             } else if current.is_none() {
+                 let token = self.cancel_token.child_token();
+                 *current = Some(token.clone());
+-                spawn_with_cancel(
++                let task = spawn_with_cancel(
+                     debug_span!(parent: self.state.shared.span.clone(), "sending_pex_to_peer", peer = ?self.addr),
+                     format!(
+                         "[{}][addr={}]sending_pex_to_peer",
+@@ -1326,6 +1342,9 @@ impl PeerConnectionHandler for &'_ PeerHandler {
+                         },
+                     ),
+                 );
++                if let Some(session) = self.state.shared.session.upgrade() {
++                    session.track_task(task);
++                }
+             }
+         }
+         // Lets update outgoing Socket address for incoming connection
+@@ -2216,6 +2235,11 @@ impl PeerHandler {
+         self.counters
+             .fetched_bytes
+             .fetch_add(piece.len() as u64, Ordering::Relaxed);
++        self.state
++            .shared
++            .payload_counters
++            .downloaded
++            .fetch_add(piece.len() as u64, Ordering::Relaxed);
+         self.counters.fetched_chunks.fetch_add(1, Ordering::Relaxed);
+ 
+         let should_process = self
+diff --git a/crates/librqbit/src/torrent_state/live/peer/mod.rs b/crates/librqbit/src/torrent_state/live/peer/mod.rs
+index 72c43fb..2fac73c 100644
+--- a/crates/librqbit/src/torrent_state/live/peer/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/peer/mod.rs
+@@ -4,7 +4,10 @@ pub mod stats;
+ use cancelled_requests::CancelledRequests;
+ use std::collections::{HashMap, hash_map::Entry};
+ use std::net::SocketAddr;
+-use std::sync::{Arc, atomic::Ordering};
++use std::sync::{
++    Arc,
++    atomic::{AtomicU64, Ordering},
++};
+ 
+ use librqbit_core::hash_id::Id20;
+ use librqbit_core::lengths::{ChunkInfo, ValidPieceIndex};
+@@ -26,6 +29,8 @@ pub(crate) type InflightRequest = ChunkInfo;
+ pub(crate) type PeerRx = UnboundedReceiver<WriterRequest>;
+ pub(crate) type PeerTx = UnboundedSender<WriterRequest>;
+ 
++static NEXT_CONNECTION_ID: AtomicU64 = AtomicU64::new(1);
++
+ #[derive(Debug)]
+ pub(crate) struct Peer {
+     pub addr: SocketAddr,
+@@ -44,7 +49,7 @@ impl Peer {
+         counters: &PeerStates,
+         connection_kind: ConnectionKind,
+     ) -> Self {
+-        let state = PeerState::Live(LivePeerState::new(peer_id, tx, true, connection_kind));
++        let state = PeerState::Live(LivePeerState::new(peer_id, tx, true, connection_kind, true));
+         for counter in [&counters.session_stats, &counters.stats] {
+             counter.inc(&state);
+         }
+@@ -221,7 +226,7 @@ impl Peer {
+         match self.take_state(counters) {
+             PeerState::Queued | PeerState::Dead | PeerState::NotNeeded => {
+                 self.set_state(
+-                    PeerState::Live(LivePeerState::new(peer_id, tx, true, connection_kind)),
++                    PeerState::Live(LivePeerState::new(peer_id, tx, true, connection_kind, true)),
+                     counters,
+                 );
+             }
+@@ -242,7 +247,7 @@ impl Peer {
+                 _ => unreachable!(),
+             };
+             self.set_state(
+-                PeerState::Live(LivePeerState::new(peer_id, tx, false, conn_kind)),
++                PeerState::Live(LivePeerState::new(peer_id, tx, false, conn_kind, false)),
+                 counters,
+             );
+             self.get_live_mut()
+@@ -258,6 +263,9 @@ impl Peer {
+ 
+ #[derive(Debug)]
+ pub(crate) struct LivePeerState {
++    pub connection_id: u64,
++    pub encrypted: Option<bool>,
++    pub incoming: bool,
+     #[allow(dead_code)]
+     peer_id: Id20,
+ 
+@@ -289,8 +297,12 @@ impl LivePeerState {
+         tx: PeerTx,
+         initial_interested: bool,
+         connection_kind: ConnectionKind,
++        incoming: bool,
+     ) -> Self {
+         LivePeerState {
++            connection_id: NEXT_CONNECTION_ID.fetch_add(1, Ordering::Relaxed),
++            encrypted: None,
++            incoming,
+             peer_id,
+             client_name: None,
+             peer_interested: initial_interested,
+diff --git a/crates/librqbit/src/torrent_state/live/peer/stats/snapshot.rs b/crates/librqbit/src/torrent_state/live/peer/stats/snapshot.rs
+index 0343dbc..ef2be5b 100644
+--- a/crates/librqbit/src/torrent_state/live/peer/stats/snapshot.rs
++++ b/crates/librqbit/src/torrent_state/live/peer/stats/snapshot.rs
+@@ -29,6 +29,9 @@ pub struct PeerStats {
+     pub state: &'static str,
+     pub conn_kind: Option<ConnectionKind>,
+     pub client_name: Option<String>,
++    pub connection_id: Option<u64>,
++    pub encrypted: Option<bool>,
++    pub incoming: Option<bool>,
+ }
+ 
+ impl From<&super::atomic::PeerCountersAtomic> for PeerCounters {
+@@ -68,6 +71,18 @@ impl From<&Peer> for PeerStats {
+                 PeerState::Live(l) => l.client_name.clone(),
+                 _ => None,
+             },
++            connection_id: match state {
++                PeerState::Live(l) => Some(l.connection_id),
++                _ => None,
++            },
++            encrypted: match state {
++                PeerState::Live(l) => l.encrypted,
++                _ => None,
++            },
++            incoming: match state {
++                PeerState::Live(l) => Some(l.incoming),
++                _ => None,
++            },
+         }
+     }
+ }
+@@ -97,3 +112,43 @@ pub struct PeerStatsFilter {
+     #[serde(default)]
+     pub state: PeerStatsFilterState,
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::torrent_state::live::peer::LivePeerState;
++    use librqbit_core::hash_id::Id20;
++
++    #[test]
++    fn connection_identity_and_encryption_follow_live_generation() {
++        let address = "127.0.0.1:1234".parse().unwrap();
++        let mut peer = Peer::new_with_outgoing_address(address, Id20::new([0; 20]));
++        let unknown = PeerStats::from(&peer);
++        assert!(unknown.connection_id.is_none());
++        assert!(unknown.encrypted.is_none());
++        assert!(unknown.incoming.is_none());
++
++        let (tx, _) = tokio::sync::mpsc::unbounded_channel();
++        let mut first = LivePeerState::new(Id20::new([1; 20]), tx, true, ConnectionKind::Tcp, true);
++        first.encrypted = Some(false);
++        peer.state = PeerState::Live(first);
++        let first = PeerStats::from(&peer);
++        assert_eq!(first.encrypted, Some(false));
++        assert_eq!(first.incoming, Some(true));
++
++        let (tx, _) = tokio::sync::mpsc::unbounded_channel();
++        let mut next =
++            LivePeerState::new(Id20::new([1; 20]), tx, false, ConnectionKind::Utp, false);
++        next.encrypted = Some(true);
++        peer.state = PeerState::Live(next);
++        let next = PeerStats::from(&peer);
++        assert_ne!(first.connection_id, next.connection_id);
++        assert_eq!(next.encrypted, Some(true));
++        assert_eq!(next.incoming, Some(false));
++
++        peer.state = PeerState::Dead;
++        let dead = PeerStats::from(&peer);
++        assert!(dead.connection_id.is_none());
++        assert!(dead.encrypted.is_none());
++    }
++}
+diff --git a/crates/librqbit/src/torrent_state/mod.rs b/crates/librqbit/src/torrent_state/mod.rs
+index bea1d12..f4bd789 100644
+--- a/crates/librqbit/src/torrent_state/mod.rs
++++ b/crates/librqbit/src/torrent_state/mod.rs
+@@ -10,7 +10,7 @@ use std::net::SocketAddr;
+ use std::path::PathBuf;
+ use std::sync::Arc;
+ use std::sync::Weak;
+-use std::sync::atomic::{AtomicBool, Ordering};
++use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+ use std::time::Duration;
+ 
+ use anyhow::Context;
+@@ -182,6 +182,13 @@ impl TorrentMetadata {
+     }
+ }
+ 
++/// Network payload totals retained across live, paused, and checking states.
++#[derive(Default)]
++pub struct PayloadCounters {
++    pub downloaded: AtomicU64,
++    pub uploaded: AtomicU64,
++}
++
+ /// Common information about torrent shared among all possible states.
+ ///
+ // The reason it's not inlined into ManagedTorrent is to break the Arc cycle:
+@@ -189,6 +196,12 @@ impl TorrentMetadata {
+ // of stuff, but it shouldn't access the state.
+ pub struct ManagedTorrentShared {
+     pub id: TorrentId,
++    pub payload_counters: PayloadCounters,
++    pub tracker_event_sequence: AtomicU64,
++    pub tracker_events: parking_lot::Mutex<std::collections::VecDeque<(u64, u64, String, String)>>,
++    pub tracker_observations: parking_lot::RwLock<
++        std::collections::HashMap<String, (String, tracker_comms::TrackerObservation)>,
++    >,
+     pub info_hash: Id20,
+     pub(crate) spawner: BlockingSpawner,
+     pub trackers: HashSet<url::Url>,
+@@ -446,7 +459,8 @@ impl ManagedTorrent {
+                     let span = t.shared().span.clone();
+                     let token = token.clone();
+ 
+-                    spawn_with_cancel(
++                    let task_owner = session.clone();
++                    let task = spawn_with_cancel(
+                         debug_span!(parent: span.clone(), "initialize_and_start"),
+                         "initialize_and_start",
+                         token.clone(),
+@@ -492,6 +506,7 @@ impl ManagedTorrent {
+                             }
+                         },
+                     );
++                    task_owner.track_task(task);
+                     Ok(())
+                 }
+                 ManagedTorrentState::Paused(_) => {
+@@ -770,8 +785,9 @@ fn spawn_fatal_errors_receiver(
+     let span = state.shared.span.clone();
+     let id = state.shared.id;
+     let info_hash = state.shared.info_hash;
++    let task_owner = state.shared.session.upgrade();
+     let state = Arc::downgrade(state);
+-    spawn_with_cancel::<&'static str>(
++    let task = spawn_with_cancel::<&'static str>(
+         debug_span!(parent: span, "fatal_errors_receiver"),
+         "fatal_errors_receiver",
+         token,
+@@ -792,6 +808,9 @@ fn spawn_fatal_errors_receiver(
+             Ok(())
+         },
+     );
++    if let Some(session) = task_owner {
++        session.track_task(task);
++    }
+ }
+ 
+ fn spawn_peer_adder(live: &Arc<TorrentStateLive>, mut peer_rx: TorrentPeerStream) {
+diff --git a/crates/tracker_comms/src/tracker_comms.rs b/crates/tracker_comms/src/tracker_comms.rs
+index 7614b1d..f6a720e 100644
+--- a/crates/tracker_comms/src/tracker_comms.rs
++++ b/crates/tracker_comms/src/tracker_comms.rs
+@@ -3,7 +3,7 @@ use std::net::SocketAddr;
+ use std::net::SocketAddrV4;
+ use std::net::SocketAddrV6;
+ use std::sync::Arc;
+-use std::time::Duration;
++use std::time::{Duration, SystemTime, UNIX_EPOCH};
+ 
+ use anyhow::Context;
+ use anyhow::bail;
+@@ -70,8 +70,71 @@ impl TrackerCommsStats {
+     }
+ }
+ 
++/// An observed announce attempt. URL and endpoint are internal identities;
++/// consumers must redact credentials before display or diagnostic export.
++#[derive(Clone, Debug, serde::Serialize)]
++pub struct TrackerObservation {
++    pub url: String,
++    pub endpoint: Option<String>,
++    pub state: String,
++    pub message: Option<String>,
++    pub last_announce: Option<u64>,
++    pub next_announce: Option<u64>,
++    pub peers: Option<u64>,
++    pub seeds: Option<u64>,
++    pub leechers: Option<u64>,
++}
++
++impl TrackerObservation {
++    fn new(url: &Url, endpoint: Option<SocketAddr>, state: &str) -> Self {
++        Self {
++            url: url.to_string(),
++            endpoint: endpoint.map(|addr| addr.to_string()),
++            state: state.into(),
++            message: None,
++            last_announce: Some(epoch_seconds()),
++            next_announce: None,
++            peers: None,
++            seeds: None,
++            leechers: None,
++        }
++    }
++
++    fn retry(url: &Url, endpoint: Option<SocketAddr>, delay: Duration, message: String) -> Self {
++        let mut observation = Self::new(url, endpoint, "error");
++        observation.message = Some(message);
++        observation.next_announce = Some(epoch_seconds().saturating_add(delay.as_secs()));
++        observation
++    }
++}
++
++fn epoch_seconds() -> u64 {
++    SystemTime::now()
++        .duration_since(UNIX_EPOCH)
++        .unwrap_or_default()
++        .as_secs()
++}
++
++// reqwest errors can contain the complete credential-bearing announce URL.
++// Only deliberately constructed tracker replies are safe to retain here;
++// applications still need to sanitize tracker-supplied failure text.
++fn http_failure_message(error: &anyhow::Error) -> String {
++    let message = error.to_string();
++    if message.starts_with("Tracker rejected announce: ")
++        || message.starts_with("Tracker returned HTTP ")
++    {
++        message
++    } else {
++        "Tracker request failed; another attempt is scheduled.".into()
++    }
++}
++
+ pub trait TorrentStatsProvider: Send + Sync {
+     fn get(&self) -> TrackerCommsStats;
++
++    /// Called synchronously before peer delivery. Implementations must remain
++    /// lightweight and must not perform disk or network I/O.
++    fn observe(&self, _observation: TrackerObservation) {}
+ }
+ 
+ impl TorrentStatsProvider for () {
+@@ -249,7 +312,15 @@ impl TrackerComms {
+                         .with_min_delay(Duration::from_secs(10))
+                         .with_max_delay(Duration::from_secs(600)),
+                 )
+-                .notify(|err, retry_in| debug!(?retry_in, "error calling tracker: {err:#}"))
++                .notify(|err, retry_in| {
++                    debug!(?retry_in, "error calling tracker: {err:#}");
++                    self.stats.observe(TrackerObservation::retry(
++                        &tracker_url,
++                        None,
++                        retry_in,
++                        http_failure_message(err),
++                    ));
++                })
+                 .await
+                 .context("this shouldn't fail")?;
+ 
+@@ -265,6 +336,8 @@ impl TrackerComms {
+         tracker_url: &Url,
+         event: Option<tracker_comms_http::TrackerRequestEvent>,
+     ) -> anyhow::Result<Duration> {
++        self.stats
++            .observe(TrackerObservation::new(tracker_url, None, "contacting"));
+         let stats = self.stats.get();
+         let request = tracker_comms_http::TrackerRequest {
+             info_hash: &self.info_hash,
+@@ -292,16 +365,13 @@ impl TrackerComms {
+ 
+         let response: reqwest::Response = self.reqwest_client.get(url).send().await?;
+         if !response.status().is_success() {
+-            anyhow::bail!("tracker responded with {:?}", response.status());
++            anyhow::bail!("Tracker returned HTTP {}", response.status());
+         }
+         let bytes = response.bytes().await?;
+         if let Ok((error, _)) =
+             bencode::from_bytes_with_rest::<tracker_comms_http::TrackerError>(&bytes)
+         {
+-            anyhow::bail!(
+-                "tracker returned failure. Failure reason: {}",
+-                error.failure_reason
+-            )
++            anyhow::bail!("Tracker rejected announce: {}", error.failure_reason)
+         };
+         let response = bencode::from_bytes_with_rest::<tracker_comms_http::TrackerResponse>(&bytes)
+             .map_err(|e| {
+@@ -310,12 +380,32 @@ impl TrackerComms {
+             })?
+             .0;
+ 
++        let interval = self.force_tracker_interval.unwrap_or(Duration::from_secs(
++            response.min_interval.unwrap_or(response.interval),
++        ));
++        let warning = response
++            .warning_message
++            .as_ref()
++            .map(|value| value.to_string());
++        let mut observation = TrackerObservation::new(
++            tracker_url,
++            None,
++            if warning.is_some() {
++                "warning"
++            } else {
++                "working"
++            },
++        );
++        observation.message = warning;
++        observation.next_announce = Some(epoch_seconds().saturating_add(interval.as_secs()));
++        observation.peers = Some(response.iter_peers().count() as u64);
++        observation.seeds = response.complete;
++        observation.leechers = response.incomplete;
++        self.stats.observe(observation);
+         for peer in response.iter_peers() {
+             self.tx.send(peer).await?;
+         }
+-        Ok(Duration::from_secs(
+-            response.min_interval.unwrap_or(response.interval),
+-        ))
++        Ok(interval)
+     }
+ 
+     async fn task_single_tracker_monitor_udp(
+@@ -339,12 +429,23 @@ impl TrackerComms {
+                 tokio::time::sleep(i).await;
+             }
+ 
++            self.stats
++                .observe(TrackerObservation::new(&url, None, "resolving"));
+             // This should retry forever until the addrs are resolved.
+             let addrs = (async || {
+                 udp_tracker_to_socket_addrs(host.clone(), port)
+                     .instrument(trace_span!("resolve", ?host))
+                     .await
+-                    .or_else(|err| prev_addrs.ok_or(err))
++                    .or_else(|err| {
++                        if let Some(previous) = prev_addrs {
++                            let mut observation = TrackerObservation::new(&url, None, "warning");
++                            observation.message = Some("Could not refresh tracker address; using previously resolved addresses.".into());
++                            self.stats.observe(observation);
++                            Ok(previous)
++                        } else {
++                            Err(err)
++                        }
++                    })
+             })
+             .retry(
+                 ExponentialBuilder::new()
+@@ -352,38 +453,58 @@ impl TrackerComms {
+                     .with_max_delay(Duration::from_secs(60))
+                     .with_jitter(),
+             )
+-            .notify(|err, retry| debug!(retry_in=?retry, "error resolving tracker: {err:#}"))
++            .notify(|err, retry| {
++                debug!(retry_in=?retry, "error resolving tracker: {err:#}");
++                self.stats.observe(TrackerObservation::retry(
++                    &url,
++                    None,
++                    retry,
++                    "Could not resolve tracker address.".into(),
++                ));
++            })
+             .await
+             .context("this shouldn't happen: failed resolving tracker addrs")?;
+ 
+             prev_addrs = Some(addrs);
+ 
+-            match addrs {
+-                UdpTrackerResolveResult::One(addr) => {
+-                    match self
+-                        .tracker_one_request_udp(addr, &client)
++            let results = match addrs {
++                UdpTrackerResolveResult::One(addr) => vec![(
++                    addr,
++                    self.tracker_one_request_udp(&url, addr, &client)
+                         .instrument(trace_span!("udp request", ?addr))
+-                        .await
+-                    {
+-                        Ok(sleep) => sleep_interval = Some(sleep),
+-                        Err(_) => {
+-                            sleep_interval = Some(sleep_interval.unwrap_or(Duration::from_secs(60)))
+-                        }
+-                    }
+-                }
++                        .await,
++                )],
+                 UdpTrackerResolveResult::Two(v4, v6) => {
+                     let (r4, r6) = tokio::join!(
+-                        self.tracker_one_request_udp(v4.into(), &client)
++                        self.tracker_one_request_udp(&url, v4.into(), &client)
+                             .instrument(trace_span!("udp request", addr=?v4)),
+-                        self.tracker_one_request_udp(v6.into(), &client)
++                        self.tracker_one_request_udp(&url, v6.into(), &client)
+                             .instrument(trace_span!("udp request", addr=?v6))
+                     );
+-                    sleep_interval = Some(
+-                        r4.or(r6)
+-                            .ok()
+-                            .or(sleep_interval)
+-                            .unwrap_or(Duration::from_secs(60)),
+-                    )
++                    vec![(v4.into(), r4), (v6.into(), r6)]
++                }
++            };
++            // Both address families share this monitor's actual next attempt.
++            // Retain each outcome separately so one family cannot hide another's failure.
++            let delay = results
++                .iter()
++                .find_map(|(_, result)| result.as_ref().ok().map(|(delay, _)| *delay))
++                .or(sleep_interval)
++                .unwrap_or(Duration::from_secs(60));
++            sleep_interval = Some(delay);
++            for (addr, result) in results {
++                match result {
++                    Ok((_, mut observation)) => {
++                        observation.next_announce =
++                            Some(epoch_seconds().saturating_add(delay.as_secs()));
++                        self.stats.observe(observation);
++                    }
++                    Err(_) => self.stats.observe(TrackerObservation::retry(
++                        &url,
++                        Some(addr),
++                        delay,
++                        "UDP tracker request failed; another attempt is scheduled.".into(),
++                    )),
+                 }
+             }
+         }
+@@ -391,11 +512,14 @@ impl TrackerComms {
+ 
+     async fn tracker_one_request_udp(
+         &self,
++        url: &Url,
+         addr: SocketAddr,
+         client: &UdpTrackerClient,
+-    ) -> anyhow::Result<Duration> {
++    ) -> anyhow::Result<(Duration, TrackerObservation)> {
+         use tracker_comms_udp::*;
+ 
++        self.stats
++            .observe(TrackerObservation::new(url, Some(addr), "contacting"));
+         let stats = self.stats.get();
+         let request = AnnounceFields {
+             info_hash: self.info_hash,
+@@ -422,12 +546,17 @@ impl TrackerComms {
+         match client.announce(addr, request).await {
+             Ok(response) => {
+                 trace!(len = response.addrs.len(), "received announce response");
++                let mut observation = TrackerObservation::new(url, Some(addr), "working");
++                observation.peers = Some(response.addrs.len() as u64);
++                observation.seeds = Some(response.seeders as u64);
++                observation.leechers = Some(response.leechers as u64);
++                self.stats.observe(observation.clone());
+                 for addr in response.addrs {
+                     self.tx.send(addr).await.context("rx closed")?;
+                 }
+                 let sleep = response.interval.max(5);
+                 let sleep = Duration::from_secs(sleep as u64);
+-                Ok(sleep)
++                Ok((sleep, observation))
+             }
+             Err(e) => {
+                 debug!(?addr, "error reading announce response: {e:#}");
+@@ -436,3 +565,42 @@ impl TrackerComms {
+         }
+     }
+ }
++
++#[cfg(test)]
++mod observation_tests {
++    use super::*;
++
++    #[test]
++    fn generic_transport_failure_does_not_expose_announce_credentials() {
++        let error = anyhow::anyhow!(
++            "failed to send request to https://user:secret@tracker.example/passkey?token=secret"
++        );
++        assert_eq!(
++            http_failure_message(&error),
++            "Tracker request failed; another attempt is scheduled."
++        );
++    }
++
++    #[test]
++    fn retry_keeps_address_family_identity_and_actual_schedule() {
++        let url = Url::parse("udp://tracker.example:80/announce").unwrap();
++        let before = epoch_seconds();
++        let v4 = TrackerObservation::retry(
++            &url,
++            Some("127.0.0.1:80".parse().unwrap()),
++            Duration::from_secs(60),
++            "request failed".into(),
++        );
++        let v6 = TrackerObservation::retry(
++            &url,
++            Some("[::1]:80".parse().unwrap()),
++            Duration::from_secs(60),
++            "request failed".into(),
++        );
++        assert_ne!(v4.endpoint, v6.endpoint);
++        assert_eq!(v4.state, "error");
++        assert!(v4.next_announce.unwrap() >= before + 60);
++        assert!(v4.next_announce.unwrap() <= epoch_seconds() + 60);
++        assert_eq!(v4.peers, None);
++    }
++}
+diff --git a/crates/tracker_comms/src/tracker_comms_http.rs b/crates/tracker_comms/src/tracker_comms_http.rs
+index 2d4e187..82478cb 100644
+--- a/crates/tracker_comms/src/tracker_comms_http.rs
++++ b/crates/tracker_comms/src/tracker_comms_http.rs
+@@ -139,7 +139,7 @@ pub struct TrackerResponse<'a> {
+     pub warning_message: Option<ByteBuf<'a>>,
+     #[allow(dead_code)]
+     #[serde(default)]
+-    pub complete: u64,
++    pub complete: Option<u64>,
+     pub interval: u64,
+     #[allow(dead_code)]
+     #[serde(rename = "min interval")]
+@@ -148,7 +148,7 @@ pub struct TrackerResponse<'a> {
+     pub tracker_id: Option<ByteBuf<'a>>,
+     #[allow(dead_code)]
+     #[serde(default)]
+-    pub incomplete: u64,
++    pub incomplete: Option<u64>,
+     #[serde(borrow)]
+     pub peers: Peers<'a, SocketAddrV4>,
+     #[serde(default, borrow)]
+@@ -247,6 +247,18 @@ mod tests {
+         dbg!(response);
+     }
+ 
++    #[test]
++    fn missing_swarm_counts_are_unknown_and_explicit_zero_is_measured() {
++        let missing = b"d8:intervali1800e5:peers0:e";
++        let response = bencode::from_bytes::<TrackerResponse>(missing).unwrap();
++        assert_eq!(response.complete, None);
++        assert_eq!(response.incomplete, None);
++        let zero = b"d8:completei0e10:incompletei0e8:intervali1800e5:peers0:e";
++        let response = bencode::from_bytes::<TrackerResponse>(zero).unwrap();
++        assert_eq!(response.complete, Some(0));
++        assert_eq!(response.incomplete, Some(0));
++    }
++
+     #[test]
+     fn parse_peers_dict() {
+         let buf = b"ld2:ip9:127.0.0.14:porti100eed2:ip39:6969:6969:6969:6969:6969:6969:6969:69694:porti101eee";

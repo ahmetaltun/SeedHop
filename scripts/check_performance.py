@@ -44,6 +44,14 @@ def evaluate(core, ui):
             flags.append("filterClearsHiddenSelection")
         for flag in flags:
             checks.append({"name": name + " " + flag, "passed": case[flag] is True})
+    if "diagnostics" in ui:
+        if {(case["section"], case["rows"]) for case in ui["diagnostics"]} != {("peers", 1000), ("trackers", 100)}:
+            raise ValueError("Missing or unexpected diagnostic fixture shapes")
+        for case in ui["diagnostics"]:
+            name = f"UI {case['section']} {case['rows']}"
+            latency(name + " layout p95 ms", case["changingSnapshotLayout"]["p95Ms"], 125)
+            latency(name + " scroll p95 ms", case["programmaticScrollLayout"]["p95Ms"], 50)
+            latency(name + " decode p95 ms", case["jsonDecode"]["p95Ms"], 50)
     return {"budgetDefinition": "docs/PERFORMANCE.md", "checks": checks,
             "passed": all(check["passed"] for check in checks)}
 

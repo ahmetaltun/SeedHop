@@ -354,7 +354,10 @@ impl TorrentStateLive {
         name: impl Into<Cow<'static, str>>,
         fut: impl std::future::Future<Output = crate::Result<()>> + Send + 'static,
     ) {
-        spawn_with_cancel(span, name, self.cancellation_token.clone(), fut);
+        let task = spawn_with_cancel(span, name, self.cancellation_token.clone(), fut);
+        if let Some(session) = self.shared.session.upgrade() {
+            session.track_task(task);
+        }
     }
 
     pub fn down_speed_estimator(&self) -> &SpeedEstimator {
@@ -1238,6 +1241,14 @@ impl PeerConnectionHandler for &'_ PeerHandler {
         Ok(len)
     }
 
+    fn on_encryption(&self, encrypted: bool) {
+        self.state
+            .peers
+            .with_live_mut(self.addr, "record negotiated encryption", |peer| {
+                peer.encrypted = Some(encrypted);
+            });
+    }
+
     fn on_handshake(&self, handshake: Handshake, ckind: ConnectionKind) -> anyhow::Result<()> {
         self.wire_v2.store(
             handshake.info_hash == self.state.shared.info_hash
@@ -1255,6 +1266,11 @@ impl PeerConnectionHandler for &'_ PeerHandler {
     }
 
     fn on_uploaded_bytes(&self, bytes: u32) {
+        self.state
+            .shared
+            .payload_counters
+            .uploaded
+            .fetch_add(bytes as u64, Ordering::Relaxed);
         self.counters
             .uploaded_bytes
             .fetch_add(bytes as u64, Ordering::Relaxed);
@@ -1309,7 +1325,7 @@ impl PeerConnectionHandler for &'_ PeerHandler {
             } else if current.is_none() {
                 let token = self.cancel_token.child_token();
                 *current = Some(token.clone());
-                spawn_with_cancel(
+                let task = spawn_with_cancel(
                     debug_span!(parent: self.state.shared.span.clone(), "sending_pex_to_peer", peer = ?self.addr),
                     format!(
                         "[{}][addr={}]sending_pex_to_peer",
@@ -1326,6 +1342,9 @@ impl PeerConnectionHandler for &'_ PeerHandler {
                         },
                     ),
                 );
+                if let Some(session) = self.state.shared.session.upgrade() {
+                    session.track_task(task);
+                }
             }
         }
         // Lets update outgoing Socket address for incoming connection
@@ -2215,6 +2234,11 @@ impl PeerHandler {
         );
         self.counters
             .fetched_bytes
+            .fetch_add(piece.len() as u64, Ordering::Relaxed);
+        self.state
+            .shared
+            .payload_counters
+            .downloaded
             .fetch_add(piece.len() as u64, Ordering::Relaxed);
         self.counters.fetched_chunks.fetch_add(1, Ordering::Relaxed);
 

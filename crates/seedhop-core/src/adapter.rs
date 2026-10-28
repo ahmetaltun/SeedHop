@@ -131,6 +131,26 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
         error_kind,
         queue_position: 0,
         paused_intent: torrent.is_paused(),
+        network_downloaded_bytes: None,
+        network_uploaded_bytes: None,
+        added_at: None,
+        completed_at: None,
+        eta_seconds: stats
+            .live
+            .as_ref()
+            .and_then(|s| s.time_remaining.as_ref())
+            .and_then(|v| serde_json::to_value(v).ok())
+            .and_then(|v| v["duration"]["secs"].as_u64()),
+        selected_bytes: torrent
+            .with_metadata(|m| {
+                m.info
+                    .iter_file_details()
+                    .enumerate()
+                    .filter(|(i, _)| selected.as_ref().is_none_or(|s| s.contains(i)))
+                    .map(|(_, f)| f.len)
+                    .sum()
+            })
+            .unwrap_or(0),
     }
 }
 

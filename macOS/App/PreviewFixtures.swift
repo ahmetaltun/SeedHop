@@ -16,7 +16,41 @@ enum PreviewFixtures {
         torrent("06","Fedora Workstation · aarch64.iso", "waiting",2_480_000_000,0,0,0,0)
     ]
     private static func torrent(_ id:String,_ name:String,_ state:String,_ total:UInt64,_ downloaded:UInt64,_ down:UInt64,_ up:UInt64,_ peers:UInt32,_ files:[FileItem] = []) -> TorrentItem {
-        TorrentItem(id:String(repeating:"0",count:38)+id,name:name,state:state,totalBytes:total,downloadedBytes:downloaded,uploadedBytes:state == "seeding" ? total * 2 : 41_000_000,downloadRate:down,uploadRate:up,peers:peers,destination:NSHomeDirectory()+"/Downloads",files:files.isEmpty ? [FileItem(index:0,name:name,size:total,downloaded:downloaded,selected:true)] : files,trackers:["udp://tracker.example.org:1337/announce"],error:nil)
+        var item = TorrentItem(id:String(repeating:"0",count:38)+id,name:name,state:state,totalBytes:total,downloadedBytes:downloaded,uploadedBytes:state == "seeding" ? total * 2 : 41_000_000,downloadRate:down,uploadRate:up,peers:peers,destination:NSHomeDirectory()+"/Downloads",files:files.isEmpty ? [FileItem(index:0,name:name,size:total,downloaded:downloaded,selected:true)] : files,trackers:["udp://tracker.example.org:1337/announce"],error:nil)
+        item.networkDownloadedBytes = downloaded; item.networkUploadedBytes = state == "seeding" ? total * 2 : 41_000_000
+        item.addedAt = 1_792_800_000; item.completedAt = state == "seeding" ? 1_792_850_000 : nil
+        item.etaSeconds = down > 0 ? (total - downloaded) / down : nil; item.selectedBytes = total
+        return item
+    }
+    static func diagnostics(_ item: TorrentItem, section: String, peerCount: Int = 6, trackerCount: Int = 3) -> TorrentDetails {
+        var peers: [PeerDetails] = []
+        for index in 0..<peerCount {
+            let endpoint: String = index % 2 == 0 ? "192.0.2.\(index % 250 + 1):51413" : "[2001:db8::\(index + 1)]:51413"
+            let client: String = ["qBittorrent","Transmission","SeedHop"][index % 3]
+            let downloaded: UInt64 = UInt64(index + 1) * 1_000_000
+            let uploaded: UInt64 = UInt64(index + 1) * 250_000
+            peers.append(PeerDetails(id:"sample-peer-\(index)",endpoint:endpoint,client:client,state:"live",transport:index % 2 == 0 ? "tcp" : "uTP",encrypted:index % 3 == 0,incoming:index % 2 == 0,downloaded:downloaded,uploaded:uploaded))
+        }
+        var trackers: [TrackerDetails] = []
+        for index in 0..<trackerCount {
+            let scheme: String = index % 2 == 0 ? "https" : "udp"
+            let address = "\(scheme)://tracker-\(index).example.org"
+            let seeds: UInt64? = index == 2 ? nil : UInt64(index) * 3
+            let leechers: UInt64? = index == 2 ? nil : UInt64(index)
+            trackers.append(TrackerDetails(id:"sample-tracker-\(index)",address:address,endpoint:nil,hash:item.id,state:index == 1 ? "error" : "working",message:index == 1 ? "Tracker connection timed out" : nil,lastAnnounce:1_792_900_000,nextAnnounce:1_792_900_900,peers:UInt64(index) * 8,seeds:seeds,leechers:leechers))
+        }
+        return TorrentDetails(torrentId:item.id,instanceId:"sample",observedAt:1_792_900_000,section:section,format:"v1",private:false,v1Hash:item.id,v2Hash:nil,dht:true,pex:true,localDiscovery:false,sessionDownloaded:120_000_000,sessionUploaded:32_000_000,seedingSeconds:7200,peers:section == "peers" ? peers : [],trackers:["trackers","activity"].contains(section) ? trackers : [])
+    }
+    static func trafficHistory() -> [TrafficSample] {
+        let now = Date()
+        var samples: [TrafficSample] = []
+        for index in 0..<60 {
+            let timestamp = now.addingTimeInterval(Double(index) - 60)
+            let download: UInt64 = 500_000 + UInt64(index) * 100_000
+            let upload: UInt64 = 100_000 + UInt64(index) * 10_000
+            samples.append(TrafficSample(id:timestamp,download:download,upload:upload))
+        }
+        return samples
     }
     static var importPreview: ImportPreview { ImportPreview(id:"sample",name:"Big Buck Bunny — Open Movie",totalBytes:1_004_401_240,files:files,torrentBytes:Data()) }
     static var filesInspector: TorrentItem {
@@ -34,6 +68,7 @@ enum PreviewFixtures {
 @MainActor enum DesignRenderer {
     static func render() throws {
         let args = ProcessInfo.processInfo.arguments
+        WorkspacePreferences.defaults.removePersistentDomain(forName:"app.seedhop.workspace-fixtures")
         let output: URL
         if let index = args.firstIndex(of:"--output"), args.indices.contains(index+1) { output = URL(fileURLWithPath:args[index+1]) }
         else { output = URL(fileURLWithPath:FileManager.default.currentDirectoryPath).appendingPathComponent(".build/design") }
@@ -47,7 +82,9 @@ enum PreviewFixtures {
             try capture(LibraryView().environmentObject(store),size:NSSize(width:1240,height:780),appearance:appearance,to:output.appendingPathComponent("selection-\(name).png"))
             store.showInspector = false; store.filter = .attention
             try capture(LibraryView().environmentObject(store),size:NSSize(width:1000,height:700),appearance:appearance,to:output.appendingPathComponent("filter-\(name).png"))
-            store.filter = .all; store.connected = false
+            store.filter = .all; store.trackerHost = "unavailable.example.org"
+            try capture(LibraryView().environmentObject(store),size:NSSize(width:1000,height:700),appearance:appearance,to:output.appendingPathComponent("tracker-empty-\(name).png"))
+            store.trackerHost = ""; store.connected = false
             store.error = "SeedHop couldn’t reach its engine. Your library has been preserved. Try reconnecting to continue."
             try capture(LibraryView().environmentObject(store),size:NSSize(width:1000,height:700),appearance:appearance,to:output.appendingPathComponent("recovery-\(name).png"))
             store.error = nil; store.connected = true
@@ -64,7 +101,8 @@ enum PreviewFixtures {
             inspectorSample.torrents = [PreviewFixtures.filesInspector]
             inspectorSample.torrents[0].name = "Open Movie Collection (2026) [1080p] [WEBRip] [5.1] — Complete Edition"
             inspectorSample.selection = [inspectorSample.torrents[0].id]
-            for tab in 0...2 {
+            for tab in 0...4 {
+                inspectorSample.details = PreviewFixtures.diagnostics(inspectorSample.torrents[0],section:["general","files","peers","trackers","activity"][tab])
                 try capture(LibraryView(inspectorTab:tab).environmentObject(inspectorSample),size:NSSize(width:1000,height:620),appearance:appearance,to:output.appendingPathComponent("transfer-details-\(tab)-\(name).png"))
             }
             for width in [250,280,360] {
@@ -134,7 +172,25 @@ enum PreviewFixtures {
             contrastStore.showInspector = false
             try capture(LibraryView().environmentObject(contrastStore),size:NSSize(width:820,height:620),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-compact-\(name).png"))
         }
-        print("Rendered 78 fixture screens to \(output.path); library fixtures are explicitly labeled sample data")
+        let workspace = LibraryStore(designPreview:true)
+        workspace.torrents = (0..<30).map { index in var item = PreviewFixtures.torrents[index % PreviewFixtures.torrents.count]; item.id += "-\(index)"; return item }
+        workspace.selection = [workspace.torrents[0].id]; workspace.showInspector = true
+        workspace.history[workspace.torrents[0].id] = PreviewFixtures.trafficHistory()
+        workspace.events[workspace.torrents[0].id] = [TransferEvent(message:"Sample tracker connection timed out"),TransferEvent(message:"Sample transfer downloading")]
+
+        for (label, appearance) in [("light",NSAppearance.Name.aqua),("dark",.darkAqua),("contrast-light",.accessibilityHighContrastAqua),("contrast-dark",.accessibilityHighContrastDarkAqua)] {
+            for (sizeName,size) in [("minimum",NSSize(width:780,height:560)),("desktop",NSSize(width:1280,height:800)),("wide",NSSize(width:1720,height:1000))] {
+                for tab in 0...4 {
+                    workspace.details = PreviewFixtures.diagnostics(workspace.torrents[0],section:["general","files","peers","trackers","activity"][tab])
+                    try capture(LibraryView(inspectorTab:tab).environmentObject(workspace),size:size,appearance:appearance,to:output.appendingPathComponent("workspace-\(sizeName)-\(tab)-\(label).png"))
+                }
+            }
+        }
+        WorkspacePreferences.defaults.set(true,forKey:"workspaceComfortableRows")
+        try capture(LibraryView(inspectorTab:0).environmentObject(workspace),size:NSSize(width:1280,height:800),appearance:.aqua,to:output.appendingPathComponent("workspace-comfortable-light.png"))
+        WorkspacePreferences.defaults.set(false,forKey:"workspaceComfortableRows")
+        print("Rendered workspace and existing fixtures to \(output.path); all data is explicitly labeled sample data")
+
     }
     private static func capture<V:View>(_ view:V,size:NSSize,appearance:NSAppearance.Name,to url:URL) throws {
         let window = NSWindow(contentRect:NSRect(origin:.zero,size:size),styleMask:[.borderless],backing:.buffered,defer:false)

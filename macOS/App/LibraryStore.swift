@@ -4,10 +4,10 @@ import ServiceManagement
 import UserNotifications
 
 enum LibraryFilter: String, CaseIterable, Identifiable {
-    case all = "All transfers", downloading = "Downloading", seeding = "Seeding", paused = "Paused", attention = "Needs attention"
+    case all = "All transfers", downloading = "Downloading", seeding = "Seeding", paused = "Paused", queued = "Queued", checking = "Checking", attention = "Needs attention"
     var id: String { rawValue }
     var symbol: String {
-        switch self { case .all:return "square.stack.3d.up"; case .downloading:return "arrow.down.circle"; case .seeding:return "arrow.up.circle"; case .paused:return "pause.circle"; case .attention:return "exclamationmark.circle" }
+        switch self { case .all:return "square.stack.3d.up"; case .downloading:return "arrow.down.circle"; case .seeding:return "arrow.up.circle"; case .paused:return "pause.circle"; case .queued:return "list.number"; case .checking:return "checkmark.shield"; case .attention:return "exclamationmark.circle" }
     }
     var emptyTitle: String {
         switch self {
@@ -15,25 +15,48 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         case .downloading: return "No downloads in progress"
         case .seeding: return "No transfers seeding"
         case .paused: return "No paused transfers"
+        case .queued: return "No queued transfers"
+        case .checking: return "No transfers being checked"
         case .attention: return "Everything looks good"
         }
     }
     func includes(_ t: TorrentItem) -> Bool {
-        switch self { case .all:return true; case .downloading:return t.isActive; case .seeding:return t.state == "seeding"; case .paused:return t.isPaused; case .attention:return t.state == "error" }
+        switch self { case .all:return true; case .downloading:return t.isActive; case .seeding:return t.state == "seeding"; case .paused:return t.isPaused; case .queued:return t.state == "queued"; case .checking:return t.state == "checking"; case .attention:return t.state == "error" }
     }
 }
 
 @MainActor final class LibraryStore: ObservableObject {
     @Published var torrents: [TorrentItem] = [] { didSet { reindexTorrents() } }
-    @Published var selection = Set<String>()
-    @Published var filter: LibraryFilter = .all { didSet { if oldValue != filter { reconcileVisibleSelection() } } }
-    @Published var search = "" { didSet { if oldValue != search { reconcileVisibleSelection() } } }
+    private var selectedIDs = Set<String>()
+    var selection: Set<String> {
+        get { selectedIDs }
+        set {
+            guard newValue != selectedIDs else { return }
+            objectWillChange.send()
+            selectedIDs = newValue
+        }
+    }
+    @Published var filter: LibraryFilter = .all { didSet { if oldValue != filter { filteredTorrents = nil; reconcileVisibleSelection() } } }
+    @Published var search = "" { didSet { if oldValue != search { filteredTorrents = nil; reconcileVisibleSelection() } } }
+    @Published var trackerHost = "" { didSet { if oldValue != trackerHost { filteredTorrents = nil; reconcileVisibleSelection() } } }
+    @Published var details: TorrentDetails?
+    @Published var detailsError: String?
+    @Published var allPeers = false
+    @Published var peerRates: [String:PeerRate] = [:]
+    var history: [String:[TrafficSample]] = [:]
+    @Published var events: [String:[TransferEvent]] = [:]
+    @Published private(set) var engineInstance = ""
+    private var detailsContext = UUID()
+    private var detailsInFlight = false
+    private var peerBaselines: [String:(UInt64,UInt64,TimeInterval)] = [:]
+    private var lastTrackerEvent: [String:UInt64] = [:]
     @Published var connected = false
     @Published var connecting = false
     @Published var switching = false
+    @Published var statisticsWarning: String?
     @Published var error: String?
     @Published var showImport = false
-    @Published var showInspector = true
+    @Published var showInspector = WorkspacePreferences.defaults.object(forKey:"showTransferDetails") as? Bool ?? true { didSet { WorkspacePreferences.defaults.set(showInspector,forKey:"showTransferDetails") } }
     @Published var incomingMagnet = ""
     @Published var incomingFile: URL?
     @Published var showRemoval = false
@@ -60,15 +83,17 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     let client: any EngineTransport
     // Derived from the current snapshot, never a second source of transfer state.
     private var torrentIndices: [String:Int] = [:]
+    private(set) var torrentGeneration: UInt64 = 0
     private var filterCounts: [LibraryFilter:Int] = [:]
     private var stateCounts: [String:Int] = [:]
+    private var filteredTorrents: [TorrentItem]?
     private var polling: Task<Void,Never>?
     private var reconnect: Task<Void,Never>?
 
     init(designPreview: Bool = false, client: (any EngineTransport)? = nil) {
         self.designPreview = designPreview
         self.client = client ?? EngineClient()
-        if designPreview { peerEncryption = .allow; savedPeerEncryption = .allow; torrents = PreviewFixtures.torrents; reindexTorrents(); selection = [torrents[0].id]; connected = true; return }
+        if designPreview { peerEncryption = .allow; savedPeerEncryption = .allow; torrents = PreviewFixtures.torrents; reindexTorrents(); selection = [torrents[0].id]; details = PreviewFixtures.diagnostics(torrents[0],section:"general"); history[torrents[0].id] = PreviewFixtures.trafficHistory(); connected = true; return }
         self.client.onInterruption = { [weak self] in
             guard let self, !self.switching else { return }
             self.connected = false
@@ -77,12 +102,14 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         }
     }
     private func reindexTorrents() {
+        torrentGeneration &+= 1
         torrentIndices.removeAll(keepingCapacity:true)
         torrentIndices.reserveCapacity(torrents.count)
         for index in torrents.indices { torrentIndices[torrents[index].id] = index }
         rebuildCounts()
     }
     private func rebuildCounts() {
+        filteredTorrents = nil
         let operation = fileOperation, recovery = storageRecovery
         var counts: [LibraryFilter:Int] = [.all:torrents.count]
         var states: [String:Int] = [:]
@@ -90,6 +117,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
             let status = TransferPresentation(torrent:item,operation:operation,recovery:recovery)
             if status.isActive { counts[.downloading,default:0] += 1 }
             if status.isSeeding { counts[.seeding,default:0] += 1 }
+            if status.isQueued { counts[.queued,default:0] += 1 }
+            if status.isChecking { counts[.checking,default:0] += 1 }
             if item.isPaused { counts[.paused,default:0] += 1 }
             if status.needsAttention { counts[.attention,default:0] += 1 }
             if item.id != operation?.torrentId { states[item.state,default:0] += 1 }
@@ -101,6 +130,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
     func includes(_ item: TorrentItem, in filter: LibraryFilter) -> Bool {
         switch filter {
+        case .queued: return presentation(item).isQueued
+        case .checking: return presentation(item).isChecking
         case .attention: return presentation(item).needsAttention
         case .downloading: return presentation(item).isActive
         case .seeding: return presentation(item).isSeeding
@@ -110,8 +141,11 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     func count(in filter: LibraryFilter) -> Int { filterCounts[filter,default:0] }
     var visibleTorrents: [TorrentItem] {
         let currentFilter = filter, query = search
-        if currentFilter == .all && query.isEmpty { return torrents }
-        return torrents.filter { includes($0,in:currentFilter) && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query)) }
+        if currentFilter == .all && query.isEmpty && trackerHost.isEmpty { return torrents }
+        if let filteredTorrents { return filteredTorrents }
+        let result = torrents.filter { includes($0,in:currentFilter) && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query)) && (trackerHost.isEmpty || $0.trackers.contains { URL(string:$0)?.host?.lowercased() == trackerHost.lowercased() }) }
+        filteredTorrents = result
+        return result
     }
     var selected: [TorrentItem] {
         guard !selection.isEmpty else { return [] }
@@ -193,11 +227,13 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
 
     private func reconcileVisibleSelection() {
         let remaining = selection.intersection(Set(visibleTorrents.map(\.id)))
-        if remaining != selection { selection = remaining }
+        // The filter already published this mutation. Update hidden selection
+        // in the same transaction instead of publishing an intermediate state.
+        if remaining != selectedIDs { selectedIDs = remaining }
     }
 
     func revealTransfer(_ id: String) {
-        filter = .all; search = ""; selection = [id]
+        filter = .all; search = ""; trackerHost = ""; selection = [id]
     }
 
     func start() async {
@@ -233,6 +269,12 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         catch { connected = false; self.error = error.localizedDescription }
     }
     private func apply(_ snapshot: LibrarySnapshot) {
+        if engineInstance != snapshot.instanceId {
+            engineInstance = snapshot.instanceId; detailsContext = UUID(); details = nil; peerBaselines = [:]; peerRates = [:]; lastTrackerEvent = [:]
+        }
+        if statisticsWarning != snapshot.statisticsWarning { statisticsWarning = snapshot.statisticsWarning }
+        recordActivity(snapshot)
+
         if completionNotifications, !torrents.isEmpty {
             var notified = Set(UserDefaults.standard.stringArray(forKey:"completedTorrents") ?? [])
             for item in snapshot.torrents where item.state == "seeding" && !notified.contains(item.id) {
@@ -257,6 +299,91 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         if fileOperation != snapshot.fileOperation { fileOperation = snapshot.fileOperation }
         if storageRecovery != snapshot.storageRecovery { storageRecovery = snapshot.storageRecovery }
     }
+    var trackerHosts: [String] {
+        var hosts = Set(torrents.flatMap { $0.trackers.compactMap { URL(string:$0)?.host?.lowercased() } })
+        if !trackerHost.isEmpty { hosts.insert(trackerHost) }
+        return hosts.sorted()
+    }
+    func clearFilters() { search = ""; trackerHost = ""; filter = .all }
+    private func recordActivity(_ snapshot: LibrarySnapshot) {
+        let date = Date()
+        let liveIDs = Set(snapshot.torrents.map(\.id))
+        for item in snapshot.torrents {
+            if let previous = torrentIndices[item.id].map({ torrents[$0] }), previous.state != item.state || previous.errorKind != item.errorKind {
+                appendEvent(item.id, message:item.statusLabel)
+            }
+            // Sample only real traffic changes or elapsed seconds, never every body read.
+            if history[item.id]?.last.map({ date.timeIntervalSince($0.id) >= 1 }) ?? true {
+                var samples = history[item.id] ?? []
+                samples.append(TrafficSample(id:date,download:item.downloadRate,upload:item.uploadRate))
+                samples.removeAll { date.timeIntervalSince($0.id) > 900 }
+                if samples.count > 900 { samples.removeFirst(samples.count - 900) }
+                history[item.id] = samples
+            }
+        }
+        if snapshot.fileOperation != fileOperation, let operation = snapshot.fileOperation {
+            appendEvent(operation.torrentId,message:operation.title)
+        }
+        if snapshot.storageRecovery != storageRecovery, let notice = snapshot.storageRecovery {
+            appendEvent(notice.torrentId,message:"File cleanup needs attention")
+        }
+        if Set(history.keys) != liveIDs { history = history.filter { liveIDs.contains($0.key) }; events = events.filter { liveIDs.contains($0.key) } }
+    }
+    private func appendEvent(_ id: String, message: String) {
+        var rows = events[id] ?? []; rows.append(TransferEvent(message:message))
+        if rows.count > 200 { rows.removeFirst(rows.count - 200) }; events[id] = rows
+    }
+    func watchDetails(id: String, section: String, allPeers: Bool) async {
+        let token = UUID(); detailsContext = token
+        if details?.torrentId != id || details?.section != section { details = nil; detailsError = nil; peerRates = [:]; peerBaselines = [:] }
+        while !Task.isCancelled && showInspector && selection == [id] {
+            if connected && !switching && !detailsInFlight && NSApp.windows.contains(where:{ $0.isVisible && $0.title == "SeedHop" }) {
+                detailsInFlight = true
+                let instance = engineInstance
+                do {
+                    var request = EngineRequest(command:"torrentDetails"); request.id = id; request.section = section; request.allPeers = allPeers
+                    let reply = try await client.send(request)
+                    guard let value = reply.details else { throw UserFacingError(message:"The engine did not return transfer details. Try again.") }
+                    if !Task.isCancelled && detailsContext == token && instance == engineInstance && showInspector && selection == [id], value.torrentId == id && value.instanceId == instance && value.section == section {
+                        applyDetails(value); if detailsError != nil { detailsError = nil }
+                    }
+                } catch {
+                    if !Task.isCancelled && detailsContext == token && detailsError != error.localizedDescription { detailsError = error.localizedDescription }
+                }
+                detailsInFlight = false
+            }
+            do { try await Task.sleep(for:.seconds(1)) } catch { break }
+        }
+    }
+    private func applyDetails(_ value: TorrentDetails) {
+        let now = ProcessInfo.processInfo.systemUptime
+        var rates: [String:PeerRate] = [:], next: [String:(UInt64,UInt64,TimeInterval)] = [:]
+        for peer in value.peers {
+            if let previous = peerBaselines[peer.id], now > previous.2 && peer.downloaded >= previous.0 && peer.uploaded >= previous.1 {
+                rates[peer.id] = PeerRate(download:UInt64(Double(peer.downloaded - previous.0) / (now - previous.2)),upload:UInt64(Double(peer.uploaded - previous.1) / (now - previous.2)))
+            }
+            next[peer.id] = (peer.downloaded,peer.uploaded,now)
+        }
+        peerBaselines = next; if peerRates != rates { peerRates = rates }
+        for event in value.events ?? [] where event.sequence > lastTrackerEvent[value.torrentId,default:0] {
+            var rows = events[value.torrentId] ?? []
+            rows.append(TransferEvent(date:Date(timeIntervalSince1970:Double(event.timestamp)),message:event.message))
+            rows.sort { $0.date < $1.date }
+            if rows.count > 200 { rows.removeFirst(rows.count - 200) }
+            events[value.torrentId] = rows; lastTrackerEvent[value.torrentId] = event.sequence
+        }
+        if details != value { details = value }
+    }
+    func diagnosticReport(_ torrent: TorrentItem) -> String {
+        // Export only allowlisted fields. Remote strings, paths, hashes and endpoints stay out.
+        let value = details?.torrentId == torrent.id ? details : nil
+        let report = "SeedHop diagnostics\nState: \(torrent.statusLabel)\nEngine connected: \(connected)\nFormat: \(value?.format ?? "unknown")\nConnected peers: \(torrent.peers)\nDownload: \(SizeText.rate(connected ? torrent.downloadRate : 0))\nUpload: \(SizeText.rate(connected ? torrent.uploadRate : 0))\nTracker states: \(value?.trackers.map(\.state).joined(separator:", ") ?? "not sampled")\nPersonal paths, torrent identifiers, tracker URLs and peer endpoints omitted."
+        return report
+    }
+    func copyDiagnostics(_ torrent: TorrentItem) {
+        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(diagnosticReport(torrent),forType:.string)
+    }
+
     func perform(_ request: EngineRequest) async throws -> EngineReply {
         guard !designPreview else { throw UserFacingError(message:"This is a design preview with sample data. Launch the app normally for real transfers.") }
         if hasFileOperation && ["add", "inspect", "pause", "select", "priorities", "queue", "queueMove", "recheck", "retry", "remove", "limits", "peerEncryption"].contains(request.command) {

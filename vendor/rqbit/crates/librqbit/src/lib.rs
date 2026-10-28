@@ -127,3 +127,6 @@ pub fn try_increase_nofile_limit() -> anyhow::Result<u64> {
 }
 
 pub use librqbit_core::v2;
+
+// Read-only peer diagnostics used by native frontends.
+pub use torrent_state::live::peer::stats::snapshot::{PeerStatsFilter, PeerStatsFilterState};

@@ -29,6 +29,9 @@ pub struct PeerStats {
     pub state: &'static str,
     pub conn_kind: Option<ConnectionKind>,
     pub client_name: Option<String>,
+    pub connection_id: Option<u64>,
+    pub encrypted: Option<bool>,
+    pub incoming: Option<bool>,
 }
 
 impl From<&super::atomic::PeerCountersAtomic> for PeerCounters {
@@ -68,6 +71,18 @@ impl From<&Peer> for PeerStats {
                 PeerState::Live(l) => l.client_name.clone(),
                 _ => None,
             },
+            connection_id: match state {
+                PeerState::Live(l) => Some(l.connection_id),
+                _ => None,
+            },
+            encrypted: match state {
+                PeerState::Live(l) => l.encrypted,
+                _ => None,
+            },
+            incoming: match state {
+                PeerState::Live(l) => Some(l.incoming),
+                _ => None,
+            },
         }
     }
 }
@@ -96,4 +111,44 @@ impl PeerStatsFilterState {
 pub struct PeerStatsFilter {
     #[serde(default)]
     pub state: PeerStatsFilterState,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::torrent_state::live::peer::LivePeerState;
+    use librqbit_core::hash_id::Id20;
+
+    #[test]
+    fn connection_identity_and_encryption_follow_live_generation() {
+        let address = "127.0.0.1:1234".parse().unwrap();
+        let mut peer = Peer::new_with_outgoing_address(address, Id20::new([0; 20]));
+        let unknown = PeerStats::from(&peer);
+        assert!(unknown.connection_id.is_none());
+        assert!(unknown.encrypted.is_none());
+        assert!(unknown.incoming.is_none());
+
+        let (tx, _) = tokio::sync::mpsc::unbounded_channel();
+        let mut first = LivePeerState::new(Id20::new([1; 20]), tx, true, ConnectionKind::Tcp, true);
+        first.encrypted = Some(false);
+        peer.state = PeerState::Live(first);
+        let first = PeerStats::from(&peer);
+        assert_eq!(first.encrypted, Some(false));
+        assert_eq!(first.incoming, Some(true));
+
+        let (tx, _) = tokio::sync::mpsc::unbounded_channel();
+        let mut next =
+            LivePeerState::new(Id20::new([1; 20]), tx, false, ConnectionKind::Utp, false);
+        next.encrypted = Some(true);
+        peer.state = PeerState::Live(next);
+        let next = PeerStats::from(&peer);
+        assert_ne!(first.connection_id, next.connection_id);
+        assert_eq!(next.encrypted, Some(true));
+        assert_eq!(next.incoming, Some(false));
+
+        peer.state = PeerState::Dead;
+        let dead = PeerStats::from(&peer);
+        assert!(dead.connection_id.is_none());
+        assert!(dead.encrypted.is_none());
+    }
 }

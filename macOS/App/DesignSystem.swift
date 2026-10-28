@@ -40,10 +40,11 @@ struct BrandMark: View {
 struct StateBadge: View {
     let torrent: TorrentItem
     var presentation: TransferPresentation? = nil
+    var verticalPadding: CGFloat = 5
     private var status: TransferPresentation { presentation ?? TransferPresentation(torrent:torrent) }
     var body: some View {
         HStack(spacing:5) { Circle().fill(Design.stateColor(status.colorState)).frame(width:5,height:5); Text(status.label).font(.system(size:11,weight:.medium)).lineLimit(1) }
-            .foregroundStyle(Design.stateColor(status.colorState)).padding(.horizontal,8).padding(.vertical,5)
+            .foregroundStyle(Design.stateColor(status.colorState)).padding(.horizontal,8).padding(.vertical,verticalPadding)
             .background(Design.stateColor(status.colorState).opacity(0.075),in:Capsule())
             .accessibilityElement(children:.ignore)
             .accessibilityLabel(status.accessibleLabel).help(status.detail)

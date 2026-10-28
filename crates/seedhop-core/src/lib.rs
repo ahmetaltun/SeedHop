@@ -1,5 +1,7 @@
 pub mod adapter;
 mod connection_settings;
+mod diagnostics;
+pub use diagnostics::{PeerDetails, TorrentDetails, TrackerDetails};
 mod file_operation;
 mod layout_journal;
 mod management;
@@ -21,10 +23,12 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 
 /// Owns library state. The FFI host retains this lease until its runtime has stopped.
 pub struct Engine {
+    accounting: Mutex<diagnostics::Accounting>,
+    statistics_warning: Mutex<Option<String>>,
     session: Arc<Session>,
     active_peer_encryption: librqbit::EncryptionPolicy,
     connection_settings: Mutex<connection_settings::ConnectionSettings>,
@@ -174,6 +178,7 @@ impl Engine {
         }
         let limits_path = dir.join("limits.json");
         let queue = management::QueueConfig::load(&dir)?;
+        let accounting = diagnostics::Accounting::load(&dir)?;
         let limits: [u32; 2] = if limits_path.exists() {
             serde_json::from_slice(&std::fs::read(limits_path).map_err(storage::io_error)?)
                 .map_err(|e| CoreError::CorruptState(e.to_string()))?
@@ -212,6 +217,8 @@ impl Engine {
             .await
             .map_err(adapter::engine_error)?;
         let engine = Arc::new(Self {
+            accounting: Mutex::new(accounting),
+            statistics_warning: Mutex::new(None),
             session,
             active_peer_encryption: peer_encryption,
             connection_settings: Mutex::new(connection_settings),
@@ -237,6 +244,13 @@ impl Engine {
                 // Retry failed persistence on the next tick. Commands still
                 // report their own persistence errors directly to the caller.
                 let _ = engine.reconcile_queue().await;
+                engine.sample_accounting();
+                let saved = engine
+                    .accounting
+                    .lock()
+                    .unwrap()
+                    .checkpoint(&engine.state_directory, false);
+                *engine.statistics_warning.lock().unwrap() = saved.err().map(|_| "Transfer statistics could not be saved. Check space and access to the library folder. Totals remain in memory until saving succeeds.".into());
             }
         });
         Ok(engine)
@@ -252,12 +266,20 @@ impl Engine {
 
     pub fn snapshot(&self) -> Result<Snapshot> {
         self.ready()?;
+        self.sample_accounting();
         let mut torrents = self
             .session
             .with_torrents(|ts| ts.map(|(_, t)| adapter::record(t)).collect::<Vec<_>>());
         torrents.sort_by_key(|a| a.name.to_lowercase());
+        let accounting = self.accounting.lock().unwrap();
         let queue = self.queue.lock().unwrap();
         for torrent in &mut torrents {
+            if let Some(totals) = accounting.entries.get(&torrent.id) {
+                torrent.network_downloaded_bytes = totals.downloaded;
+                torrent.network_uploaded_bytes = totals.uploaded;
+                torrent.added_at = totals.added;
+                torrent.completed_at = totals.completed;
+            }
             torrent.queue_position = queue
                 .order
                 .iter()
@@ -271,6 +293,7 @@ impl Engine {
                 self.connection_settings.lock().unwrap().peer_encryption,
             )
             .into(),
+            statistics_warning: self.statistics_warning.lock().unwrap().clone(),
             protocol_version: PROTOCOL_VERSION,
             engine_version: "librqbit 9.0.1 + SeedHop patches".into(),
             instance_id: self.instance_id.clone(),
@@ -397,6 +420,16 @@ impl Engine {
             return Err(CoreError::InvalidInput("Files already exist here. Enable verification of existing files or choose another folder.".into()));
         }
         let queued = self.queue.lock().unwrap().max_active > 0;
+        // Commit accounting before membership so a statistics write failure cannot
+        // report an unsuccessful Add after the torrent has already been added.
+        self.accounting
+            .lock()
+            .unwrap()
+            .new_transfer(metadata.id.clone());
+        self.accounting
+            .lock()
+            .unwrap()
+            .checkpoint(&self.state_directory, true)?;
         self.session
             .add_torrent(
                 AddTorrent::TorrentFileBytes(bytes.into()),
@@ -411,6 +444,7 @@ impl Engine {
             )
             .await
             .map_err(adapter::engine_error)?;
+        self.sample_accounting();
         Ok(metadata.id)
     }
 
@@ -586,7 +620,15 @@ impl Engine {
                 delete_files,
             )
             .await
-            .map_err(adapter::engine_error)
+            .map_err(adapter::engine_error)?;
+        self.accounting.lock().unwrap().entries.remove(&id);
+        let saved = self
+            .accounting
+            .lock()
+            .unwrap()
+            .checkpoint(&self.state_directory, true);
+        *self.statistics_warning.lock().unwrap() = saved.err().map(|_| "Transfer statistics could not be saved. Check space and access to the library folder. Totals remain in memory until saving succeeds.".into());
+        Ok(())
     }
 
     pub async fn set_limits(&self, down: u32, up: u32) -> Result<()> {
@@ -610,7 +652,12 @@ impl Engine {
         self.session
             .stop_and_wait()
             .await
-            .map_err(adapter::engine_error)
+            .map_err(adapter::engine_error)?;
+        self.sample_accounting();
+        self.accounting
+            .lock()
+            .unwrap()
+            .checkpoint(&self.state_directory, true)
     }
 
     pub fn retain_lease(&self) -> &storage::LibraryLease {

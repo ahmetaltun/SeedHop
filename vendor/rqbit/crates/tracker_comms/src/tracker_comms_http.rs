@@ -139,7 +139,7 @@ pub struct TrackerResponse<'a> {
     pub warning_message: Option<ByteBuf<'a>>,
     #[allow(dead_code)]
     #[serde(default)]
-    pub complete: u64,
+    pub complete: Option<u64>,
     pub interval: u64,
     #[allow(dead_code)]
     #[serde(rename = "min interval")]
@@ -148,7 +148,7 @@ pub struct TrackerResponse<'a> {
     pub tracker_id: Option<ByteBuf<'a>>,
     #[allow(dead_code)]
     #[serde(default)]
-    pub incomplete: u64,
+    pub incomplete: Option<u64>,
     #[serde(borrow)]
     pub peers: Peers<'a, SocketAddrV4>,
     #[serde(default, borrow)]
@@ -245,6 +245,18 @@ mod tests {
             ]
         );
         dbg!(response);
+    }
+
+    #[test]
+    fn missing_swarm_counts_are_unknown_and_explicit_zero_is_measured() {
+        let missing = b"d8:intervali1800e5:peers0:e";
+        let response = bencode::from_bytes::<TrackerResponse>(missing).unwrap();
+        assert_eq!(response.complete, None);
+        assert_eq!(response.incomplete, None);
+        let zero = b"d8:completei0e10:incompletei0e8:intervali1800e5:peers0:e";
+        let response = bencode::from_bytes::<TrackerResponse>(zero).unwrap();
+        assert_eq!(response.complete, Some(0));
+        assert_eq!(response.incomplete, Some(0));
     }
 
     #[test]

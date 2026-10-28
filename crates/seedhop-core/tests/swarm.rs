@@ -163,7 +163,25 @@ async fn multifile_download_verifies_bytes_and_respects_paused_start() {
     down.set_file_priorities(id.clone(), vec![2, 0])
         .await
         .unwrap();
-    down.set_paused(id, false).await.unwrap();
+    down.set_limits(128_000, 0).await.unwrap();
+    down.set_paused(id.clone(), false).await.unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let peers = down
+                .torrent_details(id.clone(), "peers".into(), false)
+                .unwrap();
+            if peers
+                .peers
+                .iter()
+                .any(|p| p.encrypted == Some(false) && p.transport.as_deref() == Some("tcp"))
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("live TCP connection did not publish negotiated plaintext diagnostics");
     wait_finished(&down).await;
     // The default alphabetical order starts docs/second.bin. High priority must
     // instead cause the first wire Request to target first.bin (pieces 0..16).
@@ -176,8 +194,60 @@ async fn multifile_download_verifies_bytes_and_respects_paused_start() {
         std::fs::read(down_files.path().join("docs/second.bin")).unwrap(),
         second
     );
-    assert_eq!(down.snapshot().unwrap().torrents[0].files.len(), 2);
+    let downloaded = down.snapshot().unwrap().torrents.remove(0);
+    assert_eq!(downloaded.files.len(), 2);
+    assert!(downloaded.network_downloaded_bytes.unwrap() >= (first.len() + second.len()) as u64);
+    assert_eq!(
+        seed.snapshot().unwrap().torrents[0].network_downloaded_bytes,
+        Some(0)
+    );
+    let trackers = down
+        .torrent_details(id.clone(), "trackers".into(), false)
+        .unwrap();
+    assert!(trackers.trackers.iter().any(|t| t.state == "working"
+        && t.peers == Some(1)
+        && t.seeds.is_none()
+        && t.leechers.is_none()));
+    down.set_paused(id.clone(), true).await.unwrap();
+    let paused = down.snapshot().unwrap().torrents.remove(0);
+    assert_eq!(
+        paused.network_downloaded_bytes,
+        downloaded.network_downloaded_bytes
+    );
+    down.force_recheck(id.clone()).await.unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if down.snapshot().unwrap().torrents[0].state == "paused" {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        down.snapshot().unwrap().torrents[0].network_downloaded_bytes,
+        downloaded.network_downloaded_bytes
+    );
     down.shutdown().await.unwrap();
+    drop(down);
+    let restored = Engine::open(config(down_state.path(), down_files.path()))
+        .await
+        .unwrap();
+    let summary = restored.snapshot().unwrap().torrents.remove(0);
+    assert_eq!(
+        summary.network_downloaded_bytes,
+        downloaded.network_downloaded_bytes
+    );
+    assert_eq!(summary.added_at, downloaded.added_at);
+    assert_eq!(
+        restored
+            .torrent_details(id, "general".into(), false)
+            .unwrap()
+            .session_downloaded,
+        0
+    );
+    restored.shutdown().await.unwrap();
     seed.shutdown().await.unwrap();
     tracker_task.abort();
     relay_task.abort();

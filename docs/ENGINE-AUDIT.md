@@ -154,3 +154,19 @@ Application storage transactions quiesce peers, exclusively copy and flush new
 files, persist the new layout, and only then remove originals. Descriptor-relative
 opens and cleanup reject symlink traversal. Copy/save failure retains source
 bytes; interrupted cleanup may leave duplicates. See `FILE-MANAGEMENT.md`.
+
+## Native diagnostics and accounting — 2026-10-28
+
+Patch `0023-seedhop-native-diagnostics.patch` adds shared per-torrent payload
+atomics, negotiated peer encryption and connection-generation IDs, and tracker
+outcome callbacks. HTTP omitted swarm counts remain optional. UDP address-family
+outcomes remain separate. Tracker observations do not alter announce scheduling
+or merge swarm counts. Session shutdown now retains and drains live, PEX,
+initialization, and fatal-error tasks before core accounting checkpoints.
+Completed task handles are pruned without hiding join failures.
+
+Core-owned statistics and protocol-v3 XPC presentation are documented in
+`POWER-USER-WORKSPACE.md`. Controlled loopback tests validate received payload,
+plaintext TCP connection telemetry, omitted tracker counts, preserved pause and
+recheck totals, and restart continuity. Existing protocol regression tests remain
+in the workspace suite; physical lifecycle and release gates remain separate.

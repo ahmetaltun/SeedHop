@@ -247,12 +247,22 @@ private struct TorrentFilesOutline: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView(); scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
-        scroll.drawsBackground = false; scroll.hasHorizontalScroller = false
+        scroll.drawsBackground = false; scroll.hasHorizontalScroller = true
         let outline = FilesNativeOutline()
         let column = NSTableColumn(identifier:NSUserInterfaceItemIdentifier("file"))
+        column.title = "Name"; column.width = 400; column.minWidth = 170
         outline.addTableColumn(column); outline.outlineTableColumn = column
-        outline.headerView = nil; outline.rowHeight = 44; outline.intercellSpacing = NSSize(width:0,height:0)
-        outline.indentationPerLevel = 12; outline.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        for (identifier, title, width) in [("size", "Size", CGFloat(90)), ("progress", "Progress", CGFloat(100)), ("priority", "Priority", CGFloat(100))] {
+            let column = NSTableColumn(identifier:NSUserInterfaceItemIdentifier(identifier))
+            column.title = title; column.width = width; column.minWidth = width
+            column.maxWidth = width + 60
+            outline.addTableColumn(column)
+        }
+        outline.rowHeight = 28; outline.intercellSpacing = NSSize(width:0,height:0)
+        outline.indentationPerLevel = 12; outline.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        if !WorkspacePreferences.isFixture {
+            outline.autosaveName = "torrent-file-columns"; outline.autosaveTableColumns = true
+        }
         outline.allowsMultipleSelection = true; outline.allowsEmptySelection = true
         outline.backgroundColor = .clear; outline.style = .plain
         outline.setAccessibilityLabel("Torrent files")
@@ -310,7 +320,11 @@ private struct TorrentFilesOutline: NSViewRepresentable {
             let rows = outline.rows(in:outline.visibleRect)
             for row in rows.location..<(rows.location + rows.length) {
                 guard let node = outline.item(atRow:row) as? TorrentFileNode else { continue }
-                if let cell = outline.view(atColumn:0,row:row,makeIfNecessary:false) as? FilesNativeCell { configure(cell,node:node) }
+                for column in outline.tableColumns.indices {
+                    if let cell = outline.view(atColumn:column,row:row,makeIfNecessary:false) {
+                        configureCell(cell,node:node,column:outline.tableColumns[column].identifier.rawValue)
+                    }
+                }
             }
             if outline.selectedRowIndexes != selected { outline.selectRowIndexes(selected,byExtendingSelection:false) }
         }
@@ -323,9 +337,44 @@ private struct TorrentFilesOutline: NSViewRepresentable {
         func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool { (item as? TorrentFileNode)?.isFolder == true }
         func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
             guard let node = item as? TorrentFileNode else { return nil }
-            let identifier = NSUserInterfaceItemIdentifier("file-cell")
-            let cell = (outlineView.makeView(withIdentifier:identifier,owner:self) as? FilesNativeCell) ?? FilesNativeCell()
-            cell.identifier = identifier; configure(cell,node:node); return cell
+            let column = tableColumn?.identifier.rawValue ?? "file"
+            let identifier = NSUserInterfaceItemIdentifier("file-" + column)
+            let cell = outlineView.makeView(withIdentifier:identifier,owner:self) ?? {
+                switch column {
+                case "file": return FilesNativeCell()
+                case "priority": return FilesPriorityCell()
+                default: return FilesValueCell()
+                }
+            }()
+            cell.identifier = identifier; configureCell(cell,node:node,column:column); return cell
+        }
+        private func configureCell(_ cell: NSView, node: TorrentFileNode, column: String) {
+            if let cell = cell as? FilesNativeCell { configure(cell,node:node); return }
+            let leaves = node.indices.compactMap { files[$0] }
+            if let cell = cell as? FilesPriorityCell {
+                let filteredFolder = node.isFolder && !parent.session.query.isEmpty
+                cell.priority.configure(Set(leaves.map(\.priority)))
+                cell.priority.isEnabled = parent.canChange && !filteredFolder
+                cell.priority.setAccessibilityLabel("Priority for \(node.path)")
+                cell.priority.toolTip = filteredFolder ? "Clear search to change the whole folder." : "Download priority for \(node.path)"
+                let changePriority = parent.priority
+                cell.priority.actionBlock = { value in changePriority(node.indices,value) }
+                return
+            }
+            guard let cell = cell as? FilesValueCell else { return }
+            let size = leaves.reduce(UInt64(0)) { $0 + $1.size }
+            let value: String
+            if column == "size" { value = SizeText.bytes(size) }
+            else if parent.torrent.state == "checking" { value = "Checking" }
+            else if parent.torrent.state == "error" { value = "—" }
+            else if leaves.allSatisfy({ !$0.selected }) { value = "Skipped" }
+            else if size > 0 {
+                let downloaded = leaves.reduce(UInt64(0)) { $0 + min($1.downloaded,$1.size) }
+                value = "\(Int(min(1,Double(downloaded) / Double(size)) * 100))%"
+            } else { value = "—" }
+            cell.value.stringValue = value
+            cell.value.setAccessibilityLabel("\(column == "size" ? "Size" : "Progress") for \(node.path): \(value)\(parent.torrent.state == "error" && column == "progress" ? ", unavailable" : "")")
+            cell.toolTip = node.path + "\n" + value
         }
         private func configure(_ cell: FilesNativeCell, node: TorrentFileNode) {
             let leaves = node.indices.compactMap { files[$0] }
@@ -344,14 +393,7 @@ private struct TorrentFilesOutline: NSViewRepresentable {
             else if !node.isFolder, let file = leaves.first, file.size > 0 {
                 metadata += " · \(Int(min(1,Double(file.downloaded)/Double(file.size)) * 100))%"
             }
-            let priorities = Set(leaves.map(\.priority))
-            cell.priority.configure(priorities)
-            cell.priority.isEnabled = parent.canChange && !filteredFolder
-            cell.priority.setAccessibilityLabel("Priority for \(node.path)")
-            cell.priority.toolTip = filteredFolder ? "Clear search to change the whole folder." : "Download priority for \(node.path)"
-            let changePriority = parent.priority
-            cell.priority.actionBlock = { value in changePriority(node.indices,value) }
-            cell.name.stringValue = node.name; cell.metadata.stringValue = metadata
+            cell.name.stringValue = node.name
             cell.icon.image = NSImage(systemSymbolName:node.isFolder ? "folder" : TorrentFilesView.symbol(node.name),accessibilityDescription:nil)
             cell.check.state = value; cell.check.isEnabled = parent.canChange && !wouldEmpty && !filteredFolder
             cell.check.setAccessibilityLabel("Download \(node.path)")
@@ -438,25 +480,54 @@ private final class FilesCheckbox: NSButton {
 private final class FilesNativeCell: NSTableCellView {
     let check = FilesCheckbox()
     let name = NSTextField(labelWithString:"")
-    let metadata = NSTextField(labelWithString:"")
     let icon = NSImageView()
-    let priority = FilesPriorityPopup()
     override init(frame frameRect: NSRect) {
         super.init(frame:frameRect)
         textField = name; imageView = icon
         name.font = .systemFont(ofSize:12); name.lineBreakMode = .byTruncatingMiddle
-        metadata.font = .systemFont(ofSize:11); metadata.textColor = .secondaryLabelColor; metadata.lineBreakMode = .byTruncatingTail
         icon.contentTintColor = .secondaryLabelColor
-        for view in [check,icon,name,metadata,priority] { view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view) }
+        for view in [check,icon,name] { view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view) }
         NSLayoutConstraint.activate([
-            check.leadingAnchor.constraint(equalTo:leadingAnchor,constant:2),check.centerYAnchor.constraint(equalTo:name.centerYAnchor),check.widthAnchor.constraint(equalToConstant:18),
-            icon.leadingAnchor.constraint(equalTo:check.trailingAnchor,constant:5),icon.centerYAnchor.constraint(equalTo:name.centerYAnchor),icon.widthAnchor.constraint(equalToConstant:16),icon.heightAnchor.constraint(equalToConstant:16),
-            name.leadingAnchor.constraint(equalTo:icon.trailingAnchor,constant:6),name.trailingAnchor.constraint(equalTo:trailingAnchor,constant:-8),name.topAnchor.constraint(equalTo:topAnchor,constant:6),
-            metadata.leadingAnchor.constraint(equalTo:name.leadingAnchor),metadata.trailingAnchor.constraint(lessThanOrEqualTo:priority.leadingAnchor,constant:-6),metadata.topAnchor.constraint(equalTo:name.bottomAnchor,constant:3),
-            priority.trailingAnchor.constraint(equalTo:trailingAnchor,constant:-6),priority.centerYAnchor.constraint(equalTo:metadata.centerYAnchor),priority.widthAnchor.constraint(equalToConstant:68),priority.heightAnchor.constraint(equalToConstant:18)
+            check.leadingAnchor.constraint(equalTo:leadingAnchor,constant:2),check.centerYAnchor.constraint(equalTo:centerYAnchor),check.widthAnchor.constraint(equalToConstant:18),
+            icon.leadingAnchor.constraint(equalTo:check.trailingAnchor,constant:5),icon.centerYAnchor.constraint(equalTo:centerYAnchor),icon.widthAnchor.constraint(equalToConstant:16),icon.heightAnchor.constraint(equalToConstant:16),
+            name.leadingAnchor.constraint(equalTo:icon.trailingAnchor,constant:6),name.trailingAnchor.constraint(equalTo:trailingAnchor,constant:-8),name.centerYAnchor.constraint(equalTo:centerYAnchor)
         ])
         name.setContentCompressionResistancePriority(.defaultLow,for:.horizontal)
-        metadata.setContentCompressionResistancePriority(.defaultLow,for:.horizontal)
+    }
+    convenience init() { self.init(frame:.zero) }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
+private final class FilesValueCell: NSTableCellView {
+    let value = NSTextField(labelWithString:"")
+    override init(frame frameRect: NSRect) {
+        super.init(frame:frameRect)
+        textField = value
+        value.font = .monospacedDigitSystemFont(ofSize:11,weight:.regular)
+        value.textColor = .secondaryLabelColor; value.alignment = .right
+        value.lineBreakMode = .byTruncatingTail
+        value.translatesAutoresizingMaskIntoConstraints = false; addSubview(value)
+        NSLayoutConstraint.activate([
+            value.leadingAnchor.constraint(equalTo:leadingAnchor,constant:6),
+            value.trailingAnchor.constraint(equalTo:trailingAnchor,constant:-10),
+            value.centerYAnchor.constraint(equalTo:centerYAnchor)
+        ])
+    }
+    convenience init() { self.init(frame:.zero) }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
+private final class FilesPriorityCell: NSTableCellView {
+    let priority = FilesPriorityPopup()
+    override init(frame frameRect: NSRect) {
+        super.init(frame:frameRect)
+        priority.translatesAutoresizingMaskIntoConstraints = false; addSubview(priority)
+        NSLayoutConstraint.activate([
+            priority.leadingAnchor.constraint(equalTo:leadingAnchor,constant:6),
+            priority.trailingAnchor.constraint(equalTo:trailingAnchor,constant:-6),
+            priority.centerYAnchor.constraint(equalTo:centerYAnchor),
+            priority.heightAnchor.constraint(equalToConstant:22)
+        ])
     }
     convenience init() { self.init(frame:.zero) }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }

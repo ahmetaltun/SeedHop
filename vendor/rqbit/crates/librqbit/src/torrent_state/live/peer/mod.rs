@@ -4,7 +4,10 @@ pub mod stats;
 use cancelled_requests::CancelledRequests;
 use std::collections::{HashMap, hash_map::Entry};
 use std::net::SocketAddr;
-use std::sync::{Arc, atomic::Ordering};
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
 
 use librqbit_core::hash_id::Id20;
 use librqbit_core::lengths::{ChunkInfo, ValidPieceIndex};
@@ -26,6 +29,8 @@ pub(crate) type InflightRequest = ChunkInfo;
 pub(crate) type PeerRx = UnboundedReceiver<WriterRequest>;
 pub(crate) type PeerTx = UnboundedSender<WriterRequest>;
 
+static NEXT_CONNECTION_ID: AtomicU64 = AtomicU64::new(1);
+
 #[derive(Debug)]
 pub(crate) struct Peer {
     pub addr: SocketAddr,
@@ -44,7 +49,7 @@ impl Peer {
         counters: &PeerStates,
         connection_kind: ConnectionKind,
     ) -> Self {
-        let state = PeerState::Live(LivePeerState::new(peer_id, tx, true, connection_kind));
+        let state = PeerState::Live(LivePeerState::new(peer_id, tx, true, connection_kind, true));
         for counter in [&counters.session_stats, &counters.stats] {
             counter.inc(&state);
         }
@@ -221,7 +226,7 @@ impl Peer {
         match self.take_state(counters) {
             PeerState::Queued | PeerState::Dead | PeerState::NotNeeded => {
                 self.set_state(
-                    PeerState::Live(LivePeerState::new(peer_id, tx, true, connection_kind)),
+                    PeerState::Live(LivePeerState::new(peer_id, tx, true, connection_kind, true)),
                     counters,
                 );
             }
@@ -242,7 +247,7 @@ impl Peer {
                 _ => unreachable!(),
             };
             self.set_state(
-                PeerState::Live(LivePeerState::new(peer_id, tx, false, conn_kind)),
+                PeerState::Live(LivePeerState::new(peer_id, tx, false, conn_kind, false)),
                 counters,
             );
             self.get_live_mut()
@@ -258,6 +263,9 @@ impl Peer {
 
 #[derive(Debug)]
 pub(crate) struct LivePeerState {
+    pub connection_id: u64,
+    pub encrypted: Option<bool>,
+    pub incoming: bool,
     #[allow(dead_code)]
     peer_id: Id20,
 
@@ -289,8 +297,12 @@ impl LivePeerState {
         tx: PeerTx,
         initial_interested: bool,
         connection_kind: ConnectionKind,
+        incoming: bool,
     ) -> Self {
         LivePeerState {
+            connection_id: NEXT_CONNECTION_ID.fetch_add(1, Ordering::Relaxed),
+            encrypted: None,
+            incoming,
             peer_id,
             client_name: None,
             peer_interested: initial_interested,

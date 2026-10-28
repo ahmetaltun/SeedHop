@@ -1,5 +1,14 @@
 # Milestone 0 UX review follow-up
 
+## Power-user workspace — 2026-10-28
+
+The compact transfer workspace, bottom diagnostic tabs, engine-owned payload
+accounting, real tracker outcomes, and selection-scoped detail requests are
+implemented. Native controls retain existing file-operation and recovery
+invariants. Current evidence, performance status, and separate manual acceptance
+are tracked in `POWER-USER-WORKSPACE.md` and
+`results/power-user-workspace-2026-10-28.json`.
+
 ## Large-library performance follow-up — 2026-10-27
 
 Controlled 100/1,000-row and 10,000-file fixtures now measure real native layout,
@@ -209,3 +218,20 @@ A portable summary is in [`results/ux-navigation-2026-10-25.json`](results/ux-na
 
 The environment exposes no native UI automation surface. App-owned rendering
 and model assertions cannot substitute for these input and accessibility checks.
+
+
+## Workspace implementation evidence — 2026-10-28
+
+The compact table, persistent bottom details pane, actual peer/tracker observations,
+and network-payload accounting are implemented. Native checks verify 28/40-point
+row pitch, 16 visible compact rows at 1280×800, stable pane/column preferences,
+and programmatic selection highlights. Multi-selection keeps a compact summary
+and separate Resume/Pause actions; verified content is labeled separately from
+network traffic. Fixture file-column autosave is disabled to protect user widths.
+
+The current report is `results/power-user-workspace-2026-10-28.json`. Controlled
+menu/focus/file checks and packaged XPC smoke pass. Performance acceptance remains
+open for intermittent 100-row filtering; the limits have not changed. Actual
+pointer/keyboard delivery, VoiceOver, system settings, physical lifecycle, and
+representative-user tasks remain unverified. Use `WORKSPACE-USABILITY.md` to record
+those observations rather than inferring completion from the 145 rendered fixtures.

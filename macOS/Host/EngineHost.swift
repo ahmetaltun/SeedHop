@@ -87,7 +87,7 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             } catch BridgeError.Cancelled { response = EngineReply(cancelled:true) }
             catch let BridgeError.Operation(message) { response = EngineReply(error:message) }
             catch { response = EngineReply(error: error.localizedDescription) }
-            reply((try? JSONEncoder().encode(response)) ?? Data("{\"version\":2,\"error\":\"Could not encode engine response.\"}".utf8))
+            reply((try? JSONEncoder().encode(response)) ?? Data("{\"version\":3,\"error\":\"Could not encode engine response.\"}".utf8))
         }
     }
     private func handle(_ r: EngineRequest) throws -> EngineReply {
@@ -114,7 +114,8 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         }
         let core = try start(destination: r.destination,stateDirectory:r.stateDirectory)
         switch r.command {
-        case "connect", "snapshot": return EngineReply(snapshot: Self.snapshot(try core.snapshot()))
+        case "connect", "snapshot": return EngineReply(snapshot: try JSONDecoder().decode(LibrarySnapshot.self, from:Data(core.snapshotJson().utf8)))
+        case "torrentDetails": return EngineReply(details: try JSONDecoder().decode(TorrentDetails.self, from:Data(core.torrentDetails(id:r.id ?? "",section:r.section ?? "general",allPeers:r.allPeers ?? false).utf8)))
         case "inspect":
             let p = try core.inspect(requestId: r.requestId, magnet: r.magnet, bytes: r.bytes ?? Data())
             return EngineReply(preview: ImportPreview(id: p.id, name:p.name, totalBytes:p.totalBytes, files:p.files.map(Self.file), torrentBytes:Data(p.torrentBytes)))

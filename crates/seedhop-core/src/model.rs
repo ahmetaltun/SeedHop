@@ -52,6 +52,12 @@ pub struct TorrentRecord {
     pub error_kind: Option<String>,
     pub queue_position: u32,
     pub paused_intent: bool,
+    pub network_downloaded_bytes: Option<u64>,
+    pub network_uploaded_bytes: Option<u64>,
+    pub added_at: Option<u64>,
+    pub completed_at: Option<u64>,
+    pub eta_seconds: Option<u64>,
+    pub selected_bytes: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -81,6 +87,7 @@ pub struct StorageRecovery {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
+    pub statistics_warning: Option<String>,
     pub peer_encryption: String,
     pub saved_peer_encryption: String,
     pub protocol_version: u32,
