@@ -1,4 +1,3 @@
-use arc_swap::ArcSwapOption;
 use governor::DefaultDirectRateLimiter as RateLimiter;
 use governor::Quota;
 use serde::Deserialize;
@@ -13,7 +12,7 @@ pub struct LimitsConfig {
 }
 
 struct Limit {
-    limiter: ArcSwapOption<RateLimiter>,
+    limiter: tokio::sync::watch::Sender<Option<Arc<RateLimiter>>>,
     current_bps: std::sync::atomic::AtomicU32,
 }
 
@@ -26,18 +25,31 @@ impl Limit {
     fn new(bps: Option<NonZeroU32>) -> Self {
         use std::sync::atomic::AtomicU32;
         Self {
-            limiter: ArcSwapOption::new(Self::new_inner(bps)),
+            limiter: tokio::sync::watch::channel(Self::new_inner(bps)).0,
             current_bps: AtomicU32::new(bps.map(|v| v.get()).unwrap_or(0)),
         }
     }
 
     async fn acquire(&self, size: NonZeroU32) -> crate::Result<()> {
-        let lim = self.limiter.load().clone();
-        if let Some(rl) = lim.as_ref() {
-            let mut remaining = size.get();
+        // Subscribe before reading the limiter so a concurrent settings update
+        // cannot leave an existing transfer asleep on an obsolete quota.
+        let mut changes = self.limiter.subscribe();
+        let mut remaining = size.get();
+        while remaining > 0 {
+            let Some(rl) = changes.borrow_and_update().clone() else {
+                return Ok(());
+            };
             let mut max_batch = size;
             while let Some(batch) = NonZeroU32::new(remaining.min(max_batch.get())) {
-                match rl.until_n_ready(batch).await {
+                let ready = tokio::select! {
+                    biased;
+                    changed = changes.changed() => {
+                        changed.expect("limit sender outlives acquisition");
+                        break;
+                    }
+                    ready = rl.until_n_ready(batch) => ready,
+                };
+                match ready {
                     Ok(()) => remaining -= batch.get(),
                     Err(capacity) => {
                         // A valid wire block can exceed a low configured burst.
@@ -53,9 +65,9 @@ impl Limit {
     fn set(&self, limit: Option<NonZeroU32>) {
         use std::sync::atomic::Ordering;
         let new = Self::new_inner(limit);
-        self.limiter.swap(new);
         self.current_bps
             .store(limit.map(|v| v.get()).unwrap_or(0), Ordering::Relaxed);
+        self.limiter.send_replace(new);
     }
 
     fn get(&self) -> Option<NonZeroU32> {

@@ -9,6 +9,7 @@
     "crates/librqbit/src/dht_utils.rs",
     "crates/librqbit/src/file_ops.rs",
     "crates/librqbit/src/lib.rs",
+    "crates/librqbit/src/limits.rs",
     "crates/librqbit/src/peer_connection.rs",
     "crates/librqbit/src/peer_info_reader/mod.rs",
     "crates/librqbit/src/session.rs",

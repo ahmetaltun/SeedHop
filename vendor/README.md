@@ -7,3 +7,6 @@ The upstream LICENSE is retained. SeedHop patches are described in
 the native app. No upstream instruction file is a product dependency.
 
 Unicode filename collision data is licensed under the notice in `UNICODE-LICENSE.txt`, which is bundled with the native app.
+
+Patch `0026-seedhop-live-rate-limits.patch` wakes pending payload and hash quota
+waits when upload/download limits change, including when a limit becomes unlimited.

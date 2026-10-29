@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-29",
+  "fixture": "16 MiB production MSE stream over bounded Tokio duplex; no network or disk",
+  "before": {
+    "elapsed_seconds": 7.12,
+    "decimal_megabytes_per_second": 2.357
+  },
+  "after": {
+    "elapsed_seconds": 0.102,
+    "decimal_megabytes_per_second": 164.304
+  },
+  "ratio_from_reported_rates": 69.70895205770046,
+  "pending_limit_regression": {
+    "before": "failed: obsolete limiter did not wake within 500 ms",
+    "after": "passed: upload and download; replace with unlimited or 1000000 B/s"
+  },
+  "public_swarm": "not executed: automatic approval review model at capacity",
+  "loopback_swarm": "not executed successfully: socket binding denied; escalation review unavailable",
+  "measurement_scope": "single controlled before/after observations, not live network speeds",
+  "validation": {
+    "focused_tests_passed": 7,
+    "workspace_clippy_all_targets": "passed with -D warnings",
+    "formatting": "passed",
+    "diff_check": "passed",
+    "vendor_patch_reverse_check": "passed",
+    "native_build": "passed; reused existing icon after iconutil failure",
+    "signature_verification": "passed --deep --strict"
+  }
+}

@@ -183,3 +183,21 @@ Core-owned statistics and protocol-v3 XPC presentation are documented in
 plaintext TCP connection telemetry, omitted tracker counts, preserved pause and
 recheck totals, and restart continuity. Existing protocol regression tests remain
 in the workspace suite; physical lifecycle and release gates remain separate.
+
+## Transfer throughput — 2026-10-29
+
+Patch `0026-seedhop-live-rate-limits.patch` replaces a captured limiter with an
+observable limiter generation. Pending upload/download acquisitions wake when
+settings or scheduled caps change. Already charged batches remain charged; only
+the unfinished bytes use the replacement quota. Unlimited mode releases waiters.
+The regression failed before the patch and passes afterward for both directions,
+with replacement by either an increased cap or unlimited mode.
+
+The application's default development build previously compiled the transfer
+engine and RC4 stream cipher without optimization. A disk-free, network-free
+16 MiB encrypted stream fixture measured 2.357 MB/s before package optimization
+and 164.304 MB/s afterward. Development builds now optimize `librqbit`, `rc4` and
+`cipher`, retaining debug symbols and assertions. Encryption policy, payload
+verification, resource bounds and transport fallback remain unchanged.
+
+See `TRANSFER-THROUGHPUT.md` for scope, reproduction and the blocked network gates.

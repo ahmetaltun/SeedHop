@@ -51,6 +51,25 @@ import Combine
             try expect(!store.showImport && store.error != nil,"An unsupported dropped URL opened an import")
         }
 
+        try await check("Clipboard import prefills only magnet links and preserves an open draft") {
+            let pasteboard = NSPasteboard.withUniqueName()
+            defer { pasteboard.releaseGlobally() }
+            let store = LibraryStore(designPreview:true)
+            for text in ["", "ordinary clipboard text", "https://example.org/file", "Copied link: \(magnet)", magnet, " \n\(magnet.uppercased())\t", "magnet:?xt=urn:btmh:1220" + String(repeating:"a",count:64)] {
+                pasteboard.clearContents()
+                if !text.isEmpty { pasteboard.setString(text,forType:.string) }
+                store.showImport = false
+                store.pasteMagnet(from:pasteboard)
+                let expected = text.trimmingCharacters(in:.whitespacesAndNewlines)
+                let isMagnet = expected.lowercased().hasPrefix("magnet:")
+                try expect(store.showImport && store.incomingFile == nil && store.incomingMagnet == (isMagnet ? expected : ""),"Clipboard import accepted unrelated text or lost a magnet link")
+            }
+            let draft = store.incomingMagnet
+            pasteboard.clearContents(); pasteboard.setString(magnet,forType:.string)
+            store.pasteMagnet(from:pasteboard)
+            try expect(store.incomingMagnet == draft,"Clipboard import overwrote an open draft")
+        }
+
         try await check("Explicit filters clear hidden selection; snapshots preserve identity") {
             let (store, peer) = library()
             let first = store.torrents[0]

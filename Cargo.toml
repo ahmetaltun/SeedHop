@@ -21,3 +21,14 @@ libc = "0.2"
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# The native development app transfers real data. Keep its engine and stream
+# cipher optimized while retaining debug symbols and assertions.
+[profile.dev.package.librqbit]
+opt-level = 2
+
+[profile.dev.package.rc4]
+opt-level = 3
+
+[profile.dev.package.cipher]
+opt-level = 3

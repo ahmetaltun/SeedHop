@@ -678,7 +678,10 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         guard !hasFileOperation else { error = "Wait for the current file change to finish, or cancel it, then add your torrent."; return }
         incomingMagnet = magnet; incomingFile = file; showImport = true
     }
-    func pasteMagnet() { beginImport(magnet:NSPasteboard.general.string(forType:.string) ?? "") }
+    func pasteMagnet(from pasteboard: NSPasteboard = .general) {
+        let link = (pasteboard.string(forType:.string) ?? "").trimmingCharacters(in:.whitespacesAndNewlines)
+        beginImport(magnet:URLComponents(string:link)?.scheme?.lowercased() == "magnet" ? link : "")
+    }
     func open(_ urls: [URL]) {
         guard let url = urls.first else { return }
         if url.scheme?.lowercased() == "magnet" { beginImport(magnet:url.absoluteString) }

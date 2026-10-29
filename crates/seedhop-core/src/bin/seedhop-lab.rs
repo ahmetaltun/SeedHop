@@ -342,14 +342,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )?;
             println!("Created 1 MiB deterministic fixture in {}", root.display());
         }
-        Some(command @ ("download" | "download-magnet" | "inspect-magnet")) => {
+        Some(
+            command @ ("download" | "download-magnet" | "inspect-magnet" | "benchmark-magnet"),
+        ) => {
             let source = args.get(2).ok_or("missing torrent or magnet")?;
             let state = args.get(3).ok_or("missing state folder")?.clone();
             let downloads = args.get(4).ok_or("missing downloads folder")?.clone();
             let engine = open_engine(EngineConfig {
                 state_directory: state,
                 download_directory: downloads.clone(),
-                allow_network_discovery: false,
+                allow_network_discovery: command == "benchmark-magnet",
                 listen_port: 0,
             })
             .await?;
@@ -389,6 +391,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("SEEDHOP_TRANSFER_TIMEOUT_SECS must be between 5 and 300".into());
             }
             let deadline = Instant::now() + Duration::from_secs(transfer_timeout);
+            let started = Instant::now();
+            let mut samples = Vec::new();
             loop {
                 let snapshot = engine.snapshot()?;
                 let item = snapshot
@@ -396,6 +400,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .iter()
                     .find(|t| t.id == id)
                     .ok_or("torrent missing")?;
+                if command == "benchmark-magnet" {
+                    samples.push(serde_json::json!({
+                        "elapsed_seconds": started.elapsed().as_secs_f64(),
+                        "downloaded_bytes": item.network_downloaded_bytes,
+                        "download_bps": item.download_rate,
+                        "upload_bps": item.upload_rate,
+                        "peers": engine.torrent_details(id.clone(), "peers".into(), false)?.peers,
+                    }));
+                    if Instant::now() >= deadline
+                        || item.state == "seeding"
+                        || item.state == "error"
+                    {
+                        let output = serde_json::json!({"samples": samples, "snapshot": snapshot});
+                        engine.shutdown().await?;
+                        println!("{}", serde_json::to_string(&output)?);
+                        return Ok(());
+                    }
+                }
                 if item.state == "seeding" {
                     println!("{}", serde_json::to_string_pretty(&snapshot)?);
                     break;
@@ -403,13 +425,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if item.state == "error" || Instant::now() >= deadline {
                     return Err(format!("Transfer failed: {item:?}").into());
                 }
-                tokio::time::sleep(Duration::from_millis(200)).await;
+                tokio::time::sleep(Duration::from_millis(if command == "benchmark-magnet" {
+                    1000
+                } else {
+                    200
+                }))
+                .await;
             }
             engine.shutdown().await?;
         }
         _ => {
             return Err(
-                "Usage: seedhop-lab probe-dht TORRENT DOWNLOADS BOOTSTRAP [private] | probe-magnet-dht MAGNET DOWNLOADS BOOTSTRAP EXTRA_TRACKER | inspect-v2 TORRENT | inspect-magnet MAGNET STATE DOWNLOADS | verify-v2-piece TORRENT INDEX FILE | fixture DIRECTORY | seed TORRENT STATE FILES | download TORRENT STATE DOWNLOADS [INDICES] | download-magnet MAGNET STATE DOWNLOADS [INDICES] | hold STATE DOWNLOADS".into(),
+                "Usage: seedhop-lab probe-dht TORRENT DOWNLOADS BOOTSTRAP [private] | probe-magnet-dht MAGNET DOWNLOADS BOOTSTRAP EXTRA_TRACKER | inspect-v2 TORRENT | inspect-magnet MAGNET STATE DOWNLOADS | verify-v2-piece TORRENT INDEX FILE | fixture DIRECTORY | seed TORRENT STATE FILES | download TORRENT STATE DOWNLOADS [INDICES] | download-magnet MAGNET STATE DOWNLOADS [INDICES] | benchmark-magnet MAGNET STATE DOWNLOADS [INDICES] | hold STATE DOWNLOADS".into(),
             );
         }
     }
