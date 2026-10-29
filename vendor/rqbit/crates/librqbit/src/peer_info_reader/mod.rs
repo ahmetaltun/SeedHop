@@ -135,7 +135,7 @@ pub(crate) enum MetadataTransferError {
     SizeChanged { expected: u32, received: u32 },
     #[error("peer rejected required metadata piece {0}")]
     Rejected(u32),
-    #[error("metadata peer made no useful progress for 20 seconds")]
+    #[error("metadata peer stopped making useful progress")]
     NoProgress,
     #[error("metadata peer exceeded the 120 second attempt deadline")]
     Deadline,
@@ -151,13 +151,34 @@ pub(crate) async fn read_metainfo_from_peer(
     client_name_and_version: String,
     privacy: Arc<MetadataPrivacy>,
 ) -> anyhow::Result<TorrentAndInfoBytes> {
+    // Metadata probes must advance through dead endpoints quickly. These
+    // limits do not change payload connections or the requested encryption policy.
+    let mut peer_connection_options = peer_connection_options.unwrap_or_default();
+    let probe_timeout = std::time::Duration::from_secs(3);
+    peer_connection_options.connect_timeout = Some(
+        peer_connection_options
+            .connect_timeout
+            .unwrap_or(probe_timeout)
+            .min(probe_timeout),
+    );
+    peer_connection_options.read_write_timeout = Some(
+        peer_connection_options
+            .read_write_timeout
+            .unwrap_or(probe_timeout)
+            .min(probe_timeout),
+    );
     let (result_tx, result_rx) = tokio::sync::oneshot::channel::<
         Result<(TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned), bencode::DeserializeError>,
     >();
     let (writer_tx, writer_rx) = tokio::sync::mpsc::unbounded_channel::<WriterRequest>();
-    let (progress, mut progress_rx) = tokio::sync::watch::channel(tokio::time::Instant::now());
+    let (progress, mut progress_rx) = tokio::sync::watch::channel(Some((
+        tokio::time::Instant::now(),
+        std::time::Duration::from_secs(15),
+    )));
     let handler = Handler {
         progress,
+        metadata_slots: connector.metadata_slots.clone(),
+        metadata_permit: Mutex::new(None),
         addr,
         identity,
         handshake_hash: Mutex::new(None),
@@ -175,7 +196,7 @@ pub(crate) async fn read_metainfo_from_peer(
         identity.wire_hash,
         peer_id,
         handler,
-        peer_connection_options,
+        Some(peer_connection_options),
         spawner.clone(),
         connector.clone(),
     );
@@ -186,13 +207,22 @@ pub(crate) async fn read_metainfo_from_peer(
 
     let watchdog = async move {
         loop {
-            let deadline = *progress_rx.borrow_and_update() + std::time::Duration::from_secs(20);
-            match tokio::time::timeout_at(deadline, progress_rx.changed()).await {
-                Ok(Err(_)) => return,
-                Err(_) if progress_rx.borrow().elapsed() >= std::time::Duration::from_secs(20) => {
-                    return;
+            let progress = *progress_rx.borrow_and_update();
+            match progress {
+                // Waiting for the shared dictionary budget is not peer inactivity.
+                None => {
+                    if progress_rx.changed().await.is_err() {
+                        return;
+                    }
                 }
-                _ => {}
+                Some((last, budget)) => {
+                    let deadline = last + budget;
+                    match tokio::time::timeout_at(deadline, progress_rx.changed()).await {
+                        Ok(Err(_)) => return,
+                        Err(_) if *progress_rx.borrow() == Some((last, budget)) => return,
+                        _ => {}
+                    }
+                }
             }
         }
     };
@@ -311,7 +341,9 @@ impl HandlerLocked {
 pub type TorrentAndInfoBytes = (TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned);
 
 struct Handler {
-    progress: tokio::sync::watch::Sender<tokio::time::Instant>,
+    progress: tokio::sync::watch::Sender<Option<(tokio::time::Instant, std::time::Duration)>>,
+    metadata_slots: Arc<tokio::sync::Semaphore>,
+    metadata_permit: Mutex<Option<tokio::sync::OwnedSemaphorePermit>>,
     privacy: Arc<MetadataPrivacy>,
     addr: SocketAddr,
     identity: MetadataIdentity,
@@ -396,7 +428,20 @@ impl PeerConnectionHandler for Handler {
         Ok(0)
     }
 
+    fn on_connected(&self, _connection_time: std::time::Duration) {
+        // Encryption and TCP/uTP fallback share the negotiation budget. The
+        // shorter useful-data watchdog starts once the BT handshake is valid.
+        self.progress.send_replace(Some((
+            tokio::time::Instant::now(),
+            std::time::Duration::from_secs(15),
+        )));
+    }
+
     fn on_handshake(&self, handshake: Handshake, _kind: ConnectionKind) -> anyhow::Result<()> {
+        self.progress.send_replace(Some((
+            tokio::time::Instant::now(),
+            std::time::Duration::from_secs(5),
+        )));
         *self.handshake_hash.lock() = Some(handshake.info_hash);
         if !handshake.supports_extended() {
             anyhow::bail!(
@@ -453,7 +498,10 @@ impl PeerConnectionHandler for Handler {
                 .as_mut()
                 .ok_or_else(|| anyhow::anyhow!("unsolicited hashes"))?
                 .accept(request, hashes)?;
-            self.progress.send_replace(tokio::time::Instant::now());
+            self.progress.send_replace(Some((
+                tokio::time::Instant::now(),
+                std::time::Duration::from_secs(5),
+            )));
             self.request_next_layer()?;
             return Ok(());
         }
@@ -469,7 +517,10 @@ impl PeerConnectionHandler for Handler {
                     anyhow::anyhow!("metadata data received after info dictionary completed")
                 })?
                 .record_piece(&utdata, self.identity)?;
-            self.progress.send_replace(tokio::time::Instant::now());
+            self.progress.send_replace(Some((
+                tokio::time::Instant::now(),
+                std::time::Duration::from_secs(5),
+            )));
             if piece_ready {
                 let buf = Bytes::from(self.locked.write().take().unwrap().buffer);
                 librqbit_core::v2::Metainfo::check_info_version(&buf)?;
@@ -523,9 +574,9 @@ impl PeerConnectionHandler for Handler {
         anyhow::bail!("the peer is not supposed to be requesting chunks")
     }
 
-    fn on_extended_handshake(
+    async fn on_extended_handshake(
         &self,
-        extended_handshake: &ExtendedHandshake<ByteBuf>,
+        extended_handshake: &ExtendedHandshake<ByteBuf<'_>>,
     ) -> anyhow::Result<()> {
         // BEP 10 allows later extension-handshake updates. They must not
         // allocate a second dictionary or replay all outstanding requests.
@@ -552,6 +603,19 @@ impl PeerConnectionHandler for Handler {
         if extended_handshake.m.ut_metadata.is_none_or(|id| id == 0) {
             anyhow::bail!("peer does not support ut_metadata");
         }
+
+        if metadata_size == 0 || metadata_size > 32 * 1024 * 1024 {
+            return Err(MetadataTransferError::SizeOutOfBounds(metadata_size).into());
+        }
+        // Only peers advertising usable metadata reserve dictionary memory.
+        // Other socket probes can continue while all four dictionaries are busy.
+        self.progress.send_replace(None);
+        let permit = self.metadata_slots.clone().acquire_owned().await?;
+        *self.metadata_permit.lock() = Some(permit);
+        self.progress.send_replace(Some((
+            tokio::time::Instant::now(),
+            std::time::Duration::from_secs(5),
+        )));
 
         // Metadata and Merkle-hash requests are independent of payload
         // choking. This connection has no payload interest or availability.

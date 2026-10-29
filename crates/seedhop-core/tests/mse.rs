@@ -428,3 +428,107 @@ async fn engine_binds_mse_to_the_torrent_and_handles_a_fragmented_initial_handsh
     drop(encrypted);
     engine.shutdown().await.unwrap();
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn magnet_metadata_keeps_encrypted_utp_fallback_after_silent_tcp_handshakes() {
+    use librqbit::{
+        AddTorrent, AddTorrentOptions, AddTorrentResponse, ListenerMode, ListenerOptions, Session,
+        SessionOptions,
+    };
+    use seedhop_core::adapter;
+    use std::time::Duration;
+
+    let seed_files = tempfile::tempdir().unwrap();
+    let files = tempfile::tempdir().unwrap();
+    std::fs::write(seed_files.path().join("payload.bin"), b"hello").unwrap();
+    let metadata = adapter::create_fixture("payload.bin", b"hello");
+    let id = adapter::preview(metadata.clone()).unwrap().id;
+    let seed = Session::new_with_opts(
+        seed_files.path().into(),
+        SessionOptions {
+            peer_encryption: Policy::Require,
+            dht: None,
+            disable_local_service_discovery: true,
+            listen: Some(ListenerOptions {
+                mode: ListenerMode::UtpOnly,
+                listen_addr: "127.0.0.1:0".parse().unwrap(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let handle = seed
+        .add_torrent(
+            AddTorrent::from_bytes(metadata),
+            Some(AddTorrentOptions {
+                overwrite: true,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap()
+        .into_handle()
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(5), handle.wait_until_completed())
+        .await
+        .unwrap()
+        .unwrap();
+    let peer = seed.listen_addr().unwrap();
+    let listener = tokio::net::TcpListener::bind(peer).await.unwrap();
+    let silent_tcp = tokio::spawn(async move {
+        let mut connections = tokio::task::JoinSet::new();
+        loop {
+            tokio::select! {
+                accepted = listener.accept() => {
+                    let (socket, _) = accepted.unwrap();
+                    connections.spawn(async move {
+                        tokio::time::sleep(Duration::from_secs(30)).await;
+                        drop(socket);
+                    });
+                }
+                _ = connections.join_next(), if !connections.is_empty() => {}
+            }
+        }
+    });
+    let session = Session::new_with_opts(
+        files.path().into(),
+        SessionOptions {
+            peer_encryption: Policy::Prefer,
+            dht: None,
+            disable_local_service_discovery: true,
+            listen: Some(ListenerOptions {
+                mode: ListenerMode::TcpAndUtp,
+                listen_addr: "127.0.0.1:0".parse().unwrap(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let result = tokio::time::timeout(
+        Duration::from_secs(14),
+        session.add_torrent(
+            AddTorrent::from_url(format!("magnet:?xt=urn:btih:{id}")),
+            Some(AddTorrentOptions {
+                list_only: true,
+                initial_peers: Some(vec![peer]),
+                ..Default::default()
+            }),
+        ),
+    )
+    .await;
+    session.stop_and_wait().await.unwrap();
+    seed.stop_and_wait().await.unwrap();
+    silent_tcp.abort();
+    let _ = silent_tcp.await;
+    assert!(matches!(
+        result
+            .expect("silent TCP prevented encrypted uTP metadata fallback")
+            .unwrap(),
+        AddTorrentResponse::ListOnly(_)
+    ));
+    assert_eq!(std::fs::read_dir(files.path()).unwrap().count(), 0);
+}

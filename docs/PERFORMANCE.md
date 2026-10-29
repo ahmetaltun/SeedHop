@@ -1,5 +1,17 @@
 # Controlled large-library performance
 
+## Table text correction — 2026-10-29
+
+The fixed-height mitigation disabled SwiftUI's automatic cell measurement and
+left text blank when the first transfer arrived in an empty library. Removing
+that override restores text while retaining 28/40-point density controls.
+The workspace regression now checks rendered name pixels after first arrival
+and a live update; native interface and workspace checks pass.
+
+**UI-PERF-001 is reopened:** the controlled large-library rerun emitted 11 native
+table reentrancy warnings. Selection and scroll anchors remained stable. The
+zero-warning results below describe the earlier binary, not this correction.
+
 ## Workspace follow-up — 2026-10-28
 
 Current evidence is retained in

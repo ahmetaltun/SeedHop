@@ -14,7 +14,9 @@ use futures::{
 use librqbit_core::torrent_metainfo::TorrentMetaV1Info;
 use tracing::{Instrument, debug, debug_span};
 
-use crate::peer_info_reader::{MetadataIdentity, MetadataPrivacy, PrivateMetadata};
+use crate::peer_info_reader::{
+    MetadataIdentity, MetadataPrivacy, MetadataTransferError, PrivateMetadata,
+};
 use crate::type_aliases::PeerStream;
 use crate::{
     peer_connection::PeerConnectionOptions, peer_info_reader, spawn_utils::BlockingSpawner,
@@ -24,23 +26,26 @@ use librqbit_core::hash_id::Id20;
 
 pub(crate) fn transient_peer_failure(error: &anyhow::Error) -> bool {
     error.chain().any(|cause| {
-        cause.downcast_ref::<crate::Error>().is_some_and(|error| {
-            matches!(error, crate::Error::Encryption(crate::mse::Error::Io(_)))
-                || matches!(
-                    error,
-                    crate::Error::TcpConnect(_)
-                        | crate::Error::UtpConnect(_)
-                        | crate::Error::SocksConnect(_)
-                        | crate::Error::Connect { .. }
-                        | crate::Error::WriteHandshake(_)
-                        | crate::Error::ReadHandshake(_)
-                        | crate::Error::Timeout(_)
-                        | crate::Error::PeerDisconnectedReadingHandshake
-                        | crate::Error::PeerDisconnected
-                        | crate::Error::Read(_)
-                        | crate::Error::Write(_)
-                )
-        })
+        cause
+            .downcast_ref::<MetadataTransferError>()
+            .is_some_and(|error| matches!(error, MetadataTransferError::NoProgress))
+            || cause.downcast_ref::<crate::Error>().is_some_and(|error| {
+                matches!(error, crate::Error::Encryption(crate::mse::Error::Io(_)))
+                    || matches!(
+                        error,
+                        crate::Error::TcpConnect(_)
+                            | crate::Error::UtpConnect(_)
+                            | crate::Error::SocksConnect(_)
+                            | crate::Error::Connect { .. }
+                            | crate::Error::WriteHandshake(_)
+                            | crate::Error::ReadHandshake(_)
+                            | crate::Error::Timeout(_)
+                            | crate::Error::PeerDisconnectedReadingHandshake
+                            | crate::Error::PeerDisconnected
+                            | crate::Error::Read(_)
+                            | crate::Error::Write(_)
+                    )
+            })
     })
 }
 
@@ -92,48 +97,39 @@ pub async fn read_metainfo_from_peer_receiver(
         let client_name_and_version = client_name_and_version.clone();
         let privacy = privacy.clone();
         async move {
-            let mut attempt = 0;
-            let ret = loop {
-                let token = connector.metadata_slots.acquire().await?;
-                let result = peer_info_reader::read_metainfo_from_peer(
-                    addr,
-                    peer_id,
-                    identity,
-                    peer_connection_options,
-                    // This shouldn't be called anyway as we aren't reading/writing to disk, so it's
-                    // ok not to use a shared one.
-                    BlockingSpawner::new(1),
-                    connector.clone(),
-                    client_name_and_version.clone(),
-                    privacy.clone(),
-                )
-                .instrument(debug_span!("read_metainfo_from_peer", ?addr))
-                .await;
-                drop(token);
-                let transient = result.as_ref().err().is_some_and(transient_peer_failure);
-                if attempt >= 2 || !transient {
-                    break result;
-                }
-                attempt += 1;
-                debug!(
-                    ?addr,
-                    attempt, "retrying transient metadata connection failure"
-                );
-                tokio::time::sleep(std::time::Duration::from_millis(250 * attempt)).await;
-            }
-            .with_context(|| format!("error reading metainfo from {addr}"));
+            let token = connector.metadata_probes.acquire().await?;
+            let ret = peer_info_reader::read_metainfo_from_peer(
+                addr,
+                peer_id,
+                identity,
+                peer_connection_options,
+                // This shouldn't be called anyway as we aren't reading/writing to disk, so it's
+                // ok not to use a shared one.
+                BlockingSpawner::new(1),
+                connector.clone(),
+                client_name_and_version.clone(),
+                privacy.clone(),
+            )
+            .instrument(debug_span!("read_metainfo_from_peer", ?addr))
+            .await;
+            drop(token);
+            let ret = ret.with_context(|| format!("error reading metainfo from {addr}"));
             ret.map(|(info, info_bytes)| (addr, info, info_bytes))
         }
     };
 
     let mut unordered = FuturesUnordered::new();
     let mut handles = HashMap::<SocketAddr, AbortHandle>::new();
-    let wrap = |addr, identity| {
+    let wrap = |addr, identity, attempt| {
         let (handle, registration) = AbortHandle::new_pair();
         let future = Abortable::new(read_info_guarded(addr, identity), registration);
-        (handle, async move { (addr, future.await) }.boxed())
+        (handle, async move { (addr, attempt, future.await) }.boxed())
     };
 
+    // Keep tracker/DHT streams moving while connection attempts wait. Fresh
+    // endpoints take priority over retries; both queues stay bounded.
+    let mut pending = VecDeque::new();
+    let mut retries = VecDeque::new();
     let mut addrs_completed = false;
     let mut pending_result: Option<(SocketAddr, TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned)> =
         None;
@@ -149,6 +145,8 @@ pub async fn read_metainfo_from_peer_receiver(
                     handle.abort();
                 }
             }
+            pending.retain(|addr| *addr == notice.source);
+            retries.retain(|(addr, _)| *addr == notice.source);
             seen.retain(|addr| *addr == notice.source);
             seen_order.clear();
             if seen.contains(&notice.source) {
@@ -185,7 +183,7 @@ pub async fn read_metainfo_from_peer_receiver(
                 rx: addrs,
             };
         }
-        if addrs_completed && unordered.is_empty() {
+        if addrs_completed && unordered.is_empty() && pending.is_empty() && retries.is_empty() {
             return ReadMetainfoResult::ChannelClosed { seen };
         }
 
@@ -194,11 +192,18 @@ pub async fn read_metainfo_from_peer_receiver(
             changed = privacy_changes.changed() => { if changed.is_err() { unreachable!("privacy sender is retained by this lookup"); } },
             done = unordered.next(), if !unordered.is_empty() => {
                 match done {
-                    Some((addr, result)) => {
+                    Some((addr, attempt, result)) => {
                         handles.remove(&addr);
                         match result {
                             Ok(Ok(result)) => pending_result = Some(result),
-                            Ok(Err(error)) => debug!("{:#}", error),
+                            Ok(Err(error)) => {
+                                if attempt < 2 && transient_peer_failure(&error) && retries.len() < 64
+                                    && privacy.current().is_none_or(|notice| addr == notice.source)
+                                {
+                                    retries.push_back((addr, attempt + 1));
+                                }
+                                debug!("{:#}", error);
+                            },
                             Err(_) => debug!(?addr, "unrelated public metadata attempt cancelled"),
                         }
                     },
@@ -206,7 +211,7 @@ pub async fn read_metainfo_from_peer_receiver(
                 }
             }
 
-            next_addr = addrs.next(), if !addrs_completed && unordered.len() < 8 => {
+            next_addr = addrs.next(), if !addrs_completed && pending.len() < 64 => {
                 match next_addr {
                     Some(addr) => {
                         if !seen.contains(&addr) {
@@ -220,10 +225,7 @@ pub async fn read_metainfo_from_peer_receiver(
                             }
                             seen.insert(addr);
                             seen_order.push_back(addr);
-                            let identity = privacy.current().map(|notice| identity.with_dictionary_pin(notice.dictionary_hash)).unwrap_or(identity);
-                            let (handle, future) = wrap(addr, identity);
-                            handles.insert(addr, handle);
-                            unordered.push(future);
+                            pending.push_back(addr);
                         }
                         continue;
                     },
@@ -231,6 +233,16 @@ pub async fn read_metainfo_from_peer_receiver(
                         addrs_completed = true;
                     },
                 }
+            }
+
+            _ = std::future::ready(()), if unordered.len() < 64 && (!pending.is_empty() || !retries.is_empty()) => {
+                let (addr, attempt) = pending.pop_front().map(|addr| (addr, 0))
+                    .or_else(|| retries.pop_front()).unwrap();
+                if handles.contains_key(&addr) { continue; }
+                let identity = privacy.current().map(|notice| identity.with_dictionary_pin(notice.dictionary_hash)).unwrap_or(identity);
+                let (handle, future) = wrap(addr, identity, attempt);
+                handles.insert(addr, handle);
+                unordered.push(future);
             }
         };
     }

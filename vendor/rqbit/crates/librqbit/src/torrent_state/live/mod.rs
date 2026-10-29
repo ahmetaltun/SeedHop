@@ -1289,7 +1289,10 @@ impl PeerConnectionHandler for &'_ PeerHandler {
         self.state.file_ops().read_chunk(self.addr, chunk, buf)
     }
 
-    fn on_extended_handshake(&self, hs: &ExtendedHandshake<ByteBuf>) -> anyhow::Result<()> {
+    async fn on_extended_handshake(
+        &self,
+        hs: &ExtendedHandshake<ByteBuf<'_>>,
+    ) -> anyhow::Result<()> {
         if let Some(client_name) = hs.v.as_ref().and_then(format_peer_client_name) {
             self.state
                 .peers

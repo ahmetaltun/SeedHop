@@ -1,0 +1,108 @@
+{
+  "date": "2026-10-28",
+  "scope": "Metadata-only resolution of the user-provided v1 magnet; no payload downloads.",
+  "info_hash": "61c1f40a03d05681dd6bf1a23cc891880c8ddb69",
+  "method": "Ten separate engine processes with fresh temporary state, DHT enabled and peer_encryption=prefer. OS DNS caches and the public swarm are uncontrolled.",
+  "limits": {
+    "shared_socket_probes": 64,
+    "shared_metadata_dictionaries": 4,
+    "maximum_dictionary_bytes": 33554432,
+    "socket_and_read_timeout_seconds": 3,
+    "negotiation_watchdog_seconds": 15,
+    "useful_metadata_progress_timeout_seconds": 5,
+    "per_peer_retries": 2
+  },
+  "live_results": {
+    "attempts": 10,
+    "successes": 10,
+    "all_below_15_seconds": true,
+    "min_resolution_seconds": 0.73733975,
+    "max_resolution_seconds": 11.232491375,
+    "max_process_wall_seconds": 11.327,
+    "runs": [
+      {
+        "run": 1,
+        "wall_seconds": 3.009,
+        "resolved": true,
+        "resolution_seconds": 0.73733975
+      },
+      {
+        "run": 2,
+        "wall_seconds": 5.939,
+        "resolved": true,
+        "resolution_seconds": 5.831275416
+      },
+      {
+        "run": 3,
+        "wall_seconds": 4.437,
+        "resolved": true,
+        "resolution_seconds": 4.390677958
+      },
+      {
+        "run": 4,
+        "wall_seconds": 1.002,
+        "resolved": true,
+        "resolution_seconds": 0.9586894579999999
+      },
+      {
+        "run": 5,
+        "wall_seconds": 11.327,
+        "resolved": true,
+        "resolution_seconds": 11.232491375
+      },
+      {
+        "run": 6,
+        "wall_seconds": 4.786,
+        "resolved": true,
+        "resolution_seconds": 4.523299833
+      },
+      {
+        "run": 7,
+        "wall_seconds": 2.178,
+        "resolved": true,
+        "resolution_seconds": 1.907943042
+      },
+      {
+        "run": 8,
+        "wall_seconds": 3.02,
+        "resolved": true,
+        "resolution_seconds": 1.8709095
+      },
+      {
+        "run": 9,
+        "wall_seconds": 1.103,
+        "resolved": true,
+        "resolution_seconds": 1.022479208
+      },
+      {
+        "run": 10,
+        "wall_seconds": 10.757,
+        "resolved": true,
+        "resolution_seconds": 10.681928875
+      }
+    ]
+  },
+  "controlled_regressions": [
+    "A healthy provider behind 64 silent peers resolves before the 14-second test deadline.",
+    "Transient failure of the only provider remains retryable.",
+    "Four shared dictionary allocations remain the limit across simultaneous lookups; keepalives cannot retain a buffer indefinitely.",
+    "Silent TCP handshakes preserve encrypted uTP fallback; focused test passed in 6.28 seconds."
+  ],
+  "limits_of_evidence": "This is a measured performance target, not a universal deadline guarantee. Unreachable trackers, absent peers, network outages, or exceptionally large/slow metadata can prevent resolution within 15 seconds.",
+  "validation": {
+    "mse_tests_passed": 6,
+    "recovery_tests_passed": 8,
+    "v2_tests_passed": 74,
+    "parallel_run_note": "The final parallel v2 run passed 73 tests; the file-move cancellation test hit its existing initial-verification timeout while compilation and live lookups were running. The unchanged test passed alone in 21.98 seconds. No file-management code or timeout was changed.",
+    "clippy": "cargo clippy -p seedhop-core --tests --locked -- -D warnings: passed",
+    "format_and_diff_checks": "passed",
+    "vendor_patch": "0025 reverses to the prior patched source and reapplies byte-for-byte",
+    "app_build": "make build: passed; existing WorkspaceSplitView.swift Sendable closure warning remains"
+  },
+  "earlier_32_probe_trial": {
+    "attempts": 6,
+    "resolved": 6,
+    "over_target_run_seconds": 19.69825025,
+    "outcome": "Increased the lightweight shared probe limit to 64 without increasing dictionary memory."
+  }
+}

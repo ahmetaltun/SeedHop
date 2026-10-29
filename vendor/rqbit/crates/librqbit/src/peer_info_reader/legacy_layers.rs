@@ -247,7 +247,10 @@ impl PeerConnectionHandler for Handler {
     fn on_handshake(&self, _: Handshake, _: ConnectionKind) -> anyhow::Result<()> {
         Ok(())
     }
-    fn on_extended_handshake(&self, _: &ExtendedHandshake<ByteBuf>) -> anyhow::Result<()> {
+    async fn on_extended_handshake(
+        &self,
+        _: &ExtendedHandshake<ByteBuf<'_>>,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
     async fn on_received_message(&self, message: Message<'_>) -> anyhow::Result<()> {

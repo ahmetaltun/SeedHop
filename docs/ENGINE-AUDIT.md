@@ -25,6 +25,19 @@ Baseline: `a499d2f243d124e144aef137afe7cb304a6e3f36`.
 `vendor/patches/0021-seedhop-legacy-layer-peer-state.patch` and
 `vendor/patches/0022-seedhop-final-wire-boundaries.patch`; upstream's license is retained.
 
+`vendor/patches/0024-seedhop-magnet-peer-scheduling.patch` keeps magnet discovery
+streams polled through a bounded candidate queue and tries fresh peers before
+retrying failed connections. The existing four shared metadata dictionary buffers,
+per-peer retry limit, and private-metadata isolation remain in place.
+
+`vendor/patches/0025-seedhop-magnet-probe-budgets.patch` separates up to 64
+shared socket probes from the four dictionary buffers. Metadata-only socket and
+read waits are capped at three seconds; useful metadata progress must continue
+within five seconds. Handshake negotiation retains time for encryption and
+TCP/uTP fallback, and waiting for a dictionary buffer does not count as peer
+inactivity. Payload-transfer timeouts and encryption policy remain unchanged.
+Validation is recorded in [`results/magnet-resolution-2026-10-28.json`](results/magnet-resolution-2026-10-28.json).
+
 BEP 52, simultaneous hybrid swarms, MSE/PE encryption and TCP/uTP are implemented
 and verified. The final checkpoint and supported-client bounds are recorded in
 `BEP52-CONFORMANCE.md` and `results/v2-final-2026-10-26.json`. All twenty-two

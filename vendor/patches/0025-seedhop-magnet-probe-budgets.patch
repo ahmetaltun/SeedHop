@@ -1,0 +1,327 @@
+diff --git a/crates/librqbit/src/dht_utils.rs b/crates/librqbit/src/dht_utils.rs
+--- a/crates/librqbit/src/dht_utils.rs
++++ b/crates/librqbit/src/dht_utils.rs
+@@ -14,7 +14,9 @@
+ use librqbit_core::torrent_metainfo::TorrentMetaV1Info;
+ use tracing::{Instrument, debug, debug_span};
+ 
+-use crate::peer_info_reader::{MetadataIdentity, MetadataPrivacy, PrivateMetadata};
++use crate::peer_info_reader::{
++    MetadataIdentity, MetadataPrivacy, MetadataTransferError, PrivateMetadata,
++};
+ use crate::type_aliases::PeerStream;
+ use crate::{
+     peer_connection::PeerConnectionOptions, peer_info_reader, spawn_utils::BlockingSpawner,
+@@ -24,23 +26,26 @@
+ 
+ pub(crate) fn transient_peer_failure(error: &anyhow::Error) -> bool {
+     error.chain().any(|cause| {
+-        cause.downcast_ref::<crate::Error>().is_some_and(|error| {
+-            matches!(error, crate::Error::Encryption(crate::mse::Error::Io(_)))
+-                || matches!(
+-                    error,
+-                    crate::Error::TcpConnect(_)
+-                        | crate::Error::UtpConnect(_)
+-                        | crate::Error::SocksConnect(_)
+-                        | crate::Error::Connect { .. }
+-                        | crate::Error::WriteHandshake(_)
+-                        | crate::Error::ReadHandshake(_)
+-                        | crate::Error::Timeout(_)
+-                        | crate::Error::PeerDisconnectedReadingHandshake
+-                        | crate::Error::PeerDisconnected
+-                        | crate::Error::Read(_)
+-                        | crate::Error::Write(_)
+-                )
+-        })
++        cause
++            .downcast_ref::<MetadataTransferError>()
++            .is_some_and(|error| matches!(error, MetadataTransferError::NoProgress))
++            || cause.downcast_ref::<crate::Error>().is_some_and(|error| {
++                matches!(error, crate::Error::Encryption(crate::mse::Error::Io(_)))
++                    || matches!(
++                        error,
++                        crate::Error::TcpConnect(_)
++                            | crate::Error::UtpConnect(_)
++                            | crate::Error::SocksConnect(_)
++                            | crate::Error::Connect { .. }
++                            | crate::Error::WriteHandshake(_)
++                            | crate::Error::ReadHandshake(_)
++                            | crate::Error::Timeout(_)
++                            | crate::Error::PeerDisconnectedReadingHandshake
++                            | crate::Error::PeerDisconnected
++                            | crate::Error::Read(_)
++                            | crate::Error::Write(_)
++                    )
++            })
+     })
+ }
+ 
+@@ -92,7 +97,7 @@
+         let client_name_and_version = client_name_and_version.clone();
+         let privacy = privacy.clone();
+         async move {
+-            let token = connector.metadata_slots.acquire().await?;
++            let token = connector.metadata_probes.acquire().await?;
+             let ret = peer_info_reader::read_metainfo_from_peer(
+                 addr,
+                 peer_id,
+@@ -230,7 +235,7 @@
+                 }
+             }
+ 
+-            _ = std::future::ready(()), if unordered.len() < 8 && (!pending.is_empty() || !retries.is_empty()) => {
++            _ = std::future::ready(()), if unordered.len() < 64 && (!pending.is_empty() || !retries.is_empty()) => {
+                 let (addr, attempt) = pending.pop_front().map(|addr| (addr, 0))
+                     .or_else(|| retries.pop_front()).unwrap();
+                 if handles.contains_key(&addr) { continue; }
+diff --git a/crates/librqbit/src/peer_connection.rs b/crates/librqbit/src/peer_connection.rs
+--- a/crates/librqbit/src/peer_connection.rs
++++ b/crates/librqbit/src/peer_connection.rs
+@@ -51,9 +51,9 @@
+     fn serialize_bitfield_message_to_buf(&self, buf: &mut [u8]) -> anyhow::Result<usize>;
+     fn on_encryption(&self, _encrypted: bool) {}
+     fn on_handshake(&self, handshake: Handshake, ckind: ConnectionKind) -> anyhow::Result<()>;
+-    fn on_extended_handshake(
++    async fn on_extended_handshake(
+         &self,
+-        extended_handshake: &ExtendedHandshake<ByteBuf>,
++        extended_handshake: &ExtendedHandshake<ByteBuf<'_>>,
+     ) -> anyhow::Result<()>;
+     async fn on_received_message(&self, msg: Message<'_>) -> anyhow::Result<()>;
+     fn should_transmit_have(&self, id: ValidPieceIndex) -> bool;
+@@ -620,6 +620,7 @@
+                         .apply_update(h.peer_extended_messages());
+                     self.handler
+                         .on_extended_handshake(h)
++                        .await
+                         .map_err(Error::Anyhow)?;
+                 } else {
+                     self.handler
+diff --git a/crates/librqbit/src/peer_info_reader/legacy_layers.rs b/crates/librqbit/src/peer_info_reader/legacy_layers.rs
+--- a/crates/librqbit/src/peer_info_reader/legacy_layers.rs
++++ b/crates/librqbit/src/peer_info_reader/legacy_layers.rs
+@@ -247,7 +247,10 @@
+     fn on_handshake(&self, _: Handshake, _: ConnectionKind) -> anyhow::Result<()> {
+         Ok(())
+     }
+-    fn on_extended_handshake(&self, _: &ExtendedHandshake<ByteBuf>) -> anyhow::Result<()> {
++    async fn on_extended_handshake(
++        &self,
++        _: &ExtendedHandshake<ByteBuf<'_>>,
++    ) -> anyhow::Result<()> {
+         Ok(())
+     }
+     async fn on_received_message(&self, message: Message<'_>) -> anyhow::Result<()> {
+diff --git a/crates/librqbit/src/peer_info_reader/mod.rs b/crates/librqbit/src/peer_info_reader/mod.rs
+--- a/crates/librqbit/src/peer_info_reader/mod.rs
++++ b/crates/librqbit/src/peer_info_reader/mod.rs
+@@ -135,7 +135,7 @@
+     SizeChanged { expected: u32, received: u32 },
+     #[error("peer rejected required metadata piece {0}")]
+     Rejected(u32),
+-    #[error("metadata peer made no useful progress for 20 seconds")]
++    #[error("metadata peer stopped making useful progress")]
+     NoProgress,
+     #[error("metadata peer exceeded the 120 second attempt deadline")]
+     Deadline,
+@@ -151,13 +151,34 @@
+     client_name_and_version: String,
+     privacy: Arc<MetadataPrivacy>,
+ ) -> anyhow::Result<TorrentAndInfoBytes> {
++    // Metadata probes must advance through dead endpoints quickly. These
++    // limits do not change payload connections or the requested encryption policy.
++    let mut peer_connection_options = peer_connection_options.unwrap_or_default();
++    let probe_timeout = std::time::Duration::from_secs(3);
++    peer_connection_options.connect_timeout = Some(
++        peer_connection_options
++            .connect_timeout
++            .unwrap_or(probe_timeout)
++            .min(probe_timeout),
++    );
++    peer_connection_options.read_write_timeout = Some(
++        peer_connection_options
++            .read_write_timeout
++            .unwrap_or(probe_timeout)
++            .min(probe_timeout),
++    );
+     let (result_tx, result_rx) = tokio::sync::oneshot::channel::<
+         Result<(TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned), bencode::DeserializeError>,
+     >();
+     let (writer_tx, writer_rx) = tokio::sync::mpsc::unbounded_channel::<WriterRequest>();
+-    let (progress, mut progress_rx) = tokio::sync::watch::channel(tokio::time::Instant::now());
++    let (progress, mut progress_rx) = tokio::sync::watch::channel(Some((
++        tokio::time::Instant::now(),
++        std::time::Duration::from_secs(15),
++    )));
+     let handler = Handler {
+         progress,
++        metadata_slots: connector.metadata_slots.clone(),
++        metadata_permit: Mutex::new(None),
+         addr,
+         identity,
+         handshake_hash: Mutex::new(None),
+@@ -175,7 +196,7 @@
+         identity.wire_hash,
+         peer_id,
+         handler,
+-        peer_connection_options,
++        Some(peer_connection_options),
+         spawner.clone(),
+         connector.clone(),
+     );
+@@ -186,13 +207,22 @@
+ 
+     let watchdog = async move {
+         loop {
+-            let deadline = *progress_rx.borrow_and_update() + std::time::Duration::from_secs(20);
+-            match tokio::time::timeout_at(deadline, progress_rx.changed()).await {
+-                Ok(Err(_)) => return,
+-                Err(_) if progress_rx.borrow().elapsed() >= std::time::Duration::from_secs(20) => {
+-                    return;
++            let progress = *progress_rx.borrow_and_update();
++            match progress {
++                // Waiting for the shared dictionary budget is not peer inactivity.
++                None => {
++                    if progress_rx.changed().await.is_err() {
++                        return;
++                    }
+                 }
+-                _ => {}
++                Some((last, budget)) => {
++                    let deadline = last + budget;
++                    match tokio::time::timeout_at(deadline, progress_rx.changed()).await {
++                        Ok(Err(_)) => return,
++                        Err(_) if *progress_rx.borrow() == Some((last, budget)) => return,
++                        _ => {}
++                    }
++                }
+             }
+         }
+     };
+@@ -311,7 +341,9 @@
+ pub type TorrentAndInfoBytes = (TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned);
+ 
+ struct Handler {
+-    progress: tokio::sync::watch::Sender<tokio::time::Instant>,
++    progress: tokio::sync::watch::Sender<Option<(tokio::time::Instant, std::time::Duration)>>,
++    metadata_slots: Arc<tokio::sync::Semaphore>,
++    metadata_permit: Mutex<Option<tokio::sync::OwnedSemaphorePermit>>,
+     privacy: Arc<MetadataPrivacy>,
+     addr: SocketAddr,
+     identity: MetadataIdentity,
+@@ -396,7 +428,20 @@
+         Ok(0)
+     }
+ 
++    fn on_connected(&self, _connection_time: std::time::Duration) {
++        // Encryption and TCP/uTP fallback share the negotiation budget. The
++        // shorter useful-data watchdog starts once the BT handshake is valid.
++        self.progress.send_replace(Some((
++            tokio::time::Instant::now(),
++            std::time::Duration::from_secs(15),
++        )));
++    }
++
+     fn on_handshake(&self, handshake: Handshake, _kind: ConnectionKind) -> anyhow::Result<()> {
++        self.progress.send_replace(Some((
++            tokio::time::Instant::now(),
++            std::time::Duration::from_secs(5),
++        )));
+         *self.handshake_hash.lock() = Some(handshake.info_hash);
+         if !handshake.supports_extended() {
+             anyhow::bail!(
+@@ -453,7 +498,10 @@
+                 .as_mut()
+                 .ok_or_else(|| anyhow::anyhow!("unsolicited hashes"))?
+                 .accept(request, hashes)?;
+-            self.progress.send_replace(tokio::time::Instant::now());
++            self.progress.send_replace(Some((
++                tokio::time::Instant::now(),
++                std::time::Duration::from_secs(5),
++            )));
+             self.request_next_layer()?;
+             return Ok(());
+         }
+@@ -469,7 +517,10 @@
+                     anyhow::anyhow!("metadata data received after info dictionary completed")
+                 })?
+                 .record_piece(&utdata, self.identity)?;
+-            self.progress.send_replace(tokio::time::Instant::now());
++            self.progress.send_replace(Some((
++                tokio::time::Instant::now(),
++                std::time::Duration::from_secs(5),
++            )));
+             if piece_ready {
+                 let buf = Bytes::from(self.locked.write().take().unwrap().buffer);
+                 librqbit_core::v2::Metainfo::check_info_version(&buf)?;
+@@ -523,9 +574,9 @@
+         anyhow::bail!("the peer is not supposed to be requesting chunks")
+     }
+ 
+-    fn on_extended_handshake(
++    async fn on_extended_handshake(
+         &self,
+-        extended_handshake: &ExtendedHandshake<ByteBuf>,
++        extended_handshake: &ExtendedHandshake<ByteBuf<'_>>,
+     ) -> anyhow::Result<()> {
+         // BEP 10 allows later extension-handshake updates. They must not
+         // allocate a second dictionary or replay all outstanding requests.
+@@ -553,6 +604,19 @@
+             anyhow::bail!("peer does not support ut_metadata");
+         }
+ 
++        if metadata_size == 0 || metadata_size > 32 * 1024 * 1024 {
++            return Err(MetadataTransferError::SizeOutOfBounds(metadata_size).into());
++        }
++        // Only peers advertising usable metadata reserve dictionary memory.
++        // Other socket probes can continue while all four dictionaries are busy.
++        self.progress.send_replace(None);
++        let permit = self.metadata_slots.clone().acquire_owned().await?;
++        *self.metadata_permit.lock() = Some(permit);
++        self.progress.send_replace(Some((
++            tokio::time::Instant::now(),
++            std::time::Duration::from_secs(5),
++        )));
++
+         // Metadata and Merkle-hash requests are independent of payload
+         // choking. This connection has no payload interest or availability.
+         let inner = HandlerLocked::new(metadata_size)?;
+diff --git a/crates/librqbit/src/stream_connect.rs b/crates/librqbit/src/stream_connect.rs
+--- a/crates/librqbit/src/stream_connect.rs
++++ b/crates/librqbit/src/stream_connect.rs
+@@ -129,7 +129,9 @@
+ #[derive(Debug)]
+ pub(crate) struct StreamConnector {
+     /// Shared across simultaneous magnets and both hybrid lookup lanes.
+-    pub metadata_slots: tokio::sync::Semaphore,
++    pub metadata_slots: Arc<tokio::sync::Semaphore>,
++    /// Socket probes do not reserve a potentially 32 MiB metadata dictionary.
++    pub metadata_probes: tokio::sync::Semaphore,
+ 
+     pub encryption_policy: crate::EncryptionPolicy,
+     pub incoming_crypto_semaphore: Arc<tokio::sync::Semaphore>,
+@@ -160,7 +162,8 @@
+ 
+         Ok(Self {
+             encryption_policy: config.encryption_policy,
+-            metadata_slots: tokio::sync::Semaphore::new(4),
++            metadata_slots: Arc::new(tokio::sync::Semaphore::new(4)),
++            metadata_probes: tokio::sync::Semaphore::new(64),
+             incoming_crypto_semaphore: Arc::new(tokio::sync::Semaphore::new(8)),
+             outgoing_crypto_semaphore: Arc::new(tokio::sync::Semaphore::new(8)),
+             proxy_config: config.socks_proxy_config,
+diff --git a/crates/librqbit/src/torrent_state/live/mod.rs b/crates/librqbit/src/torrent_state/live/mod.rs
+--- a/crates/librqbit/src/torrent_state/live/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/mod.rs
+@@ -1289,7 +1289,10 @@
+         self.state.file_ops().read_chunk(self.addr, chunk, buf)
+     }
+ 
+-    fn on_extended_handshake(&self, hs: &ExtendedHandshake<ByteBuf>) -> anyhow::Result<()> {
++    async fn on_extended_handshake(
++        &self,
++        hs: &ExtendedHandshake<ByteBuf<'_>>,
++    ) -> anyhow::Result<()> {
+         if let Some(client_name) = hs.v.as_ref().and_then(format_peer_client_name) {
+             self.state
+                 .peers

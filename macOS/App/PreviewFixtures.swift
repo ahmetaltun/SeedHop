@@ -90,6 +90,9 @@ enum PreviewFixtures {
             store.error = nil; store.connected = true
             store.torrents = []; store.selection = []
             try capture(LibraryView().environmentObject(store),size:NSSize(width:1000,height:700),appearance:appearance,to:output.appendingPathComponent("empty-\(name).png"))
+            for (name,size) in [("full",NSSize(width:820,height:500)),("short",NSSize(width:820,height:250)),("minimum",NSSize(width:520,height:160))] {
+                try capture(LibraryEmptyState().environmentObject(store).background(Design.canvas),size:size,appearance:appearance,to:output.appendingPathComponent("empty-pane-\(name)-\(appearance == .darkAqua ? "dark" : "light").png"))
+            }
             try capture(ImportView().environmentObject(store),size:NSSize(width:600,height:432),appearance:appearance,to:output.appendingPathComponent("add-\(name).png"))
             try capture(ImportView(preview:PreviewFixtures.importPreview).environmentObject(store),size:NSSize(width:600,height:680),appearance:appearance,to:output.appendingPathComponent("files-\(name).png"))
             try capture(SettingsView().environmentObject(store),size:NSSize(width:570,height:660),appearance:appearance,to:output.appendingPathComponent("settings-\(name).png"))

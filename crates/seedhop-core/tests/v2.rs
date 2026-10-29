@@ -3122,27 +3122,54 @@ async fn metadata_limits_are_shared_and_keepalives_cannot_block_a_healthy_provid
                             let accepted = accepted.clone(); let healthy_requests = healthy_requests.clone(); let mut gate = gate.clone();
                             connections.spawn(async move {
                                 let mut handshake = [0;68]; if socket.read_exact(&mut handshake).await.is_err() { return; }
-                                let _active = Active(active.clone()); let count = active.fetch_add(1, Ordering::SeqCst)+1;
-                                maximum.fetch_max(count, Ordering::SeqCst); accepted.fetch_add(1, Ordering::SeqCst);
+                                accepted.fetch_add(1, Ordering::SeqCst);
+                                if healthy {
+                                    // Fill the dictionary budget before this provider advertises metadata.
+                                    while maximum.load(Ordering::SeqCst) < 4 {
+                                        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+                                    }
+                                }
                                 handshake[48..].copy_from_slice(b"-SHtest-123456789012"); if socket.write_all(&handshake).await.is_err() { return; }
                                 let mut extension = ExtendedHandshake::new(); extension.metadata_size = Some(if healthy { info.len() as u32 } else { 32*1024*1024 });
                                 wire::send(&mut socket, Message::Extended(ExtendedMessage::Handshake(extension))).await;
                                 if !healthy {
                                     let (mut reader, mut writer) = socket.into_split();
-                                    let mut bytes = [0;8192]; let mut tick = tokio::time::interval(std::time::Duration::from_millis(100));
+                                    let read_requests = async {
+                                        let mut allocation = None;
+                                        while let Ok(length) = reader.read_u32().await {
+                                            assert!(length < 32768);
+                                            let mut frame = vec![0; length as usize + 4];
+                                            frame[..4].copy_from_slice(&length.to_be_bytes());
+                                            if reader.read_exact(&mut frame[4..]).await.is_err() { return; }
+                                            if allocation.is_none() && matches!(Message::deserialize(&frame, &[]).unwrap().0,
+                                                Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Request(_)))) {
+                                                allocation = Some(Active(active.clone()));
+                                                let count = active.fetch_add(1, Ordering::SeqCst) + 1;
+                                                maximum.fetch_max(count, Ordering::SeqCst);
+                                            }
+                                        }
+                                    };
+                                    tokio::pin!(read_requests);
+                                    let mut tick = tokio::time::interval(std::time::Duration::from_millis(100));
                                     loop { tokio::select! {
                                         _ = gate.changed() => return,
-                                        count = reader.read(&mut bytes) => { if count.unwrap_or(0)==0 { return; } },
+                                        _ = &mut read_requests => return,
                                         _ = tick.tick() => { if writer.write_all(&[0;4]).await.is_err() { return; } },
                                     } }
                                 }
                                 let mut metadata_id = None;
+                                let mut allocation = None;
                                 while let Ok(length) = socket.read_u32().await {
                                     assert!(length < 32768); let mut frame = vec![0; length as usize + 4]; frame[..4].copy_from_slice(&length.to_be_bytes());
                                     if socket.read_exact(&mut frame[4..]).await.is_err() { return; }
                                     match Message::deserialize(&frame, &[]).unwrap().0 {
                                         Message::Extended(ExtendedMessage::Handshake(h)) => metadata_id = h.m.ut_metadata,
                                         Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Request(0))) => {
+                                            if allocation.is_none() {
+                                                allocation = Some(Active(active.clone()));
+                                                let count = active.fetch_add(1, Ordering::SeqCst) + 1;
+                                                maximum.fetch_max(count, Ordering::SeqCst);
+                                            }
                                             healthy_requests.fetch_add(1, Ordering::SeqCst);
                                             let header = format!("d8:msg_typei1e5:piecei0e10:total_sizei{}ee", info.len());
                                             if socket.write_u32((2+header.len()+info.len()) as u32).await.is_err() { return; }
@@ -5282,5 +5309,122 @@ async fn unsupported_hash_parameters_receive_correlated_rejects_without_closing(
             }
         }
         engine.shutdown().await.unwrap();
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn magnet_metadata_tries_fresh_peers_before_retrying_failures() {
+    use librqbit::{AddTorrent, AddTorrentOptions, AddTorrentResponse, Session, SessionOptions};
+    use librqbit_peer_protocol::{
+        Message,
+        extended::{ExtendedMessage, handshake::ExtendedHandshake, ut_metadata::UtMetadata},
+    };
+    use std::sync::Arc;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    // Also retain recovery when the only provider fails its first connection.
+    for (fresh_provider, stalled, peer_count) in
+        [(true, false, 9), (false, false, 1), (true, true, 65)]
+    {
+        let mut metadata = fixture(&[("file", vec![7; 123])], 32768);
+        let id = parse(&metadata)
+            .info_hash()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>();
+        let info = Arc::new(encode(get(&mut metadata, b"info")));
+        let mut peers = Vec::new();
+        let mut tasks = Vec::new();
+        for index in 0..peer_count {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            peers.push(listener.local_addr().unwrap());
+            let info = info.clone();
+            tasks.push(tokio::spawn(async move {
+                let mut connections = tokio::task::JoinSet::new();
+                let mut attempts = 0;
+                loop {
+                    tokio::select! {
+                        accepted = listener.accept() => {
+                            let (mut socket, _) = accepted.unwrap();
+                            attempts += 1;
+                            let attempt = attempts;
+                            let info = info.clone();
+                            connections.spawn(async move {
+                                let mut handshake = [0; 68];
+                                if socket.read_exact(&mut handshake).await.is_err() { return; }
+                                let healthy = if fresh_provider { index == peer_count - 1 } else { attempt > 1 };
+                                if !healthy {
+                                    if stalled || attempt > 1 {
+                                        // A retry must not occupy the lookup ahead of a fresh provider.
+                                        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                                    }
+                                    return;
+                                }
+                                handshake[48..].copy_from_slice(b"-SHtest-123456789012");
+                                if socket.write_all(&handshake).await.is_err() { return; }
+                                let mut extension = ExtendedHandshake::new();
+                                extension.metadata_size = Some(info.len() as u32);
+                                wire::send(&mut socket, Message::Extended(ExtendedMessage::Handshake(extension))).await;
+                                let mut metadata_id = None;
+                                while let Ok(length) = socket.read_u32().await {
+                                    assert!(length < 32768);
+                                    let mut frame = vec![0; length as usize + 4];
+                                    frame[..4].copy_from_slice(&length.to_be_bytes());
+                                    if socket.read_exact(&mut frame[4..]).await.is_err() { return; }
+                                    match Message::deserialize(&frame, &[]).unwrap().0 {
+                                        Message::Extended(ExtendedMessage::Handshake(h)) => metadata_id = h.m.ut_metadata,
+                                        Message::Extended(ExtendedMessage::UtMetadata(UtMetadata::Request(0))) => {
+                                            let header = format!("d8:msg_typei1e5:piecei0e10:total_sizei{}ee", info.len());
+                                            if socket.write_u32((2 + header.len() + info.len()) as u32).await.is_err() { return; }
+                                            if socket.write_all(&[20, metadata_id.unwrap()]).await.is_err()
+                                                || socket.write_all(header.as_bytes()).await.is_err()
+                                                || socket.write_all(&info).await.is_err() { return; }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            });
+                        }
+                        _ = connections.join_next(), if !connections.is_empty() => {}
+                    }
+                }
+            }));
+        }
+        let files = tempfile::tempdir().unwrap();
+        let session = Session::new_with_opts(
+            files.path().into(),
+            SessionOptions {
+                peer_encryption: librqbit::EncryptionPolicy::Disabled,
+                dht: None,
+                disable_local_service_discovery: true,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(if stalled { 14 } else { 3 }),
+            session.add_torrent(
+                AddTorrent::from_url(format!("magnet:?xt=urn:btmh:1220{id}")),
+                Some(AddTorrentOptions {
+                    list_only: true,
+                    initial_peers: Some(peers),
+                    ..Default::default()
+                }),
+            ),
+        )
+        .await;
+        session.stop_and_wait().await.unwrap();
+        for task in tasks {
+            task.abort();
+            let _ = task.await;
+        }
+        assert!(matches!(
+            result
+                .expect("failed-peer retries starved fresh metadata provider")
+                .unwrap(),
+            AddTorrentResponse::ListOnly(_)
+        ));
+        assert_eq!(std::fs::read_dir(files.path()).unwrap().count(), 0);
     }
 }

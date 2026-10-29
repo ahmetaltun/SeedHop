@@ -129,7 +129,9 @@ gen_stats!(ConnectStatsAtomic ConnectStatsSnapshot, [], [
 #[derive(Debug)]
 pub(crate) struct StreamConnector {
     /// Shared across simultaneous magnets and both hybrid lookup lanes.
-    pub metadata_slots: tokio::sync::Semaphore,
+    pub metadata_slots: Arc<tokio::sync::Semaphore>,
+    /// Socket probes do not reserve a potentially 32 MiB metadata dictionary.
+    pub metadata_probes: tokio::sync::Semaphore,
 
     pub encryption_policy: crate::EncryptionPolicy,
     pub incoming_crypto_semaphore: Arc<tokio::sync::Semaphore>,
@@ -160,7 +162,8 @@ impl StreamConnector {
 
         Ok(Self {
             encryption_policy: config.encryption_policy,
-            metadata_slots: tokio::sync::Semaphore::new(4),
+            metadata_slots: Arc::new(tokio::sync::Semaphore::new(4)),
+            metadata_probes: tokio::sync::Semaphore::new(64),
             incoming_crypto_semaphore: Arc::new(tokio::sync::Semaphore::new(8)),
             outgoing_crypto_semaphore: Arc::new(tokio::sync::Semaphore::new(8)),
             proxy_config: config.socks_proxy_config,

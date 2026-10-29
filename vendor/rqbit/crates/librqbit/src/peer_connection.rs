@@ -51,9 +51,9 @@ pub trait PeerConnectionHandler {
     fn serialize_bitfield_message_to_buf(&self, buf: &mut [u8]) -> anyhow::Result<usize>;
     fn on_encryption(&self, _encrypted: bool) {}
     fn on_handshake(&self, handshake: Handshake, ckind: ConnectionKind) -> anyhow::Result<()>;
-    fn on_extended_handshake(
+    async fn on_extended_handshake(
         &self,
-        extended_handshake: &ExtendedHandshake<ByteBuf>,
+        extended_handshake: &ExtendedHandshake<ByteBuf<'_>>,
     ) -> anyhow::Result<()>;
     async fn on_received_message(&self, msg: Message<'_>) -> anyhow::Result<()>;
     fn should_transmit_have(&self, id: ValidPieceIndex) -> bool;
@@ -620,6 +620,7 @@ impl<H: PeerConnectionHandler> PeerConnection<H> {
                         .apply_update(h.peer_extended_messages());
                     self.handler
                         .on_extended_handshake(h)
+                        .await
                         .map_err(Error::Anyhow)?;
                 } else {
                     self.handler

@@ -300,25 +300,7 @@ struct LibraryView: View {
     private var transferTable: some View {
         TransferWorkspaceTable(store:store,sortOrder:$sortOrder,columnCustomization:$columnCustomization,comfortableRows:comfortableRows,transfersFocused:$transfersFocused)
     }
-    private var emptyState: some View {
-        VStack(spacing:0) {
-            Spacer()
-            ZStack {
-                Circle().fill(Design.green.opacity(0.035)).frame(width:174,height:174)
-                Circle().stroke(Design.green.opacity(0.12),style:StrokeStyle(lineWidth:1,dash:[3,6])).frame(width:142,height:142)
-                Image(systemName:"tray.and.arrow.down").font(.system(size:45,weight:.ultraLight)).foregroundStyle(Design.green)
-                Image(systemName:"leaf.fill").font(.system(size:18)).foregroundStyle(Design.green).padding(9).background(Design.canvas,in:Circle()).offset(x:52,y:-48)
-            }.accessibilityHidden(true)
-            Text("Something good starts here.").font(.system(size:21,weight:.medium,design:.rounded)).padding(.top,22)
-            Text("Drop a torrent file or paste a magnet link.\nWe’ll take care of the rest.").font(.system(size:12)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(5).padding(.top,10)
-            HStack(spacing:12) {
-                Button("Open torrent file…") { store.openFiles() }.buttonStyle(.borderedProminent).tint(Design.green)
-                Button("Paste magnet link") { store.pasteMagnet() }.buttonStyle(.bordered)
-            }.controlSize(.large).padding(.top,24)
-            Text("BitTorrent v1 + v2 · Files stay on your Mac").font(.system(size:10)).foregroundStyle(.tertiary).padding(.top,17)
-            Spacer(); Spacer().frame(height:45)
-        }.frame(maxWidth:.infinity,maxHeight:.infinity)
-    }
+    private var emptyState: some View { LibraryEmptyState().environmentObject(store) }
     private var workspace: some View {
         VStack(spacing:0) {
             Group {
@@ -552,5 +534,54 @@ struct LibraryView: View {
                 Button { store.toggleSelected(paused:true) } label: { Label("Pause transfers",systemImage:"pause") }.disabled(!store.canPauseSelection)
             }.controlSize(.small).buttonStyle(.bordered)
         }.padding(14).frame(maxWidth:.infinity,alignment:.topLeading)
+    }
+}
+
+struct LibraryEmptyState: View {
+    @EnvironmentObject var store: LibraryStore
+
+    var body: some View {
+        ViewThatFits(in:.vertical) {
+            expanded.padding(20).fixedSize(horizontal:false,vertical:true)
+            compact.padding(16).fixedSize(horizontal:false,vertical:true)
+            ScrollView { compact.padding(16) }
+        }.frame(maxWidth:.infinity,maxHeight:.infinity)
+    }
+    private var illustration: some View {
+        ZStack {
+            Circle().fill(Design.green.opacity(0.035)).frame(width:174,height:174)
+            Circle().stroke(Design.green.opacity(0.12),style:StrokeStyle(lineWidth:1,dash:[3,6])).frame(width:142,height:142)
+            Image(systemName:"tray.and.arrow.down").font(.system(size:45,weight:.ultraLight)).foregroundStyle(Design.green)
+            Image(systemName:"leaf.fill").font(.system(size:18)).foregroundStyle(Design.green).padding(9).background(Design.canvas,in:Circle()).offset(x:52,y:-48)
+        }.accessibilityHidden(true)
+    }
+    private var actions: some View {
+        HStack(spacing:12) {
+            Button("Open torrent file…") { store.openFiles() }.buttonStyle(.borderedProminent).tint(Design.green)
+            Button("Paste magnet link") { store.pasteMagnet() }.buttonStyle(.bordered)
+        }
+    }
+    private var privacyNote: some View {
+        Text("BitTorrent v1 + v2 · Files stay on your Mac").font(.system(size:10)).foregroundStyle(.tertiary)
+    }
+    private var expanded: some View {
+        VStack(spacing:0) {
+            illustration
+            Text("Something good starts here.").font(.system(size:21,weight:.medium,design:.rounded)).padding(.top,22)
+            Text("Drop a torrent file or paste a magnet link.\nWe’ll take care of the rest.").font(.system(size:12)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(5).padding(.top,10)
+            actions.controlSize(.large).padding(.top,24)
+            privacyNote.padding(.top,17)
+        }.multilineTextAlignment(.center)
+    }
+    private var compact: some View {
+        HStack(spacing:18) {
+            illustration.scaleEffect(0.4).frame(width:70,height:70)
+            VStack(alignment:.leading,spacing:10) {
+                Text("Something good starts here.").font(.system(size:17,weight:.medium,design:.rounded))
+                Text("Drop a torrent file or paste a magnet link.").font(.system(size:12)).foregroundStyle(.secondary)
+                actions.controlSize(.regular)
+                privacyNote
+            }
+        }.frame(maxWidth:.infinity)
     }
 }

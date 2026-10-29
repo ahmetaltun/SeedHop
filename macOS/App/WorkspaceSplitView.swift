@@ -214,11 +214,10 @@ final class TransferTableMarkerView: NSView {
             var ancestor = self.superview
             while let view = ancestor {
                 if let table = find(view) {
-                    // Fixed density avoids AppKit's estimated-height cache reentering
-                    // itself while SwiftUI restores a large filtered table.
+                    // SwiftUI must measure hosted cells when a table is inserted
+                    // into an empty library; disabling automatic heights hides text.
                     let height = max(1,self.rowHeight)
                     if table.intercellSpacing.height != 0 { table.intercellSpacing = NSSize(width:table.intercellSpacing.width,height:0) }
-                    if table.usesAutomaticRowHeights { table.usesAutomaticRowHeights = false }
                     if table.rowSizeStyle != .custom { table.rowSizeStyle = .custom }
                     if table.columnAutoresizingStyle != .noColumnAutoresizing { table.columnAutoresizingStyle = .noColumnAutoresizing }
                     if table.rowHeight != height { table.rowHeight = height }

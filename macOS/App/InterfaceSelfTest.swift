@@ -81,6 +81,13 @@ import AppKit
         func mount() { window.contentView = NSHostingView(rootView:LibraryView(inspectorTab:0).environmentObject(store)) }
         mount(); window.makeKeyAndOrderFront(nil); defer { window.close() }
         try await settle()
+        let fixtureRows = store.torrents
+        store.torrents = []; store.selection = []; try await settle()
+        store.torrents = [fixtureRows[0]]; store.selection = [fixtureRows[0].id]; try await settle()
+        try verifyTransferNameRendering(in:window)
+        store.torrents[0].downloadRate += 500; try await settle()
+        try verifyTransferNameRendering(in:window)
+        store.torrents = fixtureRows; try await settle()
         let nativeTables = descendants(window.contentView).compactMap { $0 as? NSTableView }
         guard let table = nativeTables.first(where:{ $0.numberOfRows == 30 && $0.tableColumns.first?.headerCell.stringValue == "Name" }), table.numberOfRows == 30 else { throw UserFacingError(message:"Workspace transfer table unavailable: \(nativeTables.map { "\($0.identifier?.rawValue ?? "nil"):\($0.numberOfRows):\($0.tableColumns.map { $0.identifier.rawValue + "=" + $0.headerCell.stringValue })" })") }
         print("Visible transfer columns: \(table.tableColumns.filter { !$0.isHidden }.map { $0.headerCell.stringValue })")
@@ -92,7 +99,7 @@ import AppKit
             return row.minY >= viewport.minY && row.maxY <= viewport.maxY
         }.count
         guard visible >= 12, abs(rowHeight - 28) < 1, abs(table.rect(ofRow:1).minY - table.rect(ofRow:0).minY - 28) < 1 else { throw UserFacingError(message:"Compact workspace shows \(visible) full rows at \(rowHeight) points") }
-        guard !table.usesAutomaticRowHeights else { throw UserFacingError(message:"Workspace table retained estimated native row heights") }
+        guard table.usesAutomaticRowHeights else { throw UserFacingError(message:"Workspace table cannot measure hosted cell text") }
         WorkspacePreferences.defaults.set(true,forKey:"workspaceComfortableRows"); try await settle()
         guard abs(table.rect(ofRow:0).height - 40) < 1 else { throw UserFacingError(message:"Comfortable density did not produce 40-point native rows") }
         WorkspacePreferences.defaults.set(false,forKey:"workspaceComfortableRows"); try await settle()
@@ -123,6 +130,26 @@ import AppKit
               abs(restoredSidebar.arrangedSubviews[0].frame.width - 210) < 2, abs(restoredDetails.arrangedSubviews[1].frame.height - 320) < 2 else { throw UserFacingError(message:"User pane sizes did not persist across remount") }
         WorkspaceTablePersistence.restoreWidths()
         print("PASS: 1280×800 workspace shows \(visible) full 28-point rows; default dividers, changed pane sizes, and native column-width persistence pass.")
+    }
+
+    private static func verifyTransferNameRendering(in window: NSWindow) throws {
+        guard let host = window.contentView,
+              let table = descendants(host).compactMap({ $0 as? NSTableView }).first(where:{ $0.numberOfRows == 1 && $0.tableColumns.first?.headerCell.stringValue == "Name" }) else {
+            throw UserFacingError(message:"First arriving transfer did not create a table")
+        }
+        // Inspect the name's pixels, excluding row borders. Row count and
+        // accessibility values still pass when SwiftUI renders blank text.
+        let rect = host.convert(table.frameOfCell(atColumn:0,row:0).insetBy(dx:20,dy:4),from:table)
+        guard let bitmap = host.bitmapImageRepForCachingDisplay(in:rect) else { throw UserFacingError(message:"Could not render arriving transfer name") }
+        host.cacheDisplay(in:rect,to:bitmap)
+        var darkest: CGFloat = 1, lightest: CGFloat = 0
+        for y in 0..<bitmap.pixelsHigh { for x in 0..<bitmap.pixelsWide {
+            guard let color = bitmap.colorAt(x:x,y:y)?.usingColorSpace(.deviceRGB) else { continue }
+            let brightness = (color.redComponent + color.greenComponent + color.blueComponent) / 3
+            darkest = min(darkest,brightness); lightest = max(lightest,brightness)
+        }}
+        guard lightest-darkest > 0.15 else { throw UserFacingError(message:"First arriving transfer has blank name text") }
+        print("PASS: First arriving transfer name renders visible text after an empty library and live updates.")
     }
 
     private static func verifyFilesOutline() async throws {
