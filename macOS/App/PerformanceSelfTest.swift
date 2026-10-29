@@ -137,6 +137,8 @@ import Combine
             if count>1 {
                 // A person types into an already-focused search field. Focus it
                 // before timing so toolbar expansion is not attributed to filtering.
+                window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true)
+                try await wait(window) { NSApp.isActive && window.isKeyWindow }
                 try await InterfaceSelfTest.invoke("Find Transfer…",key:"f")
                 try await Task.sleep(for:.milliseconds(300)); try await flush(window)
                 let profileFilter = count == 1000 && ProcessInfo.processInfo.arguments.contains("--profile-filter")

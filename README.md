@@ -124,8 +124,9 @@ separate opt-ins. Downloads are stored in your chosen folder; library state is
 under `~/Library/Application Support/SeedHop`. The app does not enable a local
 HTTP control server. [BitTorrent v2 support](docs/BITTORRENT-V2.md) includes pure-v2
 and hybrid transfers, seeding, magnets, file selection, and SHA-256 restart checks.
-RSS, search, remote control,
-and advanced scheduling remain roadmap work. Force Recheck, file priorities,
+Weekly scheduling supports bandwidth windows and transfer suspension; see
+[scheduling](docs/SCHEDULING.md). RSS and remote control are cancelled.
+Search integrations remain outside this release. Force Recheck, file priorities,
 download queue limits/order, relocation, and local renaming are implemented;
 see [file controls and verification](docs/FILE-MANAGEMENT.md).
 
@@ -138,8 +139,9 @@ for inspection. See [storage recovery](docs/STORAGE-RECOVERY.md) and the
 Controlled large-library measurements and targeted optimizations are documented
 in [performance evidence](docs/PERFORMANCE.md). Run `make performance` for the
 real-engine and native sample-library fixtures with fixed latency budgets.
-Budget acceptance remains open for variable 100-row latency and a native
-table-delegate warning; manual interaction acceptance remains separate.
+Three final native runs pass the fixed UI budgets with zero table-delegate
+warnings; manual interaction acceptance remains separate. See
+[development completion](docs/DEVELOPMENT-COMPLETION.md) for scope and evidence.
 
 ## License
 

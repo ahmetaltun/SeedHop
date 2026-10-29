@@ -31,6 +31,7 @@ struct LibraryView: View {
             // Notice ownership stays outside resizable hosting panes, so layout
             // changes cannot remount announcement gates or repeat speech.
             .announceAccessibility(store.statisticsWarning)
+            .announceAccessibility(store.schedulingWarning)
             .announceAccessibility(store.error.map { "Something needs attention. " + $0 })
             .announceAccessibility(store.fileOperation.map { store.connected ? "File change. " + $0.title : "Last known file change. " + $0.title },priority:.medium)
             .announceAccessibility(store.storageRecovery.map { "File cleanup needs attention. " + $0.message })
@@ -214,11 +215,12 @@ struct LibraryView: View {
     private var activeFilterDescription: String {
         [store.filter == .all ? nil : store.filter.rawValue,store.search.isEmpty ? nil : "Name: \(store.search)",store.trackerHost.isEmpty ? nil : "Tracker: \(store.trackerHost)"].compactMap { $0 }.joined(separator:" · ")
     }
-    private var hasNotice: Bool { store.switching || store.storageRecovery != nil || store.fileOperation != nil || !store.storageRequests.isEmpty || store.error != nil || store.statisticsWarning != nil }
+    private var hasNotice: Bool { store.switching || store.storageRecovery != nil || store.fileOperation != nil || !store.storageRequests.isEmpty || store.error != nil || store.statisticsWarning != nil || store.schedulingWarning != nil }
     private var noticeTitle: String {
         if store.storageRecovery != nil { return "File cleanup needs attention" }
         if let operation = store.fileOperation { return (store.connected ? "" : "Last known: ") + operation.title + " · " + operation.detail }
         if let error = store.error { return error }
+        if let warning = store.schedulingWarning { return warning }
         if let warning = store.statisticsWarning { return warning }
         return store.switching ? "Switching transfer engine…" : "Preparing file change…"
     }
@@ -240,6 +242,7 @@ struct LibraryView: View {
             if store.switching { Text("Switching transfer engine…") }
             if let recovery = store.storageRecovery { storageRecoveryNotice(recovery) }
             if let operation = store.fileOperation { fileOperationProgress(operation) }
+            if let warning = store.schedulingWarning { InlineNotice(title:"Scheduling needs attention",message:warning) }
             if let warning = store.statisticsWarning { InlineNotice(title:"Statistics need attention",message:warning) }
             if let error = store.error {
                 InlineNotice(title:"Something needs attention",message:error,retry:store.connected ? nil : { Task { store.error = nil; await store.start() } },dismiss:{ store.error = nil; showNotice = false })
@@ -361,14 +364,14 @@ struct LibraryView: View {
     }
     private static func duration(_ value: UInt64) -> String { value >= 3600 ? "\(value / 3600)h \(value % 3600 / 60)m" : "\(value / 60)m \(value % 60)s" }
     private static func date(_ value: UInt64) -> String { Date(timeIntervalSince1970:Double(value)).formatted(date:.abbreviated,time:.omitted) }
-    private static let sortFields: [(String, PartialKeyPath<TorrentItem>)] = [("name",\.name),("status",\.sortableStatus),("progress",\.progress),("download",\.downloadRate),("upload",\.uploadRate),("peers",\.peers),("eta",\.sortableETA),("ratio",\.sortableRatio),("queue",\.queuePosition),("size",\.fullBytes),("selected",\.totalBytes),("remaining",\.remainingBytes),("downloaded",\.sortableDownloaded),("uploaded",\.sortableUploaded),("added",\.sortableAdded),("completed",\.sortableCompleted),("path",\.destination)]
+    static let sortFields: [(String, PartialKeyPath<TorrentItem>)] = [("name",\.name),("status",\.sortableStatus),("progress",\.progress),("download",\.downloadRate),("upload",\.uploadRate),("peers",\.peers),("eta",\.sortableETA),("ratio",\.sortableRatio),("queue",\.queuePosition),("size",\.fullBytes),("selected",\.totalBytes),("remaining",\.remainingBytes),("downloaded",\.sortableDownloaded),("uploaded",\.sortableUploaded),("added",\.sortableAdded),("completed",\.sortableCompleted),("path",\.destination)]
     private static func restoredSort() -> [KeyPathComparator<TorrentItem>] {
         if let saved = WorkspacePreferences.defaults.array(forKey:"workspaceSortOrder") as? [[String:Any]], !saved.isEmpty {
             return saved.map { comparator(field:$0["field"] as? String ?? "name",order:($0["reverse"] as? Bool ?? false) ? .reverse : .forward) }
         }
         return [comparator(field:WorkspacePreferences.defaults.string(forKey:"workspaceSort") ?? "name",order:WorkspacePreferences.defaults.bool(forKey:"workspaceSortReverse") ? .reverse : .forward)]
     }
-    private static func comparator(field: String, order: SortOrder) -> KeyPathComparator<TorrentItem> {
+    static func comparator(field: String, order: SortOrder) -> KeyPathComparator<TorrentItem> {
         switch field {
         case "status": return KeyPathComparator(\.sortableStatus,order:order)
         case "progress": return KeyPathComparator(\.progress,order:order)

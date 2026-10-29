@@ -1,6 +1,41 @@
 # Controlled large-library performance
 
-## Table text correction — 2026-10-29
+## Native transfer grid — 2026-10-29
+
+The final transfer grid uses a direct `NSTableView` with fixed 28/40-point rows
+and native text, status, and progress cells. This replaces the SwiftUI hosted-cell
+measurement path that alternated between blank text and row-height reentrancy.
+Materialized offscreen rows receive live updates. Sorting, captured command
+targets, native selection, scroll anchors, column preferences, and focus retain
+controlled regression coverage. Recognized legacy column order migrates without
+rewriting the old customization record.
+
+Three fresh processes on the final debug binary pass every UI budget and
+stability check, with zero native table reentrancy warnings in every run.
+Unchanged snapshots produce zero store publications. No budget, sample count,
+or measured phase was relaxed. Activation and search focus are setup before the
+existing filtering timer; layout and native-row readiness remain timed.
+
+| Filtering p95 | Run 1 | Run 2 | Run 3 | Budget |
+|---|---:|---:|---:|---:|
+| 100 transfers | 86.13 ms | 84.41 ms | 81.49 ms | 100 ms |
+| 1,000 transfers | 84.33 ms | 88.27 ms | 87.61 ms | 125 ms |
+
+The fresh real-engine benchmark also passes: snapshot p95 is 1.11 ms for
+100 transfers, 15.00 ms for 1,000 transfers, and 11.93 ms for 10,000 files,
+against 5/20/25 ms. Combining those results with each native run passes all
+43 applicable budget/stability checks in each of three evaluations.
+
+UI-PERF-001, UI-PERF-002, and UI-PERF-003 are resolved within this controlled
+workload. Earlier failed and incomplete runs below remain historical evidence;
+their targets are unchanged. Portable raw samples, budgets, source/binary hashes,
+and command/log records are in
+[development-2026-10-29.json](results/development-2026-10-29.json).
+Physical input, VoiceOver, real-library presentation, and representative-user
+usability remain unperformed manual acceptance checks. Distribution signing and
+physical lifecycle tests were excluded from this development pass by the user.
+
+## Historical table text correction — 2026-10-29
 
 The fixed-height mitigation disabled SwiftUI's automatic cell measurement and
 left text blank when the first transfer arrived in an empty library. Removing
@@ -8,7 +43,7 @@ that override restores text while retaining 28/40-point density controls.
 The workspace regression now checks rendered name pixels after first arrival
 and a live update; native interface and workspace checks pass.
 
-**UI-PERF-001 is reopened:** the controlled large-library rerun emitted 11 native
+**At this historical checkpoint, UI-PERF-001 was reopened:** the controlled large-library rerun emitted 11 native
 table reentrancy warnings. Selection and scroll anchors remained stable. The
 zero-warning results below describe the earlier binary, not this correction.
 
@@ -74,7 +109,7 @@ physical scrolling, compositor frame rate, or a user's real library.
 - Native layout measurements include a 1 ms cooperative yield and explicit
   AppKit layout flushes. They are wall time through layout, not display-present
   timing. Fixture mutations yield after native row readiness before another
-  selection change. AppKit still logs the delegate warning documented below.
+  selection change. Historical SwiftUI binaries logged the delegate warning documented below.
 - Rate updates retain selected torrent identity and scroll offsets. Explicit
   filters must clear hidden selection. Model row toggles and real transfer
   safety remain covered by the existing UX/engine regressions.
@@ -215,5 +250,6 @@ and rejects diagnostic `--profile-performance` output.
 Portable raw before/after/repeat measurements, all budget results, and
 source/binary/log digests are retained in
 `results/performance-2026-10-27.json`. Diagnostic samples and local logs are hashed
-there; their full files remain under `.build`. RSS, remote control, distribution
-signing, notarization, and release remain deferred.
+there; their full files remain under `.build`. RSS and remote control were
+cancelled on 2026-10-29. Distribution signing, notarization, and release
+certification remain outside the current development pass.

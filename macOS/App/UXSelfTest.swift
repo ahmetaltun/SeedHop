@@ -11,6 +11,35 @@ import Combine
             try await body(); passed += 1; print("PASS: \(name)")
         }
 
+        try await check("Scheduling validates drafts and preserves saved state through rejected and delayed saves") {
+            try expect(ScheduleDraft.minute("23:59") == 1439 && ScheduleDraft.minute("24:00") == nil && ScheduleDraft.minute("9:00") == nil,"Schedule times accepted invalid input")
+            var draft = ScheduleDraft(ScheduleRule()); draft.down = "4294968"
+            var rejected = false
+            do { _ = try draft.rule() } catch { rejected = true }
+            try expect(rejected,"Schedule bandwidth overflow was accepted")
+            draft.suspend = true
+            let suspendedRule = try draft.rule()
+            try expect(suspendedRule.suspend,"Suspension unexpectedly requires bandwidth values")
+            let (store, peer) = library(); await store.refresh()
+            let original = store.schedule
+            let value = ScheduleConfig(enabled:true,rules:[ScheduleRule()])
+            peer.hold = ["schedule"]
+            let save = Task { try await store.saveSchedule(value) }
+            try await eventually { peer.pending.count == 1 }
+            try expect(store.savingSchedule && store.schedule == original,"Schedule save changed state optimistically")
+            peer.releaseFirst(error:UserFacingError(message:"Read-only library"))
+            do { try await save.value } catch { }
+            try expect(!store.savingSchedule && store.schedule == original,"Failed schedule save changed saved state")
+            let retry = Task { try await store.saveSchedule(value) }
+            try await eventually { peer.pending.count == 1 }; peer.releaseFirst()
+            try await retry.value
+            try expect(!store.savingSchedule && store.schedule == value,"Schedule retry did not save")
+            store.torrents[0].state = "scheduled"
+            try expect(store.presentation(store.torrents[0]).detail.contains("weekly schedule"),"Scheduled suspension is presented as queue starvation")
+            store.torrents[0].downloadedBytes = store.torrents[0].totalBytes
+            try expect(!store.torrents[0].isActive,"A suspended completed seeder was counted as an active download")
+        }
+
         try await check("New import clears old input and preserves an open draft") {
             let store = LibraryStore(designPreview:true)
             store.incomingFile = URL(fileURLWithPath:"/tmp/old.torrent"); store.incomingMagnet = "old"
@@ -602,6 +631,19 @@ import Combine
             try expect(preview.count(in:.all) == PreviewFixtures.torrents.count && preview.selected.first?.id == PreviewFixtures.torrents.first?.id,"Design fixture indexes were not initialized")
         }
 
+        try await check("Tracker host choices follow snapshots and retain a missing selected host") {
+            let (store, peer) = library()
+            peer.torrents[0].trackers = ["https://Tracker.Example/announce", "udp://tracker.example:80/announce", "invalid"]
+            peer.torrents = [peer.torrents[0]]; await store.refresh()
+            try expect(store.trackerHosts == ["tracker.example"],"Tracker hosts were not normalized or deduplicated")
+            store.trackerHost = "missing.example"
+            try expect(store.trackerHosts == ["missing.example", "tracker.example"],"Missing selected tracker disappeared")
+            peer.torrents[0].trackers = ["https://new.example/announce"]; await store.refresh()
+            try expect(store.trackerHosts == ["missing.example", "new.example"],"Tracker host cache survived a changed snapshot")
+            store.torrents = []
+            try expect(store.trackerHosts == ["missing.example"],"Deleted tracker hosts remained in choices")
+        }
+
         try await check("Tracker and state filters clear hidden selection without changing transfer intent") {
             let (store, peer) = library(); peer.torrents[0].trackers = ["https://one.example.org/private?token=secret"]
             peer.torrents[1].trackers = ["udp://two.example.org:80/announce"]
@@ -705,6 +747,7 @@ import Combine
     var storageRecovery: StorageRecoveryItem?
     var peerEncryption: PeerEncryptionPolicy? = .allow
     var savedPeerEncryption: PeerEncryptionPolicy? = .allow
+    var schedule = ScheduleConfig()
     var connections: [Bool] = []
     var stopped = false
     var failConnect = false
@@ -732,13 +775,14 @@ import Combine
         switch request.command {
         case "connect", "snapshot":
             if request.command == "connect" && stopped { peerEncryption = savedPeerEncryption; stopped = false }
-            return EngineReply(snapshot:LibrarySnapshot(protocolVersion:UInt32(SeedHopIdentity.protocolVersion),engineVersion:"test",instanceId:"fixture",listenPort:0,downloadLimit:0,uploadLimit:0,maxActiveDownloads:maxActiveDownloads,torrents:torrents,fileOperation:fileOperation,storageRecovery:storageRecovery,peerEncryption:peerEncryption,savedPeerEncryption:savedPeerEncryption))
+            return EngineReply(snapshot:LibrarySnapshot(protocolVersion:UInt32(SeedHopIdentity.protocolVersion),engineVersion:"test",instanceId:"fixture",listenPort:0,downloadLimit:0,uploadLimit:0,maxActiveDownloads:maxActiveDownloads,torrents:torrents,fileOperation:fileOperation,storageRecovery:storageRecovery,peerEncryption:peerEncryption,savedPeerEncryption:savedPeerEncryption,schedule:schedule))
         case "torrentDetails":
             guard !missingDetails, let item = torrents.first(where:{ $0.id == request.id }) else { return EngineReply() }
             var details = PreviewFixtures.diagnostics(item,section:request.section ?? "general")
             details.instanceId = "fixture"
             return EngineReply(details:details)
         case "shutdown": stopped = true
+        case "schedule": schedule = request.schedule ?? schedule
         case "peerEncryption": savedPeerEncryption = request.peerEncryption
         case "retryStorageRecovery", "keepRecoveryCopies": storageRecovery = nil
         case "cancelFileOperation":

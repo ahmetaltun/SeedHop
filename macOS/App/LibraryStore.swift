@@ -67,6 +67,12 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     @Published private(set) var resolvingStorageRecovery = false
     @Published private(set) var storageRequests = Set<String>()
     @Published private(set) var cancellingOperations = Set<String>()
+    @Published var schedule: ScheduleConfig?
+    @Published var scheduleActive = false
+    @Published var schedulingWarning: String?
+    @Published var normalDownloadLimit: UInt32 = 0
+    @Published var normalUploadLimit: UInt32 = 0
+    @Published var savingSchedule = false
     @Published var downloadLimit: UInt32 = 0
     @Published var uploadLimit: UInt32 = 0
     @Published var maxActiveDownloads: UInt32 = 0
@@ -87,6 +93,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     private var filterCounts: [LibraryFilter:Int] = [:]
     private var stateCounts: [String:Int] = [:]
     private var filteredTorrents: [TorrentItem]?
+    private var snapshotTrackerHosts: [String] = []
     private var polling: Task<Void,Never>?
     private var reconnect: Task<Void,Never>?
 
@@ -106,6 +113,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         torrentIndices.removeAll(keepingCapacity:true)
         torrentIndices.reserveCapacity(torrents.count)
         for index in torrents.indices { torrentIndices[torrents[index].id] = index }
+        snapshotTrackerHosts = Set(torrents.flatMap { $0.trackers.compactMap { URL(string:$0)?.host?.lowercased() } }).sorted()
         rebuildCounts()
     }
     private func rebuildCounts() {
@@ -179,7 +187,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     var activitySummary: String {
         if !connected { return "Showing the last update. Reconnect for live activity." }
         if torrents.isEmpty { return storageRecovery == nil ? "A fresh start for your next download." : "Retained files need attention." }
-        var parts = [("downloading", "downloading"), ("waiting", "waiting"), ("queued", "queued"), ("checking", "checking"), ("seeding", "seeding"), ("paused", "paused")].compactMap { state, label -> String? in
+        var parts = [("downloading", "downloading"), ("waiting", "waiting"), ("queued", "queued"), ("scheduled", "scheduled"), ("checking", "checking"), ("seeding", "seeding"), ("paused", "paused")].compactMap { state, label -> String? in
             let count = stateCounts[state,default:0]
             return count == 0 ? nil : "\(count) \(label)"
         }
@@ -194,7 +202,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
 
     var encryptionRestartPending: Bool { peerEncryption != nil && savedPeerEncryption != nil && peerEncryption != savedPeerEncryption }
     var canSaveEncryption: Bool { canChangeTransfers && !savingEncryption && savedPeerEncryption != nil }
-    var canRestartForEncryption: Bool { canChangeTransfers && encryptionRestartPending && !savingEncryption && busyTransfers.isEmpty && !savingQueue && !showImport }
+    var canRestartForEncryption: Bool { canChangeTransfers && encryptionRestartPending && !savingEncryption && !savingSchedule && busyTransfers.isEmpty && !savingQueue && !showImport }
     var connectionPortDescription: String { !connected ? "Unavailable while disconnected" : listenPort == 0 ? "No listening port reported" : "\(listenPort)" }
     func saveEncryption(_ policy: PeerEncryptionPolicy) {
         guard canSaveEncryption else { return }
@@ -290,6 +298,13 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         if torrents != snapshot.torrents { torrents = snapshot.torrents }
         let remainingSelection = selection.intersection(Set(torrents.map(\.id)))
         if selection != remainingSelection { selection = remainingSelection }
+        if schedulingWarning != snapshot.schedulingWarning { schedulingWarning = snapshot.schedulingWarning }
+        if schedule != snapshot.schedule { schedule = snapshot.schedule }
+        if scheduleActive != (snapshot.scheduleActive ?? false) { scheduleActive = snapshot.scheduleActive ?? false }
+        let normalDown = snapshot.normalDownloadLimit ?? snapshot.downloadLimit
+        let normalUp = snapshot.normalUploadLimit ?? snapshot.uploadLimit
+        if normalDownloadLimit != normalDown { normalDownloadLimit = normalDown }
+        if normalUploadLimit != normalUp { normalUploadLimit = normalUp }
         if downloadLimit != snapshot.downloadLimit { downloadLimit = snapshot.downloadLimit }
         if uploadLimit != snapshot.uploadLimit { uploadLimit = snapshot.uploadLimit }
         if peerEncryption != snapshot.peerEncryption { peerEncryption = snapshot.peerEncryption }
@@ -300,9 +315,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         if storageRecovery != snapshot.storageRecovery { storageRecovery = snapshot.storageRecovery }
     }
     var trackerHosts: [String] {
-        var hosts = Set(torrents.flatMap { $0.trackers.compactMap { URL(string:$0)?.host?.lowercased() } })
-        if !trackerHost.isEmpty { hosts.insert(trackerHost) }
-        return hosts.sorted()
+        guard !trackerHost.isEmpty, !snapshotTrackerHosts.contains(trackerHost) else { return snapshotTrackerHosts }
+        return (snapshotTrackerHosts + [trackerHost]).sorted()
     }
     func clearFilters() { search = ""; trackerHost = ""; filter = .all }
     private func recordActivity(_ snapshot: LibrarySnapshot) {
@@ -452,6 +466,14 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
             await refresh()
         }
     }
+    func saveSchedule(_ value: ScheduleConfig) async throws {
+        guard canChangeTransfers, !savingSchedule else { throw UserFacingError(message:"Wait for the engine, then save the schedule again.") }
+        savingSchedule = true
+        defer { savingSchedule = false }
+        var request = EngineRequest(command:"schedule"); request.schedule = value
+        do { _ = try await perform(request); await refresh() }
+        catch { await refresh(); throw error }
+    }
     func setLimits(download: UInt32, upload: UInt32) async throws {
         guard !hasFileOperation else { throw UserFacingError(message:"Wait for the current file change to finish, then apply limits again.") }
         var r = EngineRequest(command:"limits"); r.downloadLimit = download; r.uploadLimit = upload
@@ -596,7 +618,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         }
     }
     func setBackground(_ enabled: Bool) async {
-        guard !designPreview, !switching, !hasFileOperation, !savingEncryption else { return }
+        guard !designPreview, !switching, !hasFileOperation, !savingEncryption, !savingSchedule else { return }
         switching = true; polling?.cancel(); defer { switching = false; beginPolling() }
         let service = SMAppService.agent(plistName:SeedHopIdentity.agentPlist)
         var stoppedCurrent = false

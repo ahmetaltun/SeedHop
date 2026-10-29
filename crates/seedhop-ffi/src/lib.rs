@@ -132,7 +132,47 @@ impl From<seedhop_core::StorageRecovery> for StorageRecoveryNotice {
 }
 
 #[derive(uniffi::Record)]
+pub struct ScheduleWindow {
+    pub days: u8,
+    pub start_minute: u16,
+    pub end_minute: u16,
+    pub download_limit: u32,
+    pub upload_limit: u32,
+    pub suspend: bool,
+}
+impl From<seedhop_core::ScheduleRule> for ScheduleWindow {
+    fn from(r: seedhop_core::ScheduleRule) -> Self {
+        Self {
+            days: r.days,
+            start_minute: r.start_minute,
+            end_minute: r.end_minute,
+            download_limit: r.download_limit,
+            upload_limit: r.upload_limit,
+            suspend: r.suspend,
+        }
+    }
+}
+impl From<ScheduleWindow> for seedhop_core::ScheduleRule {
+    fn from(r: ScheduleWindow) -> Self {
+        Self {
+            days: r.days,
+            start_minute: r.start_minute,
+            end_minute: r.end_minute,
+            download_limit: r.download_limit,
+            upload_limit: r.upload_limit,
+            suspend: r.suspend,
+        }
+    }
+}
+
+#[derive(uniffi::Record)]
 pub struct EngineSnapshot {
+    pub schedule_enabled: bool,
+    pub schedule_rules: Vec<ScheduleWindow>,
+    pub schedule_active: bool,
+    pub scheduling_warning: Option<String>,
+    pub normal_download_limit: u32,
+    pub normal_upload_limit: u32,
     pub peer_encryption: String,
     pub saved_peer_encryption: String,
     pub protocol_version: u32,
@@ -243,6 +283,12 @@ impl EngineBridge {
         let (core, _) = self.handles()?;
         let s = core.snapshot().map_err(error)?;
         Ok(EngineSnapshot {
+            schedule_enabled: s.schedule.enabled,
+            schedule_rules: s.schedule.rules.into_iter().map(Into::into).collect(),
+            schedule_active: s.schedule_active,
+            scheduling_warning: s.scheduling_warning,
+            normal_download_limit: s.normal_download_limit,
+            normal_upload_limit: s.normal_upload_limit,
             peer_encryption: s.peer_encryption,
             saved_peer_encryption: s.saved_peer_encryption,
             protocol_version: s.protocol_version,
@@ -346,6 +392,18 @@ impl EngineBridge {
     pub fn remove(&self, id: String, delete_files: bool) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;
         rt.block_on(core.remove(id, delete_files)).map_err(error)
+    }
+    pub fn set_schedule(
+        &self,
+        enabled: bool,
+        rules: Vec<ScheduleWindow>,
+    ) -> Result<(), BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.set_schedule(seedhop_core::ScheduleConfig {
+            enabled,
+            rules: rules.into_iter().map(Into::into).collect(),
+        }))
+        .map_err(error)
     }
     pub fn set_limits(&self, download: u32, upload: u32) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;

@@ -87,6 +87,11 @@ pub struct StorageRecovery {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
+    pub schedule: crate::ScheduleConfig,
+    pub schedule_active: bool,
+    pub scheduling_warning: Option<String>,
+    pub normal_download_limit: u32,
+    pub normal_upload_limit: u32,
     pub statistics_warning: Option<String>,
     pub peer_encryption: String,
     pub saved_peer_encryption: String,

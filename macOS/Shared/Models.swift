@@ -10,7 +10,7 @@ enum SeedHopIdentity {
     #endif
     static let foreground = app + ".engine"
     static let background = app + ".agent"
-    static let protocolVersion = 3
+    static let protocolVersion = 4
     static let agentPlist = background + ".plist"
 }
 
@@ -58,9 +58,9 @@ struct TorrentItem: Codable, Identifiable, Equatable {
     var sortableUploaded: UInt64 { networkUploadedBytes ?? 0 }
     var progress: Double { totalBytes == 0 ? 0 : min(1, Double(downloadedBytes) / Double(totalBytes)) }
     var isPaused: Bool { pausedIntent ?? (state == "paused") }
-    var isActive: Bool { ["downloading", "waiting", "checking", "queued"].contains(state) }
+    var isActive: Bool { ["downloading", "waiting", "checking", "queued"].contains(state) || (state == "scheduled" && progress < 1) }
     var statusLabel: String {
-        switch state { case "downloading": return "Downloading"; case "seeding": return "Seeding"; case "paused": return "Paused"; case "queued": return "Queued"; case "checking": return "Checking files"; case "error": return "Needs attention"; case "waiting": return peers == 0 ? "Finding peers" : "Waiting for data"; default: return "Updating status" }
+        switch state { case "downloading": return "Downloading"; case "seeding": return "Seeding"; case "paused": return "Paused"; case "scheduled": return "Scheduled suspension"; case "queued": return "Queued"; case "checking": return "Checking files"; case "error": return "Needs attention"; case "waiting": return peers == 0 ? "Finding peers" : "Waiting for data"; default: return "Updating status" }
     }
 }
 struct FileOperationItem: Codable, Identifiable, Equatable {
@@ -116,6 +116,18 @@ enum PeerEncryptionPolicy: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+struct ScheduleRule: Codable, Equatable {
+    var days: UInt8 = 31
+    var startMinute: UInt16 = 540
+    var endMinute: UInt16 = 1020
+    var downloadLimit: UInt32 = 500_000
+    var uploadLimit: UInt32 = 100_000
+    var suspend = false
+}
+struct ScheduleConfig: Codable, Equatable {
+    var enabled = false
+    var rules: [ScheduleRule] = []
+}
 struct LibrarySnapshot: Codable {
     var statisticsWarning: String? = nil
     var protocolVersion: UInt32
@@ -130,6 +142,11 @@ struct LibrarySnapshot: Codable {
     var storageRecovery: StorageRecoveryItem? = nil
     var peerEncryption: PeerEncryptionPolicy? = nil
     var savedPeerEncryption: PeerEncryptionPolicy? = nil
+    var schedule: ScheduleConfig? = nil
+    var scheduleActive: Bool? = nil
+    var schedulingWarning: String? = nil
+    var normalDownloadLimit: UInt32? = nil
+    var normalUploadLimit: UInt32? = nil
 }
 struct ImportPreview: Codable {
     var id: String
@@ -163,6 +180,7 @@ struct EngineRequest: Codable {
     var peerEncryption: PeerEncryptionPolicy?
     var section: String?
     var allPeers: Bool?
+    var schedule: ScheduleConfig?
 }
 struct EngineReply: Codable {
     var version = SeedHopIdentity.protocolVersion

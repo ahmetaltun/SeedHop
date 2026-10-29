@@ -57,6 +57,7 @@ struct TransferPresentation {
         if hasRecovery { return "\(torrent.statusLabel). Review the retained-file cleanup above before changing files." }
         if isError { return errorGuidance }
         switch torrent.state {
+        case "scheduled": return "Suspended by the weekly schedule. Manual pause choices are preserved. Change scheduling in Transfers settings."
         case "queued": return torrent.queuePosition > 0 ? "Position \(torrent.queuePosition) in the download queue. Waiting for an active download slot." : "Waiting for an active download slot."
         case "waiting": return torrent.peers == 0 ? "No peers are connected. Available discovery methods depend on the torrent and current network." : "\(torrent.peers) peers connected; this snapshot shows no download activity."
         case "checking": return torrent.isPaused ? "Checking existing files. This transfer will remain paused afterward." : "Checking existing files before continuing the transfer."

@@ -180,6 +180,7 @@ impl Engine {
                 .position(|id| *id == adapter::torrent_id(t))
                 .unwrap_or(usize::MAX)
         });
+        let suspended = self.schedule_suspended();
         let mut slots = 0;
         let mut changes = Vec::new();
         for handle in handles {
@@ -188,7 +189,7 @@ impl Engine {
                 stats.state,
                 librqbit::TorrentStatsState::Initializing { .. }
             ) {
-                let queued = config.max_active > 0;
+                let queued = suspended || config.max_active > 0;
                 if queued != handle.is_queued() {
                     changes.push((handle, queued));
                 }
@@ -197,7 +198,9 @@ impl Engine {
             if matches!(stats.state, librqbit::TorrentStatsState::Error) {
                 continue;
             }
-            let queued = if handle.is_paused() || stats.finished || config.max_active == 0 {
+            let queued = if suspended {
+                true
+            } else if handle.is_paused() || stats.finished || config.max_active == 0 {
                 false
             } else {
                 slots += 1;

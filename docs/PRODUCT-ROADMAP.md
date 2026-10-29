@@ -7,9 +7,11 @@ management, and recovery. Work in ordered, independently verified increments.
 Keep the existing native design and engine architecture. Each feature includes
 implementation, error behavior, focused regression coverage, and interface review.
 
-RSS, remote control, signing, notarization, and release work are deferred.
-Search integrations, media playback, and advanced scheduling are outside this
-roadmap. Existing library search remains supported. Protocol expansion is not
+RSS and remote control are cancelled by the 2026-10-29 scope decision.
+Advanced scheduling is included in this release; see `SCHEDULING.md`.
+Signing and physical lifecycle tests are excluded from the current development
+work at the user’s request. Search integrations and media playback remain outside
+this roadmap. Existing library search remains supported. Protocol expansion is not
 required: current v2/hybrid, encryption, and uTP evidence is recorded in
 `V2-COMPLETION.md`. Physical lifecycle acceptance remains open independently.
 
@@ -316,4 +318,26 @@ in `RELEASE-VALIDATION.md`.
 - **Next acceptance work:** trace the native table warning and 100-row latency
   spikes under recorded stable load, then execute the step 6 manual matrix and
   real-library scrolling checks. Full step 6 and step 7 acceptance remain open.
-  RSS, remote control, distribution signing, notarization, and release remain deferred.
+  Historical scope: RSS and remote control were deferred at this checkpoint.
+  They were cancelled on 2026-10-29. Distribution signing and notarization remain
+  outside current development work.
+
+- **Current development scope implemented (2026-10-29):** weekly bandwidth and
+  transfer-suspension scheduling now persists in the engine, preserves user
+  intent, and applies through native Settings and authenticated protocol-v4 XPC.
+  RSS and remote control are cancelled. See `SCHEDULING.md`.
+- **Final native hardening:** direct fixed-height AppKit transfer cells replace
+  the hosted-cell measurement path. Empty-library arrival, live/cached rows,
+  density, native selection, sorting, captured commands, focus, and column
+  migration/persistence retain controlled coverage. Three fresh final-binary UI
+  runs meet the unchanged budgets with zero reentrancy warnings, superseding the
+  historical UI-PERF-001/002/003 findings above within the controlled workload.
+- **Current verification:** 134 Rust tests pass serially (zero failures, three
+  ignored), alongside 43 controlled UX regressions, 25 native PASS observations,
+  packaged XPC, 153 renders, formatting, and all-target/all-feature Clippy with
+  warnings denied. The ignored engine benchmark is measured separately. See
+  `DEVELOPMENT-COMPLETION.md` and `results/development-2026-10-29.json`.
+- **Acceptance boundary:** manual keyboard/pointer, VoiceOver, real accessibility
+  settings, representative-user tasks, and physical real-library presentation
+  remain unperformed. Signing and physical lifecycle tests were excluded by the
+  user; no release certification is claimed.

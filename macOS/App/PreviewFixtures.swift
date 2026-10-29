@@ -155,6 +155,10 @@ enum PreviewFixtures {
             try capture(LibraryView().environmentObject(controls),size:NSSize(width:1000,height:780),appearance:appearance,to:output.appendingPathComponent("cleanup-attention-\(name).png"))
             controls.torrents = []; controls.selection = []
             try capture(LibraryView().environmentObject(controls),size:NSSize(width:1000,height:780),appearance:appearance,to:output.appendingPathComponent("cleanup-orphan-\(name).png"))
+            let scheduleStore = LibraryStore(designPreview:true)
+            scheduleStore.schedule = ScheduleConfig(enabled:true,rules:[ScheduleRule(days:31,startMinute:1320,endMinute:360,downloadLimit:500_000,uploadLimit:100_000,suspend:false)])
+            scheduleStore.scheduleActive = true
+            try capture(ScrollView { SchedulingSettingsView().padding(24) }.environmentObject(scheduleStore).frame(width:570,height:660).background(Design.canvas),size:NSSize(width:570,height:660),appearance:appearance,to:output.appendingPathComponent("schedule-settings-\(name).png"))
             let preferences = LibraryStore(designPreview:true)
             preferences.peerEncryption = .allow; preferences.savedPeerEncryption = .require
             preferences.listenPort = 51413

@@ -64,6 +64,8 @@ import AppKit
         print("PASS: Dismissing import returns focus to the native transfer table.")
         try await verifyControlledSheets(store:store,window:reopened)
         try await verifyFilesOutline()
+        try await verifySchedulingSettings()
+        try await verifyNativeTransferControls()
         try await verifyWorkspaceLayout()
         print("Native key-event delivery, VoiceOver speech, live-transfer reopening, and scrolling remain manual acceptance checks.")
     }
@@ -99,7 +101,7 @@ import AppKit
             return row.minY >= viewport.minY && row.maxY <= viewport.maxY
         }.count
         guard visible >= 12, abs(rowHeight - 28) < 1, abs(table.rect(ofRow:1).minY - table.rect(ofRow:0).minY - 28) < 1 else { throw UserFacingError(message:"Compact workspace shows \(visible) full rows at \(rowHeight) points") }
-        guard table.usesAutomaticRowHeights else { throw UserFacingError(message:"Workspace table cannot measure hosted cell text") }
+        guard !table.usesAutomaticRowHeights else { throw UserFacingError(message:"Native workspace did not retain fixed row heights") }
         WorkspacePreferences.defaults.set(true,forKey:"workspaceComfortableRows"); try await settle()
         guard abs(table.rect(ofRow:0).height - 40) < 1 else { throw UserFacingError(message:"Comfortable density did not produce 40-point native rows") }
         WorkspacePreferences.defaults.set(false,forKey:"workspaceComfortableRows"); try await settle()
@@ -116,10 +118,24 @@ import AppKit
         details.setPosition(details.bounds.height - 320 - details.dividerThickness,ofDividerAt:0)
         try await settle()
         guard abs(sidebar.arrangedSubviews[0].frame.width - 210) < 2, abs(details.arrangedSubviews[1].frame.height - 320) < 2 else { throw UserFacingError(message:"Native divider changes did not retain the requested pane sizes") }
+        guard let nativeCoordinator = table.dataSource as? NativeTransferGrid.Coordinator,
+              let last = nativeCoordinator.rows.last,
+              let source = store.torrents.firstIndex(where:{$0.id == last.id}),
+              let upload = table.tableColumns.firstIndex(where:{$0.identifier.rawValue == "upload"}) else { throw UserFacingError(message:"Offscreen native rate fixture unavailable") }
+        _ = table.rowView(atRow:29,makeIfNecessary:true)
+        _ = table.view(atColumn:upload,row:29,makeIfNecessary:true)
+        store.torrents[source].uploadRate = 12_345; try await settle()
+        if let cached = table.view(atColumn:upload,row:29,makeIfNecessary:false) as? NSTableCellView {
+            guard cached.textField?.stringValue == SizeText.rate(12_345) else { throw UserFacingError(message:"Offscreen cached native row retained an old rate") }
+        }
         name.width = 275
         NotificationCenter.default.post(name:NSTableView.columnDidResizeNotification,object:table)
         try await settle()
         store.torrents[0].downloadRate += 500; try await settle()
+        try verifyTransferNameRendering(in:window)
+        table.scrollRowToVisible(29); try await settle()
+        try verifyTransferNameRendering(in:window,row:29)
+        table.scrollRowToVisible(0); try await settle()
         guard table.selectedRowIndexes == IndexSet(integer:0) else { throw UserFacingError(message:"Live transfer update lost the native selected-row highlight") }
         guard abs(name.width - 275) < 2 else { throw UserFacingError(message:"Live transfer update changed a resized column: \(name.width), saved \(String(describing:WorkspacePreferences.defaults.dictionary(forKey:"workspaceColumnWidths")?["Name"]))") }
         window.contentView = nil; mount(); try await settle()
@@ -128,18 +144,24 @@ import AppKit
         let restoredSplits = descendants(window.contentView).compactMap { $0 as? NSSplitView }
         guard let restoredSidebar = restoredSplits.first(where:{ $0.isVertical }), let restoredDetails = restoredSplits.first(where:{ !$0.isVertical }),
               abs(restoredSidebar.arrangedSubviews[0].frame.width - 210) < 2, abs(restoredDetails.arrangedSubviews[1].frame.height - 320) < 2 else { throw UserFacingError(message:"User pane sizes did not persist across remount") }
+        WorkspacePreferences.defaults.set(true,forKey:"workspaceComfortableRows"); try await settle()
+        guard abs(restored.rowHeight - 40) < 1, abs(restored.rect(ofRow:1).minY - restored.rect(ofRow:0).minY - 40) < 1 else { throw UserFacingError(message:"Comfortable density did not apply 40-point native rows") }
+        try verifyTransferNameRendering(in:window)
+        WorkspacePreferences.defaults.set(false,forKey:"workspaceComfortableRows"); try await settle()
+        guard abs(restored.rowHeight - 28) < 1 else { throw UserFacingError(message:"Compact density did not restore 28-point native rows") }
         WorkspaceTablePersistence.restoreWidths()
+        print("PASS: Native density switches between 28 and 40 points with visible text.")
         print("PASS: 1280×800 workspace shows \(visible) full 28-point rows; default dividers, changed pane sizes, and native column-width persistence pass.")
     }
 
-    private static func verifyTransferNameRendering(in window: NSWindow) throws {
+    private static func verifyTransferNameRendering(in window: NSWindow, row: Int = 0) throws {
         guard let host = window.contentView,
-              let table = descendants(host).compactMap({ $0 as? NSTableView }).first(where:{ $0.numberOfRows == 1 && $0.tableColumns.first?.headerCell.stringValue == "Name" }) else {
+              let table = descendants(host).compactMap({ $0 as? NSTableView }).first(where:{ $0.numberOfRows > row && $0.tableColumns.first?.headerCell.stringValue == "Name" }) else {
             throw UserFacingError(message:"First arriving transfer did not create a table")
         }
         // Inspect the name's pixels, excluding row borders. Row count and
         // accessibility values still pass when SwiftUI renders blank text.
-        let rect = host.convert(table.frameOfCell(atColumn:0,row:0).insetBy(dx:20,dy:4),from:table)
+        let rect = host.convert(table.frameOfCell(atColumn:0,row:row).insetBy(dx:20,dy:4),from:table)
         guard let bitmap = host.bitmapImageRepForCachingDisplay(in:rect) else { throw UserFacingError(message:"Could not render arriving transfer name") }
         host.cacheDisplay(in:rect,to:bitmap)
         var darkest: CGFloat = 1, lightest: CGFloat = 0
@@ -148,8 +170,111 @@ import AppKit
             let brightness = (color.redComponent + color.greenComponent + color.blueComponent) / 3
             darkest = min(darkest,brightness); lightest = max(lightest,brightness)
         }}
+        if lightest-darkest <= 0.15 {
+            print("Blank viewport:",table.visibleRect,table.rows(in:table.visibleRect),String(describing:table.enclosingScrollView?.contentView.bounds))
+            print("Blank name geometry:",table.tableColumns.map { ($0.headerCell.stringValue,$0.width) },table.frameOfCell(atColumn:0,row:row))
+            if let cell = table.view(atColumn:0,row:row,makeIfNecessary:false) { print("Name cell:",cell.frame,cell.subviews.map { $0.frame }) }
+        }
         guard lightest-darkest > 0.15 else { throw UserFacingError(message:"First arriving transfer has blank name text") }
         print("PASS: First arriving transfer name renders visible text after an empty library and live updates.")
+    }
+
+    private static func verifySchedulingSettings() async throws {
+        let store = UXSelfTest.nativeFixture()
+        await store.refresh()
+        let window = NSWindow(contentRect:NSRect(x:0,y:0,width:570,height:660),styleMask:[.titled],backing:.buffered,defer:false)
+        window.isReleasedWhenClosed = false; window.title = "Weekly scheduling · native fixture"
+        window.contentView = NSHostingView(rootView:ScrollView { SchedulingSettingsView().padding(24) }.environmentObject(store))
+        window.makeKeyAndOrderFront(nil); defer { window.close() }
+        try await settle()
+        // SwiftUI renders button labels in separate hosting children rather
+        // than NSButton.title. Exercise the three footer actions in source order;
+        // the captured request below verifies the resulting action and payload.
+        func footerButtons() -> [NSButton] { Array(descendants(window.contentView).compactMap { $0 as? NSButton }.suffix(3)) }
+        let initial = footerButtons()
+        guard initial.count == 3, initial[0].isEnabled else { throw UserFacingError(message:"Schedule footer controls unavailable") }
+        initial[0].performClick(nil); try await settle()
+        let edited = footerButtons()
+        guard !UXSelfTest.nativeRequests.contains(where:{$0.command == "schedule"}), edited.count == 3, edited[2].isEnabled else {
+            throw UserFacingError(message:"Editing a schedule sent a command before Save or hid Save")
+        }
+        let save = edited[2]
+        save.performClick(nil)
+        try await waitUntil("Schedule Save did not reach transport") { UXSelfTest.nativeRequests.contains { $0.command == "schedule" } }
+        guard let sent = UXSelfTest.nativeRequests.last(where:{$0.command == "schedule"})?.schedule,
+              !sent.enabled, sent.rules == [ScheduleRule()] else { throw UserFacingError(message:"Native schedule controls sent different rules") }
+        try await settle()
+        guard store.schedule == sent else { throw UserFacingError(message:"Saved schedule did not return through the store") }
+        print("PASS: Native schedule Add and Save controls keep drafts local and send the expected weekly window.")
+    }
+
+    private static func verifyNativeTransferControls() async throws {
+        let defaults = WorkspacePreferences.defaults
+        let keys = ["transferColumns",TransferColumns.orderKey,"workspaceSortOrder","workspaceColumnWidths"]
+        let saved = keys.map { defaults.object(forKey:$0) }
+        defer { for (key,value) in zip(keys,saved) { if let value { defaults.set(value,forKey:key) } else { defaults.removeObject(forKey:key) } } }
+        defaults.removeObject(forKey:TransferColumns.orderKey)
+        let store = UXSelfTest.nativeFixture(); await store.refresh()
+        let window = NSWindow(contentRect:NSRect(x:0,y:0,width:1200,height:800),styleMask:[.titled],backing:.buffered,defer:false)
+        window.isReleasedWhenClosed = false; window.title = "Transfer controls · native fixture"
+        func mount() { window.contentView = NSHostingView(rootView:LibraryView().environmentObject(store)) }
+        func native() throws -> NativeTransfersTable {
+            guard let table = descendants(window.contentView).compactMap({ $0 as? NativeTransfersTable }).first else { throw UserFacingError(message:"Native transfer controls unavailable") }
+            return table
+        }
+        func invoke(_ item: NSMenuItem) throws {
+            guard item.isEnabled, let action = item.action, NSApp.sendAction(action,to:item.target,from:item) else { throw UserFacingError(message:"Native menu action did not execute") }
+        }
+        mount(); window.makeKeyAndOrderFront(nil); defer { window.close() }
+        try await settle()
+        let table = try native()
+        guard let coordinator = table.dataSource as? NativeTransferGrid.Coordinator,
+              let row = coordinator.rows.firstIndex(where:{ !$0.isPaused }) else { throw UserFacingError(message:"Transfer action fixture has no running row") }
+        let target = coordinator.rows[row].id
+        table.selectRowIndexes(IndexSet(integer:row),byExtendingSelection:false); try await settle()
+        guard store.selection == [target], let menu = table.menuProvider?([target]), let pause = menu.item(withTitle:"Pause") else { throw UserFacingError(message:"Native selection or context menu did not capture the row") }
+        store.selection = [coordinator.rows.first(where:{$0.id != target})!.id]
+        try invoke(pause)
+        try await waitUntil("Context pause did not retain its captured torrent ID") { UXSelfTest.nativeRequests.contains { $0.command == "pause" && $0.id == target && $0.paused == true } }
+        try await waitUntil("Context pause did not settle") { store.busyTransfers.isEmpty && store.torrents.first(where:{$0.id == target})?.isPaused == true }
+        try await settle()
+        guard let activate = table.doubleAction else { throw UserFacingError(message:"Native primary action unavailable") }
+        NSApp.sendAction(activate,to:table.target,from:table)
+        try await waitUntil("Primary activation did not resume the captured row") { UXSelfTest.nativeRequests.contains { $0.command == "pause" && $0.id == target && $0.paused == false } }
+        try await settle()
+        let beforeReturn = UXSelfTest.nativeRequests.filter { $0.command == "pause" && $0.id == target }.count
+        guard let event = NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:.capsLock,timestamp:ProcessInfo.processInfo.systemUptime,windowNumber:window.windowNumber,context:nil,characters:"\r",charactersIgnoringModifiers:"\r",isARepeat:false,keyCode:36) else { throw UserFacingError(message:"Could not construct controlled Return event") }
+        table.keyDown(with:event)
+        try await waitUntil("Controlled Return with Caps Lock did not activate the selected transfer") { UXSelfTest.nativeRequests.filter { $0.command == "pause" && $0.id == target }.count > beforeReturn }
+        try await settle()
+        table.sortDescriptors = [NSSortDescriptor(key:"name",ascending:false)]; try await settle()
+        let expected = store.visibleTorrents.sorted(using:[KeyPathComparator(\TorrentItem.name,order:.reverse),KeyPathComparator(\TorrentItem.id)])
+        guard coordinator.rows.map(\.id) == expected.map(\.id), store.selection == [target],
+              table.selectedRowIndexes.compactMap({ coordinator.rows.indices.contains($0) ? coordinator.rows[$0].id : nil }) == [target] else { throw UserFacingError(message:"Native sorting lost row order or selection identity") }
+        guard let header = table.headerView?.menu else { throw UserFacingError(message:"Native column menu unavailable") }
+        header.delegate?.menuNeedsUpdate?(header)
+        guard let eta = header.item(withTitle:"ETA"), let name = header.item(withTitle:"Name"), !name.isEnabled else { throw UserFacingError(message:"Column menu allows hiding Name") }
+        let wasHidden = table.tableColumns.first(where:{$0.identifier.rawValue == "eta"})!.isHidden
+        try invoke(eta); try await settle()
+        guard table.tableColumns.first(where:{$0.identifier.rawValue == "eta"})!.isHidden != wasHidden else { throw UserFacingError(message:"Native column menu did not update visibility") }
+        table.moveColumn(0,toColumn:2); try await settle()
+        let order = table.tableColumns.map { $0.identifier.rawValue }
+        window.contentView = nil; mount(); try await settle()
+        guard try native().tableColumns.map({ $0.identifier.rawValue }) == order else { throw UserFacingError(message:"Native column order did not persist across remount") }
+        var legacy = TableColumnCustomization<TorrentItem>(); legacy[visibility:"destination"] = .hidden
+        var object = try JSONSerialization.jsonObject(with:JSONEncoder().encode(legacy)) as! [String:Any]
+        object["columnOrder"] = ["status","name","progress"].map { ["base":["explicit":["_0":$0]]] }
+        let oldData = try JSONSerialization.data(withJSONObject:object,options:.sortedKeys)
+        _ = try JSONDecoder().decode(TableColumnCustomization<TorrentItem>.self,from:oldData)
+        defaults.set(oldData,forKey:"transferColumns"); defaults.removeObject(forKey:TransferColumns.orderKey)
+        window.contentView = nil; mount(); try await settle()
+        let migrated = try native()
+        guard Array(migrated.tableColumns.prefix(3).map { $0.identifier.rawValue }) == ["status","name","progress"],
+              migrated.tableColumns.first(where:{$0.identifier.rawValue == "destination"})?.isHidden == true,
+              defaults.data(forKey:"transferColumns") == oldData else { throw UserFacingError(message:"Native migration changed legacy customization or lost order/visibility") }
+        WorkspaceTablePersistence.restoreWidths(); try await settle()
+        guard migrated.tableColumns.map({ $0.identifier.rawValue }) == TransferColumns.all.map(\.id) else { throw UserFacingError(message:"Restore Default Columns did not reset native order") }
+        print("PASS: Native transfer selection, captured context actions, primary activation, sorting, visibility, order persistence, legacy preference preservation, and reset.")
     }
 
     private static func verifyFilesOutline() async throws {
@@ -327,7 +452,8 @@ import AppKit
         var priorities: [NSAccessibilityPriorityLevel] = []
         NativeAccessibility.announcementObserver = { message, priority in announcements.append(message); priorities.append(priority) }
         defer { NativeAccessibility.announcementObserver = nil }
-        window.makeKeyAndOrderFront(nil)
+        window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true)
+        try await waitUntil("Announcement fixture did not become active and key") { NSApp.isActive && NSApp.keyWindow === window }
         store.error = "Restore access to the destination."; try await settle()
         store.error = "Restore access to the destination."; try await settle()
         guard announcements == ["Something needs attention. Restore access to the destination."] else {
@@ -391,7 +517,7 @@ import AppKit
         menu.update()
         let item = menu.items[index]
         guard item.isEnabled, item.keyEquivalent == key, item.keyEquivalentModifierMask == .command else {
-            throw UserFacingError(message:"Menu action disabled or shortcut incorrect: \(title), enabled=\(item.isEnabled), key=\(item.keyEquivalent), modifiers=\(item.keyEquivalentModifierMask.rawValue)")
+            throw UserFacingError(message:"Menu action disabled or shortcut incorrect: \(title), enabled=\(item.isEnabled), key=\(item.keyEquivalent), modifiers=\(item.keyEquivalentModifierMask.rawValue), active=\(NSApp.isActive), keyWindow=\(NSApp.keyWindow?.title ?? "none")")
         }
         menu.performActionForItem(at:index)
     }

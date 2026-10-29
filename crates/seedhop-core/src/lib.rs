@@ -6,6 +6,8 @@ mod file_operation;
 mod layout_journal;
 mod management;
 mod model;
+mod scheduling;
+pub use scheduling::{ScheduleConfig, ScheduleRule};
 pub mod storage;
 mod storage_receipt;
 pub mod v2;
@@ -23,7 +25,7 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-pub const PROTOCOL_VERSION: u32 = 3;
+pub const PROTOCOL_VERSION: u32 = 4;
 
 /// Owns library state. The FFI host retains this lease until its runtime has stopped.
 pub struct Engine {
@@ -41,6 +43,8 @@ pub struct Engine {
     resolving: Mutex<HashMap<String, tokio::sync::watch::Sender<bool>>>,
     stopping: AtomicBool,
     queue: Mutex<management::QueueConfig>,
+    scheduling: Mutex<scheduling::Scheduling>,
+    scheduling_warning: Mutex<Option<String>>,
 }
 
 impl Engine {
@@ -179,6 +183,7 @@ impl Engine {
         let limits_path = dir.join("limits.json");
         let queue = management::QueueConfig::load(&dir)?;
         let accounting = diagnostics::Accounting::load(&dir)?;
+        let schedule = ScheduleConfig::load(&dir)?;
         let limits: [u32; 2] = if limits_path.exists() {
             serde_json::from_slice(&std::fs::read(limits_path).map_err(storage::io_error)?)
                 .map_err(|e| CoreError::CorruptState(e.to_string()))?
@@ -187,7 +192,7 @@ impl Engine {
         };
         let options = SessionOptions {
             peer_encryption,
-            restore_queued: queue.max_active > 0,
+            restore_queued: queue.max_active > 0 || schedule.enabled,
             ratelimits: librqbit::limits::LimitsConfig {
                 download_bps: NonZeroU32::new(limits[0]),
                 upload_bps: NonZeroU32::new(limits[1]),
@@ -231,7 +236,20 @@ impl Engine {
             resolving: Mutex::new(HashMap::new()),
             stopping: AtomicBool::new(false),
             queue: Mutex::new(queue),
+            scheduling_warning: Mutex::new(None),
+            scheduling: Mutex::new(scheduling::Scheduling {
+                config: schedule,
+                normal_limits: limits,
+                active: None,
+            }),
         });
+        engine.reconcile_schedule();
+        let scheduling_enabled = engine.scheduling.lock().unwrap().config.enabled;
+        if scheduling_enabled {
+            // Restored transfers remain queued on failure. Keep the lease and
+            // expose a retryable warning instead of abandoning a live session.
+            let _ = engine.apply_scheduling().await;
+        }
         let weak = Arc::downgrade(&engine);
         tokio::spawn(async move {
             loop {
@@ -240,10 +258,13 @@ impl Engine {
                 if engine.stopping.load(Ordering::SeqCst) {
                     break;
                 }
-                let _operation = engine.operations.write().await;
+                // Metadata inspection is read-only and can wait on peers. Share
+                // its lock so calendar transitions still run; file changes and
+                // shutdown retain their exclusive operation boundary.
+                let _operation = engine.operations.read().await;
                 // Retry failed persistence on the next tick. Commands still
                 // report their own persistence errors directly to the caller.
-                let _ = engine.reconcile_queue().await;
+                let _ = engine.apply_scheduling().await;
                 engine.sample_accounting();
                 let saved = engine
                     .accounting
@@ -287,7 +308,23 @@ impl Engine {
                 .map(|i| i as u32 + 1)
                 .unwrap_or(0);
         }
+        let scheduling = self.scheduling.lock().unwrap();
+        if scheduling
+            .active
+            .is_some_and(|i| scheduling.config.rules[i].suspend)
+        {
+            for torrent in &mut torrents {
+                if torrent.state == "queued" {
+                    torrent.state = "scheduled".into();
+                }
+            }
+        }
         Ok(Snapshot {
+            schedule: scheduling.config.clone(),
+            scheduling_warning: self.scheduling_warning.lock().unwrap().clone(),
+            schedule_active: scheduling.active.is_some(),
+            normal_download_limit: scheduling.normal_limits[0],
+            normal_upload_limit: scheduling.normal_limits[1],
             peer_encryption: connection_settings::name(self.active_peer_encryption).into(),
             saved_peer_encryption: connection_settings::name(
                 self.connection_settings.lock().unwrap().peer_encryption,
@@ -419,7 +456,7 @@ impl Engine {
         if !reuse && metadata.files.iter().any(|f| root.join(&f.name).exists()) {
             return Err(CoreError::InvalidInput("Files already exist here. Enable verification of existing files or choose another folder.".into()));
         }
-        let queued = self.queue.lock().unwrap().max_active > 0;
+        let queued = self.queue.lock().unwrap().max_active > 0 || self.schedule_suspended();
         // Commit accounting before membership so a statistics write failure cannot
         // report an unsuccessful Add after the torrent has already been added.
         self.accounting
@@ -498,7 +535,7 @@ impl Engine {
         if paused {
             self.session.pause(&handle).await
         } else {
-            let queued = self.queue.lock().unwrap().max_active > 0;
+            let queued = self.queue.lock().unwrap().max_active > 0 || self.schedule_suspended();
             if queued {
                 self.session
                     .set_queued(&handle, true)
@@ -636,10 +673,8 @@ impl Engine {
         self.ready()?;
         let value = serde_json::to_vec(&[down, up]).map_err(adapter::engine_error)?;
         storage::atomic_write(&self.state_directory.join("limits.json"), &value)?;
-        self.session
-            .ratelimits
-            .set_download_bps(NonZeroU32::new(down));
-        self.session.ratelimits.set_upload_bps(NonZeroU32::new(up));
+        self.scheduling.lock().unwrap().normal_limits = [down, up];
+        self.reconcile_schedule();
         Ok(())
     }
 

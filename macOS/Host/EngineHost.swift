@@ -138,6 +138,11 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         case "peerEncryption":
             guard let policy = r.peerEncryption else { throw UserFacingError(message:"Choose a supported peer encryption policy.") }
             try core.setPeerEncryption(policy:policy.rawValue)
+        case "schedule":
+            guard let schedule = r.schedule else { throw UserFacingError(message:"Provide schedule settings.") }
+            try core.setSchedule(enabled:schedule.enabled,rules:schedule.rules.map { rule in
+                ScheduleWindow(days:rule.days,startMinute:rule.startMinute,endMinute:rule.endMinute,downloadLimit:rule.downloadLimit,uploadLimit:rule.uploadLimit,suspend:rule.suspend)
+            })
         case "limits": try core.setLimits(download:r.downloadLimit ?? 0, upload:r.uploadLimit ?? 0)
         case "login":
             lifecycle.lock(); defer { lifecycle.unlock() }
@@ -166,6 +171,13 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
                 StorageRecoveryItem(id:notice.id,torrentId:notice.torrentId,activeLocation:notice.activeLocation,message:notice.message,
                     originalDirectory:notice.originalDirectory,destinationDirectory:notice.destinationDirectory,canKeepCopies:notice.canKeepCopies)
             })
+        snapshot.schedule = ScheduleConfig(enabled:s.scheduleEnabled,rules:s.scheduleRules.map { rule in
+            ScheduleRule(days:rule.days,startMinute:rule.startMinute,endMinute:rule.endMinute,downloadLimit:rule.downloadLimit,uploadLimit:rule.uploadLimit,suspend:rule.suspend)
+        })
+        snapshot.scheduleActive = s.scheduleActive
+        snapshot.schedulingWarning = s.schedulingWarning
+        snapshot.normalDownloadLimit = s.normalDownloadLimit
+        snapshot.normalUploadLimit = s.normalUploadLimit
         snapshot.peerEncryption = PeerEncryptionPolicy(rawValue:s.peerEncryption)
         snapshot.savedPeerEncryption = PeerEncryptionPolicy(rawValue:s.savedPeerEncryption)
         return snapshot

@@ -8,11 +8,15 @@ operations available without resizing the table on each progress update.
 
 ## Workspace behavior
 
-- Default compact rows target 28 points; Comfortable Rows targets 40 points.
+- The transfer grid uses a direct `NSTableView` with native text, status, and
+  progress cells. Compact rows are 28 points; Comfortable Rows are 40 points.
+  Fixed geometry keeps text visible without automatic row-height reentrancy.
 - Name stays visible. The View Options > Columns menu and native header menu
   control other columns; Restore Default Columns clears customization.
 - Column IDs from the earlier table are retained. Sorting, density, tab,
-  visibility, and divider positions persist. Torrent identity breaks sort ties.
+  visibility, widths, and divider positions persist. Recognized legacy column
+  order migrates to a separate native order preference; the original Codable
+  customization remains intact. Torrent identity breaks sort ties.
 - Queued and Checking filters supplement existing state filters. Tracker filters
   use parsed hosts, never credentials or URL tokens. Explicit filter changes
   clear hidden selection; live snapshots preserve selection and scroll anchors.
@@ -27,7 +31,8 @@ operations available without resizing the table on each progress update.
 
 ## Data and protocol
 
-Protocol version 3 adds a typed `torrentDetails` XPC request. Its section is one
+Protocol version 3 introduced a typed `torrentDetails` XPC request; current
+protocol version 4 also carries weekly scheduling. Its section is one
 of `general`, `files`, `peers`, `trackers`, or `activity`; `allPeers` includes known
 connection attempts. Replies carry torrent ID, engine instance ID, observation
 time, and requested section. The UI serializes requests, polls once per second
@@ -80,18 +85,21 @@ separate explicit action. Peer encryption does not imply anonymity.
 
 ## Verification and acceptance
 
-Current implementation evidence is recorded in `results/power-user-workspace-2026-10-28.json`.
+Current development evidence is recorded in
+[development-2026-10-29.json](results/development-2026-10-29.json). Earlier
+workspace evidence remains in `results/power-user-workspace-2026-10-28.json`.
 The implementation is a development build, not a release candidate.
 
-Controlled native menu/focus/file checks and the authenticated protocol-v3 XPC
-smoke pass. The renderer produces 145 fixtures. Native geometry checks verify
-16 fully visible compact rows at 1280×800, both row densities, divider persistence,
-column persistence, and programmatic selection highlights.
+All 43 controlled UX regressions, 25 native PASS observations, authenticated
+protocol-v4 XPC checks, and 153 rendered fixtures pass. Native geometry checks
+verify 16 fully visible compact rows at 1280×800, both row densities, divider
+persistence, column widths/order/visibility, recognized legacy preference
+migration, captured commands, and programmatic selection highlights.
 
-Performance acceptance remains open: final runs 31–33 report zero table warnings
-and pass every budget except intermittent 100-row filtering (99.80–103.31 ms p95
-against 100 ms). All runs, including failures, are retained. See
-[PERFORMANCE.md](PERFORMANCE.md) for the exact measurement boundary and findings.
+Three final UI performance runs pass the unchanged budgets with zero table
+warnings. Filtering p95 spans 81.49–86.13 ms for 100 transfers against 100 ms,
+and 84.33–88.27 ms for 1,000 transfers against 125 ms. Earlier failed samples
+remain retained. See [PERFORMANCE.md](PERFORMANCE.md) for measurement boundaries.
 
 
 Automated coverage includes accounting and unknown-history regressions, actual
@@ -117,6 +125,7 @@ Manual acceptance remains separate. The task script and observation fields are i
   the automated fixtures.
 - Signing/notarization and physical lifecycle gates in RELEASE-VALIDATION.md.
 
-RSS, remote control, tags, scheduling, search plugins, tracker editing, peer
+Weekly scheduling is included in this release; see [SCHEDULING.md](SCHEDULING.md).
+RSS and remote control are cancelled. Tags, search plugins, tracker editing, peer
 banning, forced announcements, country lookup, and piece maps remain outside
-this change.
+this release.

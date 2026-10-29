@@ -127,9 +127,9 @@ final class WorkspaceNativeSplitView: NSSplitView {
     override func layout() { super.layout(); didLayout?(self) }
 }
 
-/// Native column autosave complements SwiftUI's persisted order and visibility.
+/// Retain the existing native width preferences across table implementations.
 @MainActor enum WorkspaceTablePersistence {
-    private final class WeakTable {
+    @MainActor private final class WeakTable {
         weak var value: NSTableView?
         var observer: NSObjectProtocol?
         var restoring = false
@@ -147,8 +147,8 @@ final class WorkspaceNativeSplitView: NSSplitView {
             return
         }
         let entry = WeakTable(table); entry.restoring = true
-        // SwiftUI gives native columns fresh UUIDs on each mount. Stable public
-        // headings own width persistence; SwiftUI customization owns visibility/order.
+        // Stable public headings retain widths saved by the previous table.
+        // App IDs own order; the existing customization still owns visibility.
         let saved = WorkspacePreferences.defaults.dictionary(forKey:"workspaceColumnWidths") as? [String:Double] ?? [:]
         for column in table.tableColumns { if let width = saved[column.headerCell.stringValue] { column.width = CGFloat(width) } }
         entry.restoring = false
@@ -170,73 +170,8 @@ final class WorkspaceNativeSplitView: NSSplitView {
         for entry in tables { if let table = entry.value {
             entry.restoring = true
             for column in table.tableColumns { if let width = widths[column.headerCell.stringValue] { column.width = width } }
+            if let native = table as? NativeTransfersTable { native.restoreColumnOrder?() }
             entry.restoring = false; saveWidths(table)
         }}
-    }
-}
-
-/// This marker belongs to the transfer table's background, so persistence never
-/// attaches to an inspector table or an empty-state replacement.
-@MainActor final class WorkspaceNativeSelection: ObservableObject {
-    var synchronizing = false
-}
-struct NativeTransferTableMarker: NSViewRepresentable {
-    let rowHeight: CGFloat
-    let rowIDs: [String]
-    let generation: UInt64
-    let selection: IndexSet
-    let selectionBridge: WorkspaceNativeSelection
-    func makeNSView(context: Context) -> TransferTableMarkerView { let view = TransferTableMarkerView(); configure(view); return view }
-    func updateNSView(_ view: TransferTableMarkerView, context: Context) { configure(view); view.schedule() }
-    private func configure(_ view: TransferTableMarkerView) {
-        view.rowHeight = rowHeight; view.rowCount = rowIDs.count; view.selection = selection; view.selectionBridge = selectionBridge
-    }
-}
-final class TransferTableMarkerView: NSView {
-    var rowHeight: CGFloat = 28
-    var rowCount = 0
-    var selection = IndexSet()
-    weak var selectionBridge: WorkspaceNativeSelection?
-    private var scheduled = false
-    private var attempts = 0
-    override var intrinsicContentSize: NSSize { NSSize(width:1,height:1) }
-    override func viewDidMoveToSuperview() { super.viewDidMoveToSuperview(); schedule() }
-    override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); schedule() }
-    func schedule() {
-        guard !scheduled else { return }; scheduled = true
-        DispatchQueue.main.asyncAfter(deadline:.now() + 0.01) { [weak self] in
-            guard let self else { return }; self.scheduled = false
-            func find(_ view: NSView) -> NSTableView? {
-                if let table = view as? NSTableView, table.identifier?.rawValue != "torrent-files-outline", table.tableColumns.contains(where:{ $0.headerCell.stringValue == "Name" }) { return table }
-                for child in view.subviews { if let table = find(child) { return table } }
-                return nil
-            }
-            var ancestor = self.superview
-            while let view = ancestor {
-                if let table = find(view) {
-                    // SwiftUI must measure hosted cells when a table is inserted
-                    // into an empty library; disabling automatic heights hides text.
-                    let height = max(1,self.rowHeight)
-                    if table.intercellSpacing.height != 0 { table.intercellSpacing = NSSize(width:table.intercellSpacing.width,height:0) }
-                    if table.rowSizeStyle != .custom { table.rowSizeStyle = .custom }
-                    if table.columnAutoresizingStyle != .noColumnAutoresizing { table.columnAutoresizingStyle = .noColumnAutoresizing }
-                    if table.rowHeight != height { table.rowHeight = height }
-                    WorkspaceTablePersistence.install(table)
-                    if table.numberOfRows == self.rowCount {
-                        if table.selectedRowIndexes != self.selection {
-                            // Model identity already owns selection. Suppress writeback
-                            // while restoring its native highlight after row updates.
-                            self.selectionBridge?.synchronizing = true
-                            table.selectRowIndexes(self.selection,byExtendingSelection:false)
-                            self.selectionBridge?.synchronizing = false
-                        }
-                        return
-                    }
-                }
-                ancestor = view.superview
-            }
-            self.attempts += 1
-            if self.attempts < 20 { self.schedule() }
-        }
     }
 }
