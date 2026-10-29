@@ -237,15 +237,24 @@ impl ChunkTracker {
         &'a self,
         file_priorities: &'a FilePriorities,
         file_infos: &'a FileInfos,
-    ) -> impl Iterator<Item = ValidPieceIndex> + 'a {
+    ) -> impl Iterator<Item = (ValidPieceIndex, usize, usize)> + 'a {
         file_priorities
             .iter()
-            .filter_map(|p| Some((*p, file_infos.get(*p)?)))
-            .filter(|(id, f)| self.per_file_bytes[*id] != f.len)
-            .flat_map(|(_id, f)| f.iter_piece_priorities())
-            .filter(|id| self.queue_pieces[*id])
-            .filter_map(|id| id.try_into().ok())
-            .filter_map(|id| self.lengths.validate_piece_index(id))
+            .enumerate()
+            .filter_map(|(rank, id)| Some((rank, *id, file_infos.get(*id)?)))
+            .filter(|(_, id, f)| self.per_file_bytes[*id] != f.len)
+            .flat_map(|(rank, id, f)| {
+                f.iter_piece_priorities()
+                    .map(move |piece| (piece, id, rank))
+            })
+            .filter(|(piece, _, _)| self.queue_pieces[*piece])
+            .filter_map(|(piece, id, rank)| {
+                Some((
+                    self.lengths.validate_piece_index(piece.try_into().ok()?)?,
+                    id,
+                    rank,
+                ))
+            })
     }
 
     pub(crate) fn needs_any_from(&self, peer: &[u8]) -> bool {

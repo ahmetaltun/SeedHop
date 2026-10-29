@@ -11,6 +11,9 @@ import Combine
     @Published var destination: String
     @Published var paused = false
     @Published var reuse = false
+    @Published var addToTop = false
+    @Published var sequential = false
+    @Published var firstLastPieces = false
     @Published private(set) var resolving = false
     @Published private(set) var adding = false
     @Published private(set) var error: String?
@@ -90,6 +93,7 @@ import Combine
         var request = EngineRequest(command:"add")
         request.bytes = preview.torrentBytes; request.selected = selected.sorted()
         request.destination = destination; request.paused = paused; request.reuse = reuse
+        request.addToTop = addToTop; request.sequential = sequential; request.firstLastPieces = firstLastPieces
         do {
             guard let id = try await send(request).id else { throw UserFacingError(message:"The engine did not confirm this transfer. Check your library before trying again.") }
             return id

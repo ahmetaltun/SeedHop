@@ -1,0 +1,785 @@
+diff --git a/crates/librqbit/src/chunk_tracker.rs b/crates/librqbit/src/chunk_tracker.rs
+--- a/crates/librqbit/src/chunk_tracker.rs
++++ b/crates/librqbit/src/chunk_tracker.rs
+@@ -237,15 +237,24 @@
+         &'a self,
+         file_priorities: &'a FilePriorities,
+         file_infos: &'a FileInfos,
+-    ) -> impl Iterator<Item = ValidPieceIndex> + 'a {
++    ) -> impl Iterator<Item = (ValidPieceIndex, usize, usize)> + 'a {
+         file_priorities
+             .iter()
+-            .filter_map(|p| Some((*p, file_infos.get(*p)?)))
+-            .filter(|(id, f)| self.per_file_bytes[*id] != f.len)
+-            .flat_map(|(_id, f)| f.iter_piece_priorities())
+-            .filter(|id| self.queue_pieces[*id])
+-            .filter_map(|id| id.try_into().ok())
+-            .filter_map(|id| self.lengths.validate_piece_index(id))
++            .enumerate()
++            .filter_map(|(rank, id)| Some((rank, *id, file_infos.get(*id)?)))
++            .filter(|(_, id, f)| self.per_file_bytes[*id] != f.len)
++            .flat_map(|(rank, id, f)| {
++                f.iter_piece_priorities()
++                    .map(move |piece| (piece, id, rank))
++            })
++            .filter(|(piece, _, _)| self.queue_pieces[*piece])
++            .filter_map(|(piece, id, rank)| {
++                Some((
++                    self.lengths.validate_piece_index(piece.try_into().ok()?)?,
++                    id,
++                    rank,
++                ))
++            })
+     }
+ 
+     pub(crate) fn needs_any_from(&self, peer: &[u8]) -> bool {
+diff --git a/crates/librqbit/src/piece_tracker.rs b/crates/librqbit/src/piece_tracker.rs
+--- a/crates/librqbit/src/piece_tracker.rs
++++ b/crates/librqbit/src/piece_tracker.rs
+@@ -43,6 +43,15 @@
+     },
+     /// No pieces are available for this peer.
+     NoneAvailable,
++}
++
++/// Per-torrent preferences and current connected-peer availability.
++#[derive(Clone, Copy, Default)]
++pub struct PieceSelection<'a> {
++    pub sequential: bool,
++    pub first_last_pieces: bool,
++    pub availability: &'a [u32],
++    pub file_priority_levels: &'a [u8],
+ }
+ 
+ /// Parameters for acquiring a piece.
+@@ -62,6 +71,7 @@
+     pub file_priorities: &'a FilePriorities,
+     /// File metadata for iterating pieces.
+     pub file_infos: &'a FileInfos,
++    pub selection: PieceSelection<'a>,
+     /// Returns true if the peer has the given piece.
+     pub peer_has_piece: P,
+     /// Returns true if the piece can be stolen (e.g., not locked for writing).
+@@ -145,15 +155,50 @@
+ 
+         // Then check naturally ordered queued pieces
+         // Note: iter_queued_pieces only returns pieces in queue_pieces (not in-flight)
+-        let queued: Vec<_> = self
++        // File priority precedes optional boundaries, then sequential or rarest
++        // order. Streaming, ownership, selection and verification stay unchanged.
++        // One random salt per request breaks equal-rarity ties without sorting
++        // or allocating a candidate list. A shared piece may belong to two files;
++        // the highest-priority eligible file wins.
++        let salt = rand::random::<u64>();
++        let selection = req.selection;
++        let candidate = self
+             .chunks
+             .iter_queued_pieces(req.file_priorities, req.file_infos)
+-            .collect();
+-
+-        for piece in queued {
+-            if (req.peer_has_piece)(piece) {
+-                return self.reserve_piece(piece, req.peer);
+-            }
++            .filter(|(piece, _, _)| (req.peer_has_piece)(*piece))
++            .min_by_key(|(piece, file, rank)| {
++                let index = piece.get_usize();
++                let range = &req.file_infos[*file].piece_range;
++                let boundary = piece.get() == range.start || piece.get() + 1 == range.end;
++                let priority = selection
++                    .file_priority_levels
++                    .get(*file)
++                    .copied()
++                    .unwrap_or(1);
++                let (order, tie) = if selection.sequential {
++                    (*rank as u64, index as u64)
++                } else {
++                    // SplitMix64 finalizer gives an inexpensive randomized tie
++                    // order, independent of piece index and file iteration order.
++                    let mut tie = (index as u64).wrapping_add(salt);
++                    tie = (tie ^ (tie >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
++                    tie = (tie ^ (tie >> 27)).wrapping_mul(0x94d049bb133111eb);
++                    tie ^= tie >> 31;
++                    (
++                        selection.availability.get(index).copied().unwrap_or(1) as u64,
++                        tie,
++                    )
++                };
++                (
++                    std::cmp::Reverse(priority),
++                    selection.first_last_pieces && !boundary,
++                    order,
++                    tie,
++                )
++            })
++            .map(|(piece, _, _)| piece);
++        if let Some(piece) = candidate {
++            return self.reserve_piece(piece, req.peer);
+         }
+ 
+         // 3. Try steal with 3x threshold (moderately slow peer)
+@@ -399,6 +444,129 @@
+         (0..file_infos.len()).collect()
+     }
+ 
++    fn pick(
++        tracker: &mut PieceTracker,
++        files: &FileInfos,
++        selection: PieceSelection<'_>,
++        available: &[u32],
++    ) -> Option<u32> {
++        let priorities = (0..files.len()).collect();
++        match tracker.acquire_piece(AcquireRequest {
++            peer: peer(1),
++            peer_avg_time: None,
++            priority_pieces: std::iter::empty(),
++            file_priorities: &priorities,
++            file_infos: files,
++            selection,
++            peer_has_piece: |p| available.contains(&p.get()),
++            can_steal: |_| true,
++        }) {
++            AcquireResult::Reserved(p) => Some(p.get()),
++            AcquireResult::NoneAvailable => None,
++            other => panic!("unexpected {other:?}"),
++        }
++    }
++
++    #[test]
++    fn piece_preferences_cover_all_combinations_and_reserve_only_available_pieces() {
++        let files = make_test_file_infos(6);
++        for (sequential, first_last_pieces, expected) in [
++            (false, false, vec![2, 4, 1, 3, 5, 0]),
++            (true, false, vec![0, 1, 2, 3, 4, 5]),
++            (false, true, vec![5, 0, 2, 4, 1, 3]),
++            (true, true, vec![0, 5, 1, 2, 3, 4]),
++        ] {
++            let mut tracker = PieceTracker::new(make_test_chunk_tracker(6));
++            let selection = PieceSelection {
++                sequential,
++                first_last_pieces,
++                availability: &[6, 3, 1, 4, 2, 5],
++                ..Default::default()
++            };
++            for piece in expected {
++                assert_eq!(
++                    pick(&mut tracker, &files, selection, &[0, 1, 2, 3, 4, 5]),
++                    Some(piece)
++                );
++            }
++            assert_eq!(
++                pick(&mut tracker, &files, selection, &[0, 1, 2, 3, 4, 5]),
++                None
++            );
++        }
++        let mut tracker = PieceTracker::new(make_test_chunk_tracker(6));
++        assert_eq!(
++            pick(
++                &mut tracker,
++                &files,
++                PieceSelection {
++                    availability: &[1, 1, 1, 1, 2, 1],
++                    ..Default::default()
++                },
++                &[4]
++            ),
++            Some(4)
++        );
++    }
++
++    #[test]
++    fn rarity_ties_do_not_always_choose_the_same_piece() {
++        let files = make_test_file_infos(8);
++        let mut observed = HashSet::new();
++        for _ in 0..64 {
++            let mut tracker = PieceTracker::new(make_test_chunk_tracker(8));
++            observed.insert(pick(
++                &mut tracker,
++                &files,
++                PieceSelection::default(),
++                &[0, 1, 2, 3, 4, 5, 6, 7],
++            ));
++        }
++        assert!(observed.len() > 1);
++    }
++
++    #[test]
++    fn file_priority_exclusions_and_boundary_priority_work_across_files() {
++        let mut files = make_test_file_infos(6);
++        files[0].piece_range = 0..3;
++        files[0].len = 3 * 16384;
++        let mut second = files[0].clone();
++        second.offset_in_torrent = 3 * 16384;
++        second.piece_range = 3..6;
++        files.push(second);
++        let lengths = Lengths::new(6 * 16384, 16384).unwrap();
++        let have = BF::from_boxed_slice(vec![0].into_boxed_slice());
++        let selected = BF::from_boxed_slice(vec![0b11111100].into_boxed_slice());
++        let chunks = ChunkTracker::new(have.into_dyn(), selected, lengths, &files).unwrap();
++        let mut tracker = PieceTracker::new(chunks);
++        let selection = PieceSelection {
++            first_last_pieces: true,
++            file_priority_levels: &[0, 2],
++            availability: &[1, 1, 1, 2, 1, 3],
++            ..Default::default()
++        };
++        // High file boundaries, then its middle, precede the low file.
++        assert_eq!(
++            pick(&mut tracker, &files, selection, &[0, 1, 2, 3, 4, 5]),
++            Some(3)
++        );
++        assert_eq!(
++            pick(&mut tracker, &files, selection, &[0, 1, 2, 3, 4, 5]),
++            Some(5)
++        );
++        assert_eq!(
++            pick(&mut tracker, &files, selection, &[0, 1, 2, 3, 4, 5]),
++            Some(4)
++        );
++        tracker
++            .update_only_files(&files, &HashSet::from([1]))
++            .unwrap();
++        assert_eq!(
++            pick(&mut tracker, &files, selection, &[0, 1, 2, 3, 4, 5]),
++            None
++        );
++    }
++
+     #[test]
+     fn test_new_piece_tracker() {
+         let chunks = make_test_chunk_tracker(10);
+@@ -420,6 +588,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |_| true, // Peer has all pieces
+             can_steal: |_| true,
+         });
+@@ -453,6 +626,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |p| p.get() >= 2,
+             can_steal: |_| true,
+         });
+@@ -481,6 +659,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |_| true,
+             can_steal: |_| true,
+         });
+@@ -514,6 +697,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |_| true,
+             can_steal: |_| true,
+         });
+@@ -542,6 +730,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |p| p == piece, // Only has the failed piece
+             can_steal: |_| true,
+         });
+@@ -571,6 +764,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |_| true,
+             can_steal: |_| true,
+         }) {
+@@ -583,6 +781,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |_| true,
+             can_steal: |_| true,
+         }) {
+@@ -597,6 +800,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |_| true,
+             can_steal: |_| true,
+         }) {
+@@ -636,6 +844,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |_| true,
+             can_steal: |_| true,
+         });
+@@ -645,6 +858,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |_| true,
+             can_steal: |_| true,
+         });
+@@ -662,6 +880,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |_| true,
+             can_steal: |_| true,
+         });
+@@ -700,6 +923,11 @@
+             priority_pieces: priority.into_iter(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |_| true,
+             can_steal: |_| true,
+         });
+@@ -726,6 +954,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |_| false, // Peer has nothing
+             can_steal: |_| true,
+         });
+@@ -774,6 +1007,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |_| true,
+             can_steal: |_| true,
+         }) {
+@@ -790,6 +1028,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |_| true,
+             can_steal: |_| true,
+         }) {
+@@ -812,6 +1055,11 @@
+             priority_pieces: std::iter::empty(),
+             file_priorities: &file_priorities,
+             file_infos: &file_infos,
++            selection: PieceSelection {
++                sequential: true,
++                first_last_pieces: true,
++                ..Default::default()
++            },
+             peer_has_piece: |p| p.get() == 4, // Peer B only has piece 4
+             can_steal: |_| true,
+         });
+diff --git a/crates/librqbit/src/session.rs b/crates/librqbit/src/session.rs
+--- a/crates/librqbit/src/session.rs
++++ b/crates/librqbit/src/session.rs
+@@ -254,6 +254,10 @@
+     #[serde(default)]
+     pub queued: bool,
+     #[serde(default)]
++    pub sequential: bool,
++    #[serde(default)]
++    pub first_last_pieces: bool,
++    #[serde(default)]
+     pub file_names: std::collections::HashMap<usize, PathBuf>,
+     #[serde(default)]
+     pub file_priorities: Vec<u8>,
+@@ -1594,6 +1598,8 @@
+                     output_folder: RwLock::new(output_folder),
+                     file_names: RwLock::new(opts.file_names.clone()),
+                     file_priorities: RwLock::new(opts.file_priorities.clone()),
++                    sequential: opts.sequential,
++                    first_last_pieces: opts.first_last_pieces,
+                     ratelimits: opts.ratelimits,
+                     initial_peers: opts.initial_peers.clone().unwrap_or_default(),
+                     peer_limit: opts.peer_limit.or(self.peer_limit),
+@@ -2558,7 +2564,8 @@
+         let parsed_trackers = get_trackers(&parsed);
+ 
+         let generated_torrent =
+-            torrent_file_from_info_bytes(parsed.info.raw_bytes.as_ref(), &parsed_trackers).unwrap();
++            torrent_file_from_info_bytes(parsed.info.raw_bytes.as_ref(), &parsed_trackers, None)
++                .unwrap();
+         let generated_parsed = torrent_from_bytes(generated_torrent.as_ref()).unwrap();
+         assert_eq!(parsed.info_hash, generated_parsed.info_hash);
+         assert_eq!(parsed.info, generated_parsed.info);
+diff --git a/crates/librqbit/src/session_persistence/json.rs b/crates/librqbit/src/session_persistence/json.rs
+--- a/crates/librqbit/src/session_persistence/json.rs
++++ b/crates/librqbit/src/session_persistence/json.rs
+@@ -172,6 +172,8 @@
+                     .unwrap_or(false),
+             ),
+             file_priorities: torrent.file_priorities(),
++            sequential: torrent.shared().options.sequential,
++            first_last_pieces: torrent.shared().options.first_last_pieces,
+             output_folder: torrent.output_folder(),
+         };
+ 
+diff --git a/crates/librqbit/src/session_persistence/mod.rs b/crates/librqbit/src/session_persistence/mod.rs
+--- a/crates/librqbit/src/session_persistence/mod.rs
++++ b/crates/librqbit/src/session_persistence/mod.rs
+@@ -40,6 +40,10 @@
+     file_name_mapping_version: u8,
+     #[serde(default)]
+     file_priorities: Vec<u8>,
++    #[serde(default)]
++    sequential: bool,
++    #[serde(default)]
++    first_last_pieces: bool,
+ }
+ 
+ impl SerializedTorrent {
+@@ -101,6 +105,8 @@
+             queued: self.is_queued,
+             file_names: self.file_names,
+             file_priorities: self.file_priorities,
++            sequential: self.sequential,
++            first_last_pieces: self.first_last_pieces,
+             output_folder: Some(
+                 self.output_folder
+                     .to_str()
+@@ -146,3 +152,32 @@
+ {
+     Id20::deserialize(deserializer)
+ }
++
++#[cfg(test)]
++mod preference_tests {
++    use super::*;
++
++    #[test]
++    fn saved_preferences_restore_and_legacy_records_default_to_normal() {
++        let legacy = serde_json::json!({
++            "info_hash": "0000000000000000000000000000000000000000",
++            "trackers": [], "output_folder": "/tmp", "only_files": [0], "is_paused": true
++        });
++        for (sequential, first_last) in [(false, false), (true, false), (false, true), (true, true)]
++        {
++            let mut value = legacy.clone();
++            if sequential {
++                value["sequential"] = true.into();
++            }
++            if first_last {
++                value["first_last_pieces"] = true.into();
++            }
++            let saved: SerializedTorrent = serde_json::from_value(value).unwrap();
++            let (_, options) = saved.into_add_torrent().unwrap();
++            assert_eq!(options.sequential, sequential);
++            assert_eq!(options.first_last_pieces, first_last);
++            assert!(options.paused);
++            assert_eq!(options.only_files, Some(vec![0]));
++        }
++    }
++}
+diff --git a/crates/librqbit/src/session_persistence/postgres.rs b/crates/librqbit/src/session_persistence/postgres.rs
+--- a/crates/librqbit/src/session_persistence/postgres.rs
++++ b/crates/librqbit/src/session_persistence/postgres.rs
+@@ -46,6 +46,8 @@
+                 file_names: Default::default(),
+                 file_name_mapping_version: 0,
+                 file_priorities: Default::default(),
++                sequential: false,
++                first_last_pieces: false,
+             },
+         ))
+     }
+diff --git a/crates/librqbit/src/torrent_state/live/mod.rs b/crates/librqbit/src/torrent_state/live/mod.rs
+--- a/crates/librqbit/src/torrent_state/live/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/mod.rs
+@@ -91,7 +91,7 @@
+     peer_connection::{
+         PeerConnection, PeerConnectionHandler, PeerConnectionOptions, WriterRequest,
+     },
+-    piece_tracker::{AcquireRequest, AcquireResult, PieceTracker},
++    piece_tracker::{AcquireRequest, AcquireResult, PieceSelection, PieceTracker},
+     session::CheckedIncomingConnection,
+     session_stats::SessionStats,
+     stream_connect::ConnectionKind,
+@@ -271,6 +271,7 @@
+                 stats: Default::default(),
+                 states: Default::default(),
+                 live_outgoing_peers: Default::default(),
++                piece_availability: RwLock::new(vec![0; lengths.total_pieces() as usize]),
+             },
+             _locked: RwLock::new(TorrentStateLocked {
+                 pieces: Some(PieceTracker::new(paused.chunk_tracker)),
+@@ -1673,6 +1674,12 @@
+                     priority_pieces: self.state.streams.iter_next_pieces(&self.state.lengths),
+                     file_priorities,
+                     file_infos: &self.state.metadata.file_infos,
++                    selection: PieceSelection {
++                        sequential: self.state.shared.options.sequential,
++                        first_last_pieces: self.state.shared.options.first_last_pieces,
++                        availability: &self.state.peers.piece_availability.read(),
++                        file_priority_levels: &self.state.shared.options.file_priorities.read(),
++                    },
+                     peer_has_piece: |p| bf.get(p.get() as usize).map(|v| *v) == Some(true),
+                     can_steal: |p| {
+                         self.state.per_piece_locks[p.get_usize()]
+@@ -1759,9 +1766,9 @@
+                 }
+                 // Keep the connection for other pieces; do not repeatedly request
+                 // this one until a fresh HAVE/bitfield advertises it again.
+-                if let Some(mut bit) = live.bitfield.get_mut(request.index as usize) {
+-                    *bit = false;
+-                }
++                self.state
++                    .peers
++                    .set_piece_available(live, request.index as usize, false);
+                 live.cancel_inflight_requests_for_piece(piece);
+                 self.state
+                     .lock_write("release rejected piece")
+@@ -1857,8 +1864,11 @@
+                 if live.bitfield.is_empty() {
+                     live.bitfield = make_piece_bitfield(&self.state.lengths);
+                 }
+-                match live.bitfield.get_mut(have as usize) {
+-                    Some(mut v) => *v = true,
++                match live.bitfield.get(have as usize).map(|bit| *bit) {
++                    Some(_) => self
++                        .state
++                        .peers
++                        .set_piece_available(live, have as usize, true),
+                     None => {
+                         warn!(
+                             id = self.state.shared.id,
+diff --git a/crates/librqbit/src/torrent_state/live/peer/mod.rs b/crates/librqbit/src/torrent_state/live/peer/mod.rs
+--- a/crates/librqbit/src/torrent_state/live/peer/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/peer/mod.rs
+@@ -156,6 +156,7 @@
+     }
+ 
+     pub fn destroy(self, counters: &PeerStates) {
++        counters.replace_availability(self.get_live().map(|live| &live.bitfield), None);
+         for counter in [&counters.session_stats, &counters.stats] {
+             counter.dec(&self.state);
+         }
+@@ -165,6 +166,13 @@
+     }
+ 
+     pub fn set_state(&mut self, new: PeerState, counters: &PeerStates) -> PeerState {
++        counters.replace_availability(
++            self.get_live().map(|live| &live.bitfield),
++            match &new {
++                PeerState::Live(live) => Some(&live.bitfield),
++                _ => None,
++            },
++        );
+         for counter in [&counters.session_stats, &counters.stats] {
+             counter.incdec(&self.state, &new);
+         }
+diff --git a/crates/librqbit/src/torrent_state/live/peers/mod.rs b/crates/librqbit/src/torrent_state/live/peers/mod.rs
+--- a/crates/librqbit/src/torrent_state/live/peers/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/peers/mod.rs
+@@ -23,6 +23,7 @@
+     pub live_outgoing_peers: RwLock<HashSet<PeerHandle>>,
+     pub stats: AggregatePeerStatsAtomic,
+     pub states: DashMap<PeerHandle, Peer>,
++    pub piece_availability: RwLock<Vec<u32>>,
+ }
+ 
+ impl Drop for PeerStates {
+@@ -34,6 +35,39 @@
+ }
+ 
+ impl PeerStates {
++    // Call with the peer locked. Never acquire another peer lock while holding
++    // availability: piece acquisition already holds its requesting peer lock.
++    pub fn replace_availability(&self, old: Option<&BF>, new: Option<&BF>) {
++        let mut counts = self.piece_availability.write();
++        let len = counts.len();
++        if let Some(old) = old {
++            for index in old.iter_ones().take_while(|i| *i < len) {
++                counts[index] = counts[index].saturating_sub(1);
++            }
++        }
++        if let Some(new) = new {
++            for index in new.iter_ones().take_while(|i| *i < len) {
++                counts[index] += 1;
++            }
++        }
++    }
++
++    pub fn set_piece_available(&self, live: &mut LivePeerState, index: usize, value: bool) {
++        if let Some(mut bit) = live.bitfield.get_mut(index) {
++            if *bit != value {
++                let mut counts = self.piece_availability.write();
++                if let Some(count) = counts.get_mut(index) {
++                    if value {
++                        *count += 1;
++                    } else {
++                        *count = count.saturating_sub(1);
++                    }
++                }
++                *bit = value;
++            }
++        }
++    }
++
+     pub fn stats(&self) -> AggregatePeerStats {
+         self.stats.snapshot()
+     }
+@@ -90,6 +124,7 @@
+     pub fn drop_peer(&self, handle: PeerHandle) -> Option<Peer> {
+         let p = self.states.remove(&handle).map(|r| r.1)?;
+         let s = p.get_state();
++        self.replace_availability(p.get_live().map(|live| &live.bitfield), None);
+         self.stats.dec(s);
+         self.session_stats.dec(s);
+ 
+@@ -117,6 +152,7 @@
+ 
+     pub fn update_bitfield(&self, handle: PeerHandle, bitfield: BF) -> Option<()> {
+         self.with_live_mut(handle, "update_bitfield", |live| {
++            self.replace_availability(Some(&live.bitfield), Some(&bitfield));
+             live.bitfield = bitfield;
+         })
+     }
+@@ -164,3 +200,65 @@
+         });
+     }
+ }
++
++#[cfg(test)]
++mod availability_tests {
++    use super::*;
++    use crate::stream_connect::ConnectionKind;
++    use librqbit_core::Id20;
++
++    #[test]
++    fn availability_tracks_duplicates_rejects_replacements_and_disconnects() {
++        let peers = PeerStates {
++            session_stats: Default::default(),
++            live_outgoing_peers: Default::default(),
++            stats: Default::default(),
++            states: Default::default(),
++            piece_availability: RwLock::new(vec![0; 4]),
++        };
++        let addr: SocketAddr = "127.0.0.1:1234".parse().unwrap();
++        let (tx, _) = tokio::sync::mpsc::unbounded_channel();
++        peers.states.insert(
++            addr,
++            Peer::new_live_for_incoming_connection(
++                addr,
++                Id20::new([0; 20]),
++                tx,
++                &peers,
++                ConnectionKind::Tcp,
++            ),
++        );
++        let bf = |byte| BF::from_boxed_slice(vec![byte].into_boxed_slice());
++        peers.update_bitfield(addr, bf(0b11000000));
++        peers.with_live_mut(addr, "test", |live| {
++            peers.set_piece_available(live, 1, true); // Duplicate HAVE.
++            peers.set_piece_available(live, 2, true);
++            peers.set_piece_available(live, 0, false); // Reject.
++            peers.set_piece_available(live, 0, false);
++        });
++        assert_eq!(*peers.piece_availability.read(), vec![0, 1, 1, 0]);
++        peers.update_bitfield(addr, bf(0b10010000));
++        assert_eq!(*peers.piece_availability.read(), vec![1, 0, 0, 1]);
++        let second: SocketAddr = "127.0.0.1:1235".parse().unwrap();
++        let (tx, _) = tokio::sync::mpsc::unbounded_channel();
++        peers.states.insert(
++            second,
++            Peer::new_live_for_incoming_connection(
++                second,
++                Id20::new([1; 20]),
++                tx,
++                &peers,
++                ConnectionKind::Tcp,
++            ),
++        );
++        peers.update_bitfield(second, bf(0b10000000));
++        assert_eq!(*peers.piece_availability.read(), vec![2, 0, 0, 1]);
++        peers.with_peer_mut(addr, "test", |peer| {
++            peer.take_state(&peers);
++        });
++        assert_eq!(*peers.piece_availability.read(), vec![1, 0, 0, 0]);
++        peers.drop_peer(addr);
++        peers.drop_peer(second);
++        assert_eq!(*peers.piece_availability.read(), vec![0; 4]);
++    }
++}
+diff --git a/crates/librqbit/src/torrent_state/mod.rs b/crates/librqbit/src/torrent_state/mod.rs
+--- a/crates/librqbit/src/torrent_state/mod.rs
++++ b/crates/librqbit/src/torrent_state/mod.rs
+@@ -117,6 +117,8 @@
+     pub output_folder: RwLock<PathBuf>,
+     pub file_names: RwLock<HashMap<usize, PathBuf>>,
+     pub file_priorities: RwLock<Vec<u8>>,
++    pub sequential: bool,
++    pub first_last_pieces: bool,
+     pub ratelimits: LimitsConfig,
+     pub initial_peers: Vec<SocketAddr>,
+     pub peer_limit: Option<usize>,

@@ -22,6 +22,15 @@ pub enum CoreError {
 
 pub type Result<T> = std::result::Result<T, CoreError>;
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TorrentAddOptions {
+    pub paused: bool,
+    pub reuse: bool,
+    pub add_to_top: bool,
+    pub sequential: bool,
+    pub first_last_pieces: bool,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct FileRecord {

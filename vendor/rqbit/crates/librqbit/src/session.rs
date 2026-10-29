@@ -254,6 +254,10 @@ pub struct AddTorrentOptions {
     #[serde(default)]
     pub queued: bool,
     #[serde(default)]
+    pub sequential: bool,
+    #[serde(default)]
+    pub first_last_pieces: bool,
+    #[serde(default)]
     pub file_names: std::collections::HashMap<usize, PathBuf>,
     #[serde(default)]
     pub file_priorities: Vec<u8>,
@@ -1594,6 +1598,8 @@ impl Session {
                     output_folder: RwLock::new(output_folder),
                     file_names: RwLock::new(opts.file_names.clone()),
                     file_priorities: RwLock::new(opts.file_priorities.clone()),
+                    sequential: opts.sequential,
+                    first_last_pieces: opts.first_last_pieces,
                     ratelimits: opts.ratelimits,
                     initial_peers: opts.initial_peers.clone().unwrap_or_default(),
                     peer_limit: opts.peer_limit.or(self.peer_limit),
@@ -2558,7 +2564,8 @@ mod tests {
         let parsed_trackers = get_trackers(&parsed);
 
         let generated_torrent =
-            torrent_file_from_info_bytes(parsed.info.raw_bytes.as_ref(), &parsed_trackers).unwrap();
+            torrent_file_from_info_bytes(parsed.info.raw_bytes.as_ref(), &parsed_trackers, None)
+                .unwrap();
         let generated_parsed = torrent_from_bytes(generated_torrent.as_ref()).unwrap();
         assert_eq!(parsed.info_hash, generated_parsed.info_hash);
         assert_eq!(parsed.info, generated_parsed.info);

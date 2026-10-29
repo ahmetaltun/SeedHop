@@ -156,6 +156,7 @@ impl Peer {
     }
 
     pub fn destroy(self, counters: &PeerStates) {
+        counters.replace_availability(self.get_live().map(|live| &live.bitfield), None);
         for counter in [&counters.session_stats, &counters.stats] {
             counter.dec(&self.state);
         }
@@ -165,6 +166,13 @@ impl Peer {
     }
 
     pub fn set_state(&mut self, new: PeerState, counters: &PeerStates) -> PeerState {
+        counters.replace_availability(
+            self.get_live().map(|live| &live.bitfield),
+            match &new {
+                PeerState::Live(live) => Some(&live.bitfield),
+                _ => None,
+            },
+        );
         for counter in [&counters.session_stats, &counters.stats] {
             counter.incdec(&self.state, &new);
         }

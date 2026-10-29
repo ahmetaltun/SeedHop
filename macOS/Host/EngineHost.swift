@@ -123,7 +123,7 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         case "cancelFileOperation": return EngineReply(cancellationAccepted:try core.cancelFileOperation(operationId:r.id ?? ""))
         case "retryStorageRecovery", "keepRecoveryCopies": try core.resolveStorageRecovery(id:r.id ?? "",keepCopies:r.command == "keepRecoveryCopies")
         case "add":
-            let id = try core.add(bytes:r.bytes ?? Data(), destination:r.destination ?? "", selected:r.selected ?? [], paused:r.paused ?? false, reuse:r.reuse ?? false)
+            let id = try core.addWithOptions(bytes:r.bytes ?? Data(), destination:r.destination ?? "", selected:r.selected ?? [], options:TorrentAddOptions(paused:r.paused ?? false, reuse:r.reuse ?? false, addToTop:r.addToTop ?? false, sequential:r.sequential ?? false, firstLastPieces:r.firstLastPieces ?? false))
             return EngineReply(id:id)
         case "pause": try core.setPaused(id:r.id ?? "", paused:r.paused ?? true)
         case "select": try core.selectFiles(id:r.id ?? "", indices:r.selected ?? [])

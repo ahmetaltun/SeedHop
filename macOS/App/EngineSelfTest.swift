@@ -54,10 +54,18 @@ import Foundation
         guard handshake.snapshot?.protocolVersion==UInt32(SeedHopIdentity.protocolVersion) else { throw UserFacingError(message:"Handshake version mismatch") }
         let importSession = ImportSession()
         importSession.destination = downloads.path; importSession.paused = true
+        importSession.addToTop = true; importSession.sequential = true; importSession.firstLastPieces = true
         await importSession.inspect(file:fixture.appendingPathComponent("fixture.torrent"),using:client.send)
         guard let preview = importSession.preview, preview.files.count == 1, let importedFile = preview.files.first else { throw UserFacingError(message:importSession.error ?? "Expected a single-file fixture preview") }
         let importedPath = downloads.appendingPathComponent(importedFile.name)
         guard let id = await importSession.add(using:client.send) else { throw UserFacingError(message:importSession.error ?? "Missing transfer ID") }
+        func verifyImportOptions() throws {
+            let saved = try JSONSerialization.jsonObject(with:Data(contentsOf:scratch.appendingPathComponent("state/session/session.json"))) as? [String:Any]
+            let torrents = saved?["torrents"] as? [String:[String:Any]]
+            guard let record = torrents?.values.first, record["sequential"] as? Bool == true,
+                  record["first_last_pieces"] as? Bool == true else { throw UserFacingError(message:"XPC import lost download preferences") }
+        }
+        try verifyImportOptions()
         var limits=EngineRequest(command:"limits"); limits.downloadLimit=250_000; limits.uploadLimit=50_000
         _=try await client.send(limits)
         guard let snapshot=try await client.send(EngineRequest(command:"snapshot")).snapshot,snapshot.torrents.count==1,snapshot.torrents[0].id==id,snapshot.downloadLimit==250_000 else { throw UserFacingError(message:"Snapshot did not reflect saved commands") }
@@ -133,6 +141,7 @@ import Foundation
         try client.connect(background:false)
         guard let restored=try await client.send(connect).snapshot,restored.torrents.count==1,restored.downloadLimit==31_000,restored.schedule == weekly,restored.normalDownloadLimit == 250_000 else { throw UserFacingError(message:"Restore did not preserve library state") }
         try await waitForPaused(client,id:id)
+        try verifyImportOptions()
         guard let item = try await client.send(EngineRequest(command:"snapshot")).snapshot?.torrents.first,
               item.id == id, item.files[0].priority == 2, item.files[0].name == "renamed-fixture.bin", item.destination == moved.path,
               restored.maxActiveDownloads == 1, restored.peerEncryption == .require, restored.savedPeerEncryption == .require else { throw UserFacingError(message:"Restoration lost file management settings") }
@@ -142,7 +151,7 @@ import Foundation
         var remove=EngineRequest(command:"remove"); remove.id=id; remove.deleteFiles=false
         _=try await client.send(remove)
         _=try await client.send(EngineRequest(command:"shutdown")); client.invalidate()
-        print("PASS: XPC requirement, protocol v\(SeedHopIdentity.protocolVersion), typed diagnostics, weekly schedule save/failure/retry/restart/normal-limit restoration, import, Force Recheck, stale Retry preserves paused choices, policy save failure and retry, policy activation after restart, priorities, queue, live file progress, move/rename cancellation, stale cancellation, rename, relocation, exact bytes, restart, paused selection, removal, shutdown")
+        print("PASS: XPC requirement, protocol v\(SeedHopIdentity.protocolVersion), typed diagnostics, weekly schedule save/failure/retry/restart/normal-limit restoration, import options and restart persistence, Force Recheck, stale Retry preserves paused choices, policy save failure and retry, policy activation after restart, priorities, queue, live file progress, move/rename cancellation, stale cancellation, rename, relocation, exact bytes, restart, paused selection, removal, shutdown")
     }
     private static func verifyFileCancellation(_ client: EngineClient, id: String, source: URL, content: Data, scratch: URL) async throws {
         let destination = scratch.appendingPathComponent("cancelled-move")

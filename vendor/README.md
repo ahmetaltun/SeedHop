@@ -15,3 +15,10 @@ Patch `0027-seedhop-upload-announcements-and-rate-cadence.patch` restores HAVE
 announcements to peers omitting their empty bitfield, matches per-torrent speed
 sampling to the estimator's per-second window, and exposes upload-demand and
 download-pipeline diagnostics.
+
+Patch `0028-seedhop-piece-selection-options.patch` persists per-torrent sequential
+and first/last-piece preferences, selects rarest available pieces by default with
+randomized ties, and tracks connected-peer availability across bitfield, HAVE,
+reject, and disconnect events. File priority and explicit stream priority remain
+authoritative. It also repairs an obsolete unit-test call to the v2-aware metadata
+helper so focused upstream library tests compile.

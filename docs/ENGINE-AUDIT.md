@@ -211,3 +211,19 @@ diagnostics expose upload interest and advertised availability alongside pending
 requests, errors and piece steals. Controlled loopback validates both payload
 directions; short public samples distinguish lack of interested peers from an
 upload cap. Sustained public speed and incoming reachability remain unverified.
+
+## Add-torrent piece preferences (2026-10-29)
+
+Patch `0028-seedhop-piece-selection-options.patch` adds persistent sequential and
+first/last-piece preferences at the existing session-options seam. Missing saved
+fields default to false. Default selection uses connected-peer rarity with
+randomized ties, after file priority and explicit streaming requests. Optional
+boundaries take priority within a file-priority tier; sequential mode orders
+remaining pieces by the existing filename order. Reservations, excluded-piece
+filtering, slow-peer stealing, hashing and v1/v2 validation remain in their
+existing owners. Availability updates follow peer locks without taking any other
+peer lock during piece acquisition. The picker no longer allocates the entire
+queued piece list per request.
+
+Native import wiring, queue-admission semantics, and validation are recorded in
+[ADD-TORRENT-OPTIONS.md](ADD-TORRENT-OPTIONS.md).

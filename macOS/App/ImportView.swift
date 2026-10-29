@@ -60,9 +60,19 @@ struct ImportView: View {
                             Button("Choose…",action:chooseFolder).controlSize(.small).focused($focus,equals:.destination).accessibilityLabel("Choose download folder")
                         }.padding(12).background(Design.card,in:RoundedRectangle(cornerRadius:8)).overlay(RoundedRectangle(cornerRadius:8).stroke(Design.line))
                     }
-                    VStack(alignment:.leading,spacing:9) {
-                        Toggle("Add paused",isOn:$session.paused)
-                        Toggle("Verify and reuse existing files",isOn:$session.reuse)
+                    HStack(alignment:.top,spacing:24) {
+                        VStack(alignment:.leading,spacing:9) {
+                            Toggle("Add to top of queue",isOn:$session.addToTop)
+                                .help("Start before other waiting downloads. Active downloads keep their slots.")
+                            Toggle("Download in sequential order",isOn:$session.sequential)
+                                .help("Prefer earlier pieces in each selected file. Otherwise, prefer rarer available pieces.")
+                            Toggle("Download first and last pieces first",isOn:$session.firstLastPieces)
+                                .help("Prioritize the first and last pieces of each selected file, then use the chosen download order.")
+                        }.frame(maxWidth:.infinity,alignment:.leading)
+                        VStack(alignment:.leading,spacing:9) {
+                            Toggle("Add paused",isOn:$session.paused)
+                            Toggle("Verify and reuse existing files",isOn:$session.reuse)
+                        }.frame(maxWidth:.infinity,alignment:.leading)
                     }.toggleStyle(.checkbox).font(.system(size:11))
                 } else {
                     VStack(alignment:.leading,spacing:10) {

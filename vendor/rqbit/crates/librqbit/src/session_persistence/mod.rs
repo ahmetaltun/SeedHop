@@ -40,6 +40,10 @@ pub struct SerializedTorrent {
     file_name_mapping_version: u8,
     #[serde(default)]
     file_priorities: Vec<u8>,
+    #[serde(default)]
+    sequential: bool,
+    #[serde(default)]
+    first_last_pieces: bool,
 }
 
 impl SerializedTorrent {
@@ -101,6 +105,8 @@ impl SerializedTorrent {
             queued: self.is_queued,
             file_names: self.file_names,
             file_priorities: self.file_priorities,
+            sequential: self.sequential,
+            first_last_pieces: self.first_last_pieces,
             output_folder: Some(
                 self.output_folder
                     .to_str()
@@ -145,4 +151,33 @@ where
     D: Deserializer<'de>,
 {
     Id20::deserialize(deserializer)
+}
+
+#[cfg(test)]
+mod preference_tests {
+    use super::*;
+
+    #[test]
+    fn saved_preferences_restore_and_legacy_records_default_to_normal() {
+        let legacy = serde_json::json!({
+            "info_hash": "0000000000000000000000000000000000000000",
+            "trackers": [], "output_folder": "/tmp", "only_files": [0], "is_paused": true
+        });
+        for (sequential, first_last) in [(false, false), (true, false), (false, true), (true, true)]
+        {
+            let mut value = legacy.clone();
+            if sequential {
+                value["sequential"] = true.into();
+            }
+            if first_last {
+                value["first_last_pieces"] = true.into();
+            }
+            let saved: SerializedTorrent = serde_json::from_value(value).unwrap();
+            let (_, options) = saved.into_add_torrent().unwrap();
+            assert_eq!(options.sequential, sequential);
+            assert_eq!(options.first_last_pieces, first_last);
+            assert!(options.paused);
+            assert_eq!(options.only_files, Some(vec![0]));
+        }
+    }
 }

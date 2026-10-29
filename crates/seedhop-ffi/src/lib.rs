@@ -22,6 +22,15 @@ fn error(e: impl std::fmt::Display) -> BridgeError {
 }
 
 #[derive(uniffi::Record)]
+pub struct TorrentAddOptions {
+    pub paused: bool,
+    pub reuse: bool,
+    pub add_to_top: bool,
+    pub sequential: bool,
+    pub first_last_pieces: bool,
+}
+
+#[derive(uniffi::Record)]
 pub struct TransferFile {
     pub index: u32,
     pub name: String,
@@ -336,6 +345,28 @@ impl EngineBridge {
         let (core, rt) = self.handles()?;
         rt.block_on(core.add(bytes, destination, selected, paused, reuse))
             .map_err(error)
+    }
+    pub fn add_with_options(
+        &self,
+        bytes: Vec<u8>,
+        destination: String,
+        selected: Vec<u32>,
+        options: TorrentAddOptions,
+    ) -> Result<String, BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.add_with_options(
+            bytes,
+            destination,
+            selected,
+            seedhop_core::TorrentAddOptions {
+                paused: options.paused,
+                reuse: options.reuse,
+                add_to_top: options.add_to_top,
+                sequential: options.sequential,
+                first_last_pieces: options.first_last_pieces,
+            },
+        ))
+        .map_err(error)
     }
     pub fn set_paused(&self, id: String, paused: bool) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;

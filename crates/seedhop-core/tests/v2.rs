@@ -5454,12 +5454,15 @@ async fn empty_peers_receive_new_piece_announcements_and_can_download_them() {
             .await
             .unwrap();
             engine
-                .add(
+                .add_with_options(
                     encode(&metadata),
                     downloads.path().display().to_string(),
                     vec![0],
-                    false,
-                    false,
+                    // This fixture asserts wire request order; opt into that order.
+                    seedhop_core::TorrentAddOptions {
+                        sequential: true,
+                        ..Default::default()
+                    },
                 )
                 .await
                 .unwrap();

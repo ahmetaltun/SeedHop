@@ -1,0 +1,94 @@
+{
+  "date": "2026-10-29",
+  "feature": "Add-torrent queue and piece preferences",
+  "protocol_version": 5,
+  "defaults": {
+    "add_to_top": false,
+    "sequential": false,
+    "first_last_pieces": false,
+    "piece_selection": "rarest available first, randomized ties"
+  },
+  "semantics": {
+    "queue": "ahead of waiting downloads, preserving active slots",
+    "combined": "file priority, boundary priority, then sequential order",
+    "persistence": "per-torrent sequential and boundary preferences; legacy fields default false"
+  },
+  "validation": {
+    "workspace_non_v2": {
+      "passed": 62,
+      "ignored": 5,
+      "log": ".build/add-workspace-tests.log"
+    },
+    "v2_serial": {
+      "passed": 76,
+      "failed": 0,
+      "command": "cargo test --workspace --locked --test v2 -- --test-threads=1",
+      "log": ".build/add-v2-serial.log"
+    },
+    "ffi": {
+      "passed": 1,
+      "log": ".build/add-ffi-tests.log"
+    },
+    "picker": {
+      "passed": 14,
+      "log": ".build/add-picker-tests.log"
+    },
+    "availability": {
+      "passed": 1,
+      "log": ".build/add-availability-tests.log"
+    },
+    "saved_preferences": {
+      "passed": 1,
+      "log": ".build/add-preference-tests.log"
+    },
+    "native_ux": {
+      "passed": 44,
+      "log": ".build/add-ux-tests.log"
+    },
+    "native_interface": {
+      "passed": true,
+      "log": ".build/add-interface-tests.log"
+    },
+    "packaged_xpc": {
+      "passed": true,
+      "log": ".build/add-engine-tests.log"
+    },
+    "native_build_and_signature": {
+      "passed": true,
+      "log": ".build/add-build-final.log"
+    },
+    "design_render": {
+      "png_count": 153,
+      "inspected": [
+        "files-light.png",
+        "files-dark.png"
+      ]
+    },
+    "formatting": true,
+    "clippy_warnings_denied": true,
+    "doc_tests": true,
+    "diff_check": true,
+    "vendor_patch_reverse_check": true
+  },
+  "initial_failures": [
+    {
+      "test": "empty_peers_receive_new_piece_announcements_and_can_download_them",
+      "cause": "Fixture assumed sequential default requests",
+      "resolution": "Explicitly enable sequential mode for this order-sensitive fixture; complete serial protocol run passed"
+    },
+    {
+      "test": "metadata_limits_are_shared_and_keepalives_cannot_block_a_healthy_provider",
+      "cause": "Concurrent timing assertion observed five server-side requests while limiting four client metadata buffers",
+      "resolution": "Passed alone and in complete serial protocol run; metadata resource code unchanged"
+    }
+  ],
+  "isolated_library_fixture": {
+    "path": ".build/add-picker-workspace",
+    "notes": "Only library tests selected; omit uncached unused optional/test dependencies, substitute futures executor in unrelated read-buffer test. Production picker/lifecycle/persistence sources match tracked source. Not a full upstream suite run."
+  },
+  "limitations": [
+    "Five existing opt-in tests not run",
+    "Physical input delivery and VoiceOver speech remain manual",
+    "Controlled tests do not guarantee public-swarm performance"
+  ]
+}

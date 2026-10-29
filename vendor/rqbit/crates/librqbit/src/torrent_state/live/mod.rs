@@ -91,7 +91,7 @@ use crate::{
     peer_connection::{
         PeerConnection, PeerConnectionHandler, PeerConnectionOptions, WriterRequest,
     },
-    piece_tracker::{AcquireRequest, AcquireResult, PieceTracker},
+    piece_tracker::{AcquireRequest, AcquireResult, PieceSelection, PieceTracker},
     session::CheckedIncomingConnection,
     session_stats::SessionStats,
     stream_connect::ConnectionKind,
@@ -271,6 +271,7 @@ impl TorrentStateLive {
                 stats: Default::default(),
                 states: Default::default(),
                 live_outgoing_peers: Default::default(),
+                piece_availability: RwLock::new(vec![0; lengths.total_pieces() as usize]),
             },
             _locked: RwLock::new(TorrentStateLocked {
                 pieces: Some(PieceTracker::new(paused.chunk_tracker)),
@@ -1673,6 +1674,12 @@ impl PeerHandler {
                     priority_pieces: self.state.streams.iter_next_pieces(&self.state.lengths),
                     file_priorities,
                     file_infos: &self.state.metadata.file_infos,
+                    selection: PieceSelection {
+                        sequential: self.state.shared.options.sequential,
+                        first_last_pieces: self.state.shared.options.first_last_pieces,
+                        availability: &self.state.peers.piece_availability.read(),
+                        file_priority_levels: &self.state.shared.options.file_priorities.read(),
+                    },
                     peer_has_piece: |p| bf.get(p.get() as usize).map(|v| *v) == Some(true),
                     can_steal: |p| {
                         self.state.per_piece_locks[p.get_usize()]
@@ -1759,9 +1766,9 @@ impl PeerHandler {
                 }
                 // Keep the connection for other pieces; do not repeatedly request
                 // this one until a fresh HAVE/bitfield advertises it again.
-                if let Some(mut bit) = live.bitfield.get_mut(request.index as usize) {
-                    *bit = false;
-                }
+                self.state
+                    .peers
+                    .set_piece_available(live, request.index as usize, false);
                 live.cancel_inflight_requests_for_piece(piece);
                 self.state
                     .lock_write("release rejected piece")
@@ -1857,8 +1864,11 @@ impl PeerHandler {
                 if live.bitfield.is_empty() {
                     live.bitfield = make_piece_bitfield(&self.state.lengths);
                 }
-                match live.bitfield.get_mut(have as usize) {
-                    Some(mut v) => *v = true,
+                match live.bitfield.get(have as usize).map(|bit| *bit) {
+                    Some(_) => self
+                        .state
+                        .peers
+                        .set_piece_available(live, have as usize, true),
                     None => {
                         warn!(
                             id = self.state.shared.id,

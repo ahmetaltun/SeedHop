@@ -144,6 +144,39 @@ impl Engine {
         self.reconcile_queue().await
     }
 
+    pub(crate) fn prepare_top_of_queue(&self, id: &str) -> Result<()> {
+        let mut config = self.queue.lock().unwrap().clone();
+        let mut handles = self
+            .session
+            .with_torrents(|items| items.map(|(_, t)| t.clone()).collect::<Vec<_>>());
+        handles.sort_by_key(|t| t.id());
+        config
+            .order
+            .retain(|item| item != id && handles.iter().any(|t| adapter::torrent_id(t) == *item));
+        for handle in &handles {
+            let item = adapter::torrent_id(handle);
+            if !config.order.contains(&item) {
+                config.order.push(item);
+            }
+        }
+        // Keep current downloads ahead of this admission, so the normal queue
+        // reconciler cannot preempt them. Existing queue-move behavior is unchanged.
+        let position = config
+            .order
+            .iter()
+            .rposition(|item| {
+                handles.iter().any(|t| {
+                    adapter::torrent_id(t) == *item
+                        && !t.is_paused()
+                        && !t.is_queued()
+                        && !t.stats().finished
+                })
+            })
+            .map_or(0, |p| p + 1);
+        config.order.insert(position, id.to_owned());
+        self.save_queue(config)
+    }
+
     fn save_queue(&self, config: QueueConfig) -> Result<()> {
         storage::atomic_write(
             &self.state_directory.join("queue.json"),

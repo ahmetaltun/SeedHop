@@ -389,6 +389,8 @@ import Combine
         try await check("Add captures selected files and paused intent; duplicate adds are blocked") {
             let peer = UXTransport(); peer.hold = ["add"]
             let session = ImportSession(preview:PreviewFixtures.importPreview)
+            try expect(!session.addToTop && !session.sequential && !session.firstLastPieces,"Import options must start unchecked")
+            session.addToTop = true; session.sequential = true; session.firstLastPieces = true
             session.selected = []; let empty = await session.add(using:peer.send)
             try expect(empty == nil && peer.requests.isEmpty,"Empty file selection was added")
             session.selected = [2,0]; session.paused = true; session.reuse = true; session.destination = "/tmp/chosen-folder"
@@ -397,7 +399,7 @@ import Combine
             let duplicate = await session.add(using:peer.send)
             session.cancel(using:peer.send)
             let request = peer.pending[0].request
-            try expect(session.adding && duplicate == nil && request.selected == [0,2] && request.paused == true && request.reuse == true && request.destination == "/tmp/chosen-folder","Add choices changed or duplicate was accepted")
+            try expect(session.adding && duplicate == nil && request.selected == [0,2] && request.paused == true && request.reuse == true && request.destination == "/tmp/chosen-folder" && request.addToTop == true && request.sequential == true && request.firstLastPieces == true,"Add choices changed or duplicate was accepted")
             try expect(peer.commands("cancel").isEmpty,"A committed add was treated as cancellable metadata")
             peer.releaseFirst(reply:EngineReply(id:"added"))
             let id = await add.value
@@ -407,11 +409,12 @@ import Combine
         try await check("Add failure preserves choices for recovery") {
             let peer = UXTransport(); peer.hold = ["add"]
             let session = ImportSession(preview:PreviewFixtures.importPreview); session.selected = [1]; session.paused = true
+            session.addToTop = true; session.sequential = true; session.firstLastPieces = true
             let add = Task { await session.add(using:peer.send) }
             try await eventually { peer.pending.count == 1 }
             peer.releaseFirst(error:UserFacingError(message:"Choose a writable folder."))
             _ = await add.value
-            try expect(!session.adding && session.error == "Choose a writable folder." && session.selected == [1] && session.paused,"Failed add lost the user's choices")
+            try expect(!session.adding && session.error == "Choose a writable folder." && session.selected == [1] && session.paused && session.addToTop && session.sequential && session.firstLastPieces,"Failed add lost the user's choices")
         }
 
         try await check("Torrent-file failures retain source and reject oversized metadata before XPC") {

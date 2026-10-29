@@ -117,6 +117,8 @@ pub(crate) struct ManagedTorrentOptions {
     pub output_folder: RwLock<PathBuf>,
     pub file_names: RwLock<HashMap<usize, PathBuf>>,
     pub file_priorities: RwLock<Vec<u8>>,
+    pub sequential: bool,
+    pub first_last_pieces: bool,
     pub ratelimits: LimitsConfig,
     pub initial_peers: Vec<SocketAddr>,
     pub peer_limit: Option<usize>,

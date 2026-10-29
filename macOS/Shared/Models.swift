@@ -10,7 +10,7 @@ enum SeedHopIdentity {
     #endif
     static let foreground = app + ".engine"
     static let background = app + ".agent"
-    static let protocolVersion = 4
+    static let protocolVersion = 5
     static let agentPlist = background + ".plist"
 }
 
@@ -167,6 +167,9 @@ struct EngineRequest: Codable {
     var selected: [UInt32]?
     var paused: Bool?
     var reuse: Bool?
+    var addToTop: Bool?
+    var sequential: Bool?
+    var firstLastPieces: Bool?
     var deleteFiles: Bool?
     var downloadLimit: UInt32?
     var uploadLimit: UInt32?

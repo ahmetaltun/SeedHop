@@ -172,6 +172,8 @@ impl JsonSessionPersistenceStore {
                     .unwrap_or(false),
             ),
             file_priorities: torrent.file_priorities(),
+            sequential: torrent.shared().options.sequential,
+            first_last_pieces: torrent.shared().options.first_last_pieces,
             output_folder: torrent.output_folder(),
         };
 

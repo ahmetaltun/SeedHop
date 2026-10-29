@@ -46,6 +46,8 @@ impl TorrentsTableRecord {
                 file_names: Default::default(),
                 file_name_mapping_version: 0,
                 file_priorities: Default::default(),
+                sequential: false,
+                first_last_pieces: false,
             },
         ))
     }

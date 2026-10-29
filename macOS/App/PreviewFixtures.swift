@@ -94,7 +94,7 @@ enum PreviewFixtures {
                 try capture(LibraryEmptyState().environmentObject(store).background(Design.canvas),size:size,appearance:appearance,to:output.appendingPathComponent("empty-pane-\(name)-\(appearance == .darkAqua ? "dark" : "light").png"))
             }
             try capture(ImportView().environmentObject(store),size:NSSize(width:600,height:432),appearance:appearance,to:output.appendingPathComponent("add-\(name).png"))
-            try capture(ImportView(preview:PreviewFixtures.importPreview).environmentObject(store),size:NSSize(width:600,height:680),appearance:appearance,to:output.appendingPathComponent("files-\(name).png"))
+            try capture(ImportView(preview:PreviewFixtures.importPreview).environmentObject(store),size:NSSize(width:600,height:700),appearance:appearance,to:output.appendingPathComponent("files-\(name).png"))
             try capture(SettingsView().environmentObject(store),size:NSSize(width:570,height:660),appearance:appearance,to:output.appendingPathComponent("settings-\(name).png"))
             let controls = LibraryStore(designPreview:true)
             controls.torrents[0].files[0].priority = 2
@@ -171,7 +171,7 @@ enum PreviewFixtures {
             let contrastStore = LibraryStore(designPreview:true)
             let contrastAppearance: NSAppearance.Name = name == "dark" ? .accessibilityHighContrastDarkAqua : .accessibilityHighContrastAqua
             try capture(LibraryView().environmentObject(contrastStore),size:NSSize(width:1240,height:780),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-library-\(name).png"))
-            try capture(ImportView(preview:PreviewFixtures.importPreview).environmentObject(contrastStore),size:NSSize(width:600,height:680),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-import-\(name).png"))
+            try capture(ImportView(preview:PreviewFixtures.importPreview).environmentObject(contrastStore),size:NSSize(width:600,height:700),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-import-\(name).png"))
             try capture(SettingsView(tab:1).environmentObject(contrastStore),size:NSSize(width:570,height:660),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-settings-\(name).png"))
             contrastStore.storageRecovery = StorageRecoveryItem(id:"contrast-recovery",torrentId:contrastStore.torrents[0].id,activeLocation:"original",message:"The original location is active. Reconnect the destination and retry cleanup, or inspect the retained copies.",originalDirectory:contrastStore.downloadDirectory,destinationDirectory:"/Volumes/External/Transfers",canKeepCopies:true)
             try capture(LibraryView().environmentObject(contrastStore),size:NSSize(width:1240,height:880),appearance:contrastAppearance,to:output.appendingPathComponent("contrast-recovery-\(name).png"))

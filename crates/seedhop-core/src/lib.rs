@@ -25,7 +25,7 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 5;
 
 /// Owns library state. The FFI host retains this lease until its runtime has stopped.
 pub struct Engine {
@@ -423,8 +423,35 @@ impl Engine {
         paused: bool,
         reuse: bool,
     ) -> Result<String> {
+        self.add_with_options(
+            bytes,
+            destination,
+            selected,
+            TorrentAddOptions {
+                paused,
+                reuse,
+                ..Default::default()
+            },
+        )
+        .await
+    }
+
+    pub async fn add_with_options(
+        &self,
+        bytes: Vec<u8>,
+        destination: String,
+        selected: Vec<u32>,
+        options: TorrentAddOptions,
+    ) -> Result<String> {
         let _operation = self.operations.write().await;
         self.ready()?;
+        let TorrentAddOptions {
+            paused,
+            reuse,
+            add_to_top,
+            sequential,
+            first_last_pieces,
+        } = options;
         let metadata = adapter::preview(bytes.clone())?;
         if self
             .snapshot()?
@@ -467,6 +494,11 @@ impl Engine {
             .lock()
             .unwrap()
             .checkpoint(&self.state_directory, true)?;
+        // Save admission order before membership: a failed queue write must never
+        // report an unsuccessful Add after the torrent has already been added.
+        if add_to_top {
+            self.prepare_top_of_queue(&metadata.id)?;
+        }
         self.session
             .add_torrent(
                 AddTorrent::TorrentFileBytes(bytes.into()),
@@ -475,6 +507,8 @@ impl Engine {
                     only_files: Some(selected.into_iter().map(|i| i as usize).collect()),
                     paused,
                     queued,
+                    sequential,
+                    first_last_pieces,
                     overwrite: reuse,
                     ..Default::default()
                 }),

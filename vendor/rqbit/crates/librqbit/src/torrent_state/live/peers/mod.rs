@@ -23,6 +23,7 @@ pub(crate) struct PeerStates {
     pub live_outgoing_peers: RwLock<HashSet<PeerHandle>>,
     pub stats: AggregatePeerStatsAtomic,
     pub states: DashMap<PeerHandle, Peer>,
+    pub piece_availability: RwLock<Vec<u32>>,
 }
 
 impl Drop for PeerStates {
@@ -34,6 +35,39 @@ impl Drop for PeerStates {
 }
 
 impl PeerStates {
+    // Call with the peer locked. Never acquire another peer lock while holding
+    // availability: piece acquisition already holds its requesting peer lock.
+    pub fn replace_availability(&self, old: Option<&BF>, new: Option<&BF>) {
+        let mut counts = self.piece_availability.write();
+        let len = counts.len();
+        if let Some(old) = old {
+            for index in old.iter_ones().take_while(|i| *i < len) {
+                counts[index] = counts[index].saturating_sub(1);
+            }
+        }
+        if let Some(new) = new {
+            for index in new.iter_ones().take_while(|i| *i < len) {
+                counts[index] += 1;
+            }
+        }
+    }
+
+    pub fn set_piece_available(&self, live: &mut LivePeerState, index: usize, value: bool) {
+        if let Some(mut bit) = live.bitfield.get_mut(index) {
+            if *bit != value {
+                let mut counts = self.piece_availability.write();
+                if let Some(count) = counts.get_mut(index) {
+                    if value {
+                        *count += 1;
+                    } else {
+                        *count = count.saturating_sub(1);
+                    }
+                }
+                *bit = value;
+            }
+        }
+    }
+
     pub fn stats(&self) -> AggregatePeerStats {
         self.stats.snapshot()
     }
@@ -90,6 +124,7 @@ impl PeerStates {
     pub fn drop_peer(&self, handle: PeerHandle) -> Option<Peer> {
         let p = self.states.remove(&handle).map(|r| r.1)?;
         let s = p.get_state();
+        self.replace_availability(p.get_live().map(|live| &live.bitfield), None);
         self.stats.dec(s);
         self.session_stats.dec(s);
 
@@ -117,6 +152,7 @@ impl PeerStates {
 
     pub fn update_bitfield(&self, handle: PeerHandle, bitfield: BF) -> Option<()> {
         self.with_live_mut(handle, "update_bitfield", |live| {
+            self.replace_availability(Some(&live.bitfield), Some(&bitfield));
             live.bitfield = bitfield;
         })
     }
@@ -162,5 +198,67 @@ impl PeerStates {
         self.with_live_mut(from_peer, "send_cancellations", |live| {
             live.cancel_inflight_requests_for_piece(stolen_idx);
         });
+    }
+}
+
+#[cfg(test)]
+mod availability_tests {
+    use super::*;
+    use crate::stream_connect::ConnectionKind;
+    use librqbit_core::Id20;
+
+    #[test]
+    fn availability_tracks_duplicates_rejects_replacements_and_disconnects() {
+        let peers = PeerStates {
+            session_stats: Default::default(),
+            live_outgoing_peers: Default::default(),
+            stats: Default::default(),
+            states: Default::default(),
+            piece_availability: RwLock::new(vec![0; 4]),
+        };
+        let addr: SocketAddr = "127.0.0.1:1234".parse().unwrap();
+        let (tx, _) = tokio::sync::mpsc::unbounded_channel();
+        peers.states.insert(
+            addr,
+            Peer::new_live_for_incoming_connection(
+                addr,
+                Id20::new([0; 20]),
+                tx,
+                &peers,
+                ConnectionKind::Tcp,
+            ),
+        );
+        let bf = |byte| BF::from_boxed_slice(vec![byte].into_boxed_slice());
+        peers.update_bitfield(addr, bf(0b11000000));
+        peers.with_live_mut(addr, "test", |live| {
+            peers.set_piece_available(live, 1, true); // Duplicate HAVE.
+            peers.set_piece_available(live, 2, true);
+            peers.set_piece_available(live, 0, false); // Reject.
+            peers.set_piece_available(live, 0, false);
+        });
+        assert_eq!(*peers.piece_availability.read(), vec![0, 1, 1, 0]);
+        peers.update_bitfield(addr, bf(0b10010000));
+        assert_eq!(*peers.piece_availability.read(), vec![1, 0, 0, 1]);
+        let second: SocketAddr = "127.0.0.1:1235".parse().unwrap();
+        let (tx, _) = tokio::sync::mpsc::unbounded_channel();
+        peers.states.insert(
+            second,
+            Peer::new_live_for_incoming_connection(
+                second,
+                Id20::new([1; 20]),
+                tx,
+                &peers,
+                ConnectionKind::Tcp,
+            ),
+        );
+        peers.update_bitfield(second, bf(0b10000000));
+        assert_eq!(*peers.piece_availability.read(), vec![2, 0, 0, 1]);
+        peers.with_peer_mut(addr, "test", |peer| {
+            peer.take_state(&peers);
+        });
+        assert_eq!(*peers.piece_availability.read(), vec![1, 0, 0, 0]);
+        peers.drop_peer(addr);
+        peers.drop_peer(second);
+        assert_eq!(*peers.piece_availability.read(), vec![0; 4]);
     }
 }
