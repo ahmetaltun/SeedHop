@@ -127,6 +127,12 @@ import Foundation
               scheduled.schedule == weekly, scheduled.scheduleActive == true,
               scheduled.downloadLimit == 31_000, scheduled.normalDownloadLimit == 250_000,
               scheduled.torrents.first?.pausedIntent == true else { throw UserFacingError(message:"XPC schedule lost settings, effective limits or pause intent") }
+        var alternative = EngineRequest(command:"alternativeLimits")
+        alternative.downloadLimit = 12_000; alternative.uploadLimit = 3_000; alternative.alternativeLimitsEnabled = true
+        _ = try await client.send(alternative)
+        guard let capped = try await client.send(EngineRequest(command:"snapshot")).snapshot,
+              capped.alternativeLimitsEnabled == true, capped.downloadLimit == 12_000, capped.uploadLimit == 3_000,
+              capped.normalDownloadLimit == 250_000, capped.schedule == weekly else { throw UserFacingError(message:"XPC alternative limits did not override scheduled caps") }
         let pendingSchedule = scratch.appendingPathComponent("state/schedule.pending")
         try FileManager.default.createDirectory(at:pendingSchedule,withIntermediateDirectories:false)
         scheduleRequest.schedule?.enabled = false
@@ -139,19 +145,22 @@ import Foundation
         _=try await client.send(EngineRequest(command:"shutdown")); client.invalidate()
         try await Task.sleep(for:.milliseconds(600))
         try client.connect(background:false)
-        guard let restored=try await client.send(connect).snapshot,restored.torrents.count==1,restored.downloadLimit==31_000,restored.schedule == weekly,restored.normalDownloadLimit == 250_000 else { throw UserFacingError(message:"Restore did not preserve library state") }
+        guard let restored=try await client.send(connect).snapshot,restored.torrents.count==1,restored.downloadLimit==12_000,restored.alternativeLimitsEnabled == true,restored.alternativeDownloadLimit == 12_000,restored.alternativeUploadLimit == 3_000,restored.schedule == weekly,restored.normalDownloadLimit == 250_000 else { throw UserFacingError(message:"Restore did not preserve library state") }
         try await waitForPaused(client,id:id)
         try verifyImportOptions()
         guard let item = try await client.send(EngineRequest(command:"snapshot")).snapshot?.torrents.first,
               item.id == id, item.files[0].priority == 2, item.files[0].name == "renamed-fixture.bin", item.destination == moved.path,
               restored.maxActiveDownloads == 1, restored.peerEncryption == .require, restored.savedPeerEncryption == .require else { throw UserFacingError(message:"Restoration lost file management settings") }
+        alternative.alternativeLimitsEnabled = false
+        _ = try await client.send(alternative)
+        guard try await client.send(EngineRequest(command:"snapshot")).snapshot?.downloadLimit == 31_000 else { throw UserFacingError(message:"Disabling alternative limits did not restore scheduled caps") }
         _ = try await client.send(scheduleRequest)
         guard let normal = try await client.send(EngineRequest(command:"snapshot")).snapshot,
               normal.downloadLimit == 250_000, normal.scheduleActive == false else { throw UserFacingError(message:"Disabling XPC schedule did not restore normal limits") }
         var remove=EngineRequest(command:"remove"); remove.id=id; remove.deleteFiles=false
         _=try await client.send(remove)
         _=try await client.send(EngineRequest(command:"shutdown")); client.invalidate()
-        print("PASS: XPC requirement, protocol v\(SeedHopIdentity.protocolVersion), typed diagnostics, weekly schedule save/failure/retry/restart/normal-limit restoration, import options and restart persistence, Force Recheck, stale Retry preserves paused choices, policy save failure and retry, policy activation after restart, priorities, queue, live file progress, move/rename cancellation, stale cancellation, rename, relocation, exact bytes, restart, paused selection, removal, shutdown")
+        print("PASS: XPC requirement, protocol v\(SeedHopIdentity.protocolVersion), typed diagnostics, alternative bandwidth save/switch/restart/schedule restoration, weekly schedule save/failure/retry/restart/normal-limit restoration, import options and restart persistence, Force Recheck, stale Retry preserves paused choices, policy save failure and retry, policy activation after restart, priorities, queue, live file progress, move/rename cancellation, stale cancellation, rename, relocation, exact bytes, restart, paused selection, removal, shutdown")
     }
     private static func verifyFileCancellation(_ client: EngineClient, id: String, source: URL, content: Data, scratch: URL) async throws {
         let destination = scratch.appendingPathComponent("cancelled-move")

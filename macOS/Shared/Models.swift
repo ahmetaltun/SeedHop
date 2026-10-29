@@ -147,6 +147,9 @@ struct LibrarySnapshot: Codable {
     var schedulingWarning: String? = nil
     var normalDownloadLimit: UInt32? = nil
     var normalUploadLimit: UInt32? = nil
+    var alternativeDownloadLimit: UInt32? = nil
+    var alternativeUploadLimit: UInt32? = nil
+    var alternativeLimitsEnabled: Bool? = nil
 }
 struct ImportPreview: Codable {
     var id: String
@@ -157,6 +160,7 @@ struct ImportPreview: Codable {
 }
 struct EngineRequest: Codable {
     var version = SeedHopIdentity.protocolVersion
+    var alternativeLimitsEnabled: Bool? = nil
     var command: String
     var requestId = UUID().uuidString
     var id: String?
@@ -213,6 +217,8 @@ enum SizeText {
         let formatter = ByteCountFormatter(); formatter.countStyle = .file
         return formatter.string(fromByteCount: Int64(clamping: value))
     }
+    static func limit(_ value: UInt32) -> String { value == 0 ? "Unlimited" : "\(value / 1000) KB/s" }
+    static func rate(_ value: UInt64, limit: UInt32) -> String { rate(value) + (limit == 0 ? "" : " / " + self.limit(limit)) }
     static func rate(_ value: UInt64) -> String { value == 0 ? "—" : bytes(value) + "/s" }
 }
 

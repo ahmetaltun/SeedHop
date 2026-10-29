@@ -64,6 +64,7 @@ import AppKit
         print("PASS: Dismissing import returns focus to the native transfer table.")
         try await verifyControlledSheets(store:store,window:reopened)
         try await verifyFilesOutline()
+        try await verifyAlternativeBandwidthSwitch(store:store,window:reopened)
         try await verifySchedulingSettings()
         try await verifyNativeTransferControls()
         try await verifyWorkspaceLayout()
@@ -177,6 +178,40 @@ import AppKit
         }
         guard lightest-darkest > 0.15 else { throw UserFacingError(message:"First arriving transfer has blank name text") }
         print("PASS: First arriving transfer name renders visible text after an empty library and live updates.")
+    }
+
+    private static func verifyAlternativeBandwidthSwitch(store: LibraryStore, window: NSWindow) async throws {
+        await store.refresh()
+        try await settle()
+        guard let control = descendants(window.contentView).compactMap({ $0 as? NSSwitch }).first,
+              !control.isEnabled, control.state == .off else { throw UserFacingError(message:"Unset alternative bandwidth switch was enabled") }
+        // The tortoise is the last content button, immediately before the switch.
+        guard let tortoise = descendants(window.contentView).compactMap({ $0 as? NSButton }).last else { throw UserFacingError(message:"Bandwidth settings button unavailable") }
+        tortoise.performClick(nil)
+        try await waitUntil("Tortoise did not open the bandwidth window") { NSApp.windows.contains { $0.isVisible && $0.title == "Bandwidth Limits" } }
+        guard let settings = NSApp.windows.first(where:{ $0.isVisible && $0.title == "Bandwidth Limits" }) else { throw UserFacingError(message:"Bandwidth settings window unavailable") }
+        defer { settings.close() }
+        try await settle()
+        let args = ProcessInfo.processInfo.arguments
+        if let index = args.firstIndex(of:"--output"), args.indices.contains(index+1) {
+            let url = URL(fileURLWithPath:args[index+1]).deletingPathExtension().appendingPathExtension("bandwidth-unset.png")
+            try capture(settings,to:url)
+        }
+        try await store.setAlternativeLimits(download:12_000,upload:3_000,enabled:false)
+        try await settle()
+        guard control.isEnabled else { throw UserFacingError(message:"Saved alternative caps did not enable the switch") }
+        control.performClick(nil)
+        try await waitUntil("Alternative bandwidth switch did not enable limits") { store.alternativeLimitsEnabled }
+        guard let request = UXSelfTest.nativeRequests.last(where:{$0.command == "alternativeLimits"}),
+              request.alternativeLimitsEnabled == true, request.downloadLimit == 12_000, request.uploadLimit == 3_000 else { throw UserFacingError(message:"Bandwidth switch sent incorrect limits") }
+        try await settle()
+        if let index = args.firstIndex(of:"--output"), args.indices.contains(index+1) {
+            let url = URL(fileURLWithPath:args[index+1]).deletingPathExtension().appendingPathExtension("bandwidth-active.png")
+            try capture(settings,to:url)
+        }
+        control.performClick(nil)
+        try await waitUntil("Alternative bandwidth switch did not restore global limits") { !store.alternativeLimitsEnabled }
+        print("PASS: Unset alternative switch stays disabled, tortoise opens bandwidth settings, saved caps enable switching, and profiles stay synchronized.")
     }
 
     private static func verifySchedulingSettings() async throws {

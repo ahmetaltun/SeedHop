@@ -143,6 +143,9 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             try core.setSchedule(enabled:schedule.enabled,rules:schedule.rules.map { rule in
                 ScheduleWindow(days:rule.days,startMinute:rule.startMinute,endMinute:rule.endMinute,downloadLimit:rule.downloadLimit,uploadLimit:rule.uploadLimit,suspend:rule.suspend)
             })
+        case "alternativeLimits":
+            guard let down = r.downloadLimit, let up = r.uploadLimit, let enabled = r.alternativeLimitsEnabled else { throw UserFacingError(message:"Missing alternative bandwidth limits.") }
+            try core.setAlternativeLimits(download:down, upload:up, enabled:enabled)
         case "limits": try core.setLimits(download:r.downloadLimit ?? 0, upload:r.uploadLimit ?? 0)
         case "login":
             lifecycle.lock(); defer { lifecycle.unlock() }
@@ -178,6 +181,9 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         snapshot.schedulingWarning = s.schedulingWarning
         snapshot.normalDownloadLimit = s.normalDownloadLimit
         snapshot.normalUploadLimit = s.normalUploadLimit
+        snapshot.alternativeDownloadLimit = s.alternativeDownloadLimit
+        snapshot.alternativeUploadLimit = s.alternativeUploadLimit
+        snapshot.alternativeLimitsEnabled = s.alternativeLimitsEnabled
         snapshot.peerEncryption = PeerEncryptionPolicy(rawValue:s.peerEncryption)
         snapshot.savedPeerEncryption = PeerEncryptionPolicy(rawValue:s.savedPeerEncryption)
         return snapshot

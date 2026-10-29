@@ -40,6 +40,51 @@ import Combine
             try expect(!store.torrents[0].isActive,"A suspended completed seeder was counted as an active download")
         }
 
+        try await check("Unset alternative limits cannot be enabled and bandwidth labels explain caps") {
+            let (store, peer) = library(); await store.refresh()
+            try expect(!store.hasAlternativeLimits && !store.canToggleAlternativeLimits,"Unset alternative limits enabled the switch")
+            try expect(store.alternativeLimitsHint.contains("not set"),"Unset limits lacked setup guidance")
+            var rejected = false
+            do { try await store.setAlternativeLimits(download:0,upload:0,enabled:true) } catch { rejected = true }
+            try expect(rejected && peer.commands("alternativeLimits").isEmpty,"Unset limits reached the engine")
+            try expect(SizeText.limit(0) == "Unlimited" && SizeText.limit(12_000) == "12 KB/s","Limits showed 0 as a cap")
+            let parsed = try BandwidthDraft.bytes(" 12 ",direction:"Download")
+            try expect(parsed == 12_000,"Bandwidth input lost unit conversion")
+            for invalid in ["-1","1.5","4294968","letters",""] {
+                var invalidRejected = false
+                do { _ = try BandwidthDraft.bytes(invalid,direction:"Download") } catch { invalidRejected = true }
+                try expect(invalidRejected,"Invalid bandwidth input was accepted")
+            }
+            store.normalDownloadLimit = 80_000; store.downloadLimit = 80_000
+            try expect(store.bandwidthStatus.contains("Global") && store.bandwidthStatus.contains("80 KB/s"),"Global cap was not explained")
+            store.scheduleActive = true
+            try expect(store.bandwidthProfileTitle == "Scheduled","Scheduled limits were labeled global")
+            try await store.setAlternativeLimits(download:0,upload:3_000,enabled:false)
+            try expect(store.hasAlternativeLimits && store.canToggleAlternativeLimits,"One-direction cap could not enable the switch")
+            store.connected = false
+            try expect(store.bandwidthStatus.hasPrefix("Last known:"),"Disconnected caps appeared live")
+        }
+
+        try await check("Alternative bandwidth limits wait for confirmation and recover from rejected saves") {
+            let (store, peer) = library(); await store.refresh()
+            try expect(store.alternativeLimitsAvailable && !store.alternativeLimitsEnabled,"Alternative limits were not available")
+            peer.hold = ["alternativeLimits"]
+            let save = Task { try await store.setAlternativeLimits(download:12_000,upload:3_000,enabled:true) }
+            try await eventually { peer.pending.count == 1 }
+            try expect(store.savingBandwidth && !store.alternativeLimitsEnabled,"Switch changed before engine confirmation")
+            peer.releaseFirst(error:UserFacingError(message:"Read-only library"))
+            do { try await save.value } catch { }
+            try expect(!store.savingBandwidth && !store.alternativeLimitsEnabled,"Rejected save changed alternative mode")
+            let retry = Task { try await store.setAlternativeLimits(download:12_000,upload:3_000,enabled:true) }
+            try await eventually { peer.pending.count == 1 }; peer.releaseFirst()
+            try await retry.value
+            try expect(store.alternativeLimitsEnabled && store.alternativeDownloadLimit == 12_000 && store.alternativeUploadLimit == 3_000,"Confirmed alternative limits were not reflected")
+            store.connected = false
+            var rejected = false
+            do { try await store.setAlternativeLimits(download:0,upload:0,enabled:false) } catch { rejected = true }
+            try expect(rejected && store.alternativeLimitsEnabled,"Disconnected switch changed saved state")
+        }
+
         try await check("New import clears old input and preserves an open draft") {
             let store = LibraryStore(designPreview:true)
             store.incomingFile = URL(fileURLWithPath:"/tmp/old.torrent"); store.incomingMagnet = "old"
@@ -770,6 +815,11 @@ import Combine
     var peerEncryption: PeerEncryptionPolicy? = .allow
     var savedPeerEncryption: PeerEncryptionPolicy? = .allow
     var schedule = ScheduleConfig()
+    var normalDownloadLimit: UInt32 = 0
+    var normalUploadLimit: UInt32 = 0
+    var alternativeDownloadLimit: UInt32 = 0
+    var alternativeUploadLimit: UInt32 = 0
+    var alternativeLimitsEnabled = false
     var connections: [Bool] = []
     var stopped = false
     var failConnect = false
@@ -797,13 +847,20 @@ import Combine
         switch request.command {
         case "connect", "snapshot":
             if request.command == "connect" && stopped { peerEncryption = savedPeerEncryption; stopped = false }
-            return EngineReply(snapshot:LibrarySnapshot(protocolVersion:UInt32(SeedHopIdentity.protocolVersion),engineVersion:"test",instanceId:"fixture",listenPort:0,downloadLimit:0,uploadLimit:0,maxActiveDownloads:maxActiveDownloads,torrents:torrents,fileOperation:fileOperation,storageRecovery:storageRecovery,peerEncryption:peerEncryption,savedPeerEncryption:savedPeerEncryption,schedule:schedule))
+            return EngineReply(snapshot:LibrarySnapshot(protocolVersion:UInt32(SeedHopIdentity.protocolVersion),engineVersion:"test",instanceId:"fixture",listenPort:0,downloadLimit:alternativeLimitsEnabled ? alternativeDownloadLimit : normalDownloadLimit,uploadLimit:alternativeLimitsEnabled ? alternativeUploadLimit : normalUploadLimit,maxActiveDownloads:maxActiveDownloads,torrents:torrents,fileOperation:fileOperation,storageRecovery:storageRecovery,peerEncryption:peerEncryption,savedPeerEncryption:savedPeerEncryption,schedule:schedule,normalDownloadLimit:normalDownloadLimit,normalUploadLimit:normalUploadLimit,alternativeDownloadLimit:alternativeDownloadLimit,alternativeUploadLimit:alternativeUploadLimit,alternativeLimitsEnabled:alternativeLimitsEnabled))
         case "torrentDetails":
             guard !missingDetails, let item = torrents.first(where:{ $0.id == request.id }) else { return EngineReply() }
             var details = PreviewFixtures.diagnostics(item,section:request.section ?? "general")
             details.instanceId = "fixture"
             return EngineReply(details:details)
         case "shutdown": stopped = true
+        case "limits":
+            normalDownloadLimit = request.downloadLimit ?? normalDownloadLimit
+            normalUploadLimit = request.uploadLimit ?? normalUploadLimit
+        case "alternativeLimits":
+            alternativeDownloadLimit = request.downloadLimit ?? alternativeDownloadLimit
+            alternativeUploadLimit = request.uploadLimit ?? alternativeUploadLimit
+            alternativeLimitsEnabled = request.alternativeLimitsEnabled ?? alternativeLimitsEnabled
         case "schedule": schedule = request.schedule ?? schedule
         case "peerEncryption": savedPeerEncryption = request.peerEncryption
         case "retryStorageRecovery", "keepRecoveryCopies": storageRecovery = nil

@@ -184,18 +184,24 @@ impl Engine {
         let queue = management::QueueConfig::load(&dir)?;
         let accounting = diagnostics::Accounting::load(&dir)?;
         let schedule = ScheduleConfig::load(&dir)?;
+        let alternative = scheduling::AlternativeLimits::load(&dir)?;
         let limits: [u32; 2] = if limits_path.exists() {
             serde_json::from_slice(&std::fs::read(limits_path).map_err(storage::io_error)?)
                 .map_err(|e| CoreError::CorruptState(e.to_string()))?
         } else {
             [0, 0]
         };
+        let startup_limits = if alternative.enabled {
+            [alternative.download, alternative.upload]
+        } else {
+            limits
+        };
         let options = SessionOptions {
             peer_encryption,
             restore_queued: queue.max_active > 0 || schedule.enabled,
             ratelimits: librqbit::limits::LimitsConfig {
-                download_bps: NonZeroU32::new(limits[0]),
-                upload_bps: NonZeroU32::new(limits[1]),
+                download_bps: NonZeroU32::new(startup_limits[0]),
+                upload_bps: NonZeroU32::new(startup_limits[1]),
             },
             dht: if config.allow_network_discovery {
                 Some(librqbit::DhtSessionConfig {
@@ -239,6 +245,7 @@ impl Engine {
             scheduling_warning: Mutex::new(None),
             scheduling: Mutex::new(scheduling::Scheduling {
                 config: schedule,
+                alternative,
                 normal_limits: limits,
                 active: None,
             }),
@@ -325,6 +332,9 @@ impl Engine {
             schedule_active: scheduling.active.is_some(),
             normal_download_limit: scheduling.normal_limits[0],
             normal_upload_limit: scheduling.normal_limits[1],
+            alternative_download_limit: scheduling.alternative.download,
+            alternative_upload_limit: scheduling.alternative.upload,
+            alternative_limits_enabled: scheduling.alternative.enabled,
             peer_encryption: connection_settings::name(self.active_peer_encryption).into(),
             saved_peer_encryption: connection_settings::name(
                 self.connection_settings.lock().unwrap().peer_encryption,

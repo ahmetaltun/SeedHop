@@ -37,6 +37,11 @@ import SwiftUI
             }
             CommandGroup(before:.appTermination) { Button("Quit and Stop Transfers") { delegate.stopEverything = true; NSApp.terminate(nil) }.keyboardShortcut("q",modifiers:[.command,.option]) }
         }
+        Window("Bandwidth Limits",id:"bandwidth") {
+            ScrollView { BandwidthSettingsView().padding(24) }
+                .frame(width:500,height:610).background(Design.canvas).tint(Design.green)
+                .environmentObject(store)
+        }.windowResizability(.contentSize)
         Settings { SettingsView().environmentObject(store) }
     }
 }

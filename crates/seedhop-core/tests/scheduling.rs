@@ -78,7 +78,12 @@ async fn schedule_caps_suspend_seeding_and_downloads_preserve_intent_and_restart
     engine.set_limits(90000, 17000).await.unwrap();
     assert_eq!(engine.snapshot().unwrap().download_limit, 23000);
     engine.set_schedule(schedule(true)).await.unwrap();
+    engine
+        .set_alternative_limits(12_000, 3_000, true)
+        .await
+        .unwrap();
     let suspended = engine.snapshot().unwrap();
+    assert_eq!(suspended.download_limit, 12_000);
     for t in &suspended.torrents {
         assert_eq!(
             t.state,
@@ -95,6 +100,11 @@ async fn schedule_caps_suspend_seeding_and_downloads_preserve_intent_and_restart
     settled(&engine).await;
     let restored = engine.snapshot().unwrap();
     assert_eq!(restored.schedule, schedule(true));
+    assert!(restored.alternative_limits_enabled);
+    engine
+        .set_alternative_limits(12_000, 3_000, false)
+        .await
+        .unwrap();
     assert_eq!(
         (restored.normal_download_limit, restored.normal_upload_limit),
         (90000, 17000)
@@ -223,5 +233,81 @@ async fn failed_application_is_visible_and_timer_retries_without_losing_the_save
     })
     .await
     .unwrap();
+    engine.shutdown().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn alternative_limits_switch_profiles_preserve_schedule_and_restart() {
+    let state = tempfile::tempdir().unwrap();
+    let files = tempfile::tempdir().unwrap();
+    let cfg = config(state.path(), files.path());
+    let engine = Engine::open(cfg.clone()).await.unwrap();
+    let initial = engine.snapshot().unwrap();
+    assert!(!initial.alternative_limits_enabled);
+    assert_eq!(initial.alternative_download_limit, 0);
+    assert!(engine.set_alternative_limits(0, 0, true).await.is_err());
+    assert!(!engine.snapshot().unwrap().alternative_limits_enabled);
+    engine.set_limits(80_000, 16_000).await.unwrap();
+    engine
+        .set_alternative_limits(12_000, 3_000, false)
+        .await
+        .unwrap();
+    assert_eq!(engine.snapshot().unwrap().download_limit, 80_000);
+    engine.set_schedule(schedule(false)).await.unwrap();
+    assert_eq!(engine.snapshot().unwrap().download_limit, 23_000);
+    engine
+        .set_alternative_limits(12_000, 3_000, true)
+        .await
+        .unwrap();
+    engine.set_limits(90_000, 17_000).await.unwrap();
+    let active = engine.snapshot().unwrap();
+    assert!(active.alternative_limits_enabled && active.schedule_active);
+    assert_eq!(
+        (active.download_limit, active.upload_limit),
+        (12_000, 3_000)
+    );
+    assert_eq!(active.normal_download_limit, 90_000);
+    engine.shutdown().await.unwrap();
+    drop(engine);
+    let engine = Engine::open(cfg).await.unwrap();
+    let restored = engine.snapshot().unwrap();
+    assert!(restored.alternative_limits_enabled);
+    assert_eq!(
+        (restored.download_limit, restored.upload_limit),
+        (12_000, 3_000)
+    );
+    engine.set_schedule(schedule(true)).await.unwrap();
+    assert!(engine.snapshot().unwrap().schedule.rules[0].suspend);
+    engine
+        .set_alternative_limits(12_000, 3_000, false)
+        .await
+        .unwrap();
+    assert_eq!(engine.snapshot().unwrap().download_limit, 23_000);
+    engine
+        .set_schedule(ScheduleConfig::default())
+        .await
+        .unwrap();
+    assert_eq!(engine.snapshot().unwrap().download_limit, 90_000);
+    assert!(engine.set_alternative_limits(0, 0, true).await.is_err());
+    assert_eq!(engine.snapshot().unwrap().download_limit, 90_000);
+    engine.set_alternative_limits(0, 3_000, true).await.unwrap();
+    assert_eq!(engine.snapshot().unwrap().download_limit, 0);
+    assert_eq!(engine.snapshot().unwrap().upload_limit, 3_000);
+    engine.shutdown().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn alternative_limits_failed_save_keeps_previous_profile() {
+    let state = tempfile::tempdir().unwrap();
+    let files = tempfile::tempdir().unwrap();
+    let engine = Engine::open(config(state.path(), files.path()))
+        .await
+        .unwrap();
+    engine.set_limits(80_000, 16_000).await.unwrap();
+    std::fs::create_dir(state.path().join("alternative-limits.json")).unwrap();
+    assert!(engine.set_alternative_limits(1, 2, true).await.is_err());
+    let snapshot = engine.snapshot().unwrap();
+    assert!(!snapshot.alternative_limits_enabled);
+    assert_eq!(snapshot.download_limit, 80_000);
     engine.shutdown().await.unwrap();
 }

@@ -68,6 +68,11 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     @Published private(set) var storageRequests = Set<String>()
     @Published private(set) var cancellingOperations = Set<String>()
     @Published var schedule: ScheduleConfig?
+    @Published var alternativeDownloadLimit: UInt32 = 0
+    @Published var alternativeUploadLimit: UInt32 = 0
+    @Published var alternativeLimitsEnabled = false
+    @Published var alternativeLimitsAvailable = false
+    @Published var savingBandwidth = false
     @Published var scheduleActive = false
     @Published var schedulingWarning: String?
     @Published var normalDownloadLimit: UInt32 = 0
@@ -202,7 +207,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
 
     var encryptionRestartPending: Bool { peerEncryption != nil && savedPeerEncryption != nil && peerEncryption != savedPeerEncryption }
     var canSaveEncryption: Bool { canChangeTransfers && !savingEncryption && savedPeerEncryption != nil }
-    var canRestartForEncryption: Bool { canChangeTransfers && encryptionRestartPending && !savingEncryption && !savingSchedule && busyTransfers.isEmpty && !savingQueue && !showImport }
+    var canRestartForEncryption: Bool { canChangeTransfers && encryptionRestartPending && !savingEncryption && !savingSchedule && !savingBandwidth && busyTransfers.isEmpty && !savingQueue && !showImport }
     var connectionPortDescription: String { !connected ? "Unavailable while disconnected" : listenPort == 0 ? "No listening port reported" : "\(listenPort)" }
     func saveEncryption(_ policy: PeerEncryptionPolicy) {
         guard canSaveEncryption else { return }
@@ -301,6 +306,10 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         if schedulingWarning != snapshot.schedulingWarning { schedulingWarning = snapshot.schedulingWarning }
         if schedule != snapshot.schedule { schedule = snapshot.schedule }
         if scheduleActive != (snapshot.scheduleActive ?? false) { scheduleActive = snapshot.scheduleActive ?? false }
+        if alternativeLimitsAvailable != (snapshot.alternativeLimitsEnabled != nil) { alternativeLimitsAvailable = snapshot.alternativeLimitsEnabled != nil }
+        if alternativeDownloadLimit != (snapshot.alternativeDownloadLimit ?? 0) { alternativeDownloadLimit = snapshot.alternativeDownloadLimit ?? 0 }
+        if alternativeUploadLimit != (snapshot.alternativeUploadLimit ?? 0) { alternativeUploadLimit = snapshot.alternativeUploadLimit ?? 0 }
+        if alternativeLimitsEnabled != (snapshot.alternativeLimitsEnabled ?? false) { alternativeLimitsEnabled = snapshot.alternativeLimitsEnabled ?? false }
         let normalDown = snapshot.normalDownloadLimit ?? snapshot.downloadLimit
         let normalUp = snapshot.normalUploadLimit ?? snapshot.uploadLimit
         if normalDownloadLimit != normalDown { normalDownloadLimit = normalDown }
@@ -474,7 +483,37 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         do { _ = try await perform(request); await refresh() }
         catch { await refresh(); throw error }
     }
+    var hasAlternativeLimits: Bool { alternativeDownloadLimit > 0 || alternativeUploadLimit > 0 }
+    var canToggleAlternativeLimits: Bool { canChangeBandwidth && alternativeLimitsAvailable && (hasAlternativeLimits || alternativeLimitsEnabled) }
+    var bandwidthProfileTitle: String { alternativeLimitsEnabled ? "Alternative" : scheduleActive ? "Scheduled" : "Global" }
+    var bandwidthStatus: String {
+        "\(connected ? "" : "Last known: ")\(bandwidthProfileTitle) limits · ↓ \(SizeText.limit(downloadLimit)) · ↑ \(SizeText.limit(uploadLimit))"
+    }
+    var alternativeLimitsHint: String {
+        hasAlternativeLimits ? "Alternative limits: download \(SizeText.limit(alternativeDownloadLimit)), upload \(SizeText.limit(alternativeUploadLimit))." : "Alternative limits are not set. Click the tortoise to set a download or upload limit."
+    }
+    var canChangeBandwidth: Bool { canChangeTransfers && !savingBandwidth }
+    func setAlternativeLimits(download: UInt32, upload: UInt32, enabled: Bool) async throws {
+        guard canChangeBandwidth, alternativeLimitsAvailable else { throw UserFacingError(message:"Wait for the engine, then apply alternative limits again.") }
+        guard !enabled || download > 0 || upload > 0 else { throw UserFacingError(message:"Set an alternative download or upload limit before enabling alternative limits.") }
+        savingBandwidth = true
+        defer { savingBandwidth = false }
+        var request = EngineRequest(command:"alternativeLimits")
+        request.downloadLimit = download; request.uploadLimit = upload; request.alternativeLimitsEnabled = enabled
+        do { _ = try await perform(request); await refresh() }
+        catch { await refresh(); throw error }
+    }
+    func toggleAlternativeLimits(_ enabled: Bool) {
+        guard canToggleAlternativeLimits else { return }
+        Task {
+            do { try await setAlternativeLimits(download:alternativeDownloadLimit,upload:alternativeUploadLimit,enabled:enabled) }
+            catch { self.error = error.localizedDescription }
+        }
+    }
     func setLimits(download: UInt32, upload: UInt32) async throws {
+        guard canChangeBandwidth else { throw UserFacingError(message:"Wait for the engine, then apply limits again.") }
+        savingBandwidth = true
+        defer { savingBandwidth = false }
         guard !hasFileOperation else { throw UserFacingError(message:"Wait for the current file change to finish, then apply limits again.") }
         var r = EngineRequest(command:"limits"); r.downloadLimit = download; r.uploadLimit = upload
         _ = try await perform(r); await refresh()
@@ -618,7 +657,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         }
     }
     func setBackground(_ enabled: Bool) async {
-        guard !designPreview, !switching, !hasFileOperation, !savingEncryption, !savingSchedule else { return }
+        guard !designPreview, !switching, !hasFileOperation, !savingEncryption, !savingSchedule, !savingBandwidth else { return }
         switching = true; polling?.cancel(); defer { switching = false; beginPolling() }
         let service = SMAppService.agent(plistName:SeedHopIdentity.agentPlist)
         var stoppedCurrent = false

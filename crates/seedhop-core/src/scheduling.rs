@@ -29,7 +29,33 @@ struct SavedSchedule {
     config: ScheduleConfig,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct AlternativeLimits {
+    pub download: u32,
+    pub upload: u32,
+    pub enabled: bool,
+}
+
+impl AlternativeLimits {
+    pub(crate) fn load(root: &Path) -> Result<Self> {
+        match std::fs::read(root.join("alternative-limits.json")) {
+            Ok(bytes) => {
+                let mut saved: Self = serde_json::from_slice(&bytes)
+                    .map_err(|e| CoreError::CorruptState(e.to_string()))?;
+                if saved.download == 0 && saved.upload == 0 {
+                    saved.enabled = false;
+                }
+                Ok(saved)
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
+            Err(error) => Err(storage::io_error(error)),
+        }
+    }
+}
+
 pub(crate) struct Scheduling {
+    pub alternative: AlternativeLimits,
     pub config: ScheduleConfig,
     pub normal_limits: [u32; 2],
     pub active: Option<usize>,
@@ -135,6 +161,36 @@ fn local_week_minute() -> (usize, u16) {
 }
 
 impl Engine {
+    pub async fn set_alternative_limits(&self, down: u32, up: u32, enabled: bool) -> Result<()> {
+        if enabled && down == 0 && up == 0 {
+            return Err(CoreError::InvalidInput(
+                "Set an alternative download or upload limit before enabling alternative limits."
+                    .into(),
+            ));
+        }
+        let _operation = self.operations.write().await;
+        self.ready()?;
+        let value = AlternativeLimits {
+            download: down,
+            upload: up,
+            enabled,
+        };
+        let bytes = serde_json::to_vec_pretty(&value).map_err(adapter::engine_error)?;
+        if let Err(error) = storage::atomic_write(
+            &self.state_directory.join("alternative-limits.json"),
+            &bytes,
+        ) {
+            if let Ok(saved) = AlternativeLimits::load(&self.state_directory) {
+                self.scheduling.lock().unwrap().alternative = saved;
+                self.reconcile_schedule();
+            }
+            return Err(error);
+        }
+        self.scheduling.lock().unwrap().alternative = value;
+        self.reconcile_schedule();
+        Ok(())
+    }
+
     pub async fn set_schedule(&self, config: ScheduleConfig) -> Result<()> {
         config.validate()?;
         let _operation = self.operations.write().await;
@@ -192,13 +248,17 @@ impl Engine {
     fn apply_schedule_at(&self, day: usize, minute: u16) {
         let mut state = self.scheduling.lock().unwrap();
         state.active = state.config.active_at(day, minute);
-        let limits = state
-            .active
-            .map(|index| {
-                let rule = &state.config.rules[index];
-                [rule.download_limit, rule.upload_limit]
-            })
-            .unwrap_or(state.normal_limits);
+        let limits = if state.alternative.enabled {
+            [state.alternative.download, state.alternative.upload]
+        } else {
+            state
+                .active
+                .map(|index| {
+                    let rule = &state.config.rules[index];
+                    [rule.download_limit, rule.upload_limit]
+                })
+                .unwrap_or(state.normal_limits)
+        };
         if self.session.ratelimits.get_download_bps() != NonZeroU32::new(limits[0]) {
             self.session
                 .ratelimits
@@ -215,6 +275,19 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn missing_and_legacy_unlimited_alternative_profiles_stay_off() {
+        let root = tempfile::tempdir().unwrap();
+        let initial = AlternativeLimits::load(root.path()).unwrap();
+        assert!(!initial.enabled);
+        assert_eq!((initial.download, initial.upload), (0, 0));
+        let path = root.path().join("alternative-limits.json");
+        std::fs::write(&path, br#"{"download":0,"upload":0,"enabled":true}"#).unwrap();
+        assert!(!AlternativeLimits::load(root.path()).unwrap().enabled);
+        std::fs::write(&path, br#"{"download":0,"upload":3000,"enabled":true}"#).unwrap();
+        assert!(AlternativeLimits::load(root.path()).unwrap().enabled);
+    }
+
     fn rule(days: u8, start: u16, end: u16) -> ScheduleRule {
         ScheduleRule {
             days,

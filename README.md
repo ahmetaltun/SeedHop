@@ -124,6 +124,14 @@ separate opt-ins. Downloads are stored in your chosen folder; library state is
 under `~/Library/Application Support/SeedHop`. The app does not enable a local
 HTTP control server. [BitTorrent v2 support](docs/BITTORRENT-V2.md) includes pure-v2
 and hybrid transfers, seeding, magnets, file selection, and SHA-256 restart checks.
+Settings → Transfers provides global and alternative download/upload limits in
+KB/s (0 means unlimited). Click the bottom-right tortoise to open the bandwidth
+window. The adjacent switch enables alternative limits after at least one
+nonzero cap has been saved. The status bar shows the active profile and caps
+alongside current speeds. Both profiles and the selected mode survive engine
+restarts. Alternative
+limits override scheduled caps; scheduled pauses still apply.
+
 Weekly scheduling supports bandwidth windows and transfer suspension; see
 [scheduling](docs/SCHEDULING.md). RSS and remote control are cancelled.
 Search integrations remain outside this release. Force Recheck, file priorities,

@@ -12,6 +12,7 @@ extension FocusedValues {
 
 struct LibraryView: View {
     @EnvironmentObject var store: LibraryStore
+    @Environment(\.openWindow) private var openWindow
     @State private var sortOrder = LibraryView.restoredSort()
     @State private var inspectorTab = 0
     @AppStorage("workspaceSidebarVisible",store:WorkspacePreferences.defaults) private var showSidebar = true
@@ -208,8 +209,25 @@ struct LibraryView: View {
                     Button("Clear Filters") { store.clearFilters() }.controlSize(.mini).fixedSize()
                 }
                 Spacer(minLength:0)
-                Text("↓ \(SizeText.rate(store.downloadRate))   ↑ \(SizeText.rate(store.uploadRate))").monospacedDigit().accessibilityLabel("Download \(SizeText.rate(store.downloadRate)), upload \(SizeText.rate(store.uploadRate))")
-                Text(store.connected ? "Engine connected" : "Engine disconnected").foregroundStyle(.secondary)
+                ViewThatFits(in:.horizontal) {
+                    Text("↓ \(SizeText.rate(store.downloadRate,limit:store.downloadLimit))   ↑ \(SizeText.rate(store.uploadRate,limit:store.uploadLimit))")
+                    Text("↓ \(SizeText.rate(store.downloadRate))   ↑ \(SizeText.rate(store.uploadRate))")
+                }.monospacedDigit().help(store.bandwidthStatus + ". Speeds show current rate / limit.")
+                    .accessibilityLabel("Download \(SizeText.rate(store.downloadRate)), upload \(SizeText.rate(store.uploadRate)). \(store.bandwidthStatus)")
+                Text(store.connected ? store.bandwidthProfileTitle : "Disconnected").foregroundStyle(store.alternativeLimitsEnabled ? Design.green : .secondary).help(store.bandwidthStatus)
+                Button { openWindow(id:"bandwidth") } label: {
+                    Image(systemName:store.alternativeLimitsEnabled ? "tortoise.fill" : "tortoise")
+                        .padding(.horizontal,4).padding(.vertical,3)
+                        .foregroundStyle(store.alternativeLimitsEnabled ? Design.green : .secondary)
+                }.buttonStyle(.borderless).accessibilityLabel("Open bandwidth limits")
+                    .help(store.alternativeLimitsHint + " Click to edit bandwidth limits.")
+                Toggle("Alternative limits",isOn:Binding(get:{store.alternativeLimitsEnabled},set:{store.toggleAlternativeLimits($0)}))
+                    .labelsHidden().toggleStyle(.switch).controlSize(.mini).fixedSize()
+                    .disabled(!store.canToggleAlternativeLimits)
+                    .accessibilityLabel("Alternative bandwidth limits")
+                    .accessibilityValue(store.alternativeLimitsEnabled ? "On" : "Off")
+                    .accessibilityHint(store.alternativeLimitsHint)
+                    .help(store.alternativeLimitsHint)
             }.font(.system(size:11)).padding(.horizontal,10).frame(height:26)
     }
     private var activeFilterDescription: String {

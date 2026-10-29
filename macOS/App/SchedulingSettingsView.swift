@@ -11,7 +11,7 @@ struct SchedulingSettingsView: View {
     var body: some View {
         VStack(alignment:.leading,spacing:14) {
             Toggle("Enable weekly schedule",isOn:$enabled).toggleStyle(.switch).controlSize(.small)
-            Text("Windows use this Mac’s local time. Outside them, normal bandwidth limits and queue rules apply. Scheduling needs a running engine; it does not launch or wake the Mac.").font(.system(size:11)).foregroundStyle(.secondary)
+            Text("Windows use this Mac’s local time. Outside them, global bandwidth limits and queue rules apply. Alternative limits override scheduled caps; scheduled pauses still apply. Scheduling needs a running engine; it does not launch or wake the Mac.").font(.system(size:11)).foregroundStyle(.secondary)
             if let warning = store.schedulingWarning { Text(warning).font(.system(size:11)).foregroundStyle(.orange) }
             Text(store.scheduleActive ? "A schedule window is active." : "Normal transfer settings are active.").font(.system(size:11,weight:.medium))
             Text("Overnight windows end the following day. Equal start and end times mean 24 hours. Windows cannot overlap.").font(.system(size:10)).foregroundStyle(.secondary)

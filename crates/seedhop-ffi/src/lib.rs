@@ -182,6 +182,9 @@ pub struct EngineSnapshot {
     pub scheduling_warning: Option<String>,
     pub normal_download_limit: u32,
     pub normal_upload_limit: u32,
+    pub alternative_download_limit: u32,
+    pub alternative_upload_limit: u32,
+    pub alternative_limits_enabled: bool,
     pub peer_encryption: String,
     pub saved_peer_encryption: String,
     pub protocol_version: u32,
@@ -298,6 +301,9 @@ impl EngineBridge {
             scheduling_warning: s.scheduling_warning,
             normal_download_limit: s.normal_download_limit,
             normal_upload_limit: s.normal_upload_limit,
+            alternative_download_limit: s.alternative_download_limit,
+            alternative_upload_limit: s.alternative_upload_limit,
+            alternative_limits_enabled: s.alternative_limits_enabled,
             peer_encryption: s.peer_encryption,
             saved_peer_encryption: s.saved_peer_encryption,
             protocol_version: s.protocol_version,
@@ -435,6 +441,16 @@ impl EngineBridge {
             rules: rules.into_iter().map(Into::into).collect(),
         }))
         .map_err(error)
+    }
+    pub fn set_alternative_limits(
+        &self,
+        download: u32,
+        upload: u32,
+        enabled: bool,
+    ) -> Result<(), BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.set_alternative_limits(download, upload, enabled))
+            .map_err(error)
     }
     pub fn set_limits(&self, download: u32, upload: u32) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;

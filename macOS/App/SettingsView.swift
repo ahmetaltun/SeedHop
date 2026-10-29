@@ -5,11 +5,7 @@ import UserNotifications
 struct SettingsView: View {
     @EnvironmentObject var store: LibraryStore
     @State private var tab = 0
-    @State private var down = ""
-    @State private var up = ""
-    @State private var limitError: String?
-    @State private var saving = false
-    private enum Field: Hashable { case download, upload, folder }
+    private enum Field: Hashable { case folder }
     @FocusState private var focusedField: Field?
     init(tab: Int = 0) { _tab = State(initialValue:tab) }
     var body: some View {
@@ -71,15 +67,7 @@ struct SettingsView: View {
                                 }.disabled(!store.canChangeTransfers || store.savingQueue)
                             }
                         }
-                        group("Bandwidth") {
-                            VStack(alignment:.leading,spacing:16) {
-                                settingText("Normal bandwidth limits", "Set a transfer limit in KB/s. Use 0 for unlimited. Schedule windows can replace these limits.")
-                                if store.scheduleActive { Text("Effective caps during this window: download \(store.downloadLimit / 1000) KB/s, upload \(store.uploadLimit / 1000) KB/s.").font(.system(size:11)).foregroundStyle(.secondary) }
-                                HStack { Label("Download",systemImage:"arrow.down"); Spacer(); TextField("Unlimited",text:$down).focused($focusedField,equals:.download).onSubmit { focusedField = .upload }.frame(width:90).accessibilityLabel("Download limit in kilobytes per second").accessibilityHint("Enter 0 for unlimited"); Text("KB/s").foregroundStyle(.secondary) }.font(.system(size:12))
-                                HStack { Label("Upload",systemImage:"arrow.up"); Spacer(); TextField("Unlimited",text:$up).focused($focusedField,equals:.upload).onSubmit(saveLimits).frame(width:90).accessibilityLabel("Upload limit in kilobytes per second").accessibilityHint("Enter 0 for unlimited"); Text("KB/s").foregroundStyle(.secondary) }.font(.system(size:12))
-                                HStack { if let limitError { Text(limitError).font(.system(size:10)).foregroundStyle(.orange).announceAccessibility("Bandwidth limit error. \(limitError)") }; Spacer(); Button(saving ? "Saving…" : "Apply limits",action:saveLimits).disabled(saving) }
-                            }.textFieldStyle(.roundedBorder).disabled(!store.canChangeTransfers)
-                        }
+                        BandwidthSettingsView()
                         group("Weekly schedule") { SchedulingSettingsView() }
                         Text("SeedHop rechecks saved files after an engine restart.").font(.system(size:11)).foregroundStyle(.secondary)
 
@@ -89,7 +77,6 @@ struct SettingsView: View {
                 }.padding(26)
             }
         }.frame(width:570,height:660).background(Design.canvas).tint(Design.green)
-        .onAppear { down = "\(store.normalDownloadLimit / 1000)"; up = "\(store.normalUploadLimit / 1000)" }
     }
     private func group<Content:View>(_ title: String,@ViewBuilder content: () -> Content) -> some View {
         VStack(alignment:.leading,spacing:11) { SectionEyebrow(title:title); content().padding(17).frame(maxWidth:.infinity,alignment:.leading).background(Design.card,in:RoundedRectangle(cornerRadius:11)).overlay(RoundedRectangle(cornerRadius:11).stroke(Design.line)) }
@@ -97,11 +84,4 @@ struct SettingsView: View {
     private func settingText(_ title:String,_ detail:String) -> some View { VStack(alignment:.leading,spacing:5) { Text(title).font(.system(size:12,weight:.medium)); Text(detail).font(.system(size:10)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true) } }
     private func info(_ title:String,_ value:String) -> some View { HStack { Text(title).foregroundStyle(.secondary); Spacer(); Text(value) }.font(.system(size:11)) }
     private func chooseFolder() { let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.directoryURL = URL(fileURLWithPath:store.downloadDirectory); panel.begin { focusedField = .folder; if $0 == .OK, let url = panel.url { store.downloadDirectory = url.path; UserDefaults.standard.set(url.path,forKey:"downloadDirectory") } } }
-    private func saveLimits() {
-        guard !saving, store.canChangeTransfers else { return }
-        guard let download = UInt32(down), download <= UInt32.max / 1000 else { limitError = "Download limit must be a whole number from 0 to 4,294,967."; focusedField = .download; return }
-        guard let upload = UInt32(up), upload <= UInt32.max / 1000 else { limitError = "Upload limit must be a whole number from 0 to 4,294,967."; focusedField = .upload; return }
-        saving = true; limitError = nil
-        Task { defer { saving = false }; do { try await store.setLimits(download:download * 1000,upload:upload * 1000) } catch { limitError = error.localizedDescription } }
-    }
 }

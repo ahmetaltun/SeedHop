@@ -36,6 +36,21 @@ local draft; failed saves retain the draft and report an actionable error.
   It does not create a service, launch the app, wake the Mac, or enable login
   resume. An engine that is stopped performs no scheduled work.
 
+## Alternative bandwidth limits
+
+Settings → Transfers provides a second download/upload profile. The bottom-right
+switch selects it immediately. Click the adjacent tortoise to open the bandwidth
+window, which shows saved profiles and effective caps. The switch stays disabled
+until at least one alternative cap is greater than zero. While enabled, alternative limits replace
+both global and scheduled caps. Schedule suspension and manual pause intent still
+apply. Switching off restores the current scheduled caps, or global caps outside
+windows. Saving global limits while alternative limits are active preserves them
+for later. Both profiles use decimal KB/s; 0 means unlimited.
+
+The engine atomically saves alternative caps and the selected mode together in
+`alternative-limits.json`. A missing file defaults to no alternative caps and alternative mode off.
+Previously saved unlimited alternative profiles load with alternative mode off. Existing global limits remain in `limits.json`.
+
 ## Persistence and compatibility
 
 `schedule.json` is an atomically written version-1 record in the library state

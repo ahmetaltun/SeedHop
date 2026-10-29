@@ -155,6 +155,20 @@ enum PreviewFixtures {
             try capture(LibraryView().environmentObject(controls),size:NSSize(width:1000,height:780),appearance:appearance,to:output.appendingPathComponent("cleanup-attention-\(name).png"))
             controls.torrents = []; controls.selection = []
             try capture(LibraryView().environmentObject(controls),size:NSSize(width:1000,height:780),appearance:appearance,to:output.appendingPathComponent("cleanup-orphan-\(name).png"))
+            let bandwidth = LibraryStore(designPreview:true)
+            bandwidth.showInspector = false
+            bandwidth.alternativeLimitsAvailable = true
+            for mode in ["unset","global","alternative"] {
+                bandwidth.alternativeDownloadLimit = mode == "unset" ? 0 : 500_000
+                bandwidth.alternativeUploadLimit = mode == "unset" ? 0 : 100_000
+                bandwidth.normalDownloadLimit = 2_000_000
+                bandwidth.normalUploadLimit = 500_000
+                bandwidth.alternativeLimitsEnabled = mode == "alternative"
+                bandwidth.downloadLimit = bandwidth.alternativeLimitsEnabled ? bandwidth.alternativeDownloadLimit : bandwidth.normalDownloadLimit
+                bandwidth.uploadLimit = bandwidth.alternativeLimitsEnabled ? bandwidth.alternativeUploadLimit : bandwidth.normalUploadLimit
+                try capture(LibraryView().environmentObject(bandwidth),size:NSSize(width:1000,height:680),appearance:appearance,to:output.appendingPathComponent("bandwidth-\(mode)-\(name).png"))
+                try capture(ScrollView { BandwidthSettingsView().padding(24) }.environmentObject(bandwidth).frame(width:500,height:610).background(Design.canvas),size:NSSize(width:500,height:610),appearance:appearance,to:output.appendingPathComponent("bandwidth-settings-\(mode)-\(name).png"))
+            }
             let scheduleStore = LibraryStore(designPreview:true)
             scheduleStore.schedule = ScheduleConfig(enabled:true,rules:[ScheduleRule(days:31,startMinute:1320,endMinute:360,downloadLimit:500_000,uploadLimit:100_000,suspend:false)])
             scheduleStore.scheduleActive = true
