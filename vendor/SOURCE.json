@@ -19,6 +19,7 @@
     "crates/librqbit/src/storage/filesystem/fs.rs",
     "crates/librqbit/src/torrent_state/initializing.rs",
     "crates/librqbit/src/torrent_state/live/mod.rs",
+    "crates/librqbit/src/torrent_state/live/peer/stats/snapshot.rs",
     "crates/librqbit/src/torrent_state/mod.rs",
     "crates/librqbit/src/upnp_server_adapter.rs",
     "crates/librqbit_core/Cargo.toml",

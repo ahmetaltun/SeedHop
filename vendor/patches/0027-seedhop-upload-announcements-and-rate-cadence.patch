@@ -1,0 +1,60 @@
+diff --git a/crates/librqbit/src/torrent_state/live/mod.rs b/crates/librqbit/src/torrent_state/live/mod.rs
+index 9c0ceb2..76fc025 100644
+--- a/crates/librqbit/src/torrent_state/live/mod.rs
++++ b/crates/librqbit/src/torrent_state/live/mod.rs
+@@ -327,7 +327,10 @@ impl TorrentStateLive {
+                         state
+                             .up_speed_estimator
+                             .add_snapshot(stats.uploaded_bytes, None, now);
+-                        tokio::time::sleep(Duration::from_millis(100)).await;
++                        // SpeedEstimator retains five per-second samples. A
++                        // 100 ms cadence reduced that window to half a second,
++                        // making ordinary payload bursts appear as zero/spikes.
++                        tokio::time::sleep(Duration::from_secs(1)).await;
+                     }
+                 }
+             },
+@@ -1387,7 +1390,9 @@ impl PeerConnectionHandler for &'_ PeerHandler {
+             .state
+             .peers
+             .with_live(self.addr, |l| {
+-                l.bitfield.get(id.get_usize()).map(|p| *p).unwrap_or(true)
++                // Empty peers may omit the initial bitfield. Unknown availability
++                // is not proof that they already have a newly verified piece.
++                l.bitfield.get(id.get_usize()).map(|p| *p).unwrap_or(false)
+             })
+             .unwrap_or(true);
+         !have
+diff --git a/crates/librqbit/src/torrent_state/live/peer/stats/snapshot.rs b/crates/librqbit/src/torrent_state/live/peer/stats/snapshot.rs
+index ef2be5b..40330da 100644
+--- a/crates/librqbit/src/torrent_state/live/peer/stats/snapshot.rs
++++ b/crates/librqbit/src/torrent_state/live/peer/stats/snapshot.rs
+@@ -32,6 +32,9 @@ pub struct PeerStats {
+     pub connection_id: Option<u64>,
+     pub encrypted: Option<bool>,
+     pub incoming: Option<bool>,
++    pub interested: Option<bool>,
++    pub available_pieces: Option<usize>,
++    pub pending_requests: Option<usize>,
+ }
+ 
+ impl From<&super::atomic::PeerCountersAtomic> for PeerCounters {
+@@ -83,6 +86,18 @@ impl From<&Peer> for PeerStats {
+                 PeerState::Live(l) => Some(l.incoming),
+                 _ => None,
+             },
++            interested: match state {
++                PeerState::Live(l) => Some(l.peer_interested),
++                _ => None,
++            },
++            available_pieces: match state {
++                PeerState::Live(l) if !l.bitfield.is_empty() => Some(l.bitfield.count_ones()),
++                _ => None,
++            },
++            pending_requests: match state {
++                PeerState::Live(l) => Some(l.requested_inflight_count()),
++                _ => None,
++            },
+         }
+     }
+ }

@@ -10,3 +10,8 @@ Unicode filename collision data is licensed under the notice in `UNICODE-LICENSE
 
 Patch `0026-seedhop-live-rate-limits.patch` wakes pending payload and hash quota
 waits when upload/download limits change, including when a limit becomes unlimited.
+
+Patch `0027-seedhop-upload-announcements-and-rate-cadence.patch` restores HAVE
+announcements to peers omitting their empty bitfield, matches per-torrent speed
+sampling to the estimator's per-second window, and exposes upload-demand and
+download-pipeline diagnostics.

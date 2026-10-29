@@ -201,3 +201,13 @@ and 164.304 MB/s afterward. Development builds now optimize `librqbit`, `rc4` an
 verification, resource bounds and transport fallback remain unchanged.
 
 See `TRANSFER-THROUGHPUT.md` for scope, reproduction and the blocked network gates.
+
+The follow-up lifted those network gates. Patch
+`0027-seedhop-upload-announcements-and-rate-cadence.patch` fixes suppressed HAVE
+announcements to peers omitting an empty bitfield and the 100 ms sampling cadence
+that shortened the rate estimator's intended five-second window. Real-wire
+regressions failed before each fix and pass afterward. Additive peer JSON
+diagnostics expose upload interest and advertised availability alongside pending
+requests, errors and piece steals. Controlled loopback validates both payload
+directions; short public samples distinguish lack of interested peers from an
+upload cap. Sustained public speed and incoming reachability remain unverified.

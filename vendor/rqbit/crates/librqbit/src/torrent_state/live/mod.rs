@@ -327,7 +327,10 @@ impl TorrentStateLive {
                         state
                             .up_speed_estimator
                             .add_snapshot(stats.uploaded_bytes, None, now);
-                        tokio::time::sleep(Duration::from_millis(100)).await;
+                        // SpeedEstimator retains five per-second samples. A
+                        // 100 ms cadence reduced that window to half a second,
+                        // making ordinary payload bursts appear as zero/spikes.
+                        tokio::time::sleep(Duration::from_secs(1)).await;
                     }
                 }
             },
@@ -1387,7 +1390,9 @@ impl PeerConnectionHandler for &'_ PeerHandler {
             .state
             .peers
             .with_live(self.addr, |l| {
-                l.bitfield.get(id.get_usize()).map(|p| *p).unwrap_or(true)
+                // Empty peers may omit the initial bitfield. Unknown availability
+                // is not proof that they already have a newly verified piece.
+                l.bitfield.get(id.get_usize()).map(|p| *p).unwrap_or(false)
             })
             .unwrap_or(true);
         !have

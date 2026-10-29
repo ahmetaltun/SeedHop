@@ -14,9 +14,423 @@
     "before": "failed: obsolete limiter did not wake within 500 ms",
     "after": "passed: upload and download; replace with unlimited or 1000000 B/s"
   },
-  "public_swarm": "not executed: automatic approval review model at capacity",
-  "loopback_swarm": "not executed successfully: socket binding denied; escalation review unavailable",
-  "measurement_scope": "single controlled before/after observations, not live network speeds",
+  "public_swarm": {
+    "before_followup": {
+      "downloaded_bytes": 63908801,
+      "uploaded_bytes": 327680,
+      "samples": [
+        {
+          "elapsed_seconds": 0.0,
+          "download_bytes_per_second": 0,
+          "upload_bytes_per_second": 0,
+          "live_peers": 0
+        },
+        {
+          "elapsed_seconds": 1.002,
+          "download_bytes_per_second": 0,
+          "upload_bytes_per_second": 0,
+          "live_peers": 8
+        },
+        {
+          "elapsed_seconds": 2.003,
+          "download_bytes_per_second": 9407405,
+          "upload_bytes_per_second": 0,
+          "live_peers": 11
+        },
+        {
+          "elapsed_seconds": 3.004,
+          "download_bytes_per_second": 4836910,
+          "upload_bytes_per_second": 0,
+          "live_peers": 14
+        },
+        {
+          "elapsed_seconds": 4.004,
+          "download_bytes_per_second": 7001821,
+          "upload_bytes_per_second": 0,
+          "live_peers": 15
+        },
+        {
+          "elapsed_seconds": 5.006,
+          "download_bytes_per_second": 6443329,
+          "upload_bytes_per_second": 0,
+          "live_peers": 15
+        },
+        {
+          "elapsed_seconds": 6.008,
+          "download_bytes_per_second": 5877535,
+          "upload_bytes_per_second": 0,
+          "live_peers": 14
+        },
+        {
+          "elapsed_seconds": 7.01,
+          "download_bytes_per_second": 160771,
+          "upload_bytes_per_second": 0,
+          "live_peers": 12
+        },
+        {
+          "elapsed_seconds": 8.012,
+          "download_bytes_per_second": 257077,
+          "upload_bytes_per_second": 0,
+          "live_peers": 12
+        },
+        {
+          "elapsed_seconds": 9.014,
+          "download_bytes_per_second": 419163,
+          "upload_bytes_per_second": 0,
+          "live_peers": 12
+        },
+        {
+          "elapsed_seconds": 10.017,
+          "download_bytes_per_second": 582521,
+          "upload_bytes_per_second": 0,
+          "live_peers": 12
+        },
+        {
+          "elapsed_seconds": 11.02,
+          "download_bytes_per_second": 836690,
+          "upload_bytes_per_second": 0,
+          "live_peers": 16
+        },
+        {
+          "elapsed_seconds": 12.025,
+          "download_bytes_per_second": 1367207,
+          "upload_bytes_per_second": 129439,
+          "live_peers": 15
+        },
+        {
+          "elapsed_seconds": 13.028,
+          "download_bytes_per_second": 2351083,
+          "upload_bytes_per_second": 193239,
+          "live_peers": 14
+        },
+        {
+          "elapsed_seconds": 14.032,
+          "download_bytes_per_second": 6015359,
+          "upload_bytes_per_second": 0,
+          "live_peers": 13
+        },
+        {
+          "elapsed_seconds": 15.033,
+          "download_bytes_per_second": 9356587,
+          "upload_bytes_per_second": 0,
+          "live_peers": 13
+        },
+        {
+          "elapsed_seconds": 16.035,
+          "download_bytes_per_second": 3212020,
+          "upload_bytes_per_second": 32444,
+          "live_peers": 13
+        },
+        {
+          "elapsed_seconds": 17.036,
+          "download_bytes_per_second": 680554,
+          "upload_bytes_per_second": 0,
+          "live_peers": 13
+        },
+        {
+          "elapsed_seconds": 18.041,
+          "download_bytes_per_second": 743496,
+          "upload_bytes_per_second": 0,
+          "live_peers": 13
+        },
+        {
+          "elapsed_seconds": 19.044,
+          "download_bytes_per_second": 384445,
+          "upload_bytes_per_second": 32037,
+          "live_peers": 13
+        },
+        {
+          "elapsed_seconds": 20.051,
+          "download_bytes_per_second": 2365514,
+          "upload_bytes_per_second": 0,
+          "live_peers": 13
+        }
+      ]
+    },
+    "after_followup": {
+      "downloaded_bytes": 93026178,
+      "uploaded_bytes": 0,
+      "samples": [
+        {
+          "elapsed_seconds": 0.0,
+          "download_bytes_per_second": 0,
+          "upload_bytes_per_second": 0,
+          "live_peers": 0
+        },
+        {
+          "elapsed_seconds": 1.003,
+          "download_bytes_per_second": 0,
+          "upload_bytes_per_second": 0,
+          "live_peers": 1,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 0,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 0
+        },
+        {
+          "elapsed_seconds": 2.005,
+          "download_bytes_per_second": 0,
+          "upload_bytes_per_second": 0,
+          "live_peers": 4,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 128,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 0
+        },
+        {
+          "elapsed_seconds": 3.007,
+          "download_bytes_per_second": 76341,
+          "upload_bytes_per_second": 0,
+          "live_peers": 6,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 128,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 0
+        },
+        {
+          "elapsed_seconds": 4.007,
+          "download_bytes_per_second": 106330,
+          "upload_bytes_per_second": 0,
+          "live_peers": 3,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 128,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 0
+        },
+        {
+          "elapsed_seconds": 5.009,
+          "download_bytes_per_second": 130858,
+          "upload_bytes_per_second": 0,
+          "live_peers": 3,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 256,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 0
+        },
+        {
+          "elapsed_seconds": 6.011,
+          "download_bytes_per_second": 258464,
+          "upload_bytes_per_second": 0,
+          "live_peers": 3,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 256,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 0
+        },
+        {
+          "elapsed_seconds": 7.014,
+          "download_bytes_per_second": 717277,
+          "upload_bytes_per_second": 0,
+          "live_peers": 3,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 255,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 0
+        },
+        {
+          "elapsed_seconds": 8.015,
+          "download_bytes_per_second": 1743063,
+          "upload_bytes_per_second": 0,
+          "live_peers": 3,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 256,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 0
+        },
+        {
+          "elapsed_seconds": 9.017,
+          "download_bytes_per_second": 3132780,
+          "upload_bytes_per_second": 0,
+          "live_peers": 3,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 256,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 0
+        },
+        {
+          "elapsed_seconds": 10.018,
+          "download_bytes_per_second": 4468247,
+          "upload_bytes_per_second": 0,
+          "live_peers": 3,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 256,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 0
+        },
+        {
+          "elapsed_seconds": 11.02,
+          "download_bytes_per_second": 5290929,
+          "upload_bytes_per_second": 0,
+          "live_peers": 11,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 256,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 0
+        },
+        {
+          "elapsed_seconds": 12.021,
+          "download_bytes_per_second": 6002906,
+          "upload_bytes_per_second": 0,
+          "live_peers": 13,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 512,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 1
+        },
+        {
+          "elapsed_seconds": 13.023,
+          "download_bytes_per_second": 6542180,
+          "upload_bytes_per_second": 0,
+          "live_peers": 14,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 640,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 2
+        },
+        {
+          "elapsed_seconds": 14.023,
+          "download_bytes_per_second": 6914131,
+          "upload_bytes_per_second": 0,
+          "live_peers": 13,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 639,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 2
+        },
+        {
+          "elapsed_seconds": 15.024,
+          "download_bytes_per_second": 6907442,
+          "upload_bytes_per_second": 0,
+          "live_peers": 13,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 768,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 2
+        },
+        {
+          "elapsed_seconds": 16.025,
+          "download_bytes_per_second": 7220720,
+          "upload_bytes_per_second": 0,
+          "live_peers": 12,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 640,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 2
+        },
+        {
+          "elapsed_seconds": 17.027,
+          "download_bytes_per_second": 7379434,
+          "upload_bytes_per_second": 0,
+          "live_peers": 14,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 768,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 2
+        },
+        {
+          "elapsed_seconds": 18.027,
+          "download_bytes_per_second": 7106313,
+          "upload_bytes_per_second": 0,
+          "live_peers": 14,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 768,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 2
+        },
+        {
+          "elapsed_seconds": 19.028,
+          "download_bytes_per_second": 6673225,
+          "upload_bytes_per_second": 0,
+          "live_peers": 13,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 768,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 2
+        },
+        {
+          "elapsed_seconds": 20.03,
+          "download_bytes_per_second": 6803411,
+          "upload_bytes_per_second": 0,
+          "live_peers": 13,
+          "interested_peers": 0,
+          "advertised_piece_counts": [
+            1025
+          ],
+          "pending_requests": 768,
+          "observed_live_errors": 0,
+          "observed_live_piece_steals": 2
+        }
+      ]
+    },
+    "encryption_policy": "prefer",
+    "torrent_piece_count": 1025,
+    "scope": "Two fresh 20-second observations with different peers; not a controlled speed comparison."
+  },
+  "loopback_swarm": {
+    "bytes": 16777216,
+    "elapsed_seconds": 0.162,
+    "decimal_megabytes_per_second": 103.797,
+    "upload_accounted_bytes": 16777216,
+    "byte_verification": "passed"
+  },
+  "measurement_scope": "Encryption figures are individual controlled measurements. Public swarm observations are separately recorded and are not a controlled before/after comparison.",
   "validation": {
     "focused_tests_passed": 7,
     "workspace_clippy_all_targets": "passed with -D warnings",
@@ -24,6 +438,33 @@
     "diff_check": "passed",
     "vendor_patch_reverse_check": "passed",
     "native_build": "passed; reused existing icon after iconutil failure",
+    "signature_verification": "passed --deep --strict"
+  },
+  "followup_regressions": {
+    "empty_peer_have": {
+      "before": "failed waiting for HAVE",
+      "after": "passed across six omitted/empty bitfield and hybrid identity combinations"
+    },
+    "bursty_upload_rate": {
+      "before": "failed after 1.5 s quiet gap",
+      "after": "passed; nonzero across short gap and zero after 6 s idle"
+    }
+  },
+  "followup_validation": {
+    "integration_tests": {
+      "v2_hybrid": 76,
+      "mse": 6,
+      "diagnostics": 1,
+      "swarm": 1,
+      "total": 84,
+      "failures": 0
+    },
+    "explicit_loopback_throughput": "passed",
+    "workspace_clippy_all_targets": "passed with -D warnings",
+    "formatting": "passed",
+    "diff_check": "passed",
+    "vendor_patch_reverse_check": "passed",
+    "native_build": "passed; reused existing icon",
     "signature_verification": "passed --deep --strict"
   }
 }

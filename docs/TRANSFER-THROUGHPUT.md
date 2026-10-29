@@ -1,11 +1,11 @@
 # Transfer throughput investigation — 2026-10-29
 
 The reported symptom was approximately 1 MB/s from a magnet advertised with more
-than 3,000 seeders. Two independent engine problems were reproduced and fixed.
-The supplied public swarm could not be measured in this session: the sandbox
-blocks socket listeners, and automatic approval review failed twice because its
-model was at capacity, including after the user explicitly approved both tests.
-No public-network speed improvement is claimed.
+than 3,000 seeders. The initial investigation reproduced and fixed two engine
+problems. A follow-up reproduced two more problems affecting upload availability
+and speed presentation. Socket tests were initially blocked by approval-service
+capacity; the service became available during the follow-up, allowing controlled
+swarm tests and two bounded public-swarm samples. See the follow-up results below.
 
 ## Confirmed causes and changes
 
@@ -116,7 +116,7 @@ defaults to 45 seconds and accepts 5–300 seconds.
 cargo build --offline --locked -p seedhop-core --bin seedhop-lab
 mkdir -p .build/throughput-public/downloads
 SEEDHOP_TRANSFER_TIMEOUT_SECS=20 target/debug/seedhop-lab benchmark-magnet "$MAGNET" \
-  .build/throughput-public/state .build/throughput-public/downloads \
+  "$PWD/.build/throughput-public/state" "$PWD/.build/throughput-public/downloads" \
   > .build/throughput-public/result.json
 ```
 
@@ -126,6 +126,81 @@ SEEDHOP_TRANSFER_TIMEOUT_SECS=20 target/debug/seedhop-lab benchmark-magnet "$MAG
 result can contain public endpoint addresses; raw results are kept under ignored
 `.build/`, not committed.
 
-Public-swarm throughput, live upload throughput, actual ISP capacity, VPN effects,
-router reachability and physical disk behavior remain unverified. These are
-separate from the reproduced CPU bottleneck and stale-quota bug.
+Actual ISP capacity, VPN effects, router reachability and physical disk behavior
+remain unverified. The public observations below cover two short runs on this
+machine and do not establish universal or sustained public-swarm performance.
+
+## Follow-up: bursty rates and zero uploads
+
+### Empty peers were incorrectly excluded from HAVE announcements
+
+An empty peer may omit its initial bitfield under BEP 3 and BEP 52. The engine
+treated an absent bit as if the peer already had that piece, suppressing HAVE
+announcements as new pieces finished verification. Such a peer could remain
+unaware that SeedHop had anything to upload. The fix suppresses an announcement
+only when the peer actually advertised that piece; missing availability is no
+longer interpreted as possession.
+
+The real-wire regression failed before the fix waiting for a HAVE. It now passes
+for v2, hybrid/v2 and hybrid/v1 connections, both with an omitted bitfield and an
+explicit empty bitfield. Each case downloads and verifies new pieces in SeedHop,
+checks the empty peer receives HAVE, then requests a block from SeedHop and checks
+the returned bytes and upload accounting.
+
+### The five-second rate estimator was being fed ten samples per second
+
+The per-torrent updater supplied samples every 100 ms to an estimator retaining
+five per-second samples. This reduced its steady-state window to about half a
+second. Ordinary block bursts therefore produced large peaks followed by zeros,
+including while the multi-second upload average remained nonzero. The session
+updater already used a one-second cadence.
+
+Per-torrent sampling now also runs once per second. Both download and upload
+display their intended approximately five-second average. This changes reporting,
+not the number of transferred bytes or the bandwidth available from remote peers.
+A real-peer regression failed before the fix after a 1.5-second quiet gap. It now
+checks the upload remains visible after that gap and returns to zero after six
+seconds without further uploads; cumulative payload accounting remains exact.
+
+These changes and peer diagnostics are retained in
+`vendor/patches/0027-seedhop-upload-announcements-and-rate-cadence.patch`.
+Peer diagnostics now expose remote interest, advertised piece count, pending
+download requests, connection error count and piece-steal count. Existing Swift
+decoders can ignore the added JSON fields.
+
+### Controlled transfer and supplied-magnet observations
+
+The 16 MiB real-engine loopback fixture completed in 0.162 seconds, reporting
+103.797 MB/s. All 16,777,216 bytes were uploaded, downloaded, hashed and compared.
+This verifies the local transfer paths; it is not an Internet throughput result.
+
+Two fresh, isolated 20-second samples used the supplied magnet with encryption
+set to `prefer`. The first run, before these follow-up fixes, downloaded
+63,908,801 bytes and uploaded 327,680 bytes. Its half-second rates oscillated
+between large bursts and lows. After the follow-up fixes, another fresh run
+downloaded 93,026,178 bytes and uploaded zero bytes. Its final five-second download
+rate was approximately 6.80 MB/s, with late samples around 6.67–7.38 MB/s.
+The runs encountered different peers and startup conditions, so their byte totals
+are not a controlled throughput improvement comparison.
+
+In the latter run, every observed peer with an advertised bitfield had all 1,025
+pieces in the torrent; metadata independently confirmed that piece count. Every
+observed peer reported `interested=false`. Zero upload was therefore consistent
+with no connected peer requesting SeedHop's data. Seeders already possessing the
+complete torrent cannot create upload demand. A large seeder count does not imply
+there will be downloaders needing this client's pieces.
+
+Only two piece steals and no recorded errors among the observed live peer
+snapshots appeared in the latter run. Pending downloads remained pipelined.
+These observations do not support a speculative peer-scheduler rewrite.
+
+Raw endpoint-bearing logs remain in ignored `.build/throughput-current/` and
+`.build/throughput-followup/`. Aggregate results are in
+`results/transfer-throughput-2026-10-29.json`. A long-duration public seeding test,
+incoming reachability test and ISP/VPN comparison remain outside this evidence.
+
+Follow-up validation passed all 84 tests across the v2/hybrid, MSE, diagnostics
+and swarm integration suites, plus the explicit loopback throughput fixture.
+Workspace Clippy across all targets with warnings denied, formatting, diff checks,
+vendor patch reverse-application validation and the rebuilt app's deep, strict
+signature verification also passed. Packaging reused the existing icon as above.

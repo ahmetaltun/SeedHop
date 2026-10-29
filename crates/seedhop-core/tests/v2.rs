@@ -5428,3 +5428,160 @@ async fn magnet_metadata_tries_fresh_peers_before_retrying_failures() {
         assert_eq!(std::fs::read_dir(files.path()).unwrap().count(), 0);
     }
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn empty_peers_receive_new_piece_announcements_and_can_download_them() {
+    use librqbit_peer_protocol::{Message, Request};
+    for (hybrid, legacy) in [(false, false), (true, false), (true, true)] {
+        for explicit_empty_bitfield in [false, true] {
+            let data = vec![37; 32768];
+            let mut metadata = if hybrid {
+                hybrid_files(&[("payload.bin", data.clone())], 16384, false)
+            } else {
+                fixture(&[("payload.bin", data.clone())], 16384)
+            };
+            let mut hash = parse(&metadata).info_hash();
+            if legacy {
+                hash[..20]
+                    .copy_from_slice(&sha1::Sha1::digest(encode(get(&mut metadata, b"info"))));
+            }
+            let state = tempfile::tempdir().unwrap();
+            let downloads = tempfile::tempdir().unwrap();
+            let engine = seedhop_core::Engine::open_with_peer_encryption(
+                engine_config(state.path(), downloads.path()),
+                librqbit::EncryptionPolicy::Disabled,
+            )
+            .await
+            .unwrap();
+            engine
+                .add(
+                    encode(&metadata),
+                    downloads.path().display().to_string(),
+                    vec![0],
+                    false,
+                    false,
+                )
+                .await
+                .unwrap();
+            support::wait_for(&engine, |t| t.state != "checking").await;
+            let port = engine.snapshot().unwrap().listen_port;
+            let mut empty = wire::connect(port, hash).await;
+            if explicit_empty_bitfield {
+                wire::send(&mut empty, Message::Bitfield((&[0u8][..]).into())).await;
+            }
+            // An empty client may legally omit its initial bitfield. It must
+            // learn about newly verified pieces before it can request uploads.
+            let mut source = wire::connect(port, hash).await;
+            wire::send(&mut source, Message::Bitfield((&[0xc0u8][..]).into())).await;
+            peer_interest(&mut source, true).await;
+            wire::send(&mut source, Message::Unchoke).await;
+            for index in 0..2 {
+                let request = peer_request(&mut source, index).await;
+                peer_payload(
+                    &mut source,
+                    request,
+                    &data[index as usize * 16384..][..16384],
+                )
+                .await;
+            }
+            support::wait_for(&engine, |t| t.state == "seeding").await;
+            loop {
+                let frame = wire::frame(&mut empty).await;
+                match Message::deserialize(&frame, &[]).unwrap().0 {
+                    Message::Have(0) => break,
+                    Message::Have(_) | Message::KeepAlive => {}
+                    other => panic!("unexpected announcement {other:?}"),
+                }
+            }
+            wire::send(&mut empty, Message::Interested).await;
+            wire::send(
+                &mut empty,
+                Message::Request(Request {
+                    index: 0,
+                    begin: 0,
+                    length: 16384,
+                }),
+            )
+            .await;
+            loop {
+                let frame = wire::frame(&mut empty).await;
+                match Message::deserialize(&frame, &[]).unwrap().0 {
+                    Message::Piece(piece) => {
+                        assert_eq!(piece.data().0, &data[..16384]);
+                        break;
+                    }
+                    Message::Have(_) | Message::KeepAlive => {}
+                    other => panic!("unexpected upload reply {other:?}"),
+                }
+            }
+            support::wait_for(&engine, |t| t.network_uploaded_bytes.unwrap_or(0) >= 16384).await;
+            let id = engine.snapshot().unwrap().torrents[0].id.clone();
+            let details = engine.torrent_details(id, "peers".into(), false).unwrap();
+            let recipient = details.peers.iter().find(|p| p.uploaded >= 16384).unwrap();
+            assert_eq!(recipient.interested, Some(true));
+            assert_eq!(recipient.pending_requests, Some(0));
+            assert_eq!(
+                recipient.available_pieces,
+                explicit_empty_bitfield.then_some(0)
+            );
+            engine.shutdown().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bursty_upload_rate_uses_seconds_and_eventually_returns_to_zero() {
+    use librqbit_peer_protocol::{Message, Request};
+    use std::time::Duration;
+    let data = vec![42; 16384];
+    let metadata = fixture(&[("payload.bin", data.clone())], 16384);
+    let state = tempfile::tempdir().unwrap();
+    let files = tempfile::tempdir().unwrap();
+    std::fs::write(files.path().join("payload.bin"), &data).unwrap();
+    let engine = seedhop_core::Engine::open(engine_config(state.path(), files.path()))
+        .await
+        .unwrap();
+    engine
+        .add(
+            encode(&metadata),
+            files.path().display().to_string(),
+            vec![0],
+            false,
+            true,
+        )
+        .await
+        .unwrap();
+    support::wait_for(&engine, |t| t.state == "seeding").await;
+    let mut peer = wire::connect(
+        engine.snapshot().unwrap().listen_port,
+        parse(&metadata).info_hash(),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_millis(1100)).await;
+    wire::send(&mut peer, Message::Interested).await;
+    wire::send(
+        &mut peer,
+        Message::Request(Request {
+            index: 0,
+            begin: 0,
+            length: 16384,
+        }),
+    )
+    .await;
+    let response = wire::frame(&mut peer).await;
+    let Message::Piece(piece) = Message::deserialize(&response, &[]).unwrap().0 else {
+        panic!("missing payload upload")
+    };
+    assert_eq!(piece.data().0, data);
+    // A short quiet gap must not erase a burst from a five-second estimator.
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    let item = engine.snapshot().unwrap().torrents.remove(0);
+    assert_eq!(item.network_uploaded_bytes, Some(16384));
+    assert!(
+        item.upload_rate > 0,
+        "subsecond sampling made a recent upload disappear"
+    );
+    tokio::time::sleep(Duration::from_secs(6)).await;
+    assert_eq!(engine.snapshot().unwrap().torrents[0].upload_rate, 0);
+    engine.shutdown().await.unwrap();
+}

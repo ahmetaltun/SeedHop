@@ -133,6 +133,11 @@ pub struct PeerDetails {
     pub incoming: Option<bool>,
     pub downloaded: u64,
     pub uploaded: u64,
+    pub interested: Option<bool>,
+    pub available_pieces: Option<usize>,
+    pub pending_requests: Option<usize>,
+    pub errors: u32,
+    pub pieces_stolen: u32,
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -280,6 +285,11 @@ impl Engine {
                         incoming: p.incoming,
                         downloaded: p.counters.fetched_bytes,
                         uploaded: p.counters.uploaded_bytes,
+                        interested: p.interested,
+                        available_pieces: p.available_pieces,
+                        pending_requests: p.pending_requests,
+                        errors: p.counters.errors,
+                        pieces_stolen: p.counters.times_stolen_from_me,
                     })
                     .collect()
                 })

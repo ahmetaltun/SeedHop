@@ -32,6 +32,9 @@ pub struct PeerStats {
     pub connection_id: Option<u64>,
     pub encrypted: Option<bool>,
     pub incoming: Option<bool>,
+    pub interested: Option<bool>,
+    pub available_pieces: Option<usize>,
+    pub pending_requests: Option<usize>,
 }
 
 impl From<&super::atomic::PeerCountersAtomic> for PeerCounters {
@@ -81,6 +84,18 @@ impl From<&Peer> for PeerStats {
             },
             incoming: match state {
                 PeerState::Live(l) => Some(l.incoming),
+                _ => None,
+            },
+            interested: match state {
+                PeerState::Live(l) => Some(l.peer_interested),
+                _ => None,
+            },
+            available_pieces: match state {
+                PeerState::Live(l) if !l.bitfield.is_empty() => Some(l.bitfield.count_ones()),
+                _ => None,
+            },
+            pending_requests: match state {
+                PeerState::Live(l) => Some(l.requested_inflight_count()),
                 _ => None,
             },
         }
