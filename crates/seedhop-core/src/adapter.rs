@@ -9,9 +9,10 @@ pub fn engine_error(error: impl std::fmt::Display) -> CoreError {
 
 pub fn preview(bytes: Vec<u8>) -> Result<TorrentPreview> {
     if bytes.len() > 32 * 1024 * 1024 {
-        return Err(CoreError::InvalidInput(
-            "The torrent metadata exceeds 32 MB.".into(),
-        ));
+        return Err(CoreError::Validation {
+            code: "input.the_torrent_metadata_exceeds_mb",
+            message: "The torrent metadata exceeds 32 MB.".into(),
+        });
     }
     let meta =
         librqbit::torrent_from_bytes(&bytes).map_err(|e| CoreError::InvalidInput(e.to_string()))?;

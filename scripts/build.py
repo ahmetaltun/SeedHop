@@ -8,6 +8,7 @@ import json
 import shutil
 import subprocess
 import hashlib
+from localization import LANGUAGES, check as check_localizations, normalize as normalize_localizations, pseudolocalize
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SIGNING_CONFIG = ROOT / '.build/signing-identity'
@@ -27,7 +28,13 @@ def main():
     parser.add_argument("--save-identity", action="store_true", help="Save the validated identity locally for subsequent builds")
     parser.add_argument("--validation-root", type=pathlib.Path, help="Build an isolated development lifecycle fixture with a distinct service namespace and library")
     parser.add_argument("--skip-rust",action="store_true")
+    parser.add_argument("--update-localizations",action="store_true",help="Extract and sync English source strings into catalogs")
+    parser.add_argument("--pseudolocalization",action="store_true",help="Include development-only expanded en-XA text")
     args = parser.parse_args()
+    if args.release and args.pseudolocalization:
+        parser.error("Pseudolocalization is only available in development builds.")
+    if args.release and args.update_localizations:
+        parser.error("Update catalogs in a development build before running release validation.")
     if args.identity != '-':
         identities = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'], text=True)
         if args.identity not in identities:
@@ -69,7 +76,7 @@ def main():
     iconset=ROOT/".build/AppIcon.iconset"
     run("swift","-module-cache-path",ROOT/".cache/swift",ROOT/"scripts/Icon.swift",iconset,ROOT/"macOS/Resources/AppIcon.png")
     run("iconutil","-c","icns",iconset,"-o",contents/"Resources/AppIcon.icns")
-    base = {"CFBundleVersion":"1","CFBundleShortVersionString":"0.1.0","LSMinimumSystemVersion":"15.0","CFBundleDevelopmentRegion":"en","NSLocalNetworkUsageDescription":"SeedHop connects to torrent peers and trackers on networks you use."}
+    base = {"CFBundleVersion":"1","CFBundleShortVersionString":"0.1.0","LSMinimumSystemVersion":"15.0","CFBundleDevelopmentRegion":"en","CFBundleLocalizations":LANGUAGES + (["en-XA"] if args.pseudolocalization else []),"NSLocalNetworkUsageDescription":"SeedHop connects to torrent peers and trackers on networks you use."}
     write_plist(contents/"Info.plist",dict(base,CFBundleIdentifier=app_id,CFBundleName="SeedHop",CFBundleDisplayName="SeedHop",CFBundleExecutable="SeedHop",CFBundlePackageType="APPL",NSPrincipalClass="NSApplication",LSApplicationCategoryType="public.app-category.utilities",NSHighResolutionCapable=True,CFBundleIconFile="AppIcon",CFBundleURLTypes=[{"CFBundleURLName":"BitTorrent magnet link","CFBundleURLSchemes":["magnet"]}],CFBundleDocumentTypes=[{"CFBundleTypeName":"BitTorrent torrent","CFBundleTypeRole":"Viewer","LSHandlerRank":"Alternate","LSItemContentTypes":["org.bittorrent.torrent"],"CFBundleTypeExtensions":["torrent"]}],UTImportedTypeDeclarations=[{"UTTypeIdentifier":"org.bittorrent.torrent","UTTypeConformsTo":["public.data"],"UTTypeTagSpecification":{"public.filename-extension":["torrent"],"public.mime-type":"application/x-bittorrent"}}]))
     xpc = contents/"XPCServices/SeedHopEngine.xpc"
     write_plist(xpc/"Contents/Info.plist",dict(base,CFBundleIdentifier=app_id+".engine",CFBundleExecutable="SeedHopEngine",CFBundlePackageType="XPC!",XPCService={"ServiceType":"Application","RunLoopType":"NSRunLoop","JoinExistingSession":True}))
@@ -91,7 +98,30 @@ def main():
     ffi_args = ["-I",generated,"-Xcc",f"-fmodule-map-file={generated/'seedhop_ffiFFI.modulemap'}","-L",contents/"Frameworks","-lseedhop_ffi","-Xlinker","-rpath","-Xlinker","@executable_path/../Frameworks","-Xlinker","-rpath","-Xlinker","@executable_path/../../../../Frameworks"]
     for name,path in [("SeedHopEngine",xpc/"Contents/MacOS/SeedHopEngine"),("SeedHopAgent",contents/"MacOS/SeedHopAgent")]:
         run(*common,"-module-name",name,*shared,*host,generated/"seedhop_ffi.swift",*ffi_args,"-framework","Security","-o",path)
-    run(*common,"-module-name","SeedHop",*shared,*sorted((ROOT/"macOS/App").glob("*.swift")),"-framework","SwiftUI","-framework","AppKit","-framework","ServiceManagement","-framework","Security","-framework","UserNotifications","-o",contents/"MacOS/SeedHop")
+    extraction = ROOT/".build/localization-extraction"
+    if extraction.exists(): shutil.rmtree(extraction)
+    extraction.mkdir(parents=True)
+    localization_args = ["-emit-localized-strings","-emit-localized-strings-path",extraction]
+    run(*common,*localization_args,"-module-name","SeedHop",*shared,*sorted((ROOT/"macOS/App").glob("*.swift")),"-framework","SwiftUI","-framework","AppKit","-framework","ServiceManagement","-framework","Security","-framework","UserNotifications","-o",contents/"MacOS/SeedHop")
+    catalogs = ROOT/"macOS/Resources/Localization"
+    if args.update_localizations:
+        run("xcrun","xcstringstool","sync",catalogs/"Localizable.xcstrings","--stringsdata",*sorted(extraction.glob("*.stringsdata")))
+        normalize_localizations(extraction)
+    else:
+        check_localizations(extraction=extraction)
+    for stale in (contents/"Resources").glob("*.lproj"):
+        shutil.rmtree(stale)
+    for catalog in sorted(catalogs.glob("*.xcstrings")):
+        run("xcrun","xcstringstool","compile",catalog,"--output-directory",contents/"Resources")
+    xpc_resources = xpc/"Contents/Resources"
+    xpc_resources.mkdir(parents=True,exist_ok=True)
+    for stale in xpc_resources.glob("*.lproj"): shutil.rmtree(stale)
+    run("xcrun","xcstringstool","compile",catalogs/"InfoPlist.xcstrings","--output-directory",xpc_resources)
+    if args.pseudolocalization:
+        pseudo = ROOT/".build/pseudolocalization"
+        pseudolocalize(pseudo)
+        shutil.copytree(pseudo/"en-XA.lproj",contents/"Resources/en-XA.lproj")
+    if not args.update_localizations: check_localizations(bundle=app,extraction=extraction)
     debug_entitlements = ROOT/".build/debug.entitlements"
     write_plist(debug_entitlements,{"com.apple.security.cs.disable-library-validation":True})
     for name,path in [(app_id+".rust",contents/"Frameworks/libseedhop_ffi.dylib"),(app_id+".agent",contents/"MacOS/SeedHopAgent"),(app_id+".engine",xpc),(app_id,app)]:

@@ -69,9 +69,10 @@ impl Journal {
             if reserved.contains(&original.root.join(&source))
                 || reserved.contains(&destination.root.join(&target))
             {
-                return Err(CoreError::InvalidInput(
-                    "Choose a folder outside SeedHop's library state.".into(),
-                ));
+                return Err(CoreError::Validation {
+                    code: "input.choose_a_folder_outside_seedhop_s_library_state",
+                    message: "Choose a folder outside SeedHop's library state.".into(),
+                });
             }
             let source_stamp = receipt::open_relative(&original.root, &source)?
                 .map(|file| FileStamp::read(&file))
@@ -429,12 +430,15 @@ pub(crate) fn recover(state: &Path) -> Option<StorageRecovery> {
 }
 
 pub(crate) fn keep_copies(state: &Path, id: &str) -> Result<()> {
-    let journal = load(state)?
-        .ok_or_else(|| CoreError::InvalidInput("There is no pending cleanup.".into()))?;
+    let journal = load(state)?.ok_or_else(|| CoreError::Validation {
+        code: "input.there_is_no_pending_cleanup",
+        message: "There is no pending cleanup.".into(),
+    })?;
     if journal.id != id || journal.version != 1 {
-        return Err(CoreError::InvalidInput(
-            "The recovery record changed. Refresh and try again.".into(),
-        ));
+        return Err(CoreError::Validation {
+            code: "input.the_recovery_record_changed_refresh_and_try_again",
+            message: "The recovery record changed. Refresh and try again.".into(),
+        });
     }
     committed(state, &journal)?;
     remove_record(state, id)
@@ -462,9 +466,10 @@ pub(crate) fn retry(state: &Path, id: &str, keep: bool) -> Result<RecoveryResult
         && journal.id != id
         && id != "unreadable-recovery-record"
     {
-        return Err(CoreError::InvalidInput(
-            "The recovery record changed. Refresh and try again.".into(),
-        ));
+        return Err(CoreError::Validation {
+            code: "input.the_recovery_record_changed_refresh_and_try_again",
+            message: "The recovery record changed. Refresh and try again.".into(),
+        });
     }
     if keep {
         keep_copies(state, id)?;

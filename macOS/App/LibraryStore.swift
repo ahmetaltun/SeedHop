@@ -6,18 +6,29 @@ import UserNotifications
 enum LibraryFilter: String, CaseIterable, Identifiable {
     case all = "All transfers", downloading = "Downloading", seeding = "Seeding", paused = "Paused", queued = "Queued", checking = "Checking", attention = "Needs attention"
     var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .all: return String(localized:"All transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .downloading: return String(localized:"Downloading",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .seeding: return String(localized:"Seeding",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .paused: return String(localized:"Paused",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .queued: return String(localized:"Queued",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .checking: return String(localized:"Checking",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .attention: return String(localized:"Needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        }
+    }
     var symbol: String {
         switch self { case .all:return "square.stack.3d.up"; case .downloading:return "arrow.down.circle"; case .seeding:return "arrow.up.circle"; case .paused:return "pause.circle"; case .queued:return "list.number"; case .checking:return "checkmark.shield"; case .attention:return "exclamationmark.circle" }
     }
     var emptyTitle: String {
         switch self {
-        case .all: return "No transfers yet"
-        case .downloading: return "No downloads in progress"
-        case .seeding: return "No transfers seeding"
-        case .paused: return "No paused transfers"
-        case .queued: return "No queued transfers"
-        case .checking: return "No transfers being checked"
-        case .attention: return "Everything looks good"
+        case .all: return String(localized:"No transfers yet",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .downloading: return String(localized:"No downloads in progress",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .seeding: return String(localized:"No transfers seeding",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .paused: return String(localized:"No paused transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .queued: return String(localized:"No queued transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .checking: return String(localized:"No transfers being checked",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .attention: return String(localized:"Everything looks good",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         }
     }
     func includes(_ t: TorrentItem) -> Bool {
@@ -185,22 +196,37 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     func resumeLabel(for items: [TorrentItem]) -> String {
         let retry = items.contains { $0.state == "error" && presentation($0).canRetry }
         let resume = items.contains { $0.state != "error" && canResumeOrRetry($0) }
-        return retry ? (resume ? "Resume and Retry" : "Retry") : "Resume"
+        return retry ? (resume ? String(localized:"Resume and Retry",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Retry",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) : String(localized:"Resume",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
     }
     var resumeActionLabel: String { resumeLabel(for:selected) }
+    var selectionNeedsRetry: Bool { selected.contains { $0.state == "error" && presentation($0).canRetry } }
+    var resumeSelectedLabel: String {
+        let retry = selectionNeedsRetry
+        let resume = selected.contains { $0.state != "error" && canResumeOrRetry($0) }
+        return retry ? (resume ? String(localized:"Resume and Retry Selected",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Retry Selected",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) : String(localized:"Resume Selected",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+    }
     var hasUnscopedRecovery: Bool { storageRecovery.map { notice in torrentIndices[notice.torrentId] == nil } ?? false }
     var activitySummary: String {
-        if !connected { return "Showing the last update. Reconnect for live activity." }
-        if torrents.isEmpty { return storageRecovery == nil ? "A fresh start for your next download." : "Retained files need attention." }
-        var parts = [("downloading", "downloading"), ("waiting", "waiting"), ("queued", "queued"), ("scheduled", "scheduled"), ("checking", "checking"), ("seeding", "seeding"), ("paused", "paused")].compactMap { state, label -> String? in
+        if !connected { return String(localized:"Showing the last update. Reconnect for live activity.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        if torrents.isEmpty { return storageRecovery == nil ? String(localized:"A fresh start for your next download.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Retained files need attention.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        var parts = ["downloading", "waiting", "queued", "scheduled", "checking", "seeding", "paused"].compactMap { state -> String? in
             let count = stateCounts[state,default:0]
-            return count == 0 ? nil : "\(count) \(label)"
+            guard count > 0 else { return nil }
+            switch state {
+            case "downloading": return String(localized:"\(count) downloading",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            case "waiting": return String(localized:"\(count) waiting",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            case "queued": return String(localized:"\(count) queued",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            case "scheduled": return String(localized:"\(count) scheduled",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            case "checking": return String(localized:"\(count) checking",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            case "seeding": return String(localized:"\(count) seeding",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            default: return String(localized:"\(count) paused",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            }
         }
-        if fileOperation != nil { parts.insert("1 file change",at:0) }
+        if fileOperation != nil { parts.insert(String(localized:"1 file change",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),at:0) }
         let attention = count(in:.attention)
-        if attention > 0 { parts.append("\(attention) need attention") }
-        else if hasUnscopedRecovery { parts.append("File cleanup needs attention") }
-        return parts.isEmpty ? "Waiting for a transfer update." : parts.joined(separator:" · ")
+        if attention > 0 { parts.append(String(localized:"\(attention) need attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
+        else if hasUnscopedRecovery { parts.append(String(localized:"File cleanup needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
+        return parts.isEmpty ? String(localized:"Waiting for a transfer update.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : parts.joined(separator:" · ")
     }
     var hasFileOperation: Bool { fileOperation != nil || !storageRequests.isEmpty || resolvingStorageRecovery }
     var canChangeTransfers: Bool { connected && !switching && !designPreview && !hasFileOperation }
@@ -208,7 +234,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     var encryptionRestartPending: Bool { peerEncryption != nil && savedPeerEncryption != nil && peerEncryption != savedPeerEncryption }
     var canSaveEncryption: Bool { canChangeTransfers && !savingEncryption && savedPeerEncryption != nil }
     var canRestartForEncryption: Bool { canChangeTransfers && encryptionRestartPending && !savingEncryption && !savingSchedule && !savingBandwidth && busyTransfers.isEmpty && !savingQueue && !showImport }
-    var connectionPortDescription: String { !connected ? "Unavailable while disconnected" : listenPort == 0 ? "No listening port reported" : "\(listenPort)" }
+    var connectionPortDescription: String { !connected ? String(localized:"Unavailable while disconnected",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : listenPort == 0 ? String(localized:"No listening port reported",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(listenPort) }
     func saveEncryption(_ policy: PeerEncryptionPolicy) {
         guard canSaveEncryption else { return }
         savingEncryption = true; error = nil
@@ -256,7 +282,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
             let service = SMAppService.agent(plistName:SeedHopIdentity.agentPlist)
             if backgroundEnabled && service.status != .enabled {
                 backgroundEnabled = false; UserDefaults.standard.set(false,forKey:"backgroundEnabled")
-                error = "Background access is unavailable. Transfers will run while SeedHop is open. You can enable background access in Settings."
+                error = String(localized:"Background access is unavailable. Transfers will run while SeedHop is open. You can enable background access in Settings.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
             }
             try client.connect(background:backgroundEnabled)
             var request = EngineRequest(command:"connect"); request.destination = downloadDirectory
@@ -285,14 +311,15 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         if engineInstance != snapshot.instanceId {
             engineInstance = snapshot.instanceId; detailsContext = UUID(); details = nil; peerBaselines = [:]; peerRates = [:]; lastTrackerEvent = [:]
         }
-        if statisticsWarning != snapshot.statisticsWarning { statisticsWarning = snapshot.statisticsWarning }
+        let statisticsText = snapshot.statisticsMessage?.displayText ?? snapshot.statisticsWarning.map { EngineMessage(code:"statistics.save_failed",diagnostic:$0).displayText }
+        if statisticsWarning != statisticsText { statisticsWarning = statisticsText }
         recordActivity(snapshot)
 
         if completionNotifications, !torrents.isEmpty {
             var notified = Set(UserDefaults.standard.stringArray(forKey:"completedTorrents") ?? [])
             for item in snapshot.torrents where item.state == "seeding" && !notified.contains(item.id) {
                 if let previous = torrents.first(where:{$0.id == item.id}), previous.downloadedBytes < previous.totalBytes {
-                    let content = UNMutableNotificationContent(); content.title = "Your files are ready"; content.body = item.name; content.sound = .default
+                    let content = UNMutableNotificationContent(); content.title = String(localized:"Your files are ready",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); content.body = item.name; content.sound = .default
                     UNUserNotificationCenter.current().add(UNNotificationRequest(identifier:item.id,content:content,trigger:nil))
                     notified.insert(item.id)
                 }
@@ -303,7 +330,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         if torrents != snapshot.torrents { torrents = snapshot.torrents }
         let remainingSelection = selection.intersection(Set(torrents.map(\.id)))
         if selection != remainingSelection { selection = remainingSelection }
-        if schedulingWarning != snapshot.schedulingWarning { schedulingWarning = snapshot.schedulingWarning }
+        let schedulingText = snapshot.schedulingMessage?.displayText ?? snapshot.schedulingWarning.map { EngineMessage(code:"schedule.apply_failed",diagnostic:$0).displayText }
+        if schedulingWarning != schedulingText { schedulingWarning = schedulingText }
         if schedule != snapshot.schedule { schedule = snapshot.schedule }
         if scheduleActive != (snapshot.scheduleActive ?? false) { scheduleActive = snapshot.scheduleActive ?? false }
         if alternativeLimitsAvailable != (snapshot.alternativeLimitsEnabled != nil) { alternativeLimitsAvailable = snapshot.alternativeLimitsEnabled != nil }
@@ -348,7 +376,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
             appendEvent(operation.torrentId,message:operation.title)
         }
         if snapshot.storageRecovery != storageRecovery, let notice = snapshot.storageRecovery {
-            appendEvent(notice.torrentId,message:"File cleanup needs attention")
+            appendEvent(notice.torrentId,message:String(localized:"File cleanup needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
         }
         if Set(history.keys) != liveIDs { history = history.filter { liveIDs.contains($0.key) }; events = events.filter { liveIDs.contains($0.key) } }
     }
@@ -366,7 +394,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
                 do {
                     var request = EngineRequest(command:"torrentDetails"); request.id = id; request.section = section; request.allPeers = allPeers
                     let reply = try await client.send(request)
-                    guard let value = reply.details else { throw UserFacingError(message:"The engine did not return transfer details. Try again.") }
+                    guard let value = reply.details else { throw UserFacingError(message:String(localized:"The engine did not return transfer details. Try again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
                     if !Task.isCancelled && detailsContext == token && instance == engineInstance && showInspector && selection == [id], value.torrentId == id && value.instanceId == instance && value.section == section {
                         applyDetails(value); if detailsError != nil { detailsError = nil }
                     }
@@ -400,7 +428,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     func diagnosticReport(_ torrent: TorrentItem) -> String {
         // Export only allowlisted fields. Remote strings, paths, hashes and endpoints stay out.
         let value = details?.torrentId == torrent.id ? details : nil
-        let report = "SeedHop diagnostics\nState: \(torrent.statusLabel)\nEngine connected: \(connected)\nFormat: \(value?.format ?? "unknown")\nConnected peers: \(torrent.peers)\nDownload: \(SizeText.rate(connected ? torrent.downloadRate : 0))\nUpload: \(SizeText.rate(connected ? torrent.uploadRate : 0))\nTracker states: \(value?.trackers.map(\.state).joined(separator:", ") ?? "not sampled")\nPersonal paths, torrent identifiers, tracker URLs and peer endpoints omitted."
+        let report = "SeedHop diagnostics\nState: \(torrent.state)\nEngine connected: \(connected)\nFormat: \(value?.format ?? "unknown")\nConnected peers: \(torrent.peers)\nDownload: \(SizeText.rate(connected ? torrent.downloadRate : 0))\nUpload: \(SizeText.rate(connected ? torrent.uploadRate : 0))\nTracker states: \(value?.trackers.map(\.state).joined(separator:", ") ?? "not sampled")\nPersonal paths, torrent identifiers, tracker URLs and peer endpoints omitted."
         return report
     }
     func copyDiagnostics(_ torrent: TorrentItem) {
@@ -408,9 +436,9 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
 
     func perform(_ request: EngineRequest) async throws -> EngineReply {
-        guard !designPreview else { throw UserFacingError(message:"This is a design preview with sample data. Launch the app normally for real transfers.") }
+        guard !designPreview else { throw UserFacingError(message:String(localized:"This is a design preview with sample data. Launch the app normally for real transfers.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
         if hasFileOperation && ["add", "inspect", "pause", "select", "priorities", "queue", "queueMove", "recheck", "retry", "remove", "limits", "peerEncryption"].contains(request.command) {
-            throw UserFacingError(message:"Wait for the current file change to finish, or cancel it, then try again.")
+            throw UserFacingError(message:String(localized:"Wait for the current file change to finish, or cancel it, then try again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
         }
         return try await client.send(request)
     }
@@ -476,7 +504,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         }
     }
     func saveSchedule(_ value: ScheduleConfig) async throws {
-        guard canChangeTransfers, !savingSchedule else { throw UserFacingError(message:"Wait for the engine, then save the schedule again.") }
+        guard canChangeTransfers, !savingSchedule else { throw UserFacingError(message:String(localized:"Wait for the engine, then save the schedule again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
         savingSchedule = true
         defer { savingSchedule = false }
         var request = EngineRequest(command:"schedule"); request.schedule = value
@@ -485,17 +513,23 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
     var hasAlternativeLimits: Bool { alternativeDownloadLimit > 0 || alternativeUploadLimit > 0 }
     var canToggleAlternativeLimits: Bool { canChangeBandwidth && alternativeLimitsAvailable && (hasAlternativeLimits || alternativeLimitsEnabled) }
-    var bandwidthProfileTitle: String { alternativeLimitsEnabled ? "Alternative" : scheduleActive ? "Scheduled" : "Global" }
+    var bandwidthProfileTitle: String { alternativeLimitsEnabled ? String(localized:"Alternative",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : scheduleActive ? String(localized:"Scheduled",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Global",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
     var bandwidthStatus: String {
-        "\(connected ? "" : "Last known: ")\(bandwidthProfileTitle) limits · ↓ \(SizeText.limit(downloadLimit)) · ↑ \(SizeText.limit(uploadLimit))"
+        let down = SizeText.limit(downloadLimit), up = SizeText.limit(uploadLimit)
+        if !connected {
+            if alternativeLimitsEnabled { return String(localized:"Last known alternative limits · ↓ \(down) · ↑ \(up)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+            return scheduleActive ? String(localized:"Last known scheduled limits · ↓ \(down) · ↑ \(up)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Last known global limits · ↓ \(down) · ↑ \(up)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        }
+        if alternativeLimitsEnabled { return String(localized:"Alternative limits · ↓ \(down) · ↑ \(up)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        return scheduleActive ? String(localized:"Scheduled limits · ↓ \(down) · ↑ \(up)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Global limits · ↓ \(down) · ↑ \(up)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
     }
     var alternativeLimitsHint: String {
-        hasAlternativeLimits ? "Alternative limits: download \(SizeText.limit(alternativeDownloadLimit)), upload \(SizeText.limit(alternativeUploadLimit))." : "Alternative limits are not set. Click the tortoise to set a download or upload limit."
+        hasAlternativeLimits ? String(localized:"Alternative limits: download \(SizeText.limit(alternativeDownloadLimit)), upload \(SizeText.limit(alternativeUploadLimit)).",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Alternative limits are not set. Click the tortoise to set a download or upload limit.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
     }
     var canChangeBandwidth: Bool { canChangeTransfers && !savingBandwidth }
     func setAlternativeLimits(download: UInt32, upload: UInt32, enabled: Bool) async throws {
-        guard canChangeBandwidth, alternativeLimitsAvailable else { throw UserFacingError(message:"Wait for the engine, then apply alternative limits again.") }
-        guard !enabled || download > 0 || upload > 0 else { throw UserFacingError(message:"Set an alternative download or upload limit before enabling alternative limits.") }
+        guard canChangeBandwidth, alternativeLimitsAvailable else { throw UserFacingError(message:String(localized:"Wait for the engine, then apply alternative limits again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
+        guard !enabled || download > 0 || upload > 0 else { throw UserFacingError(message:String(localized:"Set an alternative download or upload limit before enabling alternative limits.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
         savingBandwidth = true
         defer { savingBandwidth = false }
         var request = EngineRequest(command:"alternativeLimits")
@@ -511,10 +545,10 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         }
     }
     func setLimits(download: UInt32, upload: UInt32) async throws {
-        guard canChangeBandwidth else { throw UserFacingError(message:"Wait for the engine, then apply limits again.") }
+        guard canChangeBandwidth else { throw UserFacingError(message:String(localized:"Wait for the engine, then apply limits again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
         savingBandwidth = true
         defer { savingBandwidth = false }
-        guard !hasFileOperation else { throw UserFacingError(message:"Wait for the current file change to finish, then apply limits again.") }
+        guard !hasFileOperation else { throw UserFacingError(message:String(localized:"Wait for the current file change to finish, then apply limits again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
         var r = EngineRequest(command:"limits"); r.downloadLimit = download; r.uploadLimit = upload
         _ = try await perform(r); await refresh()
     }
@@ -591,7 +625,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         let previous = Set(item.files.filter(\.selected).map(\.index))
         let next = included ? previous.union(indices) : previous.subtracting(indices)
         guard next != previous else { return }
-        guard !next.isEmpty else { error = "Keep at least one file included."; return }
+        guard !next.isEmpty else { error = String(localized:"Keep at least one file included.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); return }
         setFileSelection(item,indices:Array(next))
     }
     func setQueueLimit(_ value: UInt32) {
@@ -629,7 +663,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
               storageRecovery == nil, !busyTransfers.contains(item.id), item.state != "checking",
               torrents.contains(where: { $0.id == item.id }) else { return }
         let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
-        panel.canCreateDirectories = true; panel.prompt = "Move Files"; panel.message = "Choose a folder for \(item.name). Files will be verified after moving."
+        panel.canCreateDirectories = true; panel.prompt = String(localized:"Move Files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); panel.message = String(localized:"Choose a folder for \(item.name). Files will be verified after moving.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         panel.directoryURL = URL(fileURLWithPath:item.destination)
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
@@ -640,16 +674,17 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     func requestRename(_ item: TorrentItem, file: FileItem) {
         guard canChangeTransfers, storageRecovery == nil, !busyTransfers.contains(item.id), item.state != "checking", let window = NSApp.keyWindow else { return }
         let previousFocus = window.firstResponder
-        let alert = NSAlert(); alert.messageText = "Rename File"; alert.informativeText = "Choose a new name for \(URL(fileURLWithPath:file.name).lastPathComponent)."
-        alert.addButton(withTitle:"Rename"); alert.addButton(withTitle:"Cancel")
+        let alert = NSAlert(); alert.messageText = String(localized:"Rename File",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); alert.informativeText = String(localized:"Choose a new name for \(URL(fileURLWithPath:file.name).lastPathComponent).",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        alert.addButton(withTitle:String(localized:"Rename",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).identifier = NSUserInterfaceItemIdentifier("rename-confirm")
+        alert.addButton(withTitle:String(localized:"Cancel",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).identifier = NSUserInterfaceItemIdentifier("rename-cancel")
         let input = NSTextField(string:URL(fileURLWithPath:file.name).lastPathComponent)
-        input.frame = NSRect(x:0,y:0,width:320,height:24); input.setAccessibilityLabel("New file name"); alert.accessoryView = input
+        input.frame = NSRect(x:0,y:0,width:320,height:24); input.setAccessibilityLabel(String(localized:"New file name",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)); alert.accessoryView = input
         alert.window.initialFirstResponder = input
         alert.beginSheetModal(for:window) { response in
             NativeAccessibility.restore(previousFocus,in:window)
             guard response == .alertFirstButtonReturn else { return }
             let name = input.stringValue.trimmingCharacters(in:.whitespacesAndNewlines)
-            guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains(":") else { self.error = "Enter a file name without slashes or colons."; return }
+            guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains(":") else { self.error = String(localized:"Enter a file name without slashes or colons.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); return }
             let parent = (file.name as NSString).deletingLastPathComponent
             var request = EngineRequest(command:"rename"); request.id = item.id; request.fileIndex = file.index
             request.fileName = parent.isEmpty ? name : parent + "/" + name
@@ -664,7 +699,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         do {
             if enabled {
                 if service.status == .notRegistered || service.status == .notFound { try service.register() }
-                guard service.status == .enabled else { throw UserFacingError(message:"Allow SeedHop in System Settings → General → Login Items & Extensions, then try again.") }
+                guard service.status == .enabled else { throw UserFacingError(message:String(localized:"Allow SeedHop in System Settings → General → Login Items & Extensions, then try again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
             }
             _ = try await client.send(EngineRequest(command:"shutdown")); stoppedCurrent = true; client.invalidate(); connected = false
             if !enabled && service.status != .notRegistered { try await service.unregister() }
@@ -685,7 +720,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         }
     }
     private func reconnectAfterHandoff(background: Bool) async throws -> LibrarySnapshot {
-        var failure: Error = UserFacingError(message:"The engine could not restart. Your library has been preserved.")
+        var failure: Error = UserFacingError(message:String(localized:"The engine could not restart. Your library has been preserved.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
         for attempt in 0..<12 {
             do {
                 try client.connect(background:background)
@@ -714,7 +749,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
     func beginImport(magnet: String = "", file: URL? = nil) {
         guard !showImport else { return }
-        guard !hasFileOperation else { error = "Wait for the current file change to finish, or cancel it, then add your torrent."; return }
+        guard !hasFileOperation else { error = String(localized:"Wait for the current file change to finish, or cancel it, then add your torrent.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); return }
         incomingMagnet = magnet; incomingFile = file; showImport = true
     }
     func pasteMagnet(from pasteboard: NSPasteboard = .general) {
@@ -725,6 +760,6 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         guard let url = urls.first else { return }
         if url.scheme?.lowercased() == "magnet" { beginImport(magnet:url.absoluteString) }
         else if url.isFileURL && url.pathExtension.lowercased() == "torrent" { beginImport(file:url) }
-        else { error = "Choose a .torrent file or a magnet link to add a transfer." }
+        else { error = String(localized:"Choose a .torrent file or a magnet link to add a transfer.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
     }
 }

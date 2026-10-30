@@ -222,9 +222,10 @@ impl Engine {
     ) -> Result<TorrentDetails> {
         self.ready()?;
         if !["general", "files", "peers", "trackers", "activity"].contains(&section.as_str()) {
-            return Err(crate::CoreError::InvalidInput(
-                "Unknown details section".into(),
-            ));
+            return Err(crate::CoreError::Validation {
+                code: "input.unknown_details_section",
+                message: "Unknown details section".into(),
+            });
         }
         let torrent = self.handle(&id)?;
         self.sample_accounting();
@@ -338,9 +339,13 @@ impl Engine {
             Vec::new()
         };
         let accounting = self.accounting.lock().unwrap();
-        let t = accounting.entries.get(&id).ok_or_else(|| {
-            crate::CoreError::InvalidInput("This torrent is no longer in the library.".into())
-        })?;
+        let t = accounting
+            .entries
+            .get(&id)
+            .ok_or_else(|| crate::CoreError::Validation {
+                code: "input.this_torrent_is_no_longer_in_the_library",
+                message: "This torrent is no longer in the library.".into(),
+            })?;
         let events = if section == "activity" {
             torrent
                 .shared()

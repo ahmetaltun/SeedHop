@@ -12,6 +12,7 @@ struct WorkspaceSplitView<Leading: View, Trailing: View>: NSViewRepresentable {
     private let leading: Leading
     private let trailing: Trailing
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.locale) private var locale
     @Environment(\.accessibilityAnnouncementsEnabled) private var announcementsEnabled
 
     init(vertical: Bool, autosaveName: String, initialLeading: CGFloat, minLeading: CGFloat, minTrailing: CGFloat,
@@ -92,6 +93,7 @@ struct WorkspaceSplitView<Leading: View, Trailing: View>: NSViewRepresentable {
         let split = WorkspaceNativeSplitView()
         split.isVertical = vertical; split.dividerStyle = .thin; split.delegate = context.coordinator
         context.coordinator.first.colorScheme = colorScheme; context.coordinator.second.colorScheme = colorScheme
+        context.coordinator.first.locale = locale; context.coordinator.second.locale = locale
         context.coordinator.first.announcementsEnabled = announcementsEnabled; context.coordinator.second.announcementsEnabled = announcementsEnabled
         let first = NSHostingView(rootView:WorkspaceHostedContent(model:context.coordinator.first))
         let second = NSHostingView(rootView:WorkspaceHostedContent(model:context.coordinator.second))
@@ -103,6 +105,7 @@ struct WorkspaceSplitView<Leading: View, Trailing: View>: NSViewRepresentable {
     }
     func updateNSView(_ split: WorkspaceNativeSplitView, context: Context) {
         context.coordinator.first.colorScheme = colorScheme; context.coordinator.second.colorScheme = colorScheme
+        context.coordinator.first.locale = locale; context.coordinator.second.locale = locale
         context.coordinator.first.announcementsEnabled = announcementsEnabled; context.coordinator.second.announcementsEnabled = announcementsEnabled
         context.coordinator.first.content = leading; context.coordinator.second.content = trailing
         // Content observes its own updates. Native frame and divider changes
@@ -114,12 +117,13 @@ struct WorkspaceSplitView<Leading: View, Trailing: View>: NSViewRepresentable {
 final class WorkspaceHostModel<Content: View>: ObservableObject {
     @Published var content: Content
     var colorScheme: ColorScheme = .light
+    var locale: Locale = .current
     var announcementsEnabled = true
     init(_ content: Content) { self.content = content }
 }
 private struct WorkspaceHostedContent<Content: View>: View {
     @ObservedObject var model: WorkspaceHostModel<Content>
-    var body: some View { model.content.environment(\.colorScheme,model.colorScheme).environment(\.accessibilityAnnouncementsEnabled,model.announcementsEnabled) }
+    var body: some View { model.content.environment(\.locale,model.locale).environment(\.colorScheme,model.colorScheme).environment(\.accessibilityAnnouncementsEnabled,model.announcementsEnabled) }
 }
 final class WorkspaceNativeSplitView: NSSplitView {
     var didLayout: ((NSSplitView) -> Void)?
@@ -142,7 +146,7 @@ final class WorkspaceNativeSplitView: NSSplitView {
         if let entry = tables.first(where:{ $0.value === table }) {
             entry.restoring = true
             let saved = WorkspacePreferences.defaults.dictionary(forKey:"workspaceColumnWidths") as? [String:Double] ?? [:]
-            for column in table.tableColumns { if let width = saved[column.headerCell.stringValue], abs(column.width-CGFloat(width)) > 0.5 { column.width = CGFloat(width) } }
+            for column in table.tableColumns { if let width = saved[column.identifier.rawValue] ?? saved[TransferColumns.legacyTitles[column.identifier.rawValue] ?? column.headerCell.stringValue], abs(column.width-CGFloat(width)) > 0.5 { column.width = CGFloat(width) } }
             entry.restoring = false
             return
         }
@@ -150,7 +154,7 @@ final class WorkspaceNativeSplitView: NSSplitView {
         // Stable public headings retain widths saved by the previous table.
         // App IDs own order; the existing customization still owns visibility.
         let saved = WorkspacePreferences.defaults.dictionary(forKey:"workspaceColumnWidths") as? [String:Double] ?? [:]
-        for column in table.tableColumns { if let width = saved[column.headerCell.stringValue] { column.width = CGFloat(width) } }
+        for column in table.tableColumns { if let width = saved[column.identifier.rawValue] ?? saved[TransferColumns.legacyTitles[column.identifier.rawValue] ?? column.headerCell.stringValue] { column.width = CGFloat(width) } }
         entry.restoring = false
         entry.observer = NotificationCenter.default.addObserver(forName:NSTableView.columnDidResizeNotification,object:nil,queue:.main) { [weak entry] notification in
             MainActor.assumeIsolated {
@@ -161,15 +165,15 @@ final class WorkspaceNativeSplitView: NSSplitView {
         tables.append(entry)
     }
     private static func saveWidths(_ table: NSTableView) {
-        var widths: [String:Double] = [:]
-        for column in table.tableColumns where !column.headerCell.stringValue.isEmpty { widths[column.headerCell.stringValue] = Double(column.width) }
+        var widths = WorkspacePreferences.defaults.dictionary(forKey:"workspaceColumnWidths") as? [String:Double] ?? [:]
+        for column in table.tableColumns where !column.headerCell.stringValue.isEmpty { widths[column.identifier.rawValue] = Double(column.width); if let legacy = TransferColumns.legacyTitles[column.identifier.rawValue] { widths[legacy] = Double(column.width) } }
         WorkspacePreferences.defaults.set(widths,forKey:"workspaceColumnWidths")
     }
     static func restoreWidths() {
-        let widths: [String:CGFloat] = ["Name":240,"Status":125,"Progress":90,"↓ Download":80,"↑ Upload":80,"Peers":50,"ETA":75,"Ratio":55,"Queue":55,"Selected Size":90,"Total Size":90,"Remaining":90,"Downloaded Traffic":115,"Uploaded Traffic":110,"Added":100,"Completed":100,"Save Path":220]
+        let widths = Dictionary(uniqueKeysWithValues:TransferColumns.all.map { ($0.id,TransferColumns.initialWidth($0)) })
         for entry in tables { if let table = entry.value {
             entry.restoring = true
-            for column in table.tableColumns { if let width = widths[column.headerCell.stringValue] { column.width = width } }
+            for column in table.tableColumns { if let width = widths[column.identifier.rawValue] { column.width = width } }
             if let native = table as? NativeTransfersTable { native.restoreColumnOrder?() }
             entry.restoring = false; saveWidths(table)
         }}

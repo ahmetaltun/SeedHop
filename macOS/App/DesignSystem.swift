@@ -52,7 +52,7 @@ struct StateBadge: View {
 }
 struct SectionEyebrow: View {
     let title: String
-    var body: some View { Text(title.uppercased()).font(.system(size:10,weight:.semibold)).tracking(1.4).foregroundStyle(.secondary) }
+    var body: some View { Text(title.uppercased(with:Locale(identifier:AppLocalization.shared.language))).font(.system(size:10,weight:.semibold)).tracking(1.4).foregroundStyle(.secondary) }
 }
 struct TransferProgress: View {
     let value: Double
@@ -63,7 +63,7 @@ struct TransferProgress: View {
                 Capsule().fill(color.opacity(0.10))
                 Capsule().fill(color.opacity(0.8)).frame(width:proxy.size.width * min(1,max(0,value)))
             }
-        }.frame(height:4).accessibilityElement(children:.ignore).accessibilityLabel("Progress").accessibilityValue("\(Int(value * 100)) percent")
+        }.frame(height:4).accessibilityElement(children:.ignore).accessibilityLabel(String(localized:"Progress",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).accessibilityValue(LocaleText.percent(value))
     }
 }
 struct Metric: View {
@@ -88,8 +88,8 @@ struct InlineNotice: View {
             Image(systemName:"exclamationmark.circle.fill").foregroundStyle(.orange)
             VStack(alignment:.leading,spacing:4) { Text(title).font(.system(size:12,weight:.semibold)); Text(message).font(.system(size:12)).foregroundStyle(.secondary).textSelection(.enabled) }.accessibilityElement(children:.combine)
             Spacer(minLength:4)
-            if let retry { Button("Retry",action:retry).controlSize(.small) }
-            if let dismiss { Button(action:dismiss) { Image(systemName:"xmark") }.buttonStyle(.plain).accessibilityLabel("Dismiss message") }
+            if let retry { Button(String(localized:"Retry",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),action:retry).controlSize(.small) }
+            if let dismiss { Button(action:dismiss) { Image(systemName:"xmark") }.buttonStyle(.plain).accessibilityLabel(String(localized:"Dismiss message",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
         }.padding(14).background(Color.orange.opacity(0.07),in:RoundedRectangle(cornerRadius:10))
             .accessibilityElement(children:.contain)
             .announceAccessibility("\(title). \(message)")

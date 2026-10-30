@@ -25,7 +25,7 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-pub const PROTOCOL_VERSION: u32 = 5;
+pub const PROTOCOL_VERSION: u32 = 6;
 
 /// Owns library state. The FFI host retains this lease until its runtime has stopped.
 pub struct Engine {
@@ -381,12 +381,15 @@ impl Engine {
             return adapter::preview(bytes);
         }
         let magnet = magnet.unwrap_or_default();
-        let parsed = url::Url::parse(&magnet)
-            .map_err(|_| CoreError::InvalidInput("Paste a valid magnet link.".into()))?;
+        let parsed = url::Url::parse(&magnet).map_err(|_| CoreError::Validation {
+            code: "input.paste_a_valid_magnet_link",
+            message: "Paste a valid magnet link.".into(),
+        })?;
         if parsed.scheme() != "magnet" {
-            return Err(CoreError::InvalidInput(
-                "This preview accepts magnet links or .torrent files.".into(),
-            ));
+            return Err(CoreError::Validation {
+                code: "input.this_preview_accepts_magnet_links_or_torrent_files",
+                message: "This preview accepts magnet links or .torrent files.".into(),
+            });
         }
         if !parsed.query_pairs().any(|(k, v)| {
             k == "xt" && (v.starts_with("urn:btih:") || v.starts_with("urn:btmh:1220"))
@@ -399,9 +402,10 @@ impl Engine {
                 entry.insert(cancel);
             }
             std::collections::hash_map::Entry::Occupied(_) => {
-                return Err(CoreError::InvalidInput(
-                    "This request is already resolving.".into(),
-                ));
+                return Err(CoreError::Validation {
+                    code: "input.this_request_is_already_resolving",
+                    message: "This request is already resolving.".into(),
+                });
             }
         }
         let result = tokio::select! {
@@ -409,7 +413,7 @@ impl Engine {
             response = tokio::time::timeout(Duration::from_secs(120), self.session.add_torrent(AddTorrent::from_url(magnet), Some(AddTorrentOptions { list_only: true, ..Default::default() }))) => {
                 match response {
                     Ok(Ok(librqbit::AddTorrentResponse::ListOnly(list))) => adapter::preview(list.torrent_bytes.to_vec()),
-                    Ok(Ok(_)) => Err(CoreError::InvalidInput("This torrent is already in your library.".into())),
+                    Ok(Ok(_)) => Err(CoreError::Validation { code: "input.this_torrent_is_already_in_your_library", message: "This torrent is already in your library.".into() }),
                     Ok(Err(error)) => Err(adapter::engine_error(error)),
                     Err(_) => Err(CoreError::Engine("No peers supplied metadata within two minutes. Check the link and connection, then retry.".into())),
                 }
@@ -469,14 +473,16 @@ impl Engine {
             .iter()
             .any(|t| t.id == metadata.id)
         {
-            return Err(CoreError::InvalidInput(
-                "This torrent is already in your library.".into(),
-            ));
+            return Err(CoreError::Validation {
+                code: "input.this_torrent_is_already_in_your_library",
+                message: "This torrent is already in your library.".into(),
+            });
         }
         if selected.is_empty() || selected.iter().any(|i| *i as usize >= metadata.files.len()) {
-            return Err(CoreError::InvalidInput(
-                "Select at least one file to download.".into(),
-            ));
+            return Err(CoreError::Validation {
+                code: "input.select_at_least_one_file_to_download",
+                message: "Select at least one file to download.".into(),
+            });
         }
         let root = PathBuf::from(destination)
             .canonicalize()
@@ -491,7 +497,7 @@ impl Engine {
                 .collect::<Vec<_>>(),
         )?;
         if !reuse && metadata.files.iter().any(|f| root.join(&f.name).exists()) {
-            return Err(CoreError::InvalidInput("Files already exist here. Enable verification of existing files or choose another folder.".into()));
+            return Err(CoreError::Validation { code: "input.files_already_exist_here_enable_verification_of_existing", message: "Files already exist here. Enable verification of existing files or choose another folder.".into() });
         }
         let queued = self.queue.lock().unwrap().max_active > 0 || self.schedule_suspended();
         // Commit accounting before membership so a statistics write failure cannot
@@ -539,8 +545,9 @@ impl Engine {
                 }
                 None
             })
-            .ok_or_else(|| {
-                CoreError::InvalidInput("This torrent is no longer in the library.".into())
+            .ok_or_else(|| CoreError::Validation {
+                code: "input.this_torrent_is_no_longer_in_the_library",
+                message: "This torrent is no longer in the library.".into(),
             })
     }
 
@@ -598,7 +605,10 @@ impl Engine {
         let handle = self.handle(&id)?;
         let count = adapter::record(&handle).files.len();
         if indices.is_empty() || indices.iter().any(|i| *i as usize >= count) {
-            return Err(CoreError::InvalidInput("Select valid files.".into()));
+            return Err(CoreError::Validation {
+                code: "input.select_valid_files",
+                message: "Select valid files.".into(),
+            });
         }
         self.session
             .update_only_files(&handle, &indices.into_iter().map(|i| i as usize).collect())

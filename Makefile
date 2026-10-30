@@ -1,4 +1,4 @@
-.PHONY: build test lint render interop smoke ux-test interface-test faults v2-test v2-hardening layout-recovery performance workspace-test
+.PHONY: build test lint render interop smoke ux-test interface-test faults v2-test v2-hardening layout-recovery performance workspace-test localization-check localization-test localization-update localization-render
 build:
 	python3 scripts/build.py
 test:
@@ -37,3 +37,16 @@ performance:
 
 workspace-test: build
 	.build/SeedHop.app/Contents/MacOS/SeedHop --verify-workspace-layout
+
+localization-check:
+	python3 scripts/localization.py check
+	python3 -m unittest discover -s scripts -p test_localization.py
+
+localization-test: build
+	python3 scripts/verify_localizations.py
+
+localization-update:
+	python3 scripts/build.py --update-localizations
+
+localization-render: build
+	python3 scripts/verify_localizations.py --render

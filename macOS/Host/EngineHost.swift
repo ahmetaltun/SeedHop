@@ -42,11 +42,11 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         let data = try JSONEncoder().encode(runIntent)
         try data.write(to: intentURL, options: [.atomic])
         let fd = open(intentURL.path, O_RDONLY)
-        if fd >= 0 { defer { close(fd) }; guard fsync(fd) == 0 else { throw UserFacingError(message: "Could not save the background preference.") } }
+        if fd >= 0 { defer { close(fd) }; guard fsync(fd) == 0 else { throw HostFailure(code:"host.background_save") } }
     }
     private func start(destination: String? = nil, stateDirectory: String? = nil) throws -> EngineBridge {
         lifecycle.lock(); defer { lifecycle.unlock() }
-        if stopping { throw UserFacingError(message: "The engine is stopping. Please wait.") }
+        if stopping { throw HostFailure(code:"host.stopping") }
         if let engine { return engine }
         #if SEEDHOP_DEVELOPMENT
         if let stateDirectory { libraryDirectory = URL(fileURLWithPath:stateDirectory) }
@@ -82,12 +82,13 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             let response: EngineReply
             do {
                 let request = try JSONDecoder().decode(EngineRequest.self, from: data)
-                guard request.version == SeedHopIdentity.protocolVersion else { throw UserFacingError(message: "The interface and engine versions differ. Restart SeedHop to finish updating.") }
+                guard request.version == SeedHopIdentity.protocolVersion else { throw HostFailure(code:"host.version_mismatch") }
                 response = try self.handle(request)
             } catch BridgeError.Cancelled { response = EngineReply(cancelled:true) }
-            catch let BridgeError.Operation(message) { response = EngineReply(error:message) }
-            catch { response = EngineReply(error: error.localizedDescription) }
-            reply((try? JSONEncoder().encode(response)) ?? Data("{\"version\":3,\"error\":\"Could not encode engine response.\"}".utf8))
+            catch let BridgeError.Operation(message, notice) { response = EngineReply(error:message,errorMessage:Self.message(notice)) }
+            catch let failure as HostFailure { response = EngineReply(errorMessage:EngineMessage(code:failure.code)) }
+            catch { response = EngineReply(errorMessage:EngineMessage(code:"engine.failed",diagnostic:error.localizedDescription)) }
+            reply((try? JSONEncoder().encode(response)) ?? Data("{\"version\":6,\"errorMessage\":{\"code\":\"engine.failed\",\"arguments\":[],\"diagnostic\":\"Could not encode engine response.\"}}".utf8))
         }
     }
     private func handle(_ r: EngineRequest) throws -> EngineReply {
@@ -136,21 +137,21 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         case "rename": try core.renameFile(id:r.id ?? "", index:r.fileIndex ?? UInt32.max, name:r.fileName ?? "")
         case "remove": try core.remove(id:r.id ?? "", deleteFiles:r.deleteFiles ?? false)
         case "peerEncryption":
-            guard let policy = r.peerEncryption else { throw UserFacingError(message:"Choose a supported peer encryption policy.") }
+            guard let policy = r.peerEncryption else { throw HostFailure(code:"host.encryption") }
             try core.setPeerEncryption(policy:policy.rawValue)
         case "schedule":
-            guard let schedule = r.schedule else { throw UserFacingError(message:"Provide schedule settings.") }
+            guard let schedule = r.schedule else { throw HostFailure(code:"host.schedule") }
             try core.setSchedule(enabled:schedule.enabled,rules:schedule.rules.map { rule in
                 ScheduleWindow(days:rule.days,startMinute:rule.startMinute,endMinute:rule.endMinute,downloadLimit:rule.downloadLimit,uploadLimit:rule.uploadLimit,suspend:rule.suspend)
             })
         case "alternativeLimits":
-            guard let down = r.downloadLimit, let up = r.uploadLimit, let enabled = r.alternativeLimitsEnabled else { throw UserFacingError(message:"Missing alternative bandwidth limits.") }
+            guard let down = r.downloadLimit, let up = r.uploadLimit, let enabled = r.alternativeLimitsEnabled else { throw HostFailure(code:"host.bandwidth") }
             try core.setAlternativeLimits(download:down, upload:up, enabled:enabled)
         case "limits": try core.setLimits(download:r.downloadLimit ?? 0, upload:r.uploadLimit ?? 0)
         case "login":
             lifecycle.lock(); defer { lifecycle.unlock() }
             runIntent.resumeAtLogin = r.resumeAtLogin ?? false; try persistIntent()
-        default: throw UserFacingError(message: "This action is not supported by this engine version.")
+        default: throw HostFailure(code:"host.unsupported")
         }
         return EngineReply()
     }
@@ -160,6 +161,11 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         catch { NSLog("SeedHop: shutdown failed: %@", error.localizedDescription) }
     }
     static func file(_ f: TransferFile) -> FileItem { FileItem(index:f.index,name:f.name,size:f.size,downloaded:f.downloaded,selected:f.selected,priority:f.priority) }
+    static func message(_ notice: UserNotice) -> EngineMessage {
+        EngineMessage(code:notice.code,arguments:notice.arguments.map { argument in
+            switch argument { case .text(let value): return .text(value); case .number(let value): return .number(value) }
+        },diagnostic:notice.diagnostic)
+    }
     static func snapshot(_ s: EngineSnapshot) -> LibrarySnapshot {
         var snapshot = LibrarySnapshot(protocolVersion:s.protocolVersion, engineVersion:s.engineVersion, instanceId:s.instanceId,
             listenPort:s.listenPort,downloadLimit:s.downloadLimit,uploadLimit:s.uploadLimit,maxActiveDownloads:s.maxActiveDownloads,torrents:s.torrents.map { t in
@@ -178,6 +184,8 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             ScheduleRule(days:rule.days,startMinute:rule.startMinute,endMinute:rule.endMinute,downloadLimit:rule.downloadLimit,uploadLimit:rule.uploadLimit,suspend:rule.suspend)
         })
         snapshot.scheduleActive = s.scheduleActive
+        snapshot.statisticsMessage = s.statisticsMessage.map(message)
+        snapshot.schedulingMessage = s.schedulingMessage.map(message)
         snapshot.schedulingWarning = s.schedulingWarning
         snapshot.normalDownloadLimit = s.normalDownloadLimit
         snapshot.normalUploadLimit = s.normalUploadLimit
@@ -189,3 +197,5 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         return snapshot
     }
 }
+
+private struct HostFailure: Error { let code: String }

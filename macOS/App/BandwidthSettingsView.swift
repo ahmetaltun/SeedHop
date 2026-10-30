@@ -6,8 +6,8 @@ struct BandwidthSettingsView: View {
     var body: some View {
         VStack(alignment:.leading,spacing:18) {
             VStack(alignment:.leading,spacing:6) {
-                Text("Bandwidth limits").font(.system(size:21,weight:.semibold,design:.rounded))
-                Text("Limits apply across all transfers. Use 0 for unlimited.")
+                Text(String(localized:"Bandwidth limits",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:21,weight:.semibold,design:.rounded))
+                Text(String(localized:"Limits apply across all transfers. Use 0 for unlimited.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                     .font(.system(size:11)).foregroundStyle(.secondary)
             }
             Label(store.bandwidthStatus,systemImage:store.alternativeLimitsEnabled ? "tortoise.fill" : "speedometer")
@@ -16,13 +16,13 @@ struct BandwidthSettingsView: View {
                 .background(Design.green.opacity(0.08),in:RoundedRectangle(cornerRadius:9))
                 .accessibilityLabel(store.bandwidthStatus)
             if !store.connected {
-                Text("Connect to the engine to change limits. Displayed limits are the last known values.")
+                Text(String(localized:"Connect to the engine to change limits. Displayed limits are the last known values.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                     .font(.system(size:11)).foregroundStyle(.secondary)
             }
-            if let error = store.error { InlineNotice(title:"Could not change limits",message:error) }
+            if let error = store.error { InlineNotice(title:String(localized:"Could not change limits",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),message:error) }
             BandwidthProfileEditor(alternative:false)
             BandwidthProfileEditor(alternative:true)
-            Text("Alternative limits override scheduled caps. Scheduled pauses still apply.")
+            Text(String(localized:"Alternative limits override scheduled caps. Scheduled pauses still apply.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                 .font(.system(size:10)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
         }
     }
@@ -30,8 +30,8 @@ struct BandwidthSettingsView: View {
 
 struct BandwidthDraft {
     static func bytes(_ text: String, direction: String) throws -> UInt32 {
-        guard let value = UInt32(text.trimmingCharacters(in:.whitespacesAndNewlines)), value <= UInt32.max / 1000 else {
-            throw UserFacingError(message:"\(direction) limit must be a whole number from 0 to 4,294,967.")
+        guard let value = LocaleText.wholeNumber(text) else {
+            throw UserFacingError(message:String(localized:"Limit must be a whole number from 0 to 4,294,967.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
         }
         return value * 1000
     }
@@ -51,33 +51,33 @@ private struct BandwidthProfileEditor: View {
     private var savedUp: UInt32 { alternative ? store.alternativeUploadLimit : store.normalUploadLimit }
     private var active: Bool { alternative ? store.alternativeLimitsEnabled : !store.alternativeLimitsEnabled && !store.scheduleActive }
     private var editable: Bool { store.canChangeBandwidth && (!alternative || store.alternativeLimitsAvailable) && !saving }
-    private var changed: Bool { down != "\(savedDown / 1000)" || up != "\(savedUp / 1000)" }
+    private var changed: Bool { LocaleText.wholeNumber(down) != savedDown / 1000 || LocaleText.wholeNumber(up) != savedUp / 1000 }
 
     var body: some View {
         VStack(alignment:.leading,spacing:12) {
             HStack {
-                Label(alternative ? "Alternative limits" : "Global limits",systemImage:alternative ? "tortoise" : "globe")
+                Label(alternative ? String(localized:"Alternative limits",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Global limits",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:alternative ? "tortoise" : "globe")
                     .font(.system(size:13,weight:.semibold))
                 Spacer()
-                Text(active ? (store.connected ? "Active" : "Last used") : alternative && !store.hasAlternativeLimits ? "Not set" : "Standby")
+                Text(active ? (store.connected ? String(localized:"Active",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Last used",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) : alternative && !store.hasAlternativeLimits ? String(localized:"Not set",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Standby",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                     .font(.system(size:10,weight:.medium)).foregroundStyle(active ? Design.green : .secondary)
                     .padding(.horizontal,7).padding(.vertical,3)
                     .background(active ? Design.green.opacity(0.1) : Color.secondary.opacity(0.08),in:Capsule())
             }
-            Text(alternative && !store.hasAlternativeLimits ? "No alternative limits saved" : "Saved: ↓ \(SizeText.limit(savedDown)) · ↑ \(SizeText.limit(savedUp))")
+            Text(alternative && !store.hasAlternativeLimits ? String(localized:"No alternative limits saved",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Saved: ↓ \(SizeText.limit(savedDown)) · ↑ \(SizeText.limit(savedUp))",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                 .font(.system(size:11)).foregroundStyle(.secondary)
             HStack(spacing:20) {
-                limitField("Download",image:"arrow.down",text:$down,focus:.download)
-                limitField("Upload",image:"arrow.up",text:$up,focus:.upload)
+                limitField(String(localized:"Download",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),image:"arrow.down",text:$down,focus:.download)
+                limitField(String(localized:"Upload",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),image:"arrow.up",text:$up,focus:.upload)
             }.disabled(!editable)
             if alternative {
                 Divider()
-                Toggle("Use alternative limits",isOn:Binding(get:{store.alternativeLimitsEnabled},set:{store.toggleAlternativeLimits($0)}))
+                Toggle(String(localized:"Use alternative limits",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),isOn:Binding(get:{store.alternativeLimitsEnabled},set:{store.toggleAlternativeLimits($0)}))
                     .toggleStyle(.switch).controlSize(.small)
                     .disabled(!store.canToggleAlternativeLimits || saving)
                     .accessibilityHint(store.alternativeLimitsHint)
                 if !store.hasAlternativeLimits {
-                    Label("Set and save a download or upload limit above 0 to enable the switch.",systemImage:"info.circle")
+                    Label(String(localized:"Set and save a download or upload limit above 0 to enable the switch.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:"info.circle")
                         .font(.system(size:11)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
                 }
             }
@@ -86,18 +86,18 @@ private struct BandwidthProfileEditor: View {
                     Text(error).font(.system(size:11)).foregroundStyle(.orange)
                         .fixedSize(horizontal:false,vertical:true).announceAccessibility(error)
                 } else if changed {
-                    Text("Unsaved changes").font(.system(size:10)).foregroundStyle(.secondary)
+                    Text(String(localized:"Unsaved changes",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:10)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength:0)
-                Button(saving ? "Saving…" : alternative ? "Save alternative limits" : "Save global limits",action:save)
+                Button(saving ? String(localized:"Saving…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : alternative ? String(localized:"Save alternative limits",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Save global limits",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),action:save)
                     .disabled(!editable || !changed)
             }
         }.padding(16).frame(maxWidth:.infinity,alignment:.leading)
             .background(Design.card,in:RoundedRectangle(cornerRadius:11))
             .overlay(RoundedRectangle(cornerRadius:11).stroke(Design.line))
-            .onAppear { down = "\(savedDown / 1000)"; up = "\(savedUp / 1000)" }
-            .onChange(of:savedDown) { old, new in if down == "\(old / 1000)" { down = "\(new / 1000)" } }
-            .onChange(of:savedUp) { old, new in if up == "\(old / 1000)" { up = "\(new / 1000)" } }
+            .onAppear { down = LocaleText.integer(savedDown / 1000); up = LocaleText.integer(savedUp / 1000) }
+            .onChange(of:savedDown) { old, new in if LocaleText.wholeNumber(down) == old / 1000 { down = LocaleText.integer(new / 1000) } }
+            .onChange(of:savedUp) { old, new in if LocaleText.wholeNumber(up) == old / 1000 { up = LocaleText.integer(new / 1000) } }
     }
 
     private func limitField(_ title: String, image: String, text: Binding<String>, focus: Field) -> some View {
@@ -106,20 +106,27 @@ private struct BandwidthProfileEditor: View {
             HStack(spacing:6) {
                 TextField("0",text:text).textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing)
                     .focused($field,equals:focus)
-                    .accessibilityLabel("\(alternative ? "Alternative" : "Global") \(title.lowercased()) limit in kilobytes per second")
-                    .accessibilityHint("Enter 0 for unlimited")
+                    .accessibilityLabel(limitAccessibilityLabel(focus))
+                    .accessibilityHint(String(localized:"Enter 0 for unlimited",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                     .onSubmit { if focus == .download { field = .upload } else { save() } }
-                Text("KB/s").font(.system(size:11)).foregroundStyle(.secondary)
+                Text(String(localized:"KB/s",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:11)).foregroundStyle(.secondary)
             }
         }.frame(maxWidth:.infinity)
+    }
+
+    private func limitAccessibilityLabel(_ focus: Field) -> String {
+        if alternative {
+            return focus == .download ? String(localized:"Alternative download limit in kilobytes per second",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Alternative upload limit in kilobytes per second",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        }
+        return focus == .download ? String(localized:"Global download limit in kilobytes per second",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Global upload limit in kilobytes per second",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
     }
 
     private func save() {
         guard editable else { return }
         let download: UInt32, upload: UInt32
-        do { download = try BandwidthDraft.bytes(down,direction:"Download") }
+        do { download = try BandwidthDraft.bytes(down,direction:String(localized:"Download",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
         catch { self.error = error.localizedDescription; field = .download; return }
-        do { upload = try BandwidthDraft.bytes(up,direction:"Upload") }
+        do { upload = try BandwidthDraft.bytes(up,direction:String(localized:"Upload",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
         catch { self.error = error.localizedDescription; field = .upload; return }
         saving = true; error = nil
         Task {
@@ -128,7 +135,7 @@ private struct BandwidthProfileEditor: View {
                 if alternative {
                     try await store.setAlternativeLimits(download:download,upload:upload,enabled:store.alternativeLimitsEnabled && (download > 0 || upload > 0))
                 } else { try await store.setLimits(download:download,upload:upload) }
-                down = "\(download / 1000)"; up = "\(upload / 1000)"
+                down = LocaleText.integer(download / 1000); up = LocaleText.integer(upload / 1000)
             } catch { self.error = error.localizedDescription }
         }
     }

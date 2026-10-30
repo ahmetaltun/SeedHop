@@ -39,7 +39,7 @@ import Combine
         guard !resolving, !adding, preview == nil else { return }
         let link = magnet.trimmingCharacters(in:.whitespacesAndNewlines)
         guard URLComponents(string:link)?.scheme?.lowercased() == "magnet" else {
-            error = "Paste a magnet link beginning with magnet:, or open a .torrent file."
+            error = String(localized:"Paste a magnet link beginning with magnet:, or open a .torrent file.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
             return
         }
         sourceFile = nil
@@ -62,7 +62,7 @@ import Combine
                 let handle = try FileHandle(forReadingFrom:file)
                 defer { try? handle.close() }
                 let maximum = 32 * 1024 * 1024
-                func oversized() -> UserFacingError { UserFacingError(message:"The torrent metadata exceeds 32 MB. Choose a smaller .torrent file.") }
+                func oversized() -> UserFacingError { UserFacingError(message:String(localized:"The torrent metadata exceeds 32 MB. Choose a smaller .torrent file.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
                 // Query the open file, avoiding URL resource caches when the user retries.
                 guard try handle.seekToEnd() <= UInt64(maximum) else { throw oversized() }
                 try handle.seek(toOffset:0)
@@ -95,7 +95,7 @@ import Combine
         request.destination = destination; request.paused = paused; request.reuse = reuse
         request.addToTop = addToTop; request.sequential = sequential; request.firstLastPieces = firstLastPieces
         do {
-            guard let id = try await send(request).id else { throw UserFacingError(message:"The engine did not confirm this transfer. Check your library before trying again.") }
+            guard let id = try await send(request).id else { throw UserFacingError(message:String(localized:"The engine did not confirm this transfer. Check your library before trying again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
             return id
         } catch { self.error = error.localizedDescription; return nil }
     }
@@ -110,7 +110,7 @@ import Combine
     }
     private func accept(_ value: ImportPreview?, for id: String) throws {
         guard lookupID == id else { return }
-        guard let value else { throw UserFacingError(message:"The file list could not be read. Try another torrent file or magnet link.") }
+        guard let value else { throw UserFacingError(message:String(localized:"The file list could not be read. Try another torrent file or magnet link.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
         preview = value; selected = Set(value.files.map(\.index))
     }
 }

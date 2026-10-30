@@ -17,7 +17,7 @@ import AppKit
         window.subtitle = "Native test fixture · sample data"
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps:true)
-        try await settle()
+        try await waitUntil("Native fixture did not become active and key") { NSApp.isActive && NSApp.keyWindow === window }
         print("System accessibility settings: fullKeyboardAccess=\(NSApp.isFullKeyboardAccessEnabled), reduceMotion=\(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion), increaseContrast=\(NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast)")
         print("Native fixture state: active=\(NSApp.isActive), key=\(window.isKeyWindow), main=\(window.isMainWindow), responder=\(String(describing:window.firstResponder))")
         try await invoke("Find Transfer…",key:"f")
@@ -92,7 +92,7 @@ import AppKit
         try verifyTransferNameRendering(in:window)
         store.torrents = fixtureRows; try await settle()
         let nativeTables = descendants(window.contentView).compactMap { $0 as? NSTableView }
-        guard let table = nativeTables.first(where:{ $0.numberOfRows == 30 && $0.tableColumns.first?.headerCell.stringValue == "Name" }), table.numberOfRows == 30 else { throw UserFacingError(message:"Workspace transfer table unavailable: \(nativeTables.map { "\($0.identifier?.rawValue ?? "nil"):\($0.numberOfRows):\($0.tableColumns.map { $0.identifier.rawValue + "=" + $0.headerCell.stringValue })" })") }
+        guard let table = nativeTables.first(where:{ $0.numberOfRows == 30 && $0.tableColumns.first?.identifier.rawValue == "name" }), table.numberOfRows == 30 else { throw UserFacingError(message:"Workspace transfer table unavailable: \(nativeTables.map { "\($0.identifier?.rawValue ?? "nil"):\($0.numberOfRows):\($0.tableColumns.map { $0.identifier.rawValue + "=" + $0.headerCell.stringValue })" })") }
         print("Visible transfer columns: \(table.tableColumns.filter { !$0.isHidden }.map { $0.headerCell.stringValue })")
         print("Native transfer table: type=\(type(of:table)), automatic=\(table.usesAutomaticRowHeights), style=\(table.rowSizeStyle.rawValue), rowHeight=\(table.rowHeight), spacing=\(table.intercellSpacing)")
         let rowHeight = table.rect(ofRow:0).height
@@ -140,7 +140,7 @@ import AppKit
         guard table.selectedRowIndexes == IndexSet(integer:0) else { throw UserFacingError(message:"Live transfer update lost the native selected-row highlight") }
         guard abs(name.width - 275) < 2 else { throw UserFacingError(message:"Live transfer update changed a resized column: \(name.width), saved \(String(describing:WorkspacePreferences.defaults.dictionary(forKey:"workspaceColumnWidths")?["Name"]))") }
         window.contentView = nil; mount(); try await settle()
-        guard let restored = descendants(window.contentView).compactMap({ $0 as? NSTableView }).first(where:{ $0.numberOfRows == 30 && $0.tableColumns.first?.headerCell.stringValue == "Name" }),
+        guard let restored = descendants(window.contentView).compactMap({ $0 as? NSTableView }).first(where:{ $0.numberOfRows == 30 && $0.tableColumns.first?.identifier.rawValue == "name" }),
               let restoredName = restored.tableColumns.first, abs(restoredName.width - 275) < 2 else { throw UserFacingError(message:"Native transfer column width did not persist across remount") }
         let restoredSplits = descendants(window.contentView).compactMap { $0 as? NSSplitView }
         guard let restoredSidebar = restoredSplits.first(where:{ $0.isVertical }), let restoredDetails = restoredSplits.first(where:{ !$0.isVertical }),
@@ -157,7 +157,7 @@ import AppKit
 
     private static func verifyTransferNameRendering(in window: NSWindow, row: Int = 0) throws {
         guard let host = window.contentView,
-              let table = descendants(host).compactMap({ $0 as? NSTableView }).first(where:{ $0.numberOfRows > row && $0.tableColumns.first?.headerCell.stringValue == "Name" }) else {
+              let table = descendants(host).compactMap({ $0 as? NSTableView }).first(where:{ $0.numberOfRows > row && $0.tableColumns.first?.identifier.rawValue == "name" }) else {
             throw UserFacingError(message:"First arriving transfer did not create a table")
         }
         // Inspect the name's pixels, excluding row borders. Row count and
@@ -188,8 +188,8 @@ import AppKit
         // The tortoise is the last content button, immediately before the switch.
         guard let tortoise = descendants(window.contentView).compactMap({ $0 as? NSButton }).last else { throw UserFacingError(message:"Bandwidth settings button unavailable") }
         tortoise.performClick(nil)
-        try await waitUntil("Tortoise did not open the bandwidth window") { NSApp.windows.contains { $0.isVisible && $0.title == "Bandwidth Limits" } }
-        guard let settings = NSApp.windows.first(where:{ $0.isVisible && $0.title == "Bandwidth Limits" }) else { throw UserFacingError(message:"Bandwidth settings window unavailable") }
+        try await waitUntil("Tortoise did not open the bandwidth window") { NSApp.windows.contains { $0.isVisible && $0.title == String(localized:"Bandwidth Limits",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) } }
+        guard let settings = NSApp.windows.first(where:{ $0.isVisible && $0.title == String(localized:"Bandwidth Limits",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }) else { throw UserFacingError(message:"Bandwidth settings window unavailable") }
         defer { settings.close() }
         try await settle()
         let args = ProcessInfo.processInfo.arguments
@@ -267,7 +267,8 @@ import AppKit
               let row = coordinator.rows.firstIndex(where:{ !$0.isPaused }) else { throw UserFacingError(message:"Transfer action fixture has no running row") }
         let target = coordinator.rows[row].id
         table.selectRowIndexes(IndexSet(integer:row),byExtendingSelection:false); try await settle()
-        guard store.selection == [target], let menu = table.menuProvider?([target]), let pause = menu.item(withTitle:"Pause") else { throw UserFacingError(message:"Native selection or context menu did not capture the row") }
+        guard store.selection == [target], let menu = table.menuProvider?([target]),
+              let pause = menu.items.first(where:{ ($0.representedObject as? [String:Any])?["action"] as? String == "pause" }) else { throw UserFacingError(message:"Native selection or context menu did not capture the row") }
         store.selection = [coordinator.rows.first(where:{$0.id != target})!.id]
         try invoke(pause)
         try await waitUntil("Context pause did not retain its captured torrent ID") { UXSelfTest.nativeRequests.contains { $0.command == "pause" && $0.id == target && $0.paused == true } }
@@ -288,7 +289,8 @@ import AppKit
               table.selectedRowIndexes.compactMap({ coordinator.rows.indices.contains($0) ? coordinator.rows[$0].id : nil }) == [target] else { throw UserFacingError(message:"Native sorting lost row order or selection identity") }
         guard let header = table.headerView?.menu else { throw UserFacingError(message:"Native column menu unavailable") }
         header.delegate?.menuNeedsUpdate?(header)
-        guard let eta = header.item(withTitle:"ETA"), let name = header.item(withTitle:"Name"), !name.isEnabled else { throw UserFacingError(message:"Column menu allows hiding Name") }
+        guard let eta = header.items.first(where:{ $0.representedObject as? String == "eta" }),
+              let name = header.items.first(where:{ $0.representedObject as? String == "name" }), !name.isEnabled else { throw UserFacingError(message:"Column menu allows hiding Name") }
         let wasHidden = table.tableColumns.first(where:{$0.identifier.rawValue == "eta"})!.isHidden
         try invoke(eta); try await settle()
         guard table.tableColumns.first(where:{$0.identifier.rawValue == "eta"})!.isHidden != wasHidden else { throw UserFacingError(message:"Native column menu did not update visibility") }
@@ -365,12 +367,12 @@ import AppKit
         try expectStableViewport()
         if let menu = outline.menu {
             menu.delegate?.menuNeedsUpdate?(menu)
-            guard let rename = menu.items.firstIndex(where:{ $0.title == "Rename…" }) else { throw UserFacingError(message:"File context menu omitted Rename") }
+            guard let rename = menu.items.firstIndex(where:{ $0.identifier?.rawValue == "files-rename" }) else { throw UserFacingError(message:"File context menu omitted Rename") }
             menu.performActionForItem(at:rename); try await settle()
             guard let sheet = window.attachedSheet,
                   let editor = sheet.firstResponder as? NSTextView, editor.isFieldEditor,
                   let input = editor.delegate as? NSTextField, input.stringValue == file.name,
-                  let cancel = descendants(sheet.contentView).compactMap({ $0 as? NSButton }).first(where:{ $0.title == "Cancel" }) else {
+                  let cancel = descendants(sheet.contentView).compactMap({ $0 as? NSButton }).first(where:{ $0.identifier?.rawValue == "rename-cancel" }) else {
                 throw UserFacingError(message:"File outline Rename did not capture its selected file")
             }
             cancel.performClick(nil); try await settle()
@@ -475,7 +477,7 @@ import AppKit
               input.stringValue == URL(fileURLWithPath:item.files[0].name).lastPathComponent else {
             throw UserFacingError(message:"Rename did not focus its captured file name")
         }
-        guard let cancel = descendants(rename.contentView).compactMap({ $0 as? NSButton }).first(where:{ $0.title == "Cancel" }) else {
+        guard let cancel = descendants(rename.contentView).compactMap({ $0 as? NSButton }).first(where:{ $0.identifier?.rawValue == "rename-cancel" }) else {
             throw UserFacingError(message:"Native rename Cancel button unavailable")
         }
         cancel.performClick(nil); try await settle()
@@ -491,7 +493,7 @@ import AppKit
         try await waitUntil("Announcement fixture did not become active and key") { NSApp.isActive && NSApp.keyWindow === window }
         store.error = "Restore access to the destination."; try await settle()
         store.error = "Restore access to the destination."; try await settle()
-        guard announcements == ["Something needs attention. Restore access to the destination."] else {
+        guard announcements == [String(localized:"Something needs attention. \("Restore access to the destination.")",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)] else {
             throw UserFacingError(message:"Native error announcement was missing or duplicated: \(announcements)")
         }
         store.error = nil; try await settle()
@@ -504,18 +506,21 @@ import AppKit
         try await settle()
         let copyingCount = announcements.count
         store.fileOperation?.completedBytes = 50; try await settle()
+        let movingTitle = String(localized:"Moving files…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         guard copyingCount == 3, announcements.count == copyingCount,
-              announcements.last == "File change. Moving files…", priorities.last == .medium else {
+              announcements.last == String(localized:"File change. \(movingTitle)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), priorities.last == .medium else {
             throw UserFacingError(message:"File copying did not announce its phase once or announced byte updates")
         }
         store.fileOperation?.cancelRequested = true; try await settle()
-        guard announcements.count == 4, announcements.last == "File change. Cancelling…", priorities.last == .medium else {
+        let cancellingTitle = String(localized:"Cancelling…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        guard announcements.count == 4, announcements.last == String(localized:"File change. \(cancellingTitle)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), priorities.last == .medium else {
             throw UserFacingError(message:"Cancellation phase was not announced")
         }
         store.fileOperation = nil
         store.storageRecovery = StorageRecoveryItem(id:"native-recovery",torrentId:item.id,activeLocation:"original",message:"Inspect retained copies.",originalDirectory:"/tmp/original",destinationDirectory:"/tmp/copies",canKeepCopies:true)
         try await settle()
-        guard announcements.count == 5, announcements.last == "File cleanup needs attention. Inspect retained copies.", priorities.last == .high else {
+        let recoveryMessage = store.storageRecovery!.localizedMessage
+        guard announcements.count == 5, announcements.last == String(localized:"File cleanup needs attention. \(recoveryMessage)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), priorities.last == .high else {
             throw UserFacingError(message:"Recovery guidance was not announced")
         }
         print("PASS: File phases announce at medium priority without byte chatter; recovery guidance requests high priority.")
@@ -538,7 +543,7 @@ import AppKit
             menu.delegate?.menuNeedsUpdate?(menu)
             menu.update()
             for (index,item) in menu.items.enumerated() {
-                if item.title == title { return (menu,index) }
+                if item.keyEquivalent == key && item.keyEquivalentModifierMask == .command { return (menu,index) }
                 if let submenu = item.submenu, let found = find(in:submenu) { return found }
             }
             return nil

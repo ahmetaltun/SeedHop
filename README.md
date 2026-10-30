@@ -66,11 +66,17 @@ not the user's screen. See [design system](docs/DESIGN.md).
 
 ## Verify
 
+The macOS interface supports 13 languages and follows macOS language preferences,
+with English as fallback. See [localization](docs/LOCALIZATION.md) for translation
+updates, validation, and development pseudolocalization.
+
 ```sh
 make test
 make lint
 make ux-test
 make interface-test
+make localization-check
+make localization-test
 cargo run -p seedhop-core --bin seedhop-lab -- fixture .build/fixture
 .build/SeedHop.app/Contents/MacOS/SeedHop --verify-engine "$PWD/.build/fixture"
 python3 scripts/interop.py

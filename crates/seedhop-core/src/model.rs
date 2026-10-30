@@ -6,6 +6,8 @@ pub enum CoreError {
     Busy,
     #[error("{0}")]
     InvalidInput(String),
+    #[error("{message}")]
+    Validation { code: &'static str, message: String },
     #[error("This torrent format is not supported. Use a BitTorrent v1, v2, or hybrid torrent.")]
     Unsupported,
     #[error("The operation was cancelled.")]
@@ -18,6 +20,23 @@ pub enum CoreError {
     Storage(String),
     #[error("{0}")]
     Engine(String),
+}
+
+impl CoreError {
+    /// Stable presentation identity; diagnostic Display text stays suitable for logs.
+    pub fn message_code(&self) -> &str {
+        match self {
+            Self::Validation { code, .. } => code,
+            Self::Busy => "engine.busy",
+            Self::InvalidInput(_) => "input.invalid",
+            Self::Unsupported => "torrent.unsupported",
+            Self::Cancelled => "operation.cancelled",
+            Self::Stopping => "engine.stopping",
+            Self::CorruptState(_) => "library.corrupt",
+            Self::Storage(_) => "storage.failed",
+            Self::Engine(_) => "engine.failed",
+        }
+    }
 }
 
 pub type Result<T> = std::result::Result<T, CoreError>;

@@ -1,5 +1,18 @@
 # Release validation — 2026-10-26
 
+## Localization gate added 2026-10-30
+
+Run `make localization-check`, `make localization-test`, and
+`make localization-render` against the final build. Every enabled language must
+have complete catalogs and metadata, valid plural/format arguments, passing
+packaged-language launches, and reviewed light/dark layouts. Normal and release
+builds enforce catalog and resource checks before signing. Record manual keyboard,
+pointer, and VoiceOver acceptance separately; automated fixtures do not close
+those gates. AI-drafted translations are permitted and are not human-reviewed.
+See [localization](LOCALIZATION.md) for the supported languages and workflow.
+
+## Previous validation checkpoint
+
 Protocol implementation and retained evidence are committed at `56ffc38`.
 All 84 source-file digests and five binary digests in
 [`results/v2-final-2026-10-26.json`](results/v2-final-2026-10-26.json)

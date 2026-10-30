@@ -64,9 +64,10 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
 /// Validate every existing path component before the engine gets a write-capable path.
 pub fn validate_destination(root: &Path, relative_paths: &[String]) -> Result<()> {
     if !root.is_absolute() || !root.is_dir() {
-        return Err(CoreError::InvalidInput(
-            "Choose an existing download folder.".into(),
-        ));
+        return Err(CoreError::Validation {
+            code: "input.choose_an_existing_download_folder",
+            message: "Choose an existing download folder.".into(),
+        });
     }
     let canonical = root.canonicalize().map_err(io_error)?;
     for name in relative_paths {
@@ -76,19 +77,22 @@ pub fn validate_destination(root: &Path, relative_paths: &[String]) -> Result<()
                 .components()
                 .any(|p| !matches!(p, Component::Normal(_)))
         {
-            return Err(CoreError::InvalidInput(
-                "The torrent contains an unsafe file path.".into(),
-            ));
+            return Err(CoreError::Validation {
+                code: "input.the_torrent_contains_an_unsafe_file_path",
+                message: "The torrent contains an unsafe file path.".into(),
+            });
         }
         let mut current = canonical.clone();
         for component in path.components() {
             current.push(component);
             match std::fs::symlink_metadata(&current) {
                 Ok(metadata) if metadata.file_type().is_symlink() => {
-                    return Err(CoreError::InvalidInput(
-                        "A torrent file points through a symbolic link. Choose another folder."
-                            .into(),
-                    ));
+                    return Err(CoreError::Validation {
+                        code: "input.a_torrent_file_points_through_a_symbolic_link",
+                        message:
+                            "A torrent file points through a symbolic link. Choose another folder."
+                                .into(),
+                    });
                 }
                 Ok(_) => (),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),

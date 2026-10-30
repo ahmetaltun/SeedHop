@@ -51,9 +51,10 @@ fn parse(value: &str) -> Result<EncryptionPolicy> {
         "allow" => Ok(EncryptionPolicy::Allow),
         "prefer" => Ok(EncryptionPolicy::Prefer),
         "require" => Ok(EncryptionPolicy::Require),
-        _ => Err(CoreError::InvalidInput(
-            "Choose a supported peer encryption policy.".into(),
-        )),
+        _ => Err(CoreError::Validation {
+            code: "input.choose_a_supported_peer_encryption_policy",
+            message: "Choose a supported peer encryption policy.".into(),
+        }),
     }
 }
 impl Engine {

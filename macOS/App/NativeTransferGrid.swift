@@ -12,26 +12,31 @@ import AppKit
         let sort: String
         var optional = false
     }
-    static let all: [Column] = [
-        .init(id:"name",title:"Name",width:240,minimum:180,sort:"name"),
-        .init(id:"status",title:"Status",width:125,minimum:110,sort:"status"),
-        .init(id:"progress",title:"Progress",width:90,minimum:85,sort:"progress"),
-        .init(id:"download",title:"↓ Download",width:80,minimum:70,sort:"download"),
-        .init(id:"upload",title:"↑ Upload",width:80,minimum:70,sort:"upload"),
-        .init(id:"eta",title:"ETA",width:75,minimum:60,sort:"eta"),
-        .init(id:"ratio",title:"Ratio",width:55,minimum:45,sort:"ratio"),
-        .init(id:"peers",title:"Peers",width:50,minimum:45,sort:"peers"),
-        .init(id:"queue",title:"Queue",width:55,minimum:45,sort:"queue"),
-        .init(id:"selectedSize",title:"Selected Size",width:90,minimum:70,sort:"selected",optional:true),
-        .init(id:"size",title:"Total Size",width:90,minimum:70,sort:"size",optional:true),
-        .init(id:"remaining",title:"Remaining",width:90,minimum:70,sort:"remaining",optional:true),
-        .init(id:"downloadedTraffic",title:"Downloaded Traffic",width:115,minimum:90,sort:"downloaded",optional:true),
-        .init(id:"uploadedTraffic",title:"Uploaded Traffic",width:110,minimum:85,sort:"uploaded",optional:true),
-        .init(id:"added",title:"Added",width:100,minimum:80,sort:"added",optional:true),
-        .init(id:"completed",title:"Completed",width:100,minimum:80,sort:"completed",optional:true),
-        .init(id:"destination",title:"Save Path",width:220,minimum:140,sort:"path",optional:true)
-    ]
+    static var all: [Column] { [
+        .init(id:"name",title:String(localized:"Name",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:240,minimum:180,sort:"name"),
+        .init(id:"status",title:String(localized:"Status",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:125,minimum:110,sort:"status"),
+        .init(id:"progress",title:String(localized:"Progress",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:90,minimum:85,sort:"progress"),
+        .init(id:"download",title:String(localized:"↓ Download",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:80,minimum:70,sort:"download"),
+        .init(id:"upload",title:String(localized:"↑ Upload",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:80,minimum:70,sort:"upload"),
+        .init(id:"eta",title:String(localized:"ETA",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:75,minimum:60,sort:"eta"),
+        .init(id:"ratio",title:String(localized:"Ratio",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:55,minimum:45,sort:"ratio"),
+        .init(id:"peers",title:String(localized:"Peers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:50,minimum:45,sort:"peers"),
+        .init(id:"queue",title:String(localized:"Queue",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:55,minimum:45,sort:"queue"),
+        .init(id:"selectedSize",title:String(localized:"Selected Size",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:90,minimum:70,sort:"selected",optional:true),
+        .init(id:"size",title:String(localized:"Total Size",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:90,minimum:70,sort:"size",optional:true),
+        .init(id:"remaining",title:String(localized:"Remaining",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:90,minimum:70,sort:"remaining",optional:true),
+        .init(id:"downloadedTraffic",title:String(localized:"Downloaded Traffic",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:115,minimum:90,sort:"downloaded",optional:true),
+        .init(id:"uploadedTraffic",title:String(localized:"Uploaded Traffic",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:110,minimum:85,sort:"uploaded",optional:true),
+        .init(id:"added",title:String(localized:"Added",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:100,minimum:80,sort:"added",optional:true),
+        .init(id:"completed",title:String(localized:"Completed",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:100,minimum:80,sort:"completed",optional:true),
+        .init(id:"destination",title:String(localized:"Save Path",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),width:220,minimum:140,sort:"path",optional:true)
+    ] }
     static let orderKey = "workspaceNativeColumnOrder"
+    // English headings are legacy persistence keys, never display strings.
+    static let legacyTitles = ["name":"Name", "status":"Status", "progress":"Progress", "download":"↓ Download", "upload":"↑ Upload", "eta":"ETA", "ratio":"Ratio", "peers":"Peers", "queue":"Queue", "selectedSize":"Selected Size", "size":"Total Size", "remaining":"Remaining", "downloadedTraffic":"Downloaded Traffic", "uploadedTraffic":"Uploaded Traffic", "added":"Added", "completed":"Completed", "destination":"Save Path"]
+    static func initialWidth(_ column: Column) -> CGFloat {
+        max(column.width,ceil((column.title as NSString).size(withAttributes:[.font:NSFont.systemFont(ofSize:11)]).width) + 26)
+    }
     static func order(_ customization: TableColumnCustomization<TorrentItem>) -> [String] {
         let canonical = all.map(\.id)
         var saved = WorkspacePreferences.defaults.stringArray(forKey:orderKey)
@@ -60,6 +65,7 @@ import AppKit
 }
 
 struct NativeTransferGrid: NSViewRepresentable {
+    private let language = AppLocalization.shared.language
     @ObservedObject var store: LibraryStore
     let rows: [TorrentItem]
     @Binding var sortOrder: [KeyPathComparator<TorrentItem>]
@@ -75,7 +81,7 @@ struct NativeTransferGrid: NSViewRepresentable {
         table.style = .inset; table.usesAlternatingRowBackgroundColors = true
         table.usesAutomaticRowHeights = false; table.rowSizeStyle = .custom; table.intercellSpacing = NSSize(width:0,height:0)
         table.columnAutoresizingStyle = .noColumnAutoresizing; table.allowsMultipleSelection = true; table.allowsEmptySelection = true
-        table.allowsColumnReordering = true; table.setAccessibilityLabel("Transfers")
+        table.allowsColumnReordering = true; table.setAccessibilityLabel(String(localized:"Transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
         table.delegate = context.coordinator; table.dataSource = context.coordinator
         table.target = context.coordinator; table.doubleAction = #selector(Coordinator.activate)
         table.menuProvider = { [weak coordinator = context.coordinator] in coordinator?.contextMenu($0) }
@@ -93,7 +99,7 @@ struct NativeTransferGrid: NSViewRepresentable {
         }
         for spec in TransferColumns.all {
             let column = NSTableColumn(identifier:NSUserInterfaceItemIdentifier(spec.id))
-            column.title = spec.title; column.minWidth = spec.minimum; column.maxWidth = 20_000; column.width = spec.width
+            column.title = spec.title; column.minWidth = spec.minimum; column.maxWidth = 20_000; column.width = TransferColumns.initialWidth(spec)
             column.resizingMask = .userResizingMask
             column.sortDescriptorPrototype = NSSortDescriptor(key:spec.sort,ascending:true)
             table.addTableColumn(column)
@@ -115,6 +121,7 @@ struct NativeTransferGrid: NSViewRepresentable {
         private var lastConnected: Bool?
         private var lastOperation: FileOperationItem?
         private var lastRecovery: StorageRecoveryItem?
+        private var lastLanguage: String?
         private var requestedFocus = false
         init(_ parent: NativeTransferGrid) { self.parent = parent }
         func update(_ value: NativeTransferGrid) {
@@ -122,11 +129,14 @@ struct NativeTransferGrid: NSViewRepresentable {
             guard let table else { return }
             updating = true; defer { updating = false }
             let changedIDs = rows.map(\.id) != value.rows.map(\.id)
-            let changed = rows != value.rows || lastConnected != value.store.connected || lastOperation != value.store.fileOperation || lastRecovery != value.store.storageRecovery
+            let changed = rows != value.rows || lastConnected != value.store.connected || lastOperation != value.store.fileOperation || lastRecovery != value.store.storageRecovery || lastLanguage != value.language
+            lastLanguage = value.language
+            table.setAccessibilityLabel(String(localized:"Transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
             rows = value.rows; lastConnected = value.store.connected; lastOperation = value.store.fileOperation; lastRecovery = value.store.storageRecovery
             if table.rowHeight != value.rowHeight { table.rowHeight = value.rowHeight }
             for column in table.tableColumns {
                 if let spec = TransferColumns.all.first(where:{$0.id == column.identifier.rawValue}) {
+                    if column.title != spec.title { column.title = spec.title }
                     let hidden = !TransferColumns.visible(spec,in:value.customization)
                     if column.isHidden != hidden { column.isHidden = hidden }
                 }
@@ -198,8 +208,8 @@ struct NativeTransferGrid: NSViewRepresentable {
             case "download": text = SizeText.rate(parent.store.connected ? item.downloadRate : 0)
             case "upload": text = SizeText.rate(parent.store.connected ? item.uploadRate : 0)
             case "peers": text = String(item.peers)
-            case "eta": text = item.etaSeconds.map(Self.duration) ?? "—"; help = "Estimated time for selected files; unavailable while paused, checking, or without an estimate"
-            case "ratio": text = item.shareRatio.map { String(format:"%.2f",$0) } ?? "—"; help = "Lifetime uploaded payload divided by downloaded payload. Unknown history and zero downloads have no ratio."
+            case "eta": text = item.etaSeconds.map(Self.duration) ?? "—"; help = String(localized:"Estimated time for selected files; unavailable while paused, checking, or without an estimate",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            case "ratio": text = item.shareRatio.map { $0.formatted(.number.precision(.fractionLength(2))) } ?? "—"; help = String(localized:"Lifetime uploaded payload divided by downloaded payload. Unknown history and zero downloads have no ratio.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
             case "queue": text = item.state == "queued" ? String(item.queuePosition) : "—"
             case "selectedSize": text = SizeText.bytes(item.selectedBytes ?? item.totalBytes)
             case "size": text = SizeText.bytes(item.fullBytes)
@@ -212,10 +222,10 @@ struct NativeTransferGrid: NSViewRepresentable {
             default: break
             }
             cell.label.stringValue = text; cell.toolTip = help
-            cell.label.setAccessibilityLabel(id == "name" ? "\(item.name), \(status.accessibleLabel)" : id == "status" ? status.accessibleLabel : text)
+            cell.label.setAccessibilityLabel(id == "name" ? String(localized:"\(item.name), \(status.accessibleLabel)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : id == "status" ? status.accessibleLabel : text)
             cell.updateColor(); return cell
         }
-        private static func duration(_ value: UInt64) -> String { value >= 3600 ? "\(value / 3600)h \(value % 3600 / 60)m" : "\(value / 60)m \(value % 60)s" }
+        private static func duration(_ value: UInt64) -> String { LocaleText.duration(value) }
         private static func date(_ value: UInt64) -> String { Date(timeIntervalSince1970:Double(value)).formatted(date:.abbreviated,time:.omitted) }
         @objc func activate() {
             guard let table, !table.selectedRowIndexes.isEmpty else { return }
@@ -233,13 +243,13 @@ struct NativeTransferGrid: NSViewRepresentable {
                 let item = NSMenuItem(title:title,action:#selector(menuAction(_:)),keyEquivalent:"")
                 item.target = self; item.representedObject = ["action":action,"ids":Array(ids)] as [String:Any]; item.isEnabled = enabled; menu.addItem(item)
             }
-            add("Move to Front of Queue","queue",allowed && ids.count == 1)
-            add("Move Files…","move",allowed && parent.store.storageRecovery == nil && ids.count == 1 && !items.contains { $0.state == "checking" })
-            add("Force Recheck","recheck",allowed && !items.contains { $0.state == "checking" || parent.store.hasPendingCleanup($0.id) })
+            add(String(localized:"Move to Front of Queue",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"queue",allowed && ids.count == 1)
+            add(String(localized:"Move Files…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"move",allowed && parent.store.storageRecovery == nil && ids.count == 1 && !items.contains { $0.state == "checking" })
+            add(String(localized:"Force Recheck",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"recheck",allowed && !items.contains { $0.state == "checking" || parent.store.hasPendingCleanup($0.id) })
             add(parent.store.resumeLabel(for:items),"resume",allowed && items.contains { parent.store.canResumeOrRetry($0) })
-            add("Pause","pause",allowed && items.contains { !$0.isPaused })
-            menu.addItem(.separator()); add("Show in Finder","finder",!ids.isEmpty)
-            add("Remove…","remove",allowed && !ids.contains(where:parent.store.hasPendingCleanup))
+            add(String(localized:"Pause",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"pause",allowed && items.contains { !$0.isPaused })
+            menu.addItem(.separator()); add(String(localized:"Show in Finder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"finder",!ids.isEmpty)
+            add(String(localized:"Remove…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"remove",allowed && !ids.contains(where:parent.store.hasPendingCleanup))
             return menu
         }
         @objc private func menuAction(_ item: NSMenuItem) {
@@ -309,7 +319,7 @@ private class NativeTransferCell: NSTableCellView {
         inset.identifier = "transfer-text-inset"
         NSLayoutConstraint.activate([inset,label.trailingAnchor.constraint(equalTo:trailingAnchor,constant:-2),label.centerYAnchor.constraint(equalTo:centerYAnchor)])
     }
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    required init?(coder: NSCoder) { fatalError(String(localized:"init(coder:) has not been implemented",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
     func updateColor() {
         label.textColor = backgroundStyle == .emphasized ? .alternateSelectedControlTextColor : statusTint ?? (secondary ? .secondaryLabelColor : .labelColor)
         constraints.first(where: { $0.identifier == "transfer-text-inset" })?.constant = statusTint == nil ? 2 : 18
@@ -331,10 +341,10 @@ private final class NativeProgressCell: NativeTransferCell {
         NSLayoutConstraint.activate([bar.leadingAnchor.constraint(equalTo:leadingAnchor,constant:2),bar.widthAnchor.constraint(equalToConstant:44),bar.heightAnchor.constraint(equalToConstant:4),bar.centerYAnchor.constraint(equalTo:centerYAnchor),label.leadingAnchor.constraint(equalTo:bar.trailingAnchor,constant:5)])
         label.font = .monospacedDigitSystemFont(ofSize:11,weight:.regular)
     }
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    required init?(coder: NSCoder) { fatalError(String(localized:"init(coder:) has not been implemented",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
     func configure(_ status: TransferPresentation) {
         bar.value = status.progress; bar.isHidden = status.progress == nil
-        label.stringValue = status.progress.map { "\(Int($0 * 100))%" } ?? "—"
+        label.stringValue = status.progress.map { LocaleText.percent($0) } ?? "—"
         toolTip = status.progressDescription; label.setAccessibilityLabel(status.progressDescription)
     }
 }

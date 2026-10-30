@@ -33,9 +33,9 @@ struct LibraryView: View {
             // changes cannot remount announcement gates or repeat speech.
             .announceAccessibility(store.statisticsWarning)
             .announceAccessibility(store.schedulingWarning)
-            .announceAccessibility(store.error.map { "Something needs attention. " + $0 })
-            .announceAccessibility(store.fileOperation.map { store.connected ? "File change. " + $0.title : "Last known file change. " + $0.title },priority:.medium)
-            .announceAccessibility(store.storageRecovery.map { "File cleanup needs attention. " + $0.message })
+            .announceAccessibility(store.error.map { String(localized:"Something needs attention. \($0)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) })
+            .announceAccessibility(store.fileOperation.map { store.connected ? String(localized:"File change. \($0.title)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Last known file change. \($0.title)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) },priority:.medium)
+            .announceAccessibility(store.storageRecovery.map { String(localized:"File cleanup needs attention. \($0.localizedMessage)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) })
             .focusedSceneValue(\.librarySearch,LibrarySearchAction(focus:{ searchFocused = true },focusTransfers:focusTransfers,toggleSidebar:{ showSidebar.toggle() }))
             .onDrop(of:[UTType.fileURL.identifier, UTType.url.identifier, UTType.plainText.identifier],isTargeted:$dropTargeted,perform:handleDrop)
             .overlay { if dropTargeted { RoundedRectangle(cornerRadius:8).strokeBorder(Design.green,lineWidth:2).padding(3).allowsHitTesting(false).accessibilityHidden(true) } }
@@ -54,7 +54,7 @@ struct LibraryView: View {
     }
     private var searchableWorkspace: some View {
         layout.toolbar { libraryToolbar }
-            .searchable(text:Binding(get:{store.search},set:{ if store.search != $0 { store.search = $0 } }),placement:.toolbar,prompt:"Search transfers")
+            .searchable(text:Binding(get:{store.search},set:{ if store.search != $0 { store.search = $0 } }),placement:.toolbar,prompt:String(localized:"Search transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
             .searchFocused($searchFocused)
             .onChange(of:inspectorTab) { _, value in WorkspacePreferences.defaults.set(value,forKey:"workspaceDetailsTab") }
             .onChange(of:sortOrder) { _, value in Self.saveSort(value) }
@@ -65,32 +65,32 @@ struct LibraryView: View {
         searchableWorkspace
             .sheet(isPresented:$store.showImport,onDismiss:focusTransfers) { ImportView().environmentObject(store) }
             .confirmationDialog(removalTitle,isPresented:$store.showRemoval,titleVisibility:.visible) {
-                Button("Remove from Library") { store.removeConfirmed(deleteFiles:false) }
-                Button("Remove and Delete Downloaded Files",role:.destructive) { store.removeConfirmed(deleteFiles:true) }
+                Button(String(localized:"Remove from Library",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.removeConfirmed(deleteFiles:false) }
+                Button(String(localized:"Remove and Delete Downloaded Files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),role:.destructive) { store.removeConfirmed(deleteFiles:true) }
             } message: { Text(removalMessage) }
     }
-    private var removalTitle: String { "Remove \(store.removalTargets.count == 1 ? "this transfer" : "\(store.removalTargets.count) transfers")?" }
+    private var removalTitle: String { String(localized:"Remove \(store.removalTargets.count) transfers?",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
     private var removalMessage: String {
-        store.removalTargets.count == 1 ? "“\(store.removalTargets.first?.name ?? "This transfer")” will be removed. Its files stay on your Mac unless you choose to delete them." : "These \(store.removalTargets.count) transfers will be removed. Their files stay on your Mac unless you choose to delete them."
+        store.removalTargets.count == 1 ? String(localized:"“\(store.removalTargets.first?.name ?? String(localized:"This transfer",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))” will be removed. Its files stay on your Mac unless you choose to delete them.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"These \(store.removalTargets.count) transfers will be removed. Their files stay on your Mac unless you choose to delete them.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
     }
     @ToolbarContentBuilder private var libraryToolbar: some ToolbarContent {
 
             ToolbarItemGroup(placement:.navigation) {
-                Button { showSidebar.toggle() } label: { Label("Toggle sidebar",systemImage:"sidebar.left") }.help("Show or hide filters")
-                Button { store.beginImport() } label: { Label("Add torrent",systemImage:"plus") }.disabled(store.hasFileOperation).help("Add a torrent (⌘N)")
-                Button { store.openFiles() } label: { Label("Open torrent file",systemImage:"folder.badge.plus") }.disabled(store.hasFileOperation).help("Open a torrent file (⌘O)")
+                Button { showSidebar.toggle() } label: { Label(String(localized:"Toggle sidebar",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:"sidebar.left") }.help(String(localized:"Show or hide filters",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                Button { store.beginImport() } label: { Label(String(localized:"Add torrent",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:"plus") }.disabled(store.hasFileOperation).help(String(localized:"Add a torrent (⌘N)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                Button { store.openFiles() } label: { Label(String(localized:"Open torrent file",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:"folder.badge.plus") }.disabled(store.hasFileOperation).help(String(localized:"Open a torrent file (⌘O)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
             }
             ToolbarItemGroup(placement:.primaryAction) {
-                Button { store.toggleSelected(paused:false) } label: { Label(store.resumeActionLabel,systemImage:store.resumeActionLabel == "Retry" ? "arrow.clockwise" : "play.fill") }.disabled(!store.canResumeSelection).help("Resume paused transfers or retry errors without changing saved pause intent")
-                Button { store.toggleSelected(paused:true) } label: { Label("Pause",systemImage:"pause.fill") }.disabled(!store.canPauseSelection).help("Pause selected transfers")
-                Button { store.requestRemoval() } label: { Label("Remove",systemImage:"trash") }.disabled(!store.canRemoveSelection).help("Remove selected transfers")
+                Button { store.toggleSelected(paused:false) } label: { Label(store.resumeActionLabel,systemImage:store.selectionNeedsRetry ? "arrow.clockwise" : "play.fill") }.disabled(!store.canResumeSelection).help(String(localized:"Resume paused transfers or retry errors without changing saved pause intent",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                Button { store.toggleSelected(paused:true) } label: { Label(String(localized:"Pause",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:"pause.fill") }.disabled(!store.canPauseSelection).help(String(localized:"Pause selected transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                Button { store.requestRemoval() } label: { Label(String(localized:"Remove",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:"trash") }.disabled(!store.canRemoveSelection).help(String(localized:"Remove selected transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                 Menu {
-                    Toggle("Comfortable Rows",isOn:$comfortableRows)
-                    Menu("Columns") { columnChoices }
-                    Button("Restore Default Columns") { columnCustomization = Self.defaultColumns(); WorkspaceTablePersistence.restoreWidths() }
-                } label: { Label("View options",systemImage:"tablecells") }.help("Choose row density; right-click a column heading to choose columns")
+                    Toggle(String(localized:"Comfortable Rows",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),isOn:$comfortableRows)
+                    Menu(String(localized:"Columns",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { columnChoices }
+                    Button(String(localized:"Restore Default Columns",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { columnCustomization = Self.defaultColumns(); WorkspaceTablePersistence.restoreWidths() }
+                } label: { Label(String(localized:"View options",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:"tablecells") }.help(String(localized:"Choose row density; right-click a column heading to choose columns",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                 Divider()
-                Button { withAnimation(reduceMotion ? nil : .easeInOut(duration:0.18)) { store.showInspector.toggle() } } label: { Label("Toggle details",systemImage:"rectangle.bottomthird.inset.filled") }.help("Show or hide transfer details (⌥⌘I)")
+                Button { withAnimation(reduceMotion ? nil : .easeInOut(duration:0.18)) { store.showInspector.toggle() } } label: { Label(String(localized:"Toggle details",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:"rectangle.bottomthird.inset.filled") }.help(String(localized:"Show or hide transfer details (⌥⌘I)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
             }
     }
     private static func defaultColumns() -> TableColumnCustomization<TorrentItem> {
@@ -107,26 +107,26 @@ struct LibraryView: View {
         }
     }
     private struct ColumnOption: Identifiable { let id: String; let title: String; let visible: Bool }
-    private static let columnOptions: [ColumnOption] = [
-        ColumnOption(id:"status",title:"Status",visible:true), ColumnOption(id:"progress",title:"Progress",visible:true),
-        ColumnOption(id:"download",title:"Download",visible:true), ColumnOption(id:"upload",title:"Upload",visible:true),
-        ColumnOption(id:"peers",title:"Peers",visible:true), ColumnOption(id:"eta",title:"ETA",visible:true),
-        ColumnOption(id:"ratio",title:"Ratio",visible:true), ColumnOption(id:"queue",title:"Queue",visible:true),
-        ColumnOption(id:"selectedSize",title:"Selected Size",visible:false), ColumnOption(id:"size",title:"Total Size",visible:false),
-        ColumnOption(id:"remaining",title:"Remaining",visible:false), ColumnOption(id:"downloadedTraffic",title:"Downloaded Traffic",visible:false),
-        ColumnOption(id:"uploadedTraffic",title:"Uploaded Traffic",visible:false), ColumnOption(id:"added",title:"Added",visible:false),
-        ColumnOption(id:"completed",title:"Completed",visible:false), ColumnOption(id:"destination",title:"Save Path",visible:false)
-    ]
+    private static var columnOptions: [ColumnOption] { [
+        ColumnOption(id:"status",title:String(localized:"Status",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:true), ColumnOption(id:"progress",title:String(localized:"Progress",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:true),
+        ColumnOption(id:"download",title:String(localized:"Download",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:true), ColumnOption(id:"upload",title:String(localized:"Upload",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:true),
+        ColumnOption(id:"peers",title:String(localized:"Peers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:true), ColumnOption(id:"eta",title:String(localized:"ETA",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:true),
+        ColumnOption(id:"ratio",title:String(localized:"Ratio",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:true), ColumnOption(id:"queue",title:String(localized:"Queue",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:true),
+        ColumnOption(id:"selectedSize",title:String(localized:"Selected Size",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:false), ColumnOption(id:"size",title:String(localized:"Total Size",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:false),
+        ColumnOption(id:"remaining",title:String(localized:"Remaining",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:false), ColumnOption(id:"downloadedTraffic",title:String(localized:"Downloaded Traffic",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:false),
+        ColumnOption(id:"uploadedTraffic",title:String(localized:"Uploaded Traffic",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:false), ColumnOption(id:"added",title:String(localized:"Added",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:false),
+        ColumnOption(id:"completed",title:String(localized:"Completed",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:false), ColumnOption(id:"destination",title:String(localized:"Save Path",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),visible:false)
+    ] }
     private var sidebar: some View {
         VStack(alignment:.leading,spacing:0) {
-            SectionEyebrow(title:"Transfers").padding(.horizontal,16).padding(.top,16).padding(.bottom,10)
+            SectionEyebrow(title:String(localized:"Transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).padding(.horizontal,16).padding(.top,16).padding(.bottom,10)
             VStack(spacing:4) {
                 ForEach(LibraryFilter.allCases) { filter in
                     let selected = store.filter == filter
                     Button { store.filter = filter } label: {
                         HStack(spacing:10) {
                             Image(systemName:filter.symbol).font(.system(size:14,weight:.medium)).frame(width:19)
-                            Text(filter.rawValue).font(.system(size:12,weight:selected ? .semibold : .regular)).lineLimit(1).minimumScaleFactor(0.85).help(filter.rawValue)
+                            Text(filter.title).font(.system(size:12,weight:selected ? .semibold : .regular)).lineLimit(1).minimumScaleFactor(0.85).help(filter.title)
                             Spacer(minLength:0)
                             Text("\(store.count(in:filter))").font(.system(size:10,weight:.medium,design:.rounded)).monospacedDigit().foregroundStyle(selected ? Design.green : Design.secondary)
                         }.foregroundStyle(selected ? Design.green : Color.primary.opacity(0.75)).padding(.horizontal,12).frame(height:35)
@@ -137,9 +137,9 @@ struct LibraryView: View {
             }.padding(.horizontal,10)
             Divider().padding(.vertical,12)
             VStack(alignment:.leading,spacing:8) {
-                Text("Tracker").font(.system(size:11,weight:.medium)).foregroundStyle(.secondary)
-                Picker("Tracker host",selection:$store.trackerHost) {
-                    Text("All trackers").tag("")
+                Text(String(localized:"Tracker",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:11,weight:.medium)).foregroundStyle(.secondary)
+                Picker(String(localized:"Tracker host",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),selection:$store.trackerHost) {
+                    Text(String(localized:"All trackers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag("")
                     ForEach(store.trackerHosts,id:\.self) { Text($0).tag($0) }
                 }.labelsHidden().controlSize(.small)
             }.padding(.horizontal,14)
@@ -150,12 +150,12 @@ struct LibraryView: View {
                     Image(systemName:"externaldrive").font(.system(size:15)).foregroundStyle(.secondary)
                     VStack(alignment:.leading,spacing:3) {
                         Text(URL(fileURLWithPath:store.downloadDirectory).lastPathComponent).font(.system(size:11,weight:.medium))
-                        Text("Default download folder").font(.system(size:10)).foregroundStyle(.secondary)
+                        Text(String(localized:"Default download folder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:10)).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button { NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:store.downloadDirectory) } label: { Image(systemName:"arrow.up.right") }.buttonStyle(.plain).foregroundStyle(.secondary).help("Show download folder in Finder").accessibilityLabel("Show download folder in Finder")
+                    Button { NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:store.downloadDirectory) } label: { Image(systemName:"arrow.up.right") }.buttonStyle(.plain).foregroundStyle(.secondary).help(String(localized:"Show download folder in Finder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).accessibilityLabel(String(localized:"Show download folder in Finder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                 }
-                HStack(spacing:6) { Circle().fill(store.connected ? Design.green : Design.amber).frame(width:5,height:5); Text(store.switching ? "Switching engine…" : store.connected ? (store.backgroundEnabled ? "Running in background" : "Engine connected") : store.connecting ? "Connecting to engine…" : "Engine disconnected").font(.system(size:10)).foregroundStyle(.secondary) }.accessibilityElement(children:.combine)
+                HStack(spacing:6) { Circle().fill(store.connected ? Design.green : Design.amber).frame(width:5,height:5); Text(store.switching ? String(localized:"Switching engine…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : store.connected ? (store.backgroundEnabled ? String(localized:"Running in background",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Engine connected",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) : store.connecting ? String(localized:"Connecting to engine…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Engine disconnected",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:10)).foregroundStyle(.secondary) }.accessibilityElement(children:.combine)
             }.padding(18)
         }.frame(maxWidth:.infinity,maxHeight:.infinity).background(Design.sidebar)
     }
@@ -169,28 +169,28 @@ struct LibraryView: View {
 
             }
             if store.torrents.isEmpty && store.storageRecovery != nil {
-                ContentUnavailableView("Retained files need attention",systemImage:"exclamationmark.circle",description:Text("Review the cleanup notice above. Your remaining files have been preserved."))
+                ContentUnavailableView(String(localized:"Retained files need attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:"exclamationmark.circle",description:Text(String(localized:"Review the cleanup notice above. Your remaining files have been preserved.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)))
             }
             else if store.torrents.isEmpty { emptyState }
             else if store.visibleTorrents.isEmpty {
                 if !store.trackerHost.isEmpty {
                     ContentUnavailableView {
-                        Label("No transfers for this tracker",systemImage:"network")
-                    } description: { Text("Try another tracker or clear your filters.") }
-                    actions: { Button("Clear Filters") { store.clearFilters() } }
+                        Label(String(localized:"No transfers for this tracker",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:"network")
+                    } description: { Text(String(localized:"Try another tracker or clear your filters.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
+                    actions: { Button(String(localized:"Clear Filters",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.clearFilters() } }
                 }
                 else if !store.search.isEmpty { ContentUnavailableView.search(text:store.search).frame(maxHeight:.infinity) }
                 else {
                     ContentUnavailableView {
                         Label {
-                            Text(store.filter == .attention && store.hasUnscopedRecovery ? "Retained files need attention" : store.filter.emptyTitle).foregroundStyle(.primary)
+                            Text(store.filter == .attention && store.hasUnscopedRecovery ? String(localized:"Retained files need attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : store.filter.emptyTitle).foregroundStyle(.primary)
                         } icon: {
                             Image(systemName:store.filter == .attention ? (store.hasUnscopedRecovery ? "exclamationmark.circle" : "checkmark.circle") : store.filter.symbol).foregroundStyle(store.filter == .attention ? (store.hasUnscopedRecovery ? Design.amber : Design.green) : Design.secondary)
                         }
                     } description: {
-                        Text(store.filter == .attention && store.hasUnscopedRecovery ? "Review the cleanup notice above. Your other transfers are still in the library." : "Your other transfers are still in the library.")
+                        Text(store.filter == .attention && store.hasUnscopedRecovery ? String(localized:"Review the cleanup notice above. Your other transfers are still in the library.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Your other transfers are still in the library.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                     } actions: {
-                        Button("Show all transfers") { store.clearFilters() }
+                        Button(String(localized:"Show all transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.clearFilters() }
                     }.frame(maxHeight:.infinity)
                 }
             }
@@ -200,47 +200,47 @@ struct LibraryView: View {
     }
     private var statusBar: some View {
             HStack(spacing:9) {
-                Text("\(store.visibleTorrents.count) transfers").font(.system(size:10)).foregroundStyle(.secondary)
+                Text(String(localized:"\(store.visibleTorrents.count) transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:10)).foregroundStyle(.secondary)
                 if !store.selection.isEmpty { Text("· \(store.selection.count) selected").font(.system(size:10)).foregroundStyle(.secondary) }
-                if !store.busyTransfers.isEmpty { ProgressView().controlSize(.mini); Text("Saving changes…").font(.system(size:10)).foregroundStyle(.secondary) }
+                if !store.busyTransfers.isEmpty { ProgressView().controlSize(.mini); Text(String(localized:"Saving changes…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:10)).foregroundStyle(.secondary) }
                 if !store.search.isEmpty || !store.trackerHost.isEmpty || store.filter != .all {
                     Text(activeFilterDescription).font(.system(size:10)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                        .help(activeFilterDescription).accessibilityLabel("Active filters: " + activeFilterDescription).layoutPriority(-1)
-                    Button("Clear Filters") { store.clearFilters() }.controlSize(.mini).fixedSize()
+                        .help(activeFilterDescription).accessibilityLabel(String(localized:"Active filters: \(activeFilterDescription)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).layoutPriority(-1)
+                    Button(String(localized:"Clear Filters",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.clearFilters() }.controlSize(.mini).fixedSize()
                 }
                 Spacer(minLength:0)
                 ViewThatFits(in:.horizontal) {
-                    Text("↓ \(SizeText.rate(store.downloadRate,limit:store.downloadLimit))   ↑ \(SizeText.rate(store.uploadRate,limit:store.uploadLimit))")
-                    Text("↓ \(SizeText.rate(store.downloadRate))   ↑ \(SizeText.rate(store.uploadRate))")
-                }.monospacedDigit().help(store.bandwidthStatus + ". Speeds show current rate / limit.")
-                    .accessibilityLabel("Download \(SizeText.rate(store.downloadRate)), upload \(SizeText.rate(store.uploadRate)). \(store.bandwidthStatus)")
-                Text(store.connected ? store.bandwidthProfileTitle : "Disconnected").foregroundStyle(store.alternativeLimitsEnabled ? Design.green : .secondary).help(store.bandwidthStatus)
+                    Text(String(localized:"↓ \(SizeText.rate(store.downloadRate,limit:store.downloadLimit))   ↑ \(SizeText.rate(store.uploadRate,limit:store.uploadLimit))",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                    Text(String(localized:"↓ \(SizeText.rate(store.downloadRate))   ↑ \(SizeText.rate(store.uploadRate))",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                }.monospacedDigit().help(String(localized:"\(store.bandwidthStatus). Speeds show current rate / limit.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                    .accessibilityLabel(String(localized:"Download \(SizeText.rate(store.downloadRate)), upload \(SizeText.rate(store.uploadRate)). \(store.bandwidthStatus)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                Text(store.connected ? store.bandwidthProfileTitle : String(localized:"Disconnected",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).foregroundStyle(store.alternativeLimitsEnabled ? Design.green : .secondary).help(store.bandwidthStatus)
                 Button { openWindow(id:"bandwidth") } label: {
                     Image(systemName:store.alternativeLimitsEnabled ? "tortoise.fill" : "tortoise")
                         .padding(.horizontal,4).padding(.vertical,3)
                         .foregroundStyle(store.alternativeLimitsEnabled ? Design.green : .secondary)
-                }.buttonStyle(.borderless).accessibilityLabel("Open bandwidth limits")
-                    .help(store.alternativeLimitsHint + " Click to edit bandwidth limits.")
-                Toggle("Alternative limits",isOn:Binding(get:{store.alternativeLimitsEnabled},set:{store.toggleAlternativeLimits($0)}))
+                }.buttonStyle(.borderless).accessibilityLabel(String(localized:"Open bandwidth limits",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                    .help(String(localized:"\(store.alternativeLimitsHint) Click to edit bandwidth limits.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                Toggle(String(localized:"Alternative limits",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),isOn:Binding(get:{store.alternativeLimitsEnabled},set:{store.toggleAlternativeLimits($0)}))
                     .labelsHidden().toggleStyle(.switch).controlSize(.mini).fixedSize()
                     .disabled(!store.canToggleAlternativeLimits)
-                    .accessibilityLabel("Alternative bandwidth limits")
-                    .accessibilityValue(store.alternativeLimitsEnabled ? "On" : "Off")
+                    .accessibilityLabel(String(localized:"Alternative bandwidth limits",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                    .accessibilityValue(store.alternativeLimitsEnabled ? String(localized:"On",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Off",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                     .accessibilityHint(store.alternativeLimitsHint)
                     .help(store.alternativeLimitsHint)
             }.font(.system(size:11)).padding(.horizontal,10).frame(height:26)
     }
     private var activeFilterDescription: String {
-        [store.filter == .all ? nil : store.filter.rawValue,store.search.isEmpty ? nil : "Name: \(store.search)",store.trackerHost.isEmpty ? nil : "Tracker: \(store.trackerHost)"].compactMap { $0 }.joined(separator:" · ")
+        [store.filter == .all ? nil : store.filter.title,store.search.isEmpty ? nil : String(localized:"Name: \(store.search)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),store.trackerHost.isEmpty ? nil : String(localized:"Tracker: \(store.trackerHost)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)].compactMap { $0 }.joined(separator:" · ")
     }
     private var hasNotice: Bool { store.switching || store.storageRecovery != nil || store.fileOperation != nil || !store.storageRequests.isEmpty || store.error != nil || store.statisticsWarning != nil || store.schedulingWarning != nil }
     private var noticeTitle: String {
-        if store.storageRecovery != nil { return "File cleanup needs attention" }
-        if let operation = store.fileOperation { return (store.connected ? "" : "Last known: ") + operation.title + " · " + operation.detail }
+        if store.storageRecovery != nil { return String(localized:"File cleanup needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        if let operation = store.fileOperation { return store.connected ? String(localized:"\(operation.title) · \(operation.detail)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Last known: \(operation.title) · \(operation.detail)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
         if let error = store.error { return error }
         if let warning = store.schedulingWarning { return warning }
         if let warning = store.statisticsWarning { return warning }
-        return store.switching ? "Switching transfer engine…" : "Preparing file change…"
+        return store.switching ? String(localized:"Switching transfer engine…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Preparing file change…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
     }
     private var noticeStrip: some View {
         HStack(spacing:8) {
@@ -248,22 +248,22 @@ struct LibraryView: View {
             Text(noticeTitle).lineLimit(1).truncationMode(.tail).help(noticeTitle)
             Spacer(minLength:4)
             if let operation = store.fileOperation, operation.canCancel {
-                Button("Cancel") { store.cancelFileOperation(operation) }.disabled(!store.canCancelFileOperation(operation))
+                Button(String(localized:"Cancel",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.cancelFileOperation(operation) }.disabled(!store.canCancelFileOperation(operation))
             }
-            Button("Review") { showNotice = true }
+            Button(String(localized:"Review",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { showNotice = true }
         }.font(.system(size:11)).controlSize(.small).padding(.horizontal,10).frame(height:34)
             .background(Design.amber.opacity(0.06))
             .popover(isPresented:$showNotice) { noticeDetails.padding(12).frame(width:480) }
     }
     private var noticeDetails: some View {
         VStack(alignment:.leading,spacing:10) {
-            if store.switching { Text("Switching transfer engine…") }
+            if store.switching { Text(String(localized:"Switching transfer engine…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
             if let recovery = store.storageRecovery { storageRecoveryNotice(recovery) }
             if let operation = store.fileOperation { fileOperationProgress(operation) }
-            if let warning = store.schedulingWarning { InlineNotice(title:"Scheduling needs attention",message:warning) }
-            if let warning = store.statisticsWarning { InlineNotice(title:"Statistics need attention",message:warning) }
+            if let warning = store.schedulingWarning { InlineNotice(title:String(localized:"Scheduling needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),message:warning) }
+            if let warning = store.statisticsWarning { InlineNotice(title:String(localized:"Statistics need attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),message:warning) }
             if let error = store.error {
-                InlineNotice(title:"Something needs attention",message:error,retry:store.connected ? nil : { Task { store.error = nil; await store.start() } },dismiss:{ store.error = nil; showNotice = false })
+                InlineNotice(title:String(localized:"Something needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),message:error,retry:store.connected ? nil : { Task { store.error = nil; await store.start() } },dismiss:{ store.error = nil; showNotice = false })
             }
         }.environment(\.accessibilityAnnouncementsEnabled,false)
     }
@@ -271,23 +271,23 @@ struct LibraryView: View {
         VStack(alignment:.leading,spacing:9) {
             HStack(alignment:.top,spacing:12) {
                 VStack(alignment:.leading,spacing:4) {
-                    Text(store.connected ? operation.title : "Last known: \(operation.title)").font(.system(size:12,weight:.semibold))
-                    Text(store.torrents.first(where:{ $0.id == operation.torrentId })?.name ?? "Transfer files")
+                    Text(store.connected ? operation.title : String(localized:"Last known: \(operation.title)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:12,weight:.semibold))
+                    Text(store.torrents.first(where:{ $0.id == operation.torrentId })?.name ?? String(localized:"Transfer files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                         .font(.system(size:11)).lineLimit(1).truncationMode(.middle)
                 }
                 Spacer(minLength:8)
                 if ["preparing", "copying"].contains(operation.phase) {
-                    Button(operation.cancelRequested || store.cancellingOperations.contains(operation.id) ? "Cancelling…" : "Cancel") {
+                    Button(operation.cancelRequested || store.cancellingOperations.contains(operation.id) ? String(localized:"Cancelling…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Cancel",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
                         store.cancelFileOperation(operation)
-                    }.disabled(!store.canCancelFileOperation(operation)).accessibilityLabel("Cancel file change")
+                    }.disabled(!store.canCancelFileOperation(operation)).accessibilityLabel(String(localized:"Cancel file change",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                 } else { ProgressView().controlSize(.small).accessibilityLabel(operation.title) }
             }
             if operation.phase == "copying" && operation.totalBytes > 0 {
                 TransferProgress(value:Double(operation.completedBytes) / Double(max(operation.completedBytes,operation.totalBytes)))
-                    .accessibilityLabel("Files copied")
-                    .accessibilityValue("\(SizeText.bytes(operation.completedBytes)) of \(SizeText.bytes(operation.totalBytes))")
+                    .accessibilityLabel(String(localized:"Files copied",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                    .accessibilityValue(String(localized:"\(SizeText.bytes(operation.completedBytes)) of \(SizeText.bytes(operation.totalBytes))",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
             }
-            Text(store.connected ? operation.detail : "Reconnect to see current file-operation progress.").font(.system(size:10)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
+            Text(store.connected ? operation.detail : String(localized:"Reconnect to see current file-operation progress.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:10)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
         }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
             .background(Design.card,in:RoundedRectangle(cornerRadius:10))
             .overlay(RoundedRectangle(cornerRadius:10).stroke(Design.line))
@@ -295,22 +295,22 @@ struct LibraryView: View {
     }
     private func storageRecoveryNotice(_ notice: StorageRecoveryItem) -> some View {
         VStack(alignment:.leading,spacing:10) {
-            Text("File cleanup needs attention").font(.system(size:12,weight:.semibold))
-            Text(notice.message).font(.system(size:11)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true).textSelection(.enabled)
+            Text(String(localized:"File cleanup needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:12,weight:.semibold))
+            Text(notice.localizedMessage).font(.system(size:11)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true).textSelection(.enabled)
             HStack {
-                Button(store.resolvingStorageRecovery ? "Checking…" : "Retry Cleanup") { store.resolveStorageRecovery(notice,keepCopies:false) }
+                Button(store.resolvingStorageRecovery ? String(localized:"Checking…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Retry Cleanup",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.resolveStorageRecovery(notice,keepCopies:false) }
                     .disabled(!store.canResolveStorageRecovery(notice))
                 if notice.canKeepCopies {
-                    Button("Keep Extra Copies") { store.resolveStorageRecovery(notice,keepCopies:true) }
+                    Button(String(localized:"Keep Extra Copies",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.resolveStorageRecovery(notice,keepCopies:true) }
                         .disabled(!store.canResolveStorageRecovery(notice))
-                        .help("Keep all remaining files and finish tracking this cleanup.")
+                        .help(String(localized:"Keep all remaining files and finish tracking this cleanup.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                 }
                 Spacer(minLength:0)
             }
             HStack {
-                Button("Show Original Folder") { NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:notice.originalDirectory) }
+                Button(String(localized:"Show Original Folder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:notice.originalDirectory) }
                 if notice.originalDirectory != notice.destinationDirectory {
-                    Button("Show Destination") { NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:notice.destinationDirectory) }
+                    Button(String(localized:"Show Destination",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:notice.destinationDirectory) }
                 }
             }.font(.system(size:10))
         }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
@@ -338,12 +338,12 @@ struct LibraryView: View {
     }
     private var detailsHeader: some View {
         HStack(spacing:12) {
-            Picker("Transfer details",selection:$inspectorTab) {
-                Text("General").tag(0); Text("Files").tag(1); Text("Peers").tag(2); Text("Trackers").tag(3); Text("Activity").tag(4)
+            Picker(String(localized:"Transfer details",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),selection:$inspectorTab) {
+                Text(String(localized:"General",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag(0); Text(String(localized:"Files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag(1); Text(String(localized:"Peers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag(2); Text(String(localized:"Trackers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag(3); Text(String(localized:"Activity",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag(4)
             }.pickerStyle(.segmented).labelsHidden().frame(maxWidth:500)
             Spacer(minLength:0)
             Text(store.selected.count == 1 ? store.selected[0].name : "\(store.selected.count) selected").font(.system(size:11)).lineLimit(1).truncationMode(.middle)
-            Button { store.showInspector = false } label: { Image(systemName:"xmark") }.buttonStyle(.plain).accessibilityLabel("Hide transfer details")
+            Button { store.showInspector = false } label: { Image(systemName:"xmark") }.buttonStyle(.plain).accessibilityLabel(String(localized:"Hide transfer details",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
         }.padding(.horizontal,10).frame(height:34)
     }
     @ViewBuilder private var detailsBody: some View {
@@ -353,8 +353,8 @@ struct LibraryView: View {
             ScrollView { multipleSelectionInspector }.frame(maxWidth:.infinity,maxHeight:.infinity)
         } else {
             VStack(spacing:6) {
-                Text("Select a transfer").font(.system(size:12,weight:.semibold))
-                Text("Inspect files, peers, trackers, and activity here.").font(.system(size:11)).foregroundStyle(.secondary)
+                Text(String(localized:"Select a transfer",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:12,weight:.semibold))
+                Text(String(localized:"Inspect files, peers, trackers, and activity here.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:11)).foregroundStyle(.secondary)
             }.frame(maxWidth:.infinity,maxHeight:.infinity).accessibilityElement(children:.combine)
         }
     }
@@ -378,9 +378,9 @@ struct LibraryView: View {
     private func showPreviewDetails(_ item: TorrentItem, section: String) {
         store.details = PreviewFixtures.diagnostics(item,section:section)
         store.history[item.id] = PreviewFixtures.trafficHistory()
-        store.events[item.id] = [TransferEvent(message:"Sample transfer activity")]
+        store.events[item.id] = [TransferEvent(message:String(localized:"Sample transfer activity",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))]
     }
-    private static func duration(_ value: UInt64) -> String { value >= 3600 ? "\(value / 3600)h \(value % 3600 / 60)m" : "\(value / 60)m \(value % 60)s" }
+    private static func duration(_ value: UInt64) -> String { LocaleText.duration(value) }
     private static func date(_ value: UInt64) -> String { Date(timeIntervalSince1970:Double(value)).formatted(date:.abbreviated,time:.omitted) }
     static let sortFields: [(String, PartialKeyPath<TorrentItem>)] = [("name",\.name),("status",\.sortableStatus),("progress",\.progress),("download",\.downloadRate),("upload",\.uploadRate),("peers",\.peers),("eta",\.sortableETA),("ratio",\.sortableRatio),("queue",\.queuePosition),("size",\.fullBytes),("selected",\.totalBytes),("remaining",\.remainingBytes),("downloaded",\.sortableDownloaded),("uploaded",\.sortableUploaded),("added",\.sortableAdded),("completed",\.sortableCompleted),("path",\.destination)]
     private static func restoredSort() -> [KeyPathComparator<TorrentItem>] {
@@ -391,7 +391,7 @@ struct LibraryView: View {
     }
     static func comparator(field: String, order: SortOrder) -> KeyPathComparator<TorrentItem> {
         switch field {
-        case "status": return KeyPathComparator(\.sortableStatus,order:order)
+        case "status": return KeyPathComparator(\.sortableStatus,comparator:String.StandardComparator.localizedStandard,order:order)
         case "progress": return KeyPathComparator(\.progress,order:order)
         case "download": return KeyPathComparator(\.downloadRate,order:order)
         case "upload": return KeyPathComparator(\.uploadRate,order:order)
@@ -406,8 +406,8 @@ struct LibraryView: View {
         case "uploaded": return KeyPathComparator(\.sortableUploaded,order:order)
         case "added": return KeyPathComparator(\.sortableAdded,order:order)
         case "completed": return KeyPathComparator(\.sortableCompleted,order:order)
-        case "path": return KeyPathComparator(\.destination,order:order)
-        default: return KeyPathComparator(\.name,order:order)
+        case "path": return KeyPathComparator(\.destination,comparator:String.StandardComparator.localizedStandard,order:order)
+        default: return KeyPathComparator(\.name,comparator:String.StandardComparator.localizedStandard,order:order)
         }
     }
     private static func saveSort(_ value: [KeyPathComparator<TorrentItem>]) {
@@ -432,7 +432,7 @@ struct LibraryView: View {
                 StateBadge(torrent:item,presentation:status)
                 Spacer(minLength:0)
                 if let progress = status.progress {
-                    Text("\(Int(progress * 100))%")
+                    Text(LocaleText.percent(progress))
                         .font(.system(size:12,weight:.semibold)).monospacedDigit()
                 }
             }
@@ -442,7 +442,7 @@ struct LibraryView: View {
                     HStack(spacing:4) {
                         Text(status.progressTitle)
                         Spacer(minLength:0)
-                        Text("\(SizeText.bytes(status.completedBytes)) of \(SizeText.bytes(status.totalBytes))").monospacedDigit()
+                        Text(String(localized:"\(SizeText.bytes(status.completedBytes)) of \(SizeText.bytes(status.totalBytes))",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).monospacedDigit()
                     }.font(.system(size:10)).foregroundStyle(.secondary)
                 }
             }
@@ -451,7 +451,7 @@ struct LibraryView: View {
                     .fixedSize(horizontal:false,vertical:true)
             }
             if status.isQueued {
-                Button("Move to Front of Queue") { store.moveToFront(item) }
+                Button(String(localized:"Move to Front of Queue",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.moveToFront(item) }
                     .controlSize(.small).disabled(!store.canChangeTransfers || store.busyTransfers.contains(item.id))
             }
             if status.isError && !status.hasRecovery {
@@ -463,12 +463,12 @@ struct LibraryView: View {
     private func trackers(_ item: TorrentItem) -> some View {
         VStack(alignment:.leading,spacing:10) {
             HStack {
-                Text("Trackers").font(.system(size:13,weight:.semibold))
+                Text(String(localized:"Trackers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:13,weight:.semibold))
                 Spacer()
                 Text("\(item.trackers.count)").font(.system(size:11)).monospacedDigit().foregroundStyle(.secondary)
             }
             if item.trackers.isEmpty {
-                Text("No trackers are listed for this transfer.").font(.system(size:11)).foregroundStyle(.secondary)
+                Text(String(localized:"No trackers are listed for this transfer.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:11)).foregroundStyle(.secondary)
             } else {
                 ForEach(Array(item.trackers.enumerated()),id:\.offset) { _, tracker in
                     HStack(alignment:.top,spacing:8) {
@@ -485,41 +485,41 @@ struct LibraryView: View {
             Label(status.errorTitle,systemImage:"exclamationmark.circle.fill").font(.system(size:12,weight:.semibold)).foregroundStyle(Design.amber)
             Text(status.detail).font(.system(size:11)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
             HStack {
-                Button("Retry") { store.retryTransfer(item) }.disabled(!store.canRetryTransfer(item))
-                Button("Show Folder") { store.revealDestination(item) }.help("Open the destination or its closest available parent in Finder")
+                Button(String(localized:"Retry",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.retryTransfer(item) }.disabled(!store.canRetryTransfer(item))
+                Button(String(localized:"Show Folder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.revealDestination(item) }.help(String(localized:"Open the destination or its closest available parent in Finder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
             }.controlSize(.small)
             if status.canMoveAfterError {
-                Button("Move Files…") { store.chooseRelocation(item) }.controlSize(.small).disabled(!store.canChangeTransfers || store.busyTransfers.contains(item.id))
+                Button(String(localized:"Move Files…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.chooseRelocation(item) }.controlSize(.small).disabled(!store.canChangeTransfers || store.busyTransfers.contains(item.id))
             }
             if let error = item.error {
-                DisclosureGroup("Error details") { Text(error).font(.system(size:10,design:.monospaced)).foregroundStyle(.secondary).textSelection(.enabled).fixedSize(horizontal:false,vertical:true) }.font(.system(size:10))
+                DisclosureGroup(String(localized:"Error details",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { Text(error).font(.system(size:10,design:.monospaced)).foregroundStyle(.secondary).textSelection(.enabled).fixedSize(horizontal:false,vertical:true) }.font(.system(size:10))
             }
         }.padding(12).background(Design.amber.opacity(0.06),in:RoundedRectangle(cornerRadius:10))
-            .announceAccessibility("\(item.name). \(status.errorTitle). \(status.detail)")
+            .announceAccessibility(String(localized:"\(item.name). \(status.errorTitle). \(status.detail)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
     }
     private func overview(_ t: TorrentItem) -> some View {
         let status = store.presentation(t)
         return VStack(alignment:.leading,spacing:10) {
-            Text("Activity").font(.system(size:13,weight:.semibold))
+            Text(String(localized:"Activity",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:13,weight:.semibold))
             detail(status.progressTitle,status.progress == nil ? "—" : SizeText.bytes(status.completedBytes))
-            detail("Uploaded",["downloading", "waiting", "seeding"].contains(t.state) ? SizeText.bytes(t.uploadedBytes) : "—")
-            detail(store.connected ? "Connected peers" : "Last known peers","\(t.peers)")
-            detail("Share ratio",t.shareRatio.map { String(format:"%.2f",$0) } ?? "—")
+            detail(String(localized:"Uploaded",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),["downloading", "waiting", "seeding"].contains(t.state) ? SizeText.bytes(t.uploadedBytes) : "—")
+            detail(store.connected ? String(localized:"Connected peers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Last known peers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"\(t.peers)")
+            detail(String(localized:"Share ratio",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),t.shareRatio.map { $0.formatted(.number.precision(.fractionLength(2))) } ?? "—")
             Divider()
-            Text("Location").font(.system(size:12,weight:.semibold))
+            Text(String(localized:"Location",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:12,weight:.semibold))
             Label(URL(fileURLWithPath:t.destination).lastPathComponent,systemImage:"folder").font(.system(size:11))
             Text(t.destination.replacingOccurrences(of:NSHomeDirectory(),with:"~")).font(.system(size:10)).foregroundStyle(.secondary).textSelection(.enabled).fixedSize(horizontal:false,vertical:true)
             Divider()
-            Text("Info hash").font(.system(size:12,weight:.semibold))
+            Text(String(localized:"Info hash",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:12,weight:.semibold))
             Text(t.id).font(.system(size:9,design:.monospaced)).foregroundStyle(.secondary).textSelection(.enabled).lineLimit(3)
         }
     }
     private func detail(_ label: String, _ value: String) -> some View { HStack { Text(label).foregroundStyle(.secondary); Spacer(); Text(value).monospacedDigit() }.font(.system(size:11)) }
     private var inspectorTabs: some View {
-        Picker("Details",selection:$inspectorTab) { Text("Overview").tag(0); Text("Files").tag(1); Text("Trackers").tag(2) }.pickerStyle(.segmented).labelsHidden()
+        Picker(String(localized:"Details",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),selection:$inspectorTab) { Text(String(localized:"Overview",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag(0); Text(String(localized:"Files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag(1); Text(String(localized:"Trackers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag(2) }.pickerStyle(.segmented).labelsHidden()
     }
     private func redactTracker(_ raw: String) -> String {
-        guard let url = URL(string:raw) else { return "Tracker" }
+        guard let url = URL(string:raw) else { return String(localized:"Tracker",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
         return "\(url.scheme ?? "https")://\(url.host ?? "tracker")" + (url.port.map { ":\($0)" } ?? "")
     }
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
@@ -541,18 +541,18 @@ struct LibraryView: View {
 
     private var multipleSelectionInspector: some View {
         VStack(alignment:.leading,spacing:12) {
-            Text("\(store.selected.count) transfers selected").font(.system(size:13,weight:.semibold))
-            Text("Actions apply to the selected transfers. Select one transfer to inspect its diagnostics.").font(.system(size:11)).foregroundStyle(.secondary)
+            Text(String(localized:"\(store.selected.count) transfers selected",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:13,weight:.semibold))
+            Text(String(localized:"Actions apply to the selected transfers. Select one transfer to inspect its diagnostics.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:11)).foregroundStyle(.secondary)
             Divider()
             LazyVGrid(columns:[GridItem(.flexible()),GridItem(.flexible())],spacing:12) {
-                detail("Selected size",SizeText.bytes(store.selected.reduce(0) { $0 + ($1.selectedBytes ?? $1.totalBytes) }))
-                detail("Verified selected content",store.selected.contains(where:{ $0.state == "checking" || $0.state == "error" || $0.id == store.fileOperation?.torrentId }) ? "—" : SizeText.bytes(store.selected.reduce(0) { $0 + $1.downloadedBytes }))
-                detail("Download rate",SizeText.rate(store.connected ? store.selected.reduce(0) { $0 + $1.downloadRate } : 0))
-                detail("Upload rate",SizeText.rate(store.connected ? store.selected.reduce(0) { $0 + $1.uploadRate } : 0))
+                detail(String(localized:"Selected size",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),SizeText.bytes(store.selected.reduce(0) { $0 + ($1.selectedBytes ?? $1.totalBytes) }))
+                detail(String(localized:"Verified selected content",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),store.selected.contains(where:{ $0.state == "checking" || $0.state == "error" || $0.id == store.fileOperation?.torrentId }) ? "—" : SizeText.bytes(store.selected.reduce(0) { $0 + $1.downloadedBytes }))
+                detail(String(localized:"Download rate",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),SizeText.rate(store.connected ? store.selected.reduce(0) { $0 + $1.downloadRate } : 0))
+                detail(String(localized:"Upload rate",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),SizeText.rate(store.connected ? store.selected.reduce(0) { $0 + $1.uploadRate } : 0))
             }
             HStack(spacing:10) {
-                Button { store.toggleSelected(paused:false) } label: { Label(store.resumeActionLabel,systemImage:store.resumeActionLabel == "Retry" ? "arrow.clockwise" : "play") }.disabled(!store.canResumeSelection)
-                Button { store.toggleSelected(paused:true) } label: { Label("Pause transfers",systemImage:"pause") }.disabled(!store.canPauseSelection)
+                Button { store.toggleSelected(paused:false) } label: { Label(store.resumeActionLabel,systemImage:store.selectionNeedsRetry ? "arrow.clockwise" : "play") }.disabled(!store.canResumeSelection)
+                Button { store.toggleSelected(paused:true) } label: { Label(String(localized:"Pause transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:"pause") }.disabled(!store.canPauseSelection)
             }.controlSize(.small).buttonStyle(.bordered)
         }.padding(14).frame(maxWidth:.infinity,alignment:.topLeading)
     }
@@ -578,18 +578,18 @@ struct LibraryEmptyState: View {
     }
     private var actions: some View {
         HStack(spacing:12) {
-            Button("Open torrent file…") { store.openFiles() }.buttonStyle(.borderedProminent).tint(Design.green)
-            Button("Paste magnet link") { store.pasteMagnet() }.buttonStyle(.bordered)
+            Button(String(localized:"Open torrent file…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.openFiles() }.buttonStyle(.borderedProminent).tint(Design.green)
+            Button(String(localized:"Paste magnet link",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.pasteMagnet() }.buttonStyle(.bordered)
         }
     }
     private var privacyNote: some View {
-        Text("BitTorrent v1 + v2 · Files stay on your Mac").font(.system(size:10)).foregroundStyle(.tertiary)
+        Text(String(localized:"BitTorrent v1 + v2 · Files stay on your Mac",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:10)).foregroundStyle(.tertiary)
     }
     private var expanded: some View {
         VStack(spacing:0) {
             illustration
-            Text("Something good starts here.").font(.system(size:21,weight:.medium,design:.rounded)).padding(.top,22)
-            Text("Drop a torrent file or paste a magnet link.\nWe’ll take care of the rest.").font(.system(size:12)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(5).padding(.top,10)
+            Text(String(localized:"Something good starts here.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:21,weight:.medium,design:.rounded)).padding(.top,22)
+            Text(String(localized:"Drop a torrent file or paste a magnet link.\nWe’ll take care of the rest.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:12)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(5).padding(.top,10)
             actions.controlSize(.large).padding(.top,24)
             privacyNote.padding(.top,17)
         }.multilineTextAlignment(.center)
@@ -598,8 +598,8 @@ struct LibraryEmptyState: View {
         HStack(spacing:18) {
             illustration.scaleEffect(0.4).frame(width:70,height:70)
             VStack(alignment:.leading,spacing:10) {
-                Text("Something good starts here.").font(.system(size:17,weight:.medium,design:.rounded))
-                Text("Drop a torrent file or paste a magnet link.").font(.system(size:12)).foregroundStyle(.secondary)
+                Text(String(localized:"Something good starts here.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:17,weight:.medium,design:.rounded))
+                Text(String(localized:"Drop a torrent file or paste a magnet link.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:12)).foregroundStyle(.secondary)
                 actions.controlSize(.regular)
                 privacyNote
             }

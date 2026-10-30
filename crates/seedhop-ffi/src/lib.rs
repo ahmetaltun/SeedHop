@@ -2,12 +2,51 @@ use seedhop_core::{Engine, EngineConfig};
 use std::sync::{Arc, Mutex};
 uniffi::setup_scaffolding!();
 
+#[derive(Debug, Clone, serde::Serialize, uniffi::Enum)]
+#[serde(tag = "type", content = "value", rename_all = "camelCase")]
+pub enum NoticeArgument {
+    Text(String),
+    Number(u64),
+}
+
+#[derive(Debug, Clone, serde::Serialize, uniffi::Record)]
+#[serde(rename_all = "camelCase")]
+pub struct UserNotice {
+    pub code: String,
+    pub arguments: Vec<NoticeArgument>,
+    pub diagnostic: Option<String>,
+}
+impl UserNotice {
+    fn new(code: &str, diagnostic: Option<String>) -> Self {
+        Self {
+            code: code.into(),
+            arguments: vec![],
+            diagnostic,
+        }
+    }
+}
+
+fn transfer_notice(detail: Option<&str>, kind: Option<&str>) -> Option<UserNotice> {
+    detail.map(|detail| {
+        UserNotice::new(
+            match kind {
+                Some("storage_space") => "storage.space",
+                Some("storage_permission") => "storage.permission",
+                Some("storage_missing") => "storage.missing",
+                Some("storage") => "storage.failed",
+                _ => "engine.failed",
+            },
+            Some(detail.to_owned()),
+        )
+    })
+}
+
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum BridgeError {
     #[error("The operation was cancelled.")]
     Cancelled,
     #[error("{message}")]
-    Operation { message: String },
+    Operation { message: String, notice: UserNotice },
 }
 fn layout_error(error_value: seedhop_core::CoreError) -> BridgeError {
     match error_value {
@@ -15,9 +54,24 @@ fn layout_error(error_value: seedhop_core::CoreError) -> BridgeError {
         other => error(other),
     }
 }
-fn error(e: impl std::fmt::Display) -> BridgeError {
+fn error(e: impl std::fmt::Display + std::any::Any) -> BridgeError {
+    if matches!(
+        (&e as &dyn std::any::Any).downcast_ref::<seedhop_core::CoreError>(),
+        Some(seedhop_core::CoreError::Cancelled)
+    ) {
+        return BridgeError::Cancelled;
+    }
+    let code = (&e as &dyn std::any::Any)
+        .downcast_ref::<seedhop_core::CoreError>()
+        .map(seedhop_core::CoreError::message_code)
+        .unwrap_or("engine.failed");
+    let mut notice = UserNotice::new(code, Some(e.to_string()));
+    if code == "input.use_at_most_schedule_windows" {
+        notice.arguments.push(NoticeArgument::Number(32));
+    }
     BridgeError::Operation {
         message: e.to_string(),
+        notice,
     }
 }
 
@@ -67,12 +121,14 @@ pub struct Transfer {
     pub trackers: Vec<String>,
     pub error: Option<String>,
     pub error_kind: Option<String>,
+    pub error_message: Option<UserNotice>,
     pub queue_position: u32,
     pub paused_intent: bool,
 }
 impl From<seedhop_core::TorrentRecord> for Transfer {
     fn from(t: seedhop_core::TorrentRecord) -> Self {
         Self {
+            error_message: transfer_notice(t.error.as_deref(), t.error_kind.as_deref()),
             id: t.id,
             name: t.name,
             state: t.state,
@@ -125,10 +181,12 @@ pub struct StorageRecoveryNotice {
     pub original_directory: String,
     pub destination_directory: String,
     pub can_keep_copies: bool,
+    pub message_descriptor: UserNotice,
 }
 impl From<seedhop_core::StorageRecovery> for StorageRecoveryNotice {
     fn from(notice: seedhop_core::StorageRecovery) -> Self {
         Self {
+            message_descriptor: recovery_notice(&notice),
             id: notice.id,
             torrent_id: notice.torrent_id,
             active_location: notice.active_location,
@@ -138,6 +196,17 @@ impl From<seedhop_core::StorageRecovery> for StorageRecoveryNotice {
             can_keep_copies: notice.can_keep_copies,
         }
     }
+}
+
+fn recovery_notice(notice: &seedhop_core::StorageRecovery) -> UserNotice {
+    UserNotice::new(
+        match notice.active_location.as_str() {
+            "new" => "recovery.new",
+            "original" => "recovery.original",
+            _ => "recovery.unknown",
+        },
+        Some(notice.message.clone()),
+    )
 }
 
 #[derive(uniffi::Record)]
@@ -176,6 +245,8 @@ impl From<ScheduleWindow> for seedhop_core::ScheduleRule {
 
 #[derive(uniffi::Record)]
 pub struct EngineSnapshot {
+    pub statistics_message: Option<UserNotice>,
+    pub scheduling_message: Option<UserNotice>,
     pub schedule_enabled: bool,
     pub schedule_rules: Vec<ScheduleWindow>,
     pub schedule_active: bool,
@@ -274,7 +345,39 @@ impl EngineBridge {
             .map_err(error)
     }
     pub fn snapshot_json(&self) -> Result<String, BridgeError> {
-        serde_json::to_string(&self.handles()?.0.snapshot().map_err(error)?).map_err(error)
+        let snapshot = self.handles()?.0.snapshot().map_err(error)?;
+        let mut value = serde_json::to_value(&snapshot).map_err(error)?;
+        value["statisticsMessage"] = serde_json::to_value(
+            snapshot
+                .statistics_warning
+                .as_ref()
+                .map(|detail| UserNotice::new("statistics.save_failed", Some(detail.clone()))),
+        )
+        .map_err(error)?;
+        value["schedulingMessage"] = serde_json::to_value(
+            snapshot
+                .scheduling_warning
+                .as_ref()
+                .map(|detail| UserNotice::new("schedule.apply_failed", Some(detail.clone()))),
+        )
+        .map_err(error)?;
+        for (record, torrent) in value["torrents"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .zip(&snapshot.torrents)
+        {
+            record["errorMessage"] = serde_json::to_value(transfer_notice(
+                torrent.error.as_deref(),
+                torrent.error_kind.as_deref(),
+            ))
+            .map_err(error)?;
+        }
+        if let Some(notice) = snapshot.storage_recovery {
+            value["storageRecovery"]["messageDescriptor"] =
+                serde_json::to_value(recovery_notice(&notice)).map_err(error)?;
+        }
+        serde_json::to_string(&value).map_err(error)
     }
     pub fn torrent_details(
         &self,
@@ -295,6 +398,14 @@ impl EngineBridge {
         let (core, _) = self.handles()?;
         let s = core.snapshot().map_err(error)?;
         Ok(EngineSnapshot {
+            statistics_message: s
+                .statistics_warning
+                .as_ref()
+                .map(|detail| UserNotice::new("statistics.save_failed", Some(detail.clone()))),
+            scheduling_message: s
+                .scheduling_warning
+                .as_ref()
+                .map(|detail| UserNotice::new("schedule.apply_failed", Some(detail.clone()))),
             schedule_enabled: s.schedule.enabled,
             schedule_rules: s.schedule.rules.into_iter().map(Into::into).collect(),
             schedule_active: s.schedule_active,
@@ -488,6 +599,71 @@ pub fn protocol_version() -> u32 {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn structured_errors_keep_codes_diagnostics_and_cancellation_distinct() {
+        use super::*;
+        let failure = error(seedhop_core::CoreError::Validation {
+            code: "input.use_at_most_schedule_windows",
+            message: "Use at most 32 schedule windows.".into(),
+        });
+        let BridgeError::Operation { notice, .. } = failure else {
+            panic!("missing structured failure")
+        };
+        assert_eq!(notice.code, "input.use_at_most_schedule_windows");
+        assert!(matches!(
+            notice.arguments.as_slice(),
+            [NoticeArgument::Number(32)]
+        ));
+        assert_eq!(
+            notice.diagnostic.as_deref(),
+            Some("Use at most 32 schedule windows.")
+        );
+        assert!(matches!(
+            error(seedhop_core::CoreError::Cancelled),
+            BridgeError::Cancelled
+        ));
+        let BridgeError::Operation { notice, .. } = error(std::io::Error::from_raw_os_error(13))
+        else {
+            panic!("missing OS diagnostic")
+        };
+        assert_eq!(notice.code, "engine.failed");
+        assert!(notice.diagnostic.is_some());
+    }
+
+    #[test]
+    fn message_json_preserves_unicode_and_unsigned_argument_types() {
+        let notice = super::UserNotice {
+            code: "future.message".into(),
+            arguments: vec![
+                super::NoticeArgument::Text("文件/résumé.txt".into()),
+                super::NoticeArgument::Number(u64::MAX),
+            ],
+            diagnostic: Some("untranslated peer detail".into()),
+        };
+        let value = serde_json::to_value(notice).unwrap();
+        assert_eq!(value["arguments"][0]["type"], "text");
+        assert_eq!(value["arguments"][0]["value"], "文件/résumé.txt");
+        assert_eq!(value["arguments"][1]["type"], "number");
+        assert_eq!(value["arguments"][1]["value"].as_u64(), Some(u64::MAX));
+    }
+
+    #[test]
+    fn recovery_guidance_uses_authority_not_diagnostic_wording() {
+        let mut recovery = seedhop_core::StorageRecovery {
+            id: "recovery".into(),
+            torrent_id: "torrent".into(),
+            active_location: "original".into(),
+            message: "arbitrary OS detail".into(),
+            original_directory: "/old".into(),
+            destination_directory: "/new".into(),
+            can_keep_copies: true,
+        };
+        assert_eq!(super::recovery_notice(&recovery).code, "recovery.original");
+        recovery.active_location = "new".into();
+        assert_eq!(super::recovery_notice(&recovery).code, "recovery.new");
+        recovery.active_location = "unknown".into();
+        assert_eq!(super::recovery_notice(&recovery).code, "recovery.unknown");
+    }
+    #[test]
     fn bridge_initializes_utp_and_shuts_down_from_a_small_host_stack() {
         let state = tempfile::tempdir().unwrap();
         let downloads = tempfile::tempdir().unwrap();
@@ -504,6 +680,12 @@ mod tests {
                 let snapshot = bridge.snapshot().unwrap();
                 assert!(snapshot.listen_port > 0);
                 assert!(snapshot.torrents.is_empty());
+                let json: serde_json::Value = serde_json::from_str(&bridge.snapshot_json().unwrap()).unwrap();
+                assert_eq!(json["protocolVersion"], 6);
+                assert!(json.get("statisticsMessage").unwrap().is_null());
+                assert!(json.get("schedulingMessage").unwrap().is_null());
+                let invalid = match bridge.inspect("localization".into(),Some("not a magnet".into()),vec![]) { Err(error) => error, Ok(_) => panic!("invalid magnet accepted") };
+                assert!(matches!(invalid, super::BridgeError::Operation { notice, .. } if notice.code == "input.paste_a_valid_magnet_link"));
                 bridge.shutdown().unwrap();
             })
             .unwrap()

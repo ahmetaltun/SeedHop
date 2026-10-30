@@ -36,11 +36,15 @@ impl Engine {
             .lock()
             .unwrap()
             .clone()
-            .ok_or_else(|| CoreError::InvalidInput("There is no pending file cleanup.".into()))?;
+            .ok_or_else(|| CoreError::Validation {
+                code: "input.there_is_no_pending_file_cleanup",
+                message: "There is no pending file cleanup.".into(),
+            })?;
         if notice.id != id || (keep_copies && !notice.can_keep_copies) {
-            return Err(CoreError::InvalidInput(
-                "Refresh the recovery notice and try again.".into(),
-            ));
+            return Err(CoreError::Validation {
+                code: "input.refresh_the_recovery_notice_and_try_again",
+                message: "Refresh the recovery notice and try again.".into(),
+            });
         }
         let handle = self.handle(&notice.torrent_id).ok();
         if let Some(handle) = &handle {
@@ -106,9 +110,10 @@ impl Engine {
         let handle = self.handle(&id)?;
         let count = adapter::record(&handle).files.len();
         if priorities.len() != count || priorities.iter().any(|p| *p > 2) {
-            return Err(CoreError::InvalidInput(
-                "Choose Low, Normal, or High for every file.".into(),
-            ));
+            return Err(CoreError::Validation {
+                code: "input.choose_low_normal_or_high_for_every_file",
+                message: "Choose Low, Normal, or High for every file.".into(),
+            });
         }
         self.session
             .update_file_priorities(&handle, priorities)
@@ -307,7 +312,10 @@ impl Engine {
         let mut names = old_names.clone();
         if let Some((index, name)) = &rename {
             if *index as usize >= record.files.len() {
-                return Err(CoreError::InvalidInput("Choose an existing file.".into()));
+                return Err(CoreError::Validation {
+                    code: "input.choose_an_existing_file",
+                    message: "Choose an existing file.".into(),
+                });
             }
             names.insert(*index as usize, PathBuf::from(name));
         }
@@ -336,9 +344,10 @@ impl Engine {
                     && (Path::new(path) == Path::new(other)
                         || Path::new(path).starts_with(Path::new(other)))
             }) {
-                return Err(CoreError::InvalidInput(
-                    "Two files cannot share a path or contain one another.".into(),
-                ));
+                return Err(CoreError::Validation {
+                    code: "input.two_files_cannot_share_a_path_or_contain",
+                    message: "Two files cannot share a path or contain one another.".into(),
+                });
             }
         }
         let changed: Vec<_> = record
@@ -352,10 +361,12 @@ impl Engine {
         }
         for (_, target) in &changed {
             if root.join(target).exists() {
-                return Err(CoreError::InvalidInput(
-                    "A file already exists at the new location. Choose another name or folder."
-                        .into(),
-                ));
+                return Err(CoreError::Validation {
+                    code: "input.a_file_already_exists_at_the_new_location",
+                    message:
+                        "A file already exists at the new location. Choose another name or folder."
+                            .into(),
+                });
             }
         }
         // Reject insufficient space before changing transfer state or creating

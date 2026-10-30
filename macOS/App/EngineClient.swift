@@ -31,7 +31,7 @@ import ServiceManagement
         connection?.invalidate(); connection = nil
     }
     func send(_ request: EngineRequest) async throws -> EngineReply {
-        guard let connection else { throw UserFacingError(message:"The engine is not connected yet.") }
+        guard let connection else { throw UserFacingError(message:String(localized:"The engine is not connected yet.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
         let data = try JSONEncoder().encode(request)
         return try await withCheckedThrowingContinuation { continuation in
             let box = ReplyOnce(continuation)
@@ -39,15 +39,16 @@ import ServiceManagement
             // Startup may verify retained copies before the engine can reply.
             // These operations still fail through the XPC error handler.
             if !["connect", "relocate", "rename", "retryStorageRecovery", "keepRecoveryCopies"].contains(request.command) {
-                DispatchQueue.global().asyncAfter(deadline:.now() + timeout) { box.fail(UserFacingError(message:"The engine took too long to respond. Your library has been preserved.")) }
+                DispatchQueue.global().asyncAfter(deadline:.now() + timeout) { box.fail(UserFacingError(message:String(localized:"The engine took too long to respond. Your library has been preserved.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))) }
             }
             let proxy = connection.remoteObjectProxyWithErrorHandler { error in box.fail(error) } as? EngineServiceProtocol
-            guard let proxy else { box.fail(UserFacingError(message:"Could not reach the torrent engine.")); return }
+            guard let proxy else { box.fail(UserFacingError(message:String(localized:"Could not reach the torrent engine.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))); return }
             proxy.send(data) { response in
                 do {
                     let reply = try JSONDecoder().decode(EngineReply.self,from:response)
-                    guard reply.version == SeedHopIdentity.protocolVersion else { throw UserFacingError(message:"Restart SeedHop to finish updating its engine.") }
-                    if let error = reply.error { throw UserFacingError(message:error) }
+                    guard reply.version == SeedHopIdentity.protocolVersion else { throw UserFacingError(message:String(localized:"Restart SeedHop to finish updating its engine.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
+                    if let message = reply.errorMessage { throw message }
+                    if let error = reply.error { throw EngineMessage(code:"engine.failed",diagnostic:error) }
                     if reply.cancelled == true { throw CancellationError() }
                     box.succeed(reply)
                 } catch { box.fail(error) }

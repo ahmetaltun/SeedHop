@@ -115,7 +115,7 @@ struct TorrentFilesView: View {
     }
     private var canChange: Bool { store.canChangeTransfers && !store.busyTransfers.contains(torrent.id) && torrent.state != "checking" }
     private var included: Set<UInt32> { Set(torrent.files.filter(\.selected).map(\.index)) }
-    static func priorityName(_ value: UInt8) -> String { value == 0 ? "Low" : value == 2 ? "High" : "Normal" }
+    static func priorityName(_ value: UInt8) -> String { value == 0 ? String(localized:"Low",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : value == 2 ? String(localized:"High",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Normal",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
     static func symbol(_ name: String) -> String {
         let ext = (name as NSString).pathExtension.lowercased()
         guard let type = UTType(filenameExtension:ext) else { return "doc" }
@@ -131,28 +131,28 @@ struct TorrentFilesView: View {
         VStack(alignment:.leading,spacing:0) {
             VStack(alignment:.leading,spacing:9) {
                 HStack {
-                    Text("Files").font(.system(size:13,weight:.semibold))
+                    Text(String(localized:"Files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:13,weight:.semibold))
                     Spacer()
-                    Menu("Actions") { actions }.menuStyle(.borderlessButton).fixedSize()
-                        .accessibilityLabel("File actions")
+                    Menu(String(localized:"Actions",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { actions }.menuStyle(.borderlessButton).fixedSize()
+                        .accessibilityLabel(String(localized:"File actions",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                 }
-                Text("\(included.count) of \(torrent.files.count) included · \(SizeText.bytes(torrent.files.filter(\.selected).reduce(UInt64(0)) { $0 + $1.size }))")
+                Text(String(localized:"\(included.count) of \(torrent.files.count) included · \(SizeText.bytes(torrent.files.filter(\.selected).reduce(UInt64(0)) { $0 + $1.size }))",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                     .font(.system(size:11)).foregroundStyle(.secondary)
                 HStack(spacing:6) {
                     Image(systemName:"magnifyingglass").foregroundStyle(.secondary)
-                    TextField("Search files",text:$session.query).textFieldStyle(.plain).accessibilityLabel("Search files in this transfer")
+                    TextField(String(localized:"Search files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),text:$session.query).textFieldStyle(.plain).accessibilityLabel(String(localized:"Search files in this transfer",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                         .focused($fileSearchFocused).onExitCommand { session.query = "" }
                     if !session.query.isEmpty {
                         Button { session.query = "" } label: { Image(systemName:"xmark.circle.fill") }
-                            .buttonStyle(.plain).foregroundStyle(.secondary).accessibilityLabel("Clear file search")
+                            .buttonStyle(.plain).foregroundStyle(.secondary).accessibilityLabel(String(localized:"Clear file search",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                     }
                 }.font(.system(size:12)).padding(7).background(.quaternary.opacity(0.35),in:RoundedRectangle(cornerRadius:6))
             }.padding(.horizontal,14).padding(.vertical,12)
             Divider()
             if torrent.files.isEmpty {
-                emptyState(store.connected ? "File list unavailable" : "Files unavailable",detail:store.connected ? "Files will appear when metadata is available." : "Reconnect to load this transfer’s files.")
+                emptyState(store.connected ? String(localized:"File list unavailable",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Files unavailable",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),detail:store.connected ? String(localized:"Files will appear when metadata is available.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Reconnect to load this transfer’s files.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
             } else if !session.query.isEmpty && session.tree.matchingKeys(session.query).isEmpty {
-                emptyState("No matching files",detail:"Try another name or clear the search.",clearSearch:true)
+                emptyState(String(localized:"No matching files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),detail:String(localized:"Try another name or clear the search.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),clearSearch:true)
             } else {
                 TorrentFilesOutline(torrent:torrent,session:session,canChange:canChange,
                     include:{ indices, value in store.setFilesIncluded(torrentID:torrent.id,indices:indices,included:value) },
@@ -178,7 +178,7 @@ struct TorrentFilesView: View {
 
     private var footerSummary: String {
         if !targets.isEmpty { return "\(targets.count) \(targets.count == 1 ? "file" : "files") selected" }
-        if !session.query.isEmpty { return "\(torrent.files.filter { $0.name.localizedCaseInsensitiveContains(session.query) }.count) matching files" }
+        if !session.query.isEmpty { return String(localized:"\(torrent.files.filter { $0.name.localizedCaseInsensitiveContains(session.query) }.count) matching files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
         return "\(torrent.files.count) files"
     }
     @ViewBuilder private var priorityActions: some View {
@@ -190,44 +190,44 @@ struct TorrentFilesView: View {
     @ViewBuilder private var actions: some View {
         let indices = targets
         let renameFile = selectedFiles.first
-        Button("Include in Download") { store.setFilesIncluded(torrentID:torrent.id,indices:indices,included:true) }
+        Button(String(localized:"Include in Download",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.setFilesIncluded(torrentID:torrent.id,indices:indices,included:true) }
             .disabled(!canChange || targets.isEmpty || targets.isSubset(of:included))
-        Button("Skip Download") { store.setFilesIncluded(torrentID:torrent.id,indices:indices,included:false) }
+        Button(String(localized:"Skip Download",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.setFilesIncluded(torrentID:torrent.id,indices:indices,included:false) }
             .disabled(!canChange || targets.isDisjoint(with:included) || included.subtracting(targets).isEmpty)
-        Menu("Priority") { priorityActions }.disabled(!canChange || targets.isEmpty)
+        Menu(String(localized:"Priority",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { priorityActions }.disabled(!canChange || targets.isEmpty)
         Divider()
-        Button("Rename…") { if let file = renameFile { store.requestRename(torrent,file:file) } }
+        Button(String(localized:"Rename…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { if let file = renameFile { store.requestRename(torrent,file:file) } }
             .disabled(!canChange || store.storageRecovery != nil || targets.count != 1 || session.selection.contains(where:{ session.tree.nodes[$0]?.isFolder == true }))
-        Button("Show File Details") { showDetails = true }.disabled(targets.count != 1)
+        Button(String(localized:"Show File Details",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { showDetails = true }.disabled(targets.count != 1)
     }
     private var statusMessage: String? {
-        if !store.connected { return "Last known files · Reconnect to make changes." }
-        if store.busyTransfers.contains(torrent.id) { return "Updating files…" }
-        if torrent.state == "checking" { return "Checking files · Changes are temporarily unavailable." }
-        if store.hasFileOperation { return "Wait for the current file change to finish." }
-        if !session.query.isEmpty && session.selection.contains(where:{ session.tree.nodes[$0]?.isFolder == true }) { return "Clear search to change the whole folder." }
+        if !store.connected { return String(localized:"Last known files · Reconnect to make changes.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        if store.busyTransfers.contains(torrent.id) { return String(localized:"Updating files…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        if torrent.state == "checking" { return String(localized:"Checking files · Changes are temporarily unavailable.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        if store.hasFileOperation { return String(localized:"Wait for the current file change to finish.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        if !session.query.isEmpty && session.selection.contains(where:{ session.tree.nodes[$0]?.isFolder == true }) { return String(localized:"Clear search to change the whole folder.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
         return nil
     }
     private func emptyState(_ title: String, detail: String, clearSearch: Bool = false) -> some View {
         VStack(alignment:.leading,spacing:8) {
             Text(title).font(.system(size:13,weight:.medium))
             Text(detail).font(.system(size:11)).foregroundStyle(.secondary)
-            if clearSearch { Button("Clear Search") { session.query = "" }.controlSize(.small) }
+            if clearSearch { Button(String(localized:"Clear Search",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { session.query = "" }.controlSize(.small) }
         }
             .padding(14).frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
     }
     private var details: some View {
         VStack(alignment:.leading,spacing:10) {
             if let file = selectedFiles.first {
-                Text("File Details").font(.headline)
+                Text(String(localized:"File Details",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.headline)
                 Text(file.name).font(.system(size:12)).textSelection(.enabled).fixedSize(horizontal:false,vertical:true)
                 Text(SizeText.bytes(file.size)).font(.system(size:12))
-                Text(file.selected ? "Included in download" : "Skipped")
-                Text("Priority: \(Self.priorityName(file.priority))")
-                if torrent.state == "checking" { Text("Checking files") }
-                else if torrent.state == "error" { Text("File progress unavailable") }
-                else { Text("\(SizeText.bytes(min(file.downloaded,file.size))) downloaded\(store.connected ? "" : " · Last known")") }
-                if file.selected && included.count == 1 { Text("Keep at least one file included.").foregroundStyle(.secondary) }
+                Text(file.selected ? String(localized:"Included in download",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Skipped",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                Text(String(localized:"Priority: \(Self.priorityName(file.priority))",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                if torrent.state == "checking" { Text(String(localized:"Checking files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
+                else if torrent.state == "error" { Text(String(localized:"File progress unavailable",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
+                else { Text(store.connected ? String(localized:"\(SizeText.bytes(min(file.downloaded,file.size))) downloaded",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Last known: \(SizeText.bytes(min(file.downloaded,file.size))) downloaded",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
+                if file.selected && included.count == 1 { Text(String(localized:"Keep at least one file included.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).foregroundStyle(.secondary) }
             }
         }.font(.system(size:12))
     }
@@ -235,6 +235,7 @@ struct TorrentFilesView: View {
 
 /// Native outline supplies selection, disclosure, keyboard navigation, and virtualization.
 private struct TorrentFilesOutline: NSViewRepresentable {
+    private let language = AppLocalization.shared.language
     let torrent: TorrentItem
     @ObservedObject var session: TorrentFilesSession
     let canChange: Bool
@@ -250,9 +251,9 @@ private struct TorrentFilesOutline: NSViewRepresentable {
         scroll.drawsBackground = false; scroll.hasHorizontalScroller = true
         let outline = FilesNativeOutline()
         let column = NSTableColumn(identifier:NSUserInterfaceItemIdentifier("file"))
-        column.title = "Name"; column.width = 400; column.minWidth = 170
+        column.title = String(localized:"Name",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); column.width = 400; column.minWidth = 170
         outline.addTableColumn(column); outline.outlineTableColumn = column
-        for (identifier, title, width) in [("size", "Size", CGFloat(90)), ("progress", "Progress", CGFloat(100)), ("priority", "Priority", CGFloat(100))] {
+        for (identifier, title, width) in [("size", String(localized:"Size",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), CGFloat(90)), ("progress", String(localized:"Progress",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), CGFloat(100)), ("priority", String(localized:"Priority",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), CGFloat(100))] {
             let column = NSTableColumn(identifier:NSUserInterfaceItemIdentifier(identifier))
             column.title = title; column.width = width; column.minWidth = width
             column.maxWidth = width + 60
@@ -265,7 +266,7 @@ private struct TorrentFilesOutline: NSViewRepresentable {
         }
         outline.allowsMultipleSelection = true; outline.allowsEmptySelection = true
         outline.backgroundColor = .clear; outline.style = .plain
-        outline.setAccessibilityLabel("Torrent files")
+        outline.setAccessibilityLabel(String(localized:"Torrent files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
         outline.identifier = NSUserInterfaceItemIdentifier("torrent-files-outline")
         outline.dataSource = context.coordinator; outline.delegate = context.coordinator
         outline.menu = NSMenu(); outline.menu?.delegate = context.coordinator
@@ -288,6 +289,7 @@ private struct TorrentFilesOutline: NSViewRepresentable {
         private var includedCount = 0
         private var syncing = false
         private var menuActions: [() -> Void] = []
+        private var lastLanguage: String?
         init(_ parent: TorrentFilesOutline) { self.parent = parent }
 
         func update(_ parent: TorrentFilesOutline) {
@@ -295,6 +297,13 @@ private struct TorrentFilesOutline: NSViewRepresentable {
             files = Dictionary(uniqueKeysWithValues:parent.torrent.files.map { ($0.index,$0) })
             includedCount = parent.torrent.files.filter(\.selected).count
             guard let outline else { return }
+            let languageChanged = lastLanguage != parent.language
+            lastLanguage = parent.language
+            if languageChanged {
+                outline.setAccessibilityLabel(String(localized:"Torrent files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                let titles = ["file":String(localized:"Name",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), "size":String(localized:"Size",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), "progress":String(localized:"Progress",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), "priority":String(localized:"Priority",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)]
+                for column in outline.tableColumns { if let title = titles[column.identifier.rawValue] { column.title = title } }
+            }
             syncing = true
             defer { syncing = false }
             if tree !== parent.session.tree || query != parent.session.query || torrentID != parent.torrent.id {
@@ -317,8 +326,10 @@ private struct TorrentFilesOutline: NSViewRepresentable {
             for key in parent.session.selection {
                 if let node = parent.session.tree.nodes[key] { let row = outline.row(forItem:node); if row >= 0 { selected.insert(row) } }
             }
-            let rows = outline.rows(in:outline.visibleRect)
-            for row in rows.location..<(rows.location + rows.length) {
+            let visibleRows = outline.rows(in:outline.visibleRect)
+            var rows = IndexSet(integersIn:visibleRows.location..<(visibleRows.location + visibleRows.length))
+            if languageChanged { outline.enumerateAvailableRowViews { _, row in rows.insert(row) } }
+            for row in rows {
                 guard let node = outline.item(atRow:row) as? TorrentFileNode else { continue }
                 for column in outline.tableColumns.indices {
                     if let cell = outline.view(atColumn:column,row:row,makeIfNecessary:false) {
@@ -355,8 +366,8 @@ private struct TorrentFilesOutline: NSViewRepresentable {
                 let filteredFolder = node.isFolder && !parent.session.query.isEmpty
                 cell.priority.configure(Set(leaves.map(\.priority)))
                 cell.priority.isEnabled = parent.canChange && !filteredFolder
-                cell.priority.setAccessibilityLabel("Priority for \(node.path)")
-                cell.priority.toolTip = filteredFolder ? "Clear search to change the whole folder." : "Download priority for \(node.path)"
+                cell.priority.setAccessibilityLabel(String(localized:"Priority for \(node.path)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                cell.priority.toolTip = filteredFolder ? String(localized:"Clear search to change the whole folder.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Download priority for \(node.path)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
                 let changePriority = parent.priority
                 cell.priority.actionBlock = { value in changePriority(node.indices,value) }
                 return
@@ -365,15 +376,15 @@ private struct TorrentFilesOutline: NSViewRepresentable {
             let size = leaves.reduce(UInt64(0)) { $0 + $1.size }
             let value: String
             if column == "size" { value = SizeText.bytes(size) }
-            else if parent.torrent.state == "checking" { value = "Checking" }
+            else if parent.torrent.state == "checking" { value = String(localized:"Checking",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
             else if parent.torrent.state == "error" { value = "—" }
-            else if leaves.allSatisfy({ !$0.selected }) { value = "Skipped" }
+            else if leaves.allSatisfy({ !$0.selected }) { value = String(localized:"Skipped",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
             else if size > 0 {
                 let downloaded = leaves.reduce(UInt64(0)) { $0 + min($1.downloaded,$1.size) }
-                value = "\(Int(min(1,Double(downloaded) / Double(size)) * 100))%"
+                value = LocaleText.percent(min(1,Double(downloaded) / Double(size)))
             } else { value = "—" }
             cell.value.stringValue = value
-            cell.value.setAccessibilityLabel("\(column == "size" ? "Size" : "Progress") for \(node.path): \(value)\(parent.torrent.state == "error" && column == "progress" ? ", unavailable" : "")")
+            cell.value.setAccessibilityLabel(column == "size" ? String(localized:"Size for \(node.path): \(value)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : parent.torrent.state == "error" ? String(localized:"Progress for \(node.path) is unavailable",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Progress for \(node.path): \(value)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
             cell.toolTip = node.path + "\n" + value
         }
         private func configure(_ cell: FilesNativeCell, node: TorrentFileNode) {
@@ -382,21 +393,21 @@ private struct TorrentFilesOutline: NSViewRepresentable {
             let value: NSControl.StateValue = included == 0 ? .off : included == leaves.count ? .on : .mixed
             let wouldEmpty = included > 0 && included == leaves.count && included == includedCount
             let filteredFolder = node.isFolder && !parent.session.query.isEmpty
-            let help = filteredFolder ? "Clear search to change the whole folder." : wouldEmpty ? "Keep at least one file included." : "Include or skip this \(node.isFolder ? "folder" : "file")."
+            let help = filteredFolder ? String(localized:"Clear search to change the whole folder.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : wouldEmpty ? String(localized:"Keep at least one file included.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : node.isFolder ? String(localized:"Include or skip this folder.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Include or skip this file.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
             let size = leaves.reduce(UInt64(0)) { $0 + $1.size }
             var metadata = SizeText.bytes(size)
-            if node.isFolder { metadata = "\(leaves.count) \(leaves.count == 1 ? "file" : "files") · " + metadata }
-            if included == 0 { metadata += " · Skipped" }
-            else if included != leaves.count { metadata += " · Mixed" }
-            else if parent.torrent.state == "checking" { metadata += " · Checking" }
-            else if parent.torrent.state == "error" { metadata += " · Progress unavailable" }
+            if node.isFolder { metadata = String(localized:"\(leaves.count) files · \(metadata)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+            if included == 0 { metadata += String(localized:" · Skipped",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+            else if included != leaves.count { metadata += String(localized:" · Mixed",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+            else if parent.torrent.state == "checking" { metadata += String(localized:" · Checking",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+            else if parent.torrent.state == "error" { metadata += String(localized:" · Progress unavailable",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
             else if !node.isFolder, let file = leaves.first, file.size > 0 {
-                metadata += " · \(Int(min(1,Double(file.downloaded)/Double(file.size)) * 100))%"
+                metadata += " · " + LocaleText.percent(min(1,Double(file.downloaded)/Double(file.size)))
             }
             cell.name.stringValue = node.name
             cell.icon.image = NSImage(systemSymbolName:node.isFolder ? "folder" : TorrentFilesView.symbol(node.name),accessibilityDescription:nil)
             cell.check.state = value; cell.check.isEnabled = parent.canChange && !wouldEmpty && !filteredFolder
-            cell.check.setAccessibilityLabel("Download \(node.path)")
+            cell.check.setAccessibilityLabel(String(localized:"Download \(node.path)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
             cell.check.setAccessibilityHelp(help); cell.check.toolTip = help
             cell.name.setAccessibilityLabel(node.path)
             cell.toolTip = node.path + "\n" + metadata
@@ -428,20 +439,21 @@ private struct TorrentFilesOutline: NSViewRepresentable {
             guard !indices.isEmpty else { return }
             let included = Set(files.values.filter(\.selected).map(\.index))
             if parent.canChange {
-                if !indices.isSubset(of:included) { add("Include in Download",to:menu) { include(indices,true) } }
-                if !indices.isDisjoint(with:included) && !included.subtracting(indices).isEmpty { add("Skip Download",to:menu) { include(indices,false) } }
-                let priority = NSMenu(title:"Priority")
+                if !indices.isSubset(of:included) { add(String(localized:"Include in Download",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),to:menu) { include(indices,true) } }
+                if !indices.isDisjoint(with:included) && !included.subtracting(indices).isEmpty { add(String(localized:"Skip Download",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),to:menu) { include(indices,false) } }
+                let priority = NSMenu(title:String(localized:"Priority",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                 for value in [UInt8(0),1,2] { add(TorrentFilesView.priorityName(value),to:priority) { changePriority(indices,value) } }
-                let item = NSMenuItem(title:"Priority",action:nil,keyEquivalent:""); item.submenu = priority; menu.addItem(item)
+                let item = NSMenuItem(title:String(localized:"Priority",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),action:nil,keyEquivalent:""); item.submenu = priority; menu.addItem(item)
                 if indices.count == 1, let index = indices.first, let file = files[index], parent.canRename,
                    !parent.session.selection.contains(where:{ parent.session.tree.nodes[$0]?.isFolder == true }) {
-                    menu.addItem(.separator()); add("Rename…",to:menu) { rename(file) }
+                    menu.addItem(.separator()); add(String(localized:"Rename…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),identifier:"files-rename",to:menu) { rename(file) }
                 }
             }
-            if indices.count == 1 { add("Show File Details",to:menu) { details() } }
+            if indices.count == 1 { add(String(localized:"Show File Details",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),to:menu) { details() } }
         }
-        private func add(_ title: String, to menu: NSMenu, action: @escaping () -> Void) {
+        private func add(_ title: String, identifier: String? = nil, to menu: NSMenu, action: @escaping () -> Void) {
             let item = NSMenuItem(title:title,action:#selector(invokeMenu(_:)),keyEquivalent:"")
+            item.identifier = identifier.map { NSUserInterfaceItemIdentifier($0) }
             item.target = self; item.tag = menuActions.count; menuActions.append(action); menu.addItem(item)
         }
         @objc private func invokeMenu(_ item: NSMenuItem) { if menuActions.indices.contains(item.tag) { menuActions[item.tag]() } }
@@ -473,7 +485,7 @@ private final class FilesCheckbox: NSButton {
         super.init(frame:.zero); setButtonType(.switch); title = ""; allowsMixedState = true
         target = self; action = #selector(invoke)
     }
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    required init?(coder: NSCoder) { fatalError(String(localized:"init(coder:) has not been implemented",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
     @objc private func invoke() { actionBlock?() }
 }
 
@@ -495,7 +507,7 @@ private final class FilesNativeCell: NSTableCellView {
         name.setContentCompressionResistancePriority(.defaultLow,for:.horizontal)
     }
     convenience init() { self.init(frame:.zero) }
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    required init?(coder: NSCoder) { fatalError(String(localized:"init(coder:) has not been implemented",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
 }
 
 private final class FilesValueCell: NSTableCellView {
@@ -514,7 +526,7 @@ private final class FilesValueCell: NSTableCellView {
         ])
     }
     convenience init() { self.init(frame:.zero) }
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    required init?(coder: NSCoder) { fatalError(String(localized:"init(coder:) has not been implemented",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
 }
 
 private final class FilesPriorityCell: NSTableCellView {
@@ -530,7 +542,7 @@ private final class FilesPriorityCell: NSTableCellView {
         ])
     }
     convenience init() { self.init(frame:.zero) }
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    required init?(coder: NSCoder) { fatalError(String(localized:"init(coder:) has not been implemented",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
 }
 
 private final class FilesPriorityPopup: NSPopUpButton {
@@ -540,13 +552,13 @@ private final class FilesPriorityPopup: NSPopUpButton {
         isBordered = false; font = .systemFont(ofSize:11); controlSize = .small
         target = self; action = #selector(invoke)
     }
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    required init?(coder: NSCoder) { fatalError(String(localized:"init(coder:) has not been implemented",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
     func configure(_ priorities: Set<UInt8>) {
         let mixed = priorities.count != 1
         // Progress snapshots must not rebuild a menu the user is interacting with.
         if numberOfItems != (mixed ? 4 : 3) {
             removeAllItems()
-            if mixed { addItem(withTitle:"Mixed"); lastItem?.tag = -1 }
+            if mixed { addItem(withTitle:String(localized:"Mixed",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)); lastItem?.tag = -1 }
             for value in [UInt8(0),1,2] {
                 addItem(withTitle:TorrentFilesView.priorityName(value)); lastItem?.tag = Int(value)
             }

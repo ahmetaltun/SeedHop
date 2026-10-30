@@ -62,7 +62,7 @@ import Combine
             try await store.setAlternativeLimits(download:0,upload:3_000,enabled:false)
             try expect(store.hasAlternativeLimits && store.canToggleAlternativeLimits,"One-direction cap could not enable the switch")
             store.connected = false
-            try expect(store.bandwidthStatus.hasPrefix("Last known:"),"Disconnected caps appeared live")
+            try expect(store.bandwidthStatus.hasPrefix("Last known "),"Disconnected caps appeared live")
         }
 
         try await check("Alternative bandwidth limits wait for confirmation and recover from rejected saves") {

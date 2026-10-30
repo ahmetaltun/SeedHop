@@ -66,6 +66,46 @@ enum PreviewFixtures {
 }
 
 @MainActor enum DesignRenderer {
+    #if SEEDHOP_DEVELOPMENT
+    static func renderLocalizations() throws {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of:"--output"), args.indices.contains(index+1) else {
+            throw UserFacingError(message:"Localization renders require --output")
+        }
+        let output = URL(fileURLWithPath:args[index+1],isDirectory:true)
+        try FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
+        WorkspacePreferences.defaults.removePersistentDomain(forName:"app.seedhop.workspace-fixtures")
+        var count = 0
+        for (name,appearance) in [("light",NSAppearance.Name.aqua),("dark",.darkAqua)] {
+            func render<V: View>(_ id: String, _ view: V, _ size: NSSize) throws {
+                try capture(view,size:size,appearance:appearance,to:output.appendingPathComponent("\(id)-\(name).png"))
+                count += 1
+            }
+            let store = LibraryStore(designPreview:true)
+            store.peerEncryption = .allow; store.savedPeerEncryption = .allow
+            store.schedule = ScheduleConfig(enabled:true,rules:[ScheduleRule()])
+            store.normalDownloadLimit = 1_234_000; store.alternativeDownloadLimit = 500_000
+            store.alternativeUploadLimit = 100_000; store.alternativeLimitsAvailable = true
+            store.downloadLimit = 1_234_000
+            try render("library",LibraryView(inspectorTab:0).environmentObject(store),NSSize(width:1240,height:780))
+            try render("minimum",LibraryView(inspectorTab:1).environmentObject(store),NSSize(width:820,height:560))
+            for tab in [2,3,4] {
+                store.details = PreviewFixtures.diagnostics(store.torrents[0],section:[2:"peers",3:"trackers",4:"activity"][tab]!)
+                try render("inspector-\(tab)",LibraryView(inspectorTab:tab).environmentObject(store),NSSize(width:1240,height:780))
+            }
+            try render("import",ImportView().environmentObject(store),NSSize(width:600,height:500))
+            try render("import-files",ImportView(preview:PreviewFixtures.importPreview).environmentObject(store),NSSize(width:600,height:820))
+            for tab in 0..<3 { try render("settings-\(tab)",SettingsView(tab:tab).environmentObject(store),NSSize(width:570,height:660)) }
+            try render("bandwidth",ScrollView { BandwidthSettingsView().padding(24) }.background(Design.canvas).tint(Design.green).environmentObject(store),NSSize(width:500,height:610))
+            try render("schedule",ScrollView { SchedulingSettingsView().padding(24) }.background(Design.canvas).tint(Design.green).environmentObject(store),NSSize(width:570,height:660))
+            let recovery = StorageRecoveryItem(id:"fixture",torrentId:store.torrents[0].id,activeLocation:"original",message:"Fixture: volume unavailable",originalDirectory:"/Volumes/Archive/文件",destinationDirectory:"/Volumes/Downloads/résumé",canKeepCopies:true)
+            try render("recovery",InlineNotice(title:String(localized:"File cleanup needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),message:recovery.localizedMessage).padding(24).frame(maxWidth:.infinity,maxHeight:.infinity).background(Design.canvas),NSSize(width:570,height:400))
+            try render("error",InlineNotice(title:String(localized:"Something needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),message:EngineMessage(code:"storage.permission",diagnostic:"Fixture: EACCES").displayText).padding(24).frame(maxWidth:.infinity,maxHeight:.infinity).background(Design.canvas),NSSize(width:570,height:300))
+            try render("empty-minimum",LibraryEmptyState().environmentObject(store).background(Design.canvas),NSSize(width:520,height:160))
+        }
+        print("Rendered \(count) localization fixtures to \(output.path)")
+    }
+    #endif
     static func render() throws {
         let args = ProcessInfo.processInfo.arguments
         WorkspacePreferences.defaults.removePersistentDomain(forName:"app.seedhop.workspace-fixtures")

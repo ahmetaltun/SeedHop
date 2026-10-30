@@ -28,65 +28,68 @@ struct TransferPresentation {
         if needsAttention { return "error" }
         return torrent.state
     }
-    var label: String { connected ? currentLabel : "Last: \(currentLabel)" }
+    var label: String { connected ? currentLabel : String(localized:"Last: \(currentLabel)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
     private var currentLabel: String {
         if let change = fileChange {
-            if change.cancelRequested { return "Cancelling" }
+            if change.cancelRequested { return String(localized:"Cancelling",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
             switch change.phase {
-            case "copying": return change.kind == "rename" ? "Renaming file" : "Moving files"
-            case "saving": return "Saving location"
-            case "cleaning": return "Cleaning up"
-            case "restoring": return "Restoring files"
-            case "verifying": return "Starting check"
-            default: return "Preparing files"
+            case "copying": return change.kind == "rename" ? String(localized:"Renaming file",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Moving files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            case "saving": return String(localized:"Saving location",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            case "cleaning": return String(localized:"Cleaning up",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            case "restoring": return String(localized:"Restoring files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            case "verifying": return String(localized:"Starting check",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            default: return String(localized:"Preparing files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
             }
         }
-        if hasRecovery { return "Cleanup needed" }
-        if torrent.state == "queued" && torrent.queuePosition > 0 { return "Queued · \(torrent.queuePosition)" }
-        if isError && (torrent.errorKind ?? "").hasPrefix("storage") { return "File access error" }
-        if torrent.state == "paused" && !torrent.isPaused { return "Preparing transfer" }
+        if hasRecovery { return String(localized:"Cleanup needed",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        if torrent.state == "queued" && torrent.queuePosition > 0 { return String(localized:"Queued · \(torrent.queuePosition)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        if isError && (torrent.errorKind ?? "").hasPrefix("storage") { return String(localized:"File access error",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        if torrent.state == "paused" && !torrent.isPaused { return String(localized:"Preparing transfer",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
         return torrent.statusLabel
     }
     var accessibleLabel: String {
-        if isQueued && torrent.queuePosition > 0 { return "\(connected ? "" : "Last known: ")Queued, position \(torrent.queuePosition)" }
+        if isQueued && torrent.queuePosition > 0 {
+            return connected ? String(localized:"Queued, position \(torrent.queuePosition)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Last known: Queued, position \(torrent.queuePosition)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        }
         return label
     }
     var detail: String {
-        if !connected { return "This is the last known state. Reconnect to see current activity." }
+        if !connected { return String(localized:"This is the last known state. Reconnect to see current activity.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
         if let change = fileChange { return change.detail }
-        if hasRecovery { return "\(torrent.statusLabel). Review the retained-file cleanup above before changing files." }
+        if hasRecovery { return String(localized:"\(torrent.statusLabel). Review the retained-file cleanup above before changing files.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
         if isError { return errorGuidance }
         switch torrent.state {
-        case "scheduled": return "Suspended by the weekly schedule. Manual pause choices are preserved. Change scheduling in Transfers settings."
-        case "queued": return torrent.queuePosition > 0 ? "Position \(torrent.queuePosition) in the download queue. Waiting for an active download slot." : "Waiting for an active download slot."
-        case "waiting": return torrent.peers == 0 ? "No peers are connected. Available discovery methods depend on the torrent and current network." : "\(torrent.peers) peers connected; this snapshot shows no download activity."
-        case "checking": return torrent.isPaused ? "Checking existing files. This transfer will remain paused afterward." : "Checking existing files before continuing the transfer."
-        case "paused": return torrent.isPaused ? "Paused by you. Resume when you are ready." : "Preparing the transfer without changing your saved pause setting."
-        case "seeding": return "Your selected files are complete and available to share."
-        case "downloading": return "Receiving data for your selected files."
-        default: return "Waiting for the next engine update."
+        case "scheduled": return String(localized:"Suspended by the weekly schedule. Manual pause choices are preserved. Change scheduling in Transfers settings.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "queued": return torrent.queuePosition > 0 ? String(localized:"Position \(torrent.queuePosition) in the download queue. Waiting for an active download slot.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Waiting for an active download slot.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "waiting": return torrent.peers == 0 ? String(localized:"No peers are connected. Available discovery methods depend on the torrent and current network.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"\(torrent.peers) peers connected; this snapshot shows no download activity.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "checking": return torrent.isPaused ? String(localized:"Checking existing files. This transfer will remain paused afterward.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Checking existing files before continuing the transfer.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "paused": return torrent.isPaused ? String(localized:"Paused by you. Resume when you are ready.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Preparing the transfer without changing your saved pause setting.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "seeding": return String(localized:"Your selected files are complete and available to share.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "downloading": return String(localized:"Receiving data for your selected files.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        default: return String(localized:"Waiting for the next engine update.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         }
     }
     var errorTitle: String {
         switch torrent.errorKind {
-        case "storage_space": return "Not enough disk space"
-        case "storage_permission": return "File access is restricted"
-        case "storage_missing": return "Files or destination unavailable"
-        case "storage": return "Files need attention"
-        default: return "Transfer stopped"
+        case "storage_space": return String(localized:"Not enough disk space",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "storage_permission": return String(localized:"File access is restricted",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "storage_missing": return String(localized:"Files or destination unavailable",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "storage": return String(localized:"Files need attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        default: return String(localized:"Transfer stopped",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         }
     }
     private var errorGuidance: String {
-        let continuation = torrent.isPaused ? "Retry checks existing files and leaves this transfer paused." : "Retry checks existing files and follows the download queue."
+        let continuation = torrent.isPaused ? String(localized:"Retry checks existing files and leaves this transfer paused.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Retry checks existing files and follows the download queue.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         switch torrent.errorKind {
-        case "storage_space": return "Free space on the destination disk, then retry. \(continuation)"
-        case "storage_permission": return "Restore read and write access to the saved folder, then retry. \(continuation)"
-        case "storage_missing": return "Reconnect the drive or restore the saved path, then retry. SeedHop will keep the saved location. \(continuation)"
-        case "storage": return "Check the destination disk and folder, then retry. \(continuation)"
-        default: return "The engine stopped this transfer. \(continuation) See details if the error returns."
+        case "storage_space": return String(localized:"Free space on the destination disk, then retry. \(continuation)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "storage_permission": return String(localized:"Restore read and write access to the saved folder, then retry. \(continuation)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "storage_missing": return String(localized:"Reconnect the drive or restore the saved path, then retry. SeedHop will keep the saved location. \(continuation)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "storage": return String(localized:"Check the destination disk and folder, then retry. \(continuation)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        default: return String(localized:"The engine stopped this transfer. \(continuation) See details if the error returns.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         }
     }
-    var progressTitle: String { fileChange != nil ? "Copied" : isChecking ? "Checked" : "Downloaded" }
+    var progressTitle: String { fileChange != nil ? String(localized:"Copied",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : isChecking ? String(localized:"Checked",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Downloaded",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+    var progressMetricTitle: String { fileChange != nil ? String(localized:"Copied bytes",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : isChecking ? String(localized:"Checked bytes",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Downloaded bytes",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
     var completedBytes: UInt64 { fileChange?.completedBytes ?? torrent.downloadedBytes }
     var totalBytes: UInt64 { fileChange?.totalBytes ?? torrent.totalBytes }
     var progress: Double? {
@@ -95,7 +98,9 @@ struct TransferPresentation {
         return totalBytes == 0 ? 0 : min(1, Double(completedBytes) / Double(totalBytes))
     }
     var progressDescription: String {
-        guard let progress else { return "Progress is unavailable during this operation." }
-        return "\(Int(progress * 100)) percent \(progressTitle.lowercased())"
+        guard let progress else { return String(localized:"Progress is unavailable during this operation.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        let percentage = LocaleText.percent(progress)
+        if fileChange != nil { return String(localized:"\(percentage) copied",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        return isChecking ? String(localized:"\(percentage) checked",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"\(percentage) downloaded",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
     }
 }

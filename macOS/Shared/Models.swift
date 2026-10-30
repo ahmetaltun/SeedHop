@@ -10,7 +10,7 @@ enum SeedHopIdentity {
     #endif
     static let foreground = app + ".engine"
     static let background = app + ".agent"
-    static let protocolVersion = 5
+    static let protocolVersion = 6
     static let agentPlist = background + ".plist"
 }
 
@@ -40,6 +40,7 @@ struct TorrentItem: Codable, Identifiable, Equatable {
     var queuePosition: UInt32 = 0
     var pausedIntent: Bool? = nil
     var errorKind: String? = nil
+    var errorMessage: EngineMessage? = nil
     var networkDownloadedBytes: UInt64? = nil
     var networkUploadedBytes: UInt64? = nil
     var addedAt: UInt64? = nil
@@ -60,7 +61,7 @@ struct TorrentItem: Codable, Identifiable, Equatable {
     var isPaused: Bool { pausedIntent ?? (state == "paused") }
     var isActive: Bool { ["downloading", "waiting", "checking", "queued"].contains(state) || (state == "scheduled" && progress < 1) }
     var statusLabel: String {
-        switch state { case "downloading": return "Downloading"; case "seeding": return "Seeding"; case "paused": return "Paused"; case "scheduled": return "Scheduled suspension"; case "queued": return "Queued"; case "checking": return "Checking files"; case "error": return "Needs attention"; case "waiting": return peers == 0 ? "Finding peers" : "Waiting for data"; default: return "Updating status" }
+        switch state { case "downloading": return String(localized:"Downloading",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); case "seeding": return String(localized:"Seeding",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); case "paused": return String(localized:"Paused",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); case "scheduled": return String(localized:"Scheduled suspension",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); case "queued": return String(localized:"Queued",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); case "checking": return String(localized:"Checking files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); case "error": return String(localized:"Needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); case "waiting": return peers == 0 ? String(localized:"Finding peers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Waiting for data",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); default: return String(localized:"Updating status",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
     }
 }
 struct FileOperationItem: Codable, Identifiable, Equatable {
@@ -73,22 +74,22 @@ struct FileOperationItem: Codable, Identifiable, Equatable {
     var cancelRequested: Bool
     var canCancel: Bool { ["preparing", "copying"].contains(phase) && !cancelRequested }
     var title: String {
-        if cancelRequested && ["preparing", "copying", "restoring"].contains(phase) { return "Cancelling…" }
+        if cancelRequested && ["preparing", "copying", "restoring"].contains(phase) { return String(localized:"Cancelling…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
         switch phase {
-        case "copying": return kind == "rename" ? "Renaming file…" : "Moving files…"
-        case "saving": return "Saving the new location…"
-        case "verifying": return "Starting file verification…"
-        case "cleaning": return "Removing original copies…"
-        case "restoring": return "Restoring the original location…"
-        default: return "Preparing files…"
+        case "copying": return kind == "rename" ? String(localized:"Renaming file…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Moving files…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "saving": return String(localized:"Saving the new location…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "verifying": return String(localized:"Starting file verification…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "cleaning": return String(localized:"Removing original copies…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "restoring": return String(localized:"Restoring the original location…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        default: return String(localized:"Preparing files…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         }
     }
     var detail: String {
-        if cancelRequested { return "Your original files will stay in place." }
-        if phase == "copying" { return "\(SizeText.bytes(completedBytes)) of \(SizeText.bytes(totalBytes)) copied" }
-        if phase == "preparing" { return "Checking the destination and available space." }
-        if phase == "restoring" { return "Keeping your original files and transfer settings." }
-        return "Finishing this change. File verification is shown separately in the transfer list."
+        if cancelRequested { return String(localized:"Your original files will stay in place.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        if phase == "copying" { return String(localized:"\(SizeText.bytes(completedBytes)) of \(SizeText.bytes(totalBytes)) copied",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        if phase == "preparing" { return String(localized:"Checking the destination and available space.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        if phase == "restoring" { return String(localized:"Keeping your original files and transfer settings.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        return String(localized:"Finishing this change. File verification is shown separately in the transfer list.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
     }
 }
 struct StorageRecoveryItem: Codable, Identifiable, Equatable {
@@ -99,19 +100,23 @@ struct StorageRecoveryItem: Codable, Identifiable, Equatable {
     var originalDirectory: String
     var destinationDirectory: String
     var canKeepCopies: Bool
+    var messageDescriptor: EngineMessage? = nil
+    var localizedMessage: String {
+        (messageDescriptor ?? EngineMessage(code:activeLocation == "new" ? "recovery.new" : activeLocation == "original" ? "recovery.original" : "recovery.unknown",diagnostic:message)).displayText
+    }
 }
 enum PeerEncryptionPolicy: String, Codable, CaseIterable, Identifiable {
     case disabled, allow, prefer, require
     var id: String { rawValue }
     var title: String {
-        switch self { case .disabled: return "Disabled"; case .allow: return "Allow encrypted peers"; case .prefer: return "Prefer encrypted peers"; case .require: return "Require encryption" }
+        switch self { case .disabled: return String(localized:"Disabled",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); case .allow: return String(localized:"Allow encrypted peers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); case .prefer: return String(localized:"Prefer encrypted peers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); case .require: return String(localized:"Require encryption",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
     }
     var detail: String {
         switch self {
-        case .disabled: return "Use plaintext peer connections only. Encrypted-only peers cannot connect."
-        case .allow: return "Accept encrypted peers. Try plaintext first when connecting, then encryption if needed."
-        case .prefer: return "Try encryption first. Plaintext connections are still allowed if encryption fails."
-        case .require: return "Require encrypted peer payloads. Peers that only support plaintext cannot connect, which may reduce available peers."
+        case .disabled: return String(localized:"Use plaintext peer connections only. Encrypted-only peers cannot connect.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .allow: return String(localized:"Accept encrypted peers. Try plaintext first when connecting, then encryption if needed.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .prefer: return String(localized:"Try encryption first. Plaintext connections are still allowed if encryption fails.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case .require: return String(localized:"Require encrypted peer payloads. Peers that only support plaintext cannot connect, which may reduce available peers.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         }
     }
 }
@@ -129,6 +134,8 @@ struct ScheduleConfig: Codable, Equatable {
     var rules: [ScheduleRule] = []
 }
 struct LibrarySnapshot: Codable {
+    var statisticsMessage: EngineMessage? = nil
+    var schedulingMessage: EngineMessage? = nil
     var statisticsWarning: String? = nil
     var protocolVersion: UInt32
     var engineVersion: String
@@ -195,12 +202,14 @@ struct EngineReply: Codable {
     var preview: ImportPreview?
     var id: String?
     var error: String?
+    var errorMessage: EngineMessage? = nil
     var cancelled: Bool?
     var cancellationAccepted: Bool?
     var details: TorrentDetails?
-    init(snapshot: LibrarySnapshot? = nil, preview: ImportPreview? = nil, id: String? = nil, error: String? = nil, cancelled: Bool? = nil, cancellationAccepted: Bool? = nil, details: TorrentDetails? = nil) {
+    init(snapshot: LibrarySnapshot? = nil, preview: ImportPreview? = nil, id: String? = nil, error: String? = nil, errorMessage: EngineMessage? = nil, cancelled: Bool? = nil, cancellationAccepted: Bool? = nil, details: TorrentDetails? = nil) {
         self.snapshot = snapshot; self.preview = preview; self.id = id; self.error = error
         self.cancelled = cancelled; self.cancellationAccepted = cancellationAccepted; self.details = details
+        self.errorMessage = errorMessage
     }
 }
 struct UserFacingError: LocalizedError {
@@ -217,9 +226,9 @@ enum SizeText {
         let formatter = ByteCountFormatter(); formatter.countStyle = .file
         return formatter.string(fromByteCount: Int64(clamping: value))
     }
-    static func limit(_ value: UInt32) -> String { value == 0 ? "Unlimited" : "\(value / 1000) KB/s" }
+    static func limit(_ value: UInt32) -> String { value == 0 ? String(localized:"Unlimited",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"\(LocaleText.integer(value / 1000)) KB/s",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
     static func rate(_ value: UInt64, limit: UInt32) -> String { rate(value) + (limit == 0 ? "" : " / " + self.limit(limit)) }
-    static func rate(_ value: UInt64) -> String { value == 0 ? "—" : bytes(value) + "/s" }
+    static func rate(_ value: UInt64) -> String { value == 0 ? "—" : String(localized:"\(bytes(value))/s",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
 }
 
 struct PeerDetails: Codable, Identifiable, Equatable {

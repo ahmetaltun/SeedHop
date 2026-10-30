@@ -76,14 +76,16 @@ impl ScheduleRule {
 impl ScheduleConfig {
     pub fn validate(&self) -> Result<()> {
         if self.enabled && self.rules.is_empty() {
-            return Err(CoreError::InvalidInput(
-                "Add a window before enabling the schedule.".into(),
-            ));
+            return Err(CoreError::Validation {
+                code: "input.add_a_window_before_enabling_the_schedule",
+                message: "Add a window before enabling the schedule.".into(),
+            });
         }
         if self.rules.len() > 32 {
-            return Err(CoreError::InvalidInput(
-                "Use at most 32 schedule windows.".into(),
-            ));
+            return Err(CoreError::Validation {
+                code: "input.use_at_most_schedule_windows",
+                message: "Use at most 32 schedule windows.".into(),
+            });
         }
         let mut occupied = vec![false; 7 * 1440];
         for rule in &self.rules {
@@ -92,18 +94,21 @@ impl ScheduleConfig {
                 || rule.start_minute >= 1440
                 || rule.end_minute >= 1440
             {
-                return Err(CoreError::InvalidInput(
-                    "Choose at least one day and valid schedule times.".into(),
-                ));
+                return Err(CoreError::Validation {
+                    code: "input.choose_at_least_one_day_and_valid_schedule",
+                    message: "Choose at least one day and valid schedule times.".into(),
+                });
             }
             for day in 0..7 {
                 for minute in 0..1440 {
                     if rule.contains(day, minute) {
                         let slot = &mut occupied[day * 1440 + minute as usize];
                         if *slot {
-                            return Err(CoreError::InvalidInput(
-                                "Schedule windows overlap. Adjust their days or times.".into(),
-                            ));
+                            return Err(CoreError::Validation {
+                                code: "input.schedule_windows_overlap_adjust_their_days_or_times",
+                                message: "Schedule windows overlap. Adjust their days or times."
+                                    .into(),
+                            });
                         }
                         *slot = true;
                     }
@@ -163,10 +168,7 @@ fn local_week_minute() -> (usize, u16) {
 impl Engine {
     pub async fn set_alternative_limits(&self, down: u32, up: u32, enabled: bool) -> Result<()> {
         if enabled && down == 0 && up == 0 {
-            return Err(CoreError::InvalidInput(
-                "Set an alternative download or upload limit before enabling alternative limits."
-                    .into(),
-            ));
+            return Err(CoreError::Validation { code: "input.set_an_alternative_download_or_upload_limit_before", message: "Set an alternative download or upload limit before enabling alternative limits.".into() });
         }
         let _operation = self.operations.write().await;
         self.ready()?;
