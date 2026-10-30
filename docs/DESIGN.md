@@ -18,8 +18,27 @@ for headlines and large metrics, and monospaced digits for changing values.
 - Supporting labels: 10–12 pt; section eyebrows: 10 pt with expanded tracking.
 - Primary content insets: 26–28 pt; panel insets: 16–20 pt.
 - Status uses both words and color; selection follows native table behavior.
+- Dropdown rows keep labels at the leading edge and content-sized controls at
+  the trailing edge. Narrow panes stack the row and constrain long values.
+  The sidebar tracker filter keeps its label above a full-width dropdown.
 - `BrandMark`, `StateBadge`, `TransferProgress`, `Metric`, and `InlineNotice`
   provide repeated presentation conventions.
+
+## Appearance
+
+Settings → General → Appearance offers Follow macOS, Light, and Dark. Dark is
+the default when no valid preference is saved. The choice persists locally and
+applies immediately without restarting the app or engine. Follow macOS tracks
+system appearance changes; explicit Light and Dark choices override them.
+
+The application owns one `NSApplication.appearance` override. Production windows,
+sheets, panels, and hosted SwiftUI panes inherit it without replacing their view
+identity. Rendering fixtures retain explicit appearance overrides. Keep adaptive
+colors in the existing design tokens: the dark palette remains unchanged, and
+the light palette uses a warm canvas, pale green sidebar, and forest accents.
+Use native semantic text, control, and selection colors, including Increase
+Contrast support. Appearance changes must preserve drafts, focus, selection,
+scroll positions, and workspace sizing.
 
 ## Main window
 

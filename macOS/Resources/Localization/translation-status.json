@@ -92,6 +92,8 @@
       "An optional background engine continues your downloads.": "740c017651152421fcbd379a70f44a73c936940884c8b089f86c862a9fb8f81f",
       "Announced wire identity: %@": "a6a15f984f08173cdecd5072a7aa2498688e06445a149272803d9ce365403101",
       "Another SeedHop engine is already using this library.": "c2b9606790a881b29d621599eba58ccccd1856741fe55c836cac25c6fda00386",
+      "Appearance": "c247f720dc087106e916ef13f69711572db116f833c63493e6bb380b80f0ede8",
+      "Appearance changes apply immediately.": "1bbe28e43862e01e711e318d0f77a5c44b7783e2aa51b7d1617fbed57f4046ae",
       "Background access is unavailable. Transfers will run while SeedHop is open. You can enable background access in Settings.": "0b6ee3e5efbcc6200447f0e853287096bd07d5b97088b2b06084661f51e9b150",
       "Bandwidth Limits": "130c7d0e864f73be2d7ca3c661073a556eee41828725612386d49a5821bdbe4a",
       "Bandwidth limits": "5330a517a5679b8fd63bfe0e14c9c433e0d863a406b2015a3123e9860620219d",
@@ -164,6 +166,7 @@
       "Could not save the background preference.": "d2ff5e3e4487b8652c28d85414923342a502595a8113328975a677ad8a7b4f72",
       "Couldn’t add this torrent": "af0ca0bb362cd04eb78e0bf6e6bbb32197ed6e024f5b468247217f4eac4ca554",
       "DESIGN PREVIEW · SAMPLE DATA": "2f0a1fc032434ef342df307bd3ad6a77ac329b2699a25f6a56a8633976e20d30",
+      "Dark": "34aaff1a4ecf5ec59db6e443c7eb0cf7f249ff33bc3211159ef4d9fcd1ef3cd7",
       "Default download folder": "734b1fac1d9847ebc7381f5994e7013c068a9acf40b66f0448f7c9bc431d7af5",
       "Deselect all": "4e66910ca4fa5b943e4bd101ab0d79938bbac82b76e769b00a1cbd365aff8b0f",
       "Design preview · sample data": "fb184516230784854c7590434726111149c1754325849e5f8221e2611f0e3921",
@@ -279,6 +282,7 @@
       "Leechers reported": "ddc074566738e714e3cf7c4ea840543896ab65b04371a74a26799db486c1faa9",
       "Let me know when a download finishes": "68a195382f9688f3ef8fd1fea20236a946b86baf51c1f80fc9e4fbf1679cd0cd",
       "Lifetime uploaded payload divided by downloaded payload. Unknown history and zero downloads have no ratio.": "ac681e8fac72613c1a1e43881caa7e2a92edf89c4cd99819c234c89dfc490cc7",
+      "Light": "07e834f41479b53e4469606900a3554e59a5c014ef8e0a19a191082a330022fd",
       "Limit must be a whole number from 0 to 4,294,967.": "bbdacadb646da90e9f95ce9f60cdebaba3998e180ecbccebee407f106116bd5e",
       "Limits apply across all transfers. Use 0 for unlimited.": "b9df85b203706d0cec2d785ccce6a0fd091a858846552b47a60eba9cd3691c98",
       "Loading peer information…": "8bb65db37b39bbbe9f1af2d666a7866a2294384996bef7e10bd282a85e4aa4d5",
@@ -532,6 +536,7 @@
       "The torrent metadata exceeds 32 MB.": "9b6655825b030350757c3eaf75ea4cef6e40172be9328b89d838913c7e893dd2",
       "The torrent metadata exceeds 32 MB. Choose a smaller .torrent file.": "5311c2d11365d0a071ca8f89b616126ce59c5fc15efcd3fd5c45ada48e175e71",
       "The weekly schedule could not be applied. Check the details and transfer settings.": "503476c3c4810eea5a8d631879a01a82bf4f9a40eadff0bdd0613575ac0b13d3",
+      "Theme": "2658f4113b22c35ef64cac8e0a5a945f1ed264c50607ea54899b42135aa792e8",
       "There is no pending cleanup.": "781892bdc5283fe8626ce0878cbc21aa171cf93a473e4a89cc401e1b404ce0b0",
       "There is no pending file cleanup.": "4a7e3907bc875ad27a06cd2aa39e262d876fe68b873be71f1948f0d3865dc6ed",
       "These %lld transfers will be removed. Their files stay on your Mac unless you choose to delete them.": "0be295358ebe4852cba28382545f74942d50c56ca0ee5e8163ec7185f0fbf386",
@@ -722,6 +727,6 @@
       "origin": "AI draft"
     }
   },
-  "sourceDigest": "bfffc9387a6b6494f9a9e72bb3fe73e3c8e0ada513f7ce37573e139fe3f9430b",
+  "sourceDigest": "126c8b01546674cc26455f43b41da4fb226b7289d5a8fd9b33fe7cca322aaf7b",
   "sourceLanguage": "en"
 }

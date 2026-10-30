@@ -320,6 +320,11 @@ private class NativeTransferCell: NSTableCellView {
         NSLayoutConstraint.activate([inset,label.trailingAnchor.constraint(equalTo:trailingAnchor,constant:-2),label.centerYAnchor.constraint(equalTo:centerYAnchor)])
     }
     required init?(coder: NSCoder) { fatalError(String(localized:"init(coder:) has not been implemented",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateColor()
+        needsDisplay = true
+    }
     func updateColor() {
         label.textColor = backgroundStyle == .emphasized ? .alternateSelectedControlTextColor : statusTint ?? (secondary ? .secondaryLabelColor : .labelColor)
         constraints.first(where: { $0.identifier == "transfer-text-inset" })?.constant = statusTint == nil ? 2 : 18
@@ -350,6 +355,10 @@ private final class NativeProgressCell: NativeTransferCell {
 }
 private final class NativeTransferProgress: NSView {
     var value: Double? { didSet { needsDisplay = true } }
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
     override func draw(_ dirtyRect: NSRect) {
         NSColor.separatorColor.setFill(); NSBezierPath(roundedRect:bounds,xRadius:2,yRadius:2).fill()
         if let value {

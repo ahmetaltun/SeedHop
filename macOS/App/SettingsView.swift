@@ -35,6 +35,7 @@ struct SettingsView: View {
     @EnvironmentObject var store: LibraryStore
     @State private var tab = 0
     @State private var language = AppLanguagePreference.saved
+    @State private var appearance = AppAppearance.shared
     private enum Field: Hashable { case folder }
     @FocusState private var focusedField: Field?
     init(tab: Int = 0) { _tab = State(initialValue:tab) }
@@ -47,15 +48,31 @@ struct SettingsView: View {
                 VStack(alignment:.leading,spacing:22) {
                     if let error = store.error { InlineNotice(title:String(localized:"Something needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),message:error) }
                     if tab == 0 {
+                        group(String(localized:"Appearance",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
+                            VStack(alignment:.leading,spacing:8) {
+                                DropdownRow(String(localized:"Theme",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
+                                    Picker(String(localized:"Theme",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),selection:Binding(get:{appearance.selection},set:{appearance.select($0)})) {
+                                        Text(String(localized:"Follow macOS",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag(AppearancePreference.system)
+                                        Text(String(localized:"Light",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag(AppearancePreference.light)
+                                        Text(String(localized:"Dark",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag(AppearancePreference.dark)
+                                    }
+                                    .accessibilityIdentifier("settings-appearance")
+                                }
+                                Text(String(localized:"Appearance changes apply immediately.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                                    .font(.system(size:10)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
+                            }
+                        }
                         group(String(localized:"Language",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
                             VStack(alignment:.leading,spacing:8) {
-                                Picker(String(localized:"Display language",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),selection:$language) {
-                                    Text(String(localized:"Follow macOS",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag("")
-                                    ForEach(AppLanguagePreference.available,id:\.id) { option in
-                                        Text(verbatim:option.title).tag(option.id)
+                                DropdownRow(String(localized:"Display language",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
+                                    Picker(String(localized:"Display language",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),selection:$language) {
+                                        Text(String(localized:"Follow macOS",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag("")
+                                        ForEach(AppLanguagePreference.available,id:\.id) { option in
+                                            Text(verbatim:option.title).tag(option.id)
+                                        }
                                     }
+                                    .accessibilityIdentifier("settings-language")
                                 }
-                                .pickerStyle(.menu).accessibilityIdentifier("settings-language")
                                 .onChange(of:language) { _, value in AppLanguagePreference.save(value) }
                                 Text(String(localized:"Language changes apply immediately.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                                     .font(.system(size:10)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
@@ -80,9 +97,11 @@ struct SettingsView: View {
                     } else if tab == 1 {
                         group(String(localized:"Peer encryption",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
                             VStack(alignment:.leading,spacing:12) {
-                                Picker(String(localized:"Connection policy",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),selection:Binding(get:{store.savedPeerEncryption ?? .allow},set:{store.saveEncryption($0)})) {
-                                    ForEach(PeerEncryptionPolicy.allCases) { policy in Text(policy.title).tag(policy) }
-                                }.disabled(!store.canSaveEncryption)
+                                DropdownRow(String(localized:"Connection policy",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
+                                    Picker(String(localized:"Connection policy",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),selection:Binding(get:{store.savedPeerEncryption ?? .allow},set:{store.saveEncryption($0)})) {
+                                        ForEach(PeerEncryptionPolicy.allCases) { policy in Text(policy.title).tag(policy) }
+                                    }.disabled(!store.canSaveEncryption)
+                                }
                                 if let policy = store.savedPeerEncryption { Text(policy.detail).font(.system(size:11)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true) }
                                 info(store.connected ? String(localized:"Active policy",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Last known policy",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), store.peerEncryption?.title ?? String(localized:"Not reported",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                                 if store.savingEncryption { Text(String(localized:"Saving preference…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:11)).foregroundStyle(.secondary) }
@@ -105,10 +124,12 @@ struct SettingsView: View {
                         group(String(localized:"Download queue",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
                             VStack(alignment:.leading,spacing:12) {
                                 settingText(String(localized:"Active downloads",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), String(localized:"Completed transfers keep seeding. Paused transfers stay paused.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
-                                Picker(String(localized:"Download at once",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),selection:Binding(get:{store.maxActiveDownloads},set:{store.setQueueLimit($0)})) {
-                                    Text(String(localized:"Unlimited",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag(UInt32(0))
-                                    ForEach([1,2,3,4,5,8,10],id:\.self) { value in Text("\(value)").tag(UInt32(value)) }
-                                }.disabled(!store.canChangeTransfers || store.savingQueue)
+                                DropdownRow(String(localized:"Download at once",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
+                                    Picker(String(localized:"Download at once",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),selection:Binding(get:{store.maxActiveDownloads},set:{store.setQueueLimit($0)})) {
+                                        Text(String(localized:"Unlimited",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).tag(UInt32(0))
+                                        ForEach([1,2,3,4,5,8,10],id:\.self) { value in Text("\(value)").tag(UInt32(value)) }
+                                    }.disabled(!store.canChangeTransfers || store.savingQueue)
+                                }
                             }
                         }
                         BandwidthSettingsView()

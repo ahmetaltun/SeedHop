@@ -535,7 +535,7 @@ private final class FilesPriorityCell: NSTableCellView {
         super.init(frame:frameRect)
         priority.translatesAutoresizingMaskIntoConstraints = false; addSubview(priority)
         NSLayoutConstraint.activate([
-            priority.leadingAnchor.constraint(equalTo:leadingAnchor,constant:6),
+            priority.leadingAnchor.constraint(greaterThanOrEqualTo:leadingAnchor,constant:6),
             priority.trailingAnchor.constraint(equalTo:trailingAnchor,constant:-6),
             priority.centerYAnchor.constraint(equalTo:centerYAnchor),
             priority.heightAnchor.constraint(equalToConstant:22)

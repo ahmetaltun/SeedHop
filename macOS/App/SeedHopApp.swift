@@ -69,6 +69,9 @@ struct LibraryNavigationCommands: Commands {
     weak var store: LibraryStore?
     var stopEverything = false
     private var quitting = false
+    func applicationWillFinishLaunching(_ notification:Notification) {
+        AppAppearance.shared.apply()
+    }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender:NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender:NSApplication) -> NSApplication.TerminateReply {
         guard let store, !quitting else { return quitting ? .terminateCancel : .terminateNow }

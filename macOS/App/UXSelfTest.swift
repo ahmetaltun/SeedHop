@@ -2,6 +2,7 @@
 import Foundation
 import AppKit
 import Combine
+import SwiftUI
 
 /// Deterministic presentation-model regressions; this does not certify native input or VoiceOver.
 @MainActor enum UXSelfTest {
@@ -9,6 +10,89 @@ import Combine
         var passed = 0
         func check(_ name: String, _ body: @MainActor () async throws -> Void) async throws {
             try await body(); passed += 1; print("PASS: \(name)")
+        }
+
+        try await check("Appearance defaults to dark and persists every choice") {
+            let suite = "app.seedhop.appearance-test.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName:suite)!
+            let original = NSApp.appearance
+            defer { defaults.removePersistentDomain(forName:suite); NSApp.appearance = original }
+            try expect(AppAppearance(defaults:defaults).selection == .dark,"Missing appearance did not default to dark")
+            defaults.set("invalid",forKey:AppAppearance.preferenceKey)
+            try expect(AppAppearance(defaults:defaults).selection == .dark,"Invalid appearance did not default to dark")
+            let preference = AppAppearance(defaults:defaults)
+            for choice in AppearancePreference.allCases {
+                preference.select(choice)
+                try expect(AppAppearance(defaults:defaults).selection == choice,"Appearance did not survive reload")
+                try expect(defaults.string(forKey:AppAppearance.preferenceKey) == choice.rawValue,"Appearance was not saved")
+            }
+        }
+
+        try await check("Appearance updates existing native windows without replacing workspace state") {
+            let preference = AppAppearance.shared
+            let saved = WorkspacePreferences.defaults.object(forKey:AppAppearance.preferenceKey)
+            let original = NSApp.appearance, originalSelection = preference.selection
+            let (store, _) = library()
+            store.selection = [store.torrents[0].id]; store.showInspector = true
+            @MainActor func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+            @MainActor func window<V:View>(_ view: V, size: NSSize) -> NSWindow {
+                let window = NSWindow(contentRect:NSRect(origin:.zero,size:size),styleMask:[.titled,.resizable],backing:.buffered,defer:false)
+                window.isReleasedWhenClosed = false
+                window.contentView = NSHostingView(rootView:view.environment(\.accessibilityAnnouncementsEnabled,false))
+                window.orderFront(nil)
+                return window
+            }
+            let libraryWindow = window(LibraryView().environmentObject(store),size:NSSize(width:1000,height:700))
+            let settings = window(SettingsView().environmentObject(store),size:NSSize(width:570,height:660))
+            let bandwidth = window(BandwidthSettingsView().environmentObject(store),size:NSSize(width:500,height:610))
+            let panel = NSOpenPanel()
+            let windows = [libraryWindow,settings,bandwidth,panel]
+            defer {
+                for window in windows { window.contentView = nil; window.close() }
+                preference.select(originalSelection)
+                if let saved { WorkspacePreferences.defaults.set(saved,forKey:AppAppearance.preferenceKey) }
+                else { WorkspacePreferences.defaults.removeObject(forKey:AppAppearance.preferenceKey) }
+                NSApp.appearance = original
+            }
+            try await eventually {
+                descendants(libraryWindow.contentView!).contains { $0 is NativeTransfersTable }
+            }
+            let content = libraryWindow.contentView!
+            let table = descendants(content).compactMap { $0 as? NativeTransfersTable }.first!
+            let column = table.tableColumns.first!
+            column.width = 270
+            libraryWindow.makeKeyAndOrderFront(nil); libraryWindow.makeFirstResponder(table)
+            let selection = store.selection, torrents = store.torrents, selectedRows = table.selectedRowIndexes
+            let splits = descendants(content).compactMap { $0 as? NSSplitView }
+            let splitSizes = splits.map { $0.subviews.map(\.frame.size) }
+            let scroll = table.enclosingScrollView?.contentView.bounds.origin
+            for choice in [AppearancePreference.dark,.light,.system] {
+                preference.select(choice)
+                try await Task.sleep(for:.milliseconds(150))
+                let expected = (choice.appearance ?? NSApp.effectiveAppearance).bestMatch(from:[.aqua,.darkAqua])
+                try expect(windows.allSatisfy { $0.effectiveAppearance.bestMatch(from:[.aqua,.darkAqua]) == expected },"An existing window or panel retained its previous appearance")
+                try expect(table.effectiveAppearance.bestMatch(from:[.aqua,.darkAqua]) == expected,"The hosted native table retained its previous appearance")
+                try expect(NSApp.appearance?.name == choice.appearance?.name,"Follow macOS retained an application override")
+                try expect(descendants(content).contains { $0 === table } && libraryWindow.contentView === content,"Appearance replaced the workspace")
+                try expect(store.selection == selection && store.torrents == torrents && table.selectedRowIndexes == selectedRows,"Appearance changed transfer state or selection")
+                try expect(abs(column.width - 270) < 0.5 && splits.map { $0.subviews.map(\.frame.size) } == splitSizes,"Appearance changed workspace sizing")
+                try expect(libraryWindow.firstResponder === table && table.enclosingScrollView?.contentView.bounds.origin == scroll,"Appearance changed focus or scrolling")
+            }
+            store.beginImport(magnet:"Unfinished appearance fixture draft")
+            try await eventually {
+                (libraryWindow.attachedSheet?.firstResponder as? NSTextView)?.string == "Unfinished appearance fixture draft"
+            }
+            let sheet = libraryWindow.attachedSheet!
+            let editor = sheet.firstResponder as! NSTextView
+            let draft = editor.string
+            try expect(draft == "Unfinished appearance fixture draft","Import draft fixture did not load")
+            for choice in [AppearancePreference.light,.dark,.system] {
+                preference.select(choice)
+                try await Task.sleep(for:.milliseconds(150))
+                try expect(libraryWindow.attachedSheet === sheet && sheet.firstResponder === editor && editor.string == draft,"Appearance replaced the import sheet, draft, or focus")
+                try expect(sheet.effectiveAppearance.bestMatch(from:[.aqua,.darkAqua]) == libraryWindow.effectiveAppearance.bestMatch(from:[.aqua,.darkAqua]),"Import sheet retained its previous appearance")
+            }
+            store.showImport = false
         }
 
         try await check("Scheduling validates drafts and preserves saved state through rejected and delayed saves") {

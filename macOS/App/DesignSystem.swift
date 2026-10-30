@@ -28,6 +28,29 @@ enum Design {
     }
 }
 
+/// Content-sized popups sit opposite their labels. Narrow panes stack the row
+/// so long localized labels or tracker hosts cannot overflow the available width.
+struct DropdownRow<Content: View>: View {
+    let title: String
+    private let content: Content
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.title = title; self.content = content()
+    }
+    var body: some View {
+        ViewThatFits(in:.horizontal) {
+            HStack(alignment:.firstTextBaseline,spacing:12) {
+                Text(title).fixedSize()
+                Spacer(minLength:0)
+                content.labelsHidden().pickerStyle(.menu).fixedSize(horizontal:true,vertical:false)
+            }
+            VStack(alignment:.leading,spacing:8) {
+                Text(title).fixedSize(horizontal:false,vertical:true)
+                content.labelsHidden().pickerStyle(.menu).frame(maxWidth:.infinity,alignment:.trailing)
+            }
+        }.frame(maxWidth:.infinity,alignment:.leading)
+    }
+}
+
 struct BrandMark: View {
     var size: CGFloat = 34
     var body: some View {
