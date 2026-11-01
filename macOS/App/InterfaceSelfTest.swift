@@ -6,6 +6,10 @@ import AppKit
 @MainActor enum InterfaceSelfTest {
     static func run(store provider: @MainActor () -> LibraryStore?) async throws {
         try await settle()
+        if ProcessInfo.processInfo.arguments.contains("--transfer-controls-only") {
+            try await verifyNativeTransferControls()
+            return
+        }
         // macOS may restore a previous no-window state when this test is repeated.
         if !NSApp.windows.contains(where:{ $0.isVisible && $0.title == "SeedHop" }) {
             try await invoke("Show Library",key:"0")
@@ -274,6 +278,48 @@ import AppKit
         try await waitUntil("Context pause did not retain its captured torrent ID") { UXSelfTest.nativeRequests.contains { $0.command == "pause" && $0.id == target && $0.paused == true } }
         try await waitUntil("Context pause did not settle") { store.busyTransfers.isEmpty && store.torrents.first(where:{$0.id == target})?.isPaused == true }
         try await settle()
+        func preferenceMenu(_ ids: Set<String>, _ action: String) throws -> NSMenuItem {
+            guard let item = table.menuProvider?(ids)?.items.first(where:{ ($0.representedObject as? [String:Any])?["action"] as? String == action }) else { throw UserFacingError(message:"Missing piece preference menu") }
+            return item
+        }
+        for action in ["sequential","firstLastPieces"] {
+            let off = try preferenceMenu([target],action)
+            guard off.state == .off, off.isEnabled else { throw UserFacingError(message:"Default piece preference menu state incorrect") }
+            store.selection = [coordinator.rows.first(where:{$0.id != target})!.id]
+            try invoke(off)
+            try await waitUntil("Piece preference action did not settle") { store.busyTransfers.isEmpty && store.torrents.first(where:{$0.id == target}).map { action == "sequential" ? $0.sequential == true : $0.firstLastPieces == true } == true }
+            guard try preferenceMenu([target],action).state == .on,
+                  UXSelfTest.nativeRequests.contains(where:{ $0.command == "piecePreferences" && $0.id == target && (action == "sequential" ? $0.sequential == true && $0.firstLastPieces == nil : $0.firstLastPieces == true && $0.sequential == nil) }) else { throw UserFacingError(message:"Piece preference checkmark or captured request incorrect") }
+        }
+        let other = coordinator.rows.first(where:{$0.id != target})!.id
+        let both: Set<String> = [target,other]
+        for action in ["sequential","firstLastPieces"] {
+            let mixed = try preferenceMenu(both,action)
+            guard mixed.state == .mixed else { throw UserFacingError(message:"Mixed piece preference state missing") }
+            try invoke(mixed)
+            try await waitUntil("Bulk piece preferences did not settle") { store.busyTransfers.isEmpty && store.torrents.filter { both.contains($0.id) }.allSatisfy { action == "sequential" ? $0.sequential == true : $0.firstLastPieces == true } }
+            let on = try preferenceMenu(both,action)
+            guard on.state == .on else { throw UserFacingError(message:"Bulk piece preferences did not enable all targets") }
+            try invoke(on)
+            try await waitUntil("Bulk piece preferences did not disable") { store.busyTransfers.isEmpty && store.torrents.filter { both.contains($0.id) }.allSatisfy { action == "sequential" ? $0.sequential == false : $0.firstLastPieces == false } }
+        }
+        let original = store.torrents
+        for state in ["downloading","paused","queued","waiting","checking","seeding","error"] {
+            let at = store.torrents.firstIndex(where:{$0.id == target})!
+            store.torrents[at].state = state
+            for action in ["sequential","firstLastPieces"] {
+                guard try preferenceMenu([target],action).isEnabled else { throw UserFacingError(message:"Piece preference unavailable in \(state)") }
+            }
+        }
+        store.torrents = original
+        store.setPiecePreferences(ids:[target],sequential:false)
+        guard try !preferenceMenu([target],"sequential").isEnabled else { throw UserFacingError(message:"Busy piece preference remained enabled") }
+        try await waitUntil("Busy preference action did not settle") { store.busyTransfers.isEmpty }
+        store.connected = false
+        guard try !preferenceMenu([target],"firstLastPieces").isEnabled else { throw UserFacingError(message:"Disconnected piece preference remained enabled") }
+        store.connected = true
+        store.selection = [target]
+        table.selectRowIndexes(IndexSet(integer:row),byExtendingSelection:false)
         guard let activate = table.doubleAction else { throw UserFacingError(message:"Native primary action unavailable") }
         NSApp.sendAction(activate,to:table.target,from:table)
         try await waitUntil("Primary activation did not resume the captured row") { UXSelfTest.nativeRequests.contains { $0.command == "pause" && $0.id == target && $0.paused == false } }
@@ -311,7 +357,7 @@ import AppKit
               defaults.data(forKey:"transferColumns") == oldData else { throw UserFacingError(message:"Native migration changed legacy customization or lost order/visibility") }
         WorkspaceTablePersistence.restoreWidths(); try await settle()
         guard migrated.tableColumns.map({ $0.identifier.rawValue }) == TransferColumns.all.map(\.id) else { throw UserFacingError(message:"Restore Default Columns did not reset native order") }
-        print("PASS: Native transfer selection, captured context actions, primary activation, sorting, visibility, order persistence, legacy preference preservation, and reset.")
+        print("PASS: Native transfer selection, captured context actions, piece preference checkmarks, mixed selections, lifecycle and busy guards, primary activation, sorting, visibility, order persistence, legacy preference preservation, and reset.")
     }
 
     private static func verifyFilesOutline() async throws {
@@ -543,18 +589,21 @@ import AppKit
             menu.delegate?.menuNeedsUpdate?(menu)
             menu.update()
             for (index,item) in menu.items.enumerated() {
-                if item.keyEquivalent == key && item.keyEquivalentModifierMask == .command { return (menu,index) }
+                if !item.isHidden, item.keyEquivalent == key && item.keyEquivalentModifierMask == .command { return (menu,index) }
                 if let submenu = item.submenu, let found = find(in:submenu) { return found }
             }
             return nil
         }
-        guard let root = NSApp.mainMenu, let (menu,index) = find(in:root) else {
+        guard let root = NSApp.mainMenu, let (menu,_) = find(in:root) else {
             throw UserFacingError(message:"Missing native menu action: \(title)")
         }
         menu.delegate?.menuWillOpen?(menu)
         defer { menu.delegate?.menuDidClose?(menu) }
         try await settle()
         menu.update()
+        guard let index = menu.items.firstIndex(where:{ !$0.isHidden && $0.keyEquivalent == key && $0.keyEquivalentModifierMask == .command }) else {
+            throw UserFacingError(message:"Menu action disappeared during update: \(title)")
+        }
         let item = menu.items[index]
         guard item.isEnabled, item.keyEquivalent == key, item.keyEquivalentModifierMask == .command else {
             throw UserFacingError(message:"Menu action disabled or shortcut incorrect: \(title), enabled=\(item.isEnabled), key=\(item.keyEquivalent), modifiers=\(item.keyEquivalentModifierMask.rawValue), active=\(NSApp.isActive), keyWindow=\(NSApp.keyWindow?.title ?? "none")")

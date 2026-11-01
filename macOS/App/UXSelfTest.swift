@@ -252,6 +252,29 @@ import SwiftUI
             try expect(peer.commands("pause").count == 1 && store.selection == [other],"Duplicate command or unrelated selection loss")
         }
 
+        try await check("Piece preferences capture targets, preserve state, and recover from save failure") {
+            let (store, peer) = library(); peer.hold = ["piecePreferences"]
+            let first = store.torrents[0], other = store.torrents[1].id
+            store.setPiecePreferences(ids:[first.id],sequential:true)
+            store.setPiecePreferences(ids:[first.id],sequential:false)
+            store.selection = [other]
+            try await eventually { peer.pending.count == 1 }
+            try expect(peer.pending[0].request.id == first.id && peer.pending[0].request.sequential == true && peer.pending[0].request.firstLastPieces == nil,"Piece preference request lost its captured target or changed both fields")
+            peer.releaseFirst(error:UserFacingError(message:"Could not save preferences"))
+            try await eventually { store.busyTransfers.isEmpty }
+            try expect(store.torrents[0] == first && store.error != nil && store.selection == [other],"Failed preference save changed torrent state or selection")
+            store.setPiecePreferences(ids:[first.id],firstLastPieces:true)
+            try await eventually { peer.pending.count == 1 }
+            peer.releaseFirst()
+            try await eventually { store.busyTransfers.isEmpty }
+            var expected = first; expected.firstLastPieces = true
+            try expect(store.torrents[0] == expected && store.error == nil,"Preference retry changed unrelated torrent fields")
+            try expect(peer.commands("piecePreferences").count == 2,"Duplicate preference command was sent")
+            store.setPiecePreferences(ids:["missing"],sequential:true)
+            store.setPiecePreferences(ids:[first.id])
+            try expect(store.busyTransfers.isEmpty,"Invalid preference request reserved targets")
+        }
+
         try await check("Recheck captures targets, preserves choices, and allows retry after failure") {
             let (store, peer) = library(); peer.hold = ["recheck"]
             let first = store.torrents[0], other = store.torrents[1].id
@@ -976,6 +999,11 @@ import SwiftUI
         case "select":
             if let at = torrents.firstIndex(where: { $0.id == request.id }) {
                 for index in torrents[at].files.indices { torrents[at].files[index].selected = request.selected?.contains(torrents[at].files[index].index) == true }
+            }
+        case "piecePreferences":
+            if let at = torrents.firstIndex(where: { $0.id == request.id }) {
+                if let enabled = request.sequential { torrents[at].sequential = enabled }
+                if let enabled = request.firstLastPieces { torrents[at].firstLastPieces = enabled }
             }
         case "priorities":
             if let at = torrents.firstIndex(where: { $0.id == request.id }), let priorities = request.priorities {

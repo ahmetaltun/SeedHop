@@ -10,7 +10,7 @@ enum SeedHopIdentity {
     #endif
     static let foreground = app + ".engine"
     static let background = app + ".agent"
-    static let protocolVersion = 6
+    static let protocolVersion = 7
     static let agentPlist = background + ".plist"
 }
 
@@ -39,6 +39,8 @@ struct TorrentItem: Codable, Identifiable, Equatable {
     var error: String?
     var queuePosition: UInt32 = 0
     var pausedIntent: Bool? = nil
+    var sequential: Bool? = nil
+    var firstLastPieces: Bool? = nil
     var errorKind: String? = nil
     var errorMessage: EngineMessage? = nil
     var networkDownloadedBytes: UInt64? = nil

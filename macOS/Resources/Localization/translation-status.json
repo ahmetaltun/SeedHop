@@ -631,9 +631,11 @@
     "NativeMenus.xcstrings": {
       "%@ Help": "f545cbf975dfc86ad9153d60429e09ef10f470fedb03103abbb4c644463aeeb0",
       "About %@": "c5f4427799a01a2c0a44a6c7386de90a2ee7cc3b7d67cef139c2ce09894e2ca3",
+      "Arrange in Front": "b46b3745856b5e2a8789b86275233938231442215619ec8fd5c66e1cf6b3330b",
       "AutoFill": "0c391eb8ec7b8bd3ce1f0a2f535d6ac1696c39989a8df47a10766084a8bc732a",
       "Bring All to Front": "b1197a69a5cfc20af9f0f70e8622eec1e135eaec990be39dc90bd12dabee3961",
       "Cancel Dictation": "87ecb6f4a2cb85ea30f3ade20ef8674bbd31ab07cdc5b2981d8f416884576a07",
+      "Center": "15d2bfb059286d6699dc774862a0e5b34bffc27bf1106652b39f88dbcc83c91e",
       "Close": "7607a8c0f1c9104304479dadd5cac45f3a4b20811b16338045125ab409c1b0f4",
       "Close All": "172520e678306fc474de7a8c97481e6d8af10cf8f67e9faad00087ff14c3df91",
       "Contact…": "294228396f22c84482833e4beb14102842aa750be70ac77a1abd278a23d4d8b4",
@@ -647,6 +649,8 @@
       "Exit Full Screen": "3a711616630fd18ab9ad527eef9a6e686fbdb58c0359f65b88e21c48fa96015e",
       "Exit Tab Overview": "0986487825710db29cc6b1fe4d8e22d3adaad93458058ca61039e8066e4aa851",
       "File": "eb20a8ca81ee93e099ee3b5ceceae0594f93234c453d2fe883e12a7d677ddafe",
+      "Fill": "6c5df26408cd6617a4279938646a1e9259c0afa0e595ae2a965252dc0fe38d34",
+      "Full Screen Tile": "8c115bc70f959df33632a06ff9086b05b213d6efcb01f50a7dbf49edef9e273f",
       "Help": "bedb0ee1e3482a829b43a743b2efb37d501d4f377c280e17c3184276175de147",
       "Hide %@": "be5039b6f785004449fe6640cab3a8624ea6dc4477bc6f6fe3f0c92698c7836b",
       "Hide Others": "74471a28d8aaff7bd7840319db062e6d4578754377f757531cd707501bda9d41",
@@ -654,11 +658,14 @@
       "Hide Toolbar": "3534e62ad09ff90858336441c8e60dbc744c06b1576998dec1d793b9bcb7de7c",
       "Merge All Windows": "807d2c7d3826427dd245618bc423310f77d4314a757498ffa6a0d98258b0f5fc",
       "Minimize": "c0057ea28db260592535e3b226f16ff047bf7422f1706b687ef69b5544242bbd",
+      "Minimize All": "f784345038a2b7e4d9ec43af2f6e851ea7f4acbd0f75df6ccd145a0abce176e9",
+      "Move & Resize": "ba8322b14f823dc4691e222b0bfcafcc430dd011525caedd9ba5a8629f3a682a",
       "Move Tab to New Window": "f3ef1f1d98c910893d5c44e155c42473706ab0cd162319f2ef9867abcd8f4591",
       "Passwords…": "bdeeee3f81935a977b50c2674c47ae91a6bdb9830c25ab37fda3e74d26f3e5ad",
       "Paste": "b8b488978b001613e04762fa052ed77c2140a787cccdec7b3d80b5ad6b9ce300",
       "Quit %@": "0fd18c7ef269af23639c9e5e0db2b5a4ad6bc8343e037bef47e3456addb7f25d",
       "Redo": "ef3d69bba1322fe5d44568c48f33688a29dadeb06798c4d4ee94ca0738eecb22",
+      "Remove Window from Set": "17574a45620e8487c70571855501e5b6a52850ec880046e2b3d4e25c36abc8e9",
       "Select All": "a2ff4640e2b4f0b9ab86f1e6b3c5bdc176a7e58b03ed06208e61130d88b99ded",
       "Services": "5208cac2f3c0ac756b82fa27371039c185479ab04d5cf3ae7eb8025b616c975e",
       "Settings…": "5962cbea77d218958e775503073394036a85e8f02870cd96fe2d66f12db16960",
@@ -674,7 +681,8 @@
       "Undo": "f562a89a17aae305d3f37e4e32286b403fa8a308b147c376e303052dc5f0f9af",
       "View": "99d5a305cfa62d64926ef5fa00640351d9ea4087aa41cbd83ff265d5f8884721",
       "Window": "eea28b0d436f2bc8f034639d0e7226c37ed2c9f0aaff452687ef72e9a4e2c4bc",
-      "Zoom": "6cae2e0aec6b4dc85688d57c2a99037d10262c095a8d9f36dec0b079cf704154"
+      "Zoom": "6cae2e0aec6b4dc85688d57c2a99037d10262c095a8d9f36dec0b079cf704154",
+      "Zoom All": "107cfe3d373fdec85809921b6c26c35cba962e1fb2550e8ee880285a4dd96a4e"
     }
   },
   "languages": {
@@ -727,6 +735,6 @@
       "origin": "AI draft"
     }
   },
-  "sourceDigest": "126c8b01546674cc26455f43b41da4fb226b7289d5a8fd9b33fe7cca322aaf7b",
+  "sourceDigest": "ce7991e8ac9028af20269ad91ae1810fbb36f055654525d925063db7eb81812f",
   "sourceLanguage": "en"
 }

@@ -118,8 +118,7 @@ pub(crate) struct ManagedTorrentOptions {
     pub file_names: RwLock<HashMap<usize, PathBuf>>,
     pub selected_files: RwLock<Option<Vec<usize>>>,
     pub file_priorities: RwLock<Vec<u8>>,
-    pub sequential: bool,
-    pub first_last_pieces: bool,
+    pub piece_preferences: RwLock<(bool, bool)>,
     pub ratelimits: LimitsConfig,
     pub initial_peers: Vec<SocketAddr>,
     pub peer_limit: Option<usize>,
@@ -267,6 +266,11 @@ impl ManagedTorrent {
     pub fn file_priorities(&self) -> Vec<u8> {
         self.shared.options.file_priorities.read().clone()
     }
+    /// Sequential and first/last-piece preferences, read as one consistent pair.
+    pub fn piece_preferences(&self) -> (bool, bool) {
+        *self.shared.options.piece_preferences.read()
+    }
+
     pub fn is_queued(&self) -> bool {
         self.locked.read().queued
     }

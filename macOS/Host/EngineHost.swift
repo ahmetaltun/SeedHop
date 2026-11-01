@@ -88,7 +88,7 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             catch let BridgeError.Operation(message, notice) { response = EngineReply(error:message,errorMessage:Self.message(notice)) }
             catch let failure as HostFailure { response = EngineReply(errorMessage:EngineMessage(code:failure.code)) }
             catch { response = EngineReply(errorMessage:EngineMessage(code:"engine.failed",diagnostic:error.localizedDescription)) }
-            reply((try? JSONEncoder().encode(response)) ?? Data("{\"version\":6,\"errorMessage\":{\"code\":\"engine.failed\",\"arguments\":[],\"diagnostic\":\"Could not encode engine response.\"}}".utf8))
+            reply((try? JSONEncoder().encode(response)) ?? Data("{\"version\":7,\"errorMessage\":{\"code\":\"engine.failed\",\"arguments\":[],\"diagnostic\":\"Could not encode engine response.\"}}".utf8))
         }
     }
     private func handle(_ r: EngineRequest) throws -> EngineReply {
@@ -130,6 +130,7 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         case "select": try core.selectFiles(id:r.id ?? "", indices:r.selected ?? [])
         case "recheck": try core.forceRecheck(id:r.id ?? "")
         case "retry": try core.retryTransfer(id:r.id ?? "")
+        case "piecePreferences": try core.setPiecePreferences(id:r.id ?? "", sequential:r.sequential, firstLastPieces:r.firstLastPieces)
         case "priorities": try core.setFilePriorities(id:r.id ?? "", priorities:Data(r.priorities ?? []))
         case "queue": try core.setQueue(maxActive:r.maxActiveDownloads ?? 0)
         case "queueMove": try core.moveInQueue(id:r.id ?? "", position:r.queuePosition ?? 1)

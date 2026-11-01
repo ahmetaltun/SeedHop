@@ -1,0 +1,94 @@
+{
+  "date": "2026-11-01",
+  "feature": "Runtime per-torrent sequential and first/last-piece context-menu controls",
+  "protocol_version": 7,
+  "behavior": {
+    "independent_preferences": true,
+    "multi_selection": "Mixed enables all selected torrents; checked disables all selected torrents.",
+    "lifecycle": "Changing preferences does not pause, resume, recheck, reconnect, or re-add a torrent.",
+    "application": "New piece acquisitions read one consistent pair; existing in-flight requests retain ownership.",
+    "persistence": "Existing session metadata; prior runtime values restored on a failed save.",
+    "legacy_defaults": [
+      false,
+      false
+    ]
+  },
+  "completed_checks": [
+    {
+      "command": "cargo test --locked --workspace -- --test-threads=1; cargo test --locked -p seedhop-ffi -- --test-threads=1; cargo test --locked --workspace --doc",
+      "result": "153 passed, 5 existing opt-in tests ignored; documentation tests passed",
+      "coverage": "Final serial run passed all 149 core tests, including all 76 protocol tests. An outdated protocol-v6 assertion then stopped the FFI suite; after updating that assertion to v7, all 4 FFI tests and both workspace doctest targets passed."
+    },
+    {
+      "command": "cargo test --locked -p seedhop-core --test add_options",
+      "result": "6 passed",
+      "coverage": "All four combinations; independent and concurrent updates; pause/queue/seeding intent; failed persistence and retry; removal; restart; legacy fields; live next-piece ordering and exact payload on the same peer connection."
+    },
+    {
+      "command": ".build/SeedHop.app/Contents/MacOS/SeedHop --verify-ux",
+      "result": "50 passed",
+      "coverage": "Includes captured targets, duplicate suppression, save failure, unchanged state, and successful preference retry."
+    },
+    {
+      "command": ".build/SeedHop.app/Contents/MacOS/SeedHop --verify-interface --transfer-controls-only",
+      "result": "passed",
+      "coverage": "Native checkmarks, mixed selection enable/disable, per-field requests, captured row identity, all lifecycle states, busy/disconnected guards, existing activation/sorting/column persistence checks."
+    },
+    {
+      "command": ".build/SeedHop.app/Contents/MacOS/SeedHop --verify-engine .build/localization-fixture",
+      "result": "passed",
+      "coverage": "Packaged protocol-v7 XPC; runtime preference combinations; persistence failure rollback; file operations, retry, and restart preserve choices."
+    },
+    {
+      "command": "python3 scripts/build.py --skip-rust --identity -",
+      "result": "passed",
+      "coverage": "Native app and both hosts compiled; 670 localization entries across 13 languages validated; strict code-signature verification passed. Rust and UniFFI bindings were built and regenerated beforehand."
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --locked -- -D warnings",
+      "result": "passed"
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    },
+    {
+      "command": "git apply --reverse --check vendor/patches/0030-seedhop-runtime-piece-preferences.patch",
+      "result": "passed"
+    },
+    {
+      "command": "graphify update .",
+      "result": "passed; AST-only update, no LLM calls",
+      "coverage": "Repository code graph regenerated after implementation."
+    }
+  ],
+  "observed_validation_failures": [
+    {
+      "check": "Initial sandboxed tests and build",
+      "result": "Loopback listeners could not start; iconutil reported Invalid Iconset. Required checks passed outside the sandbox."
+    },
+    {
+      "check": "Initial serial workspace run during native builds",
+      "result": "75/76 protocol tests passed; cancelling_v2_and_hybrid_moves_cleans_completed_and_partial_unselected_copies hit the existing five-second initial-verification deadline. Unchanged fixture passed alone in 21.50 seconds."
+    },
+    {
+      "check": "Full --verify-interface, direct and Launch Services launches",
+      "result": "Blocked at Native fixture did not become active and key. Focused native transfer controls passed without this global activation prerequisite; the original full gate remains intact."
+    },
+    {
+      "check": "Final workspace FFI gate",
+      "result": "One FFI test still asserted protocol v6. Its explicit expectation was updated to v7; all 4 FFI tests then passed. Core regressions were already green."
+    }
+  ],
+  "limitations": [
+    "Five existing opt-in environment/performance tests were not run.",
+    "Full interface window-activation acceptance could not complete in this host session.",
+    "Physical input delivery and VoiceOver speech remain manual checks.",
+    "Controlled peer tests do not guarantee public-swarm performance.",
+    "Development app is ad-hoc signed; distribution signing and notarization were not part of this change."
+  ]
+}

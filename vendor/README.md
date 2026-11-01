@@ -28,3 +28,8 @@ unopened. Shared-piece boundary bytes live in per-torrent hidden part storage.
 Selecting a file later links its sparse part data into place without replacing an
 existing file. Removal deletes the owned part rather than an unrelated unchecked
 file at the payload path.
+
+Patch `0030-seedhop-runtime-piece-preferences.patch` makes the existing per-torrent
+sequential and first/last-piece preferences mutable without restarting peers or
+changing transfer intent. It reads both flags consistently for new piece
+acquisitions and restores prior preferences if session persistence fails.

@@ -81,6 +81,25 @@ import Foundation
         var recheck = EngineRequest(command:"recheck"); recheck.id = id
         _ = try await client.send(recheck)
         try await waitForPaused(client, id:id)
+        for (sequential,boundary) in [(false,false),(true,false),(false,true),(true,true)] {
+            var preference = EngineRequest(command:"piecePreferences"); preference.id = id
+            preference.sequential = sequential
+            _ = try await client.send(preference)
+            preference.sequential = nil; preference.firstLastPieces = boundary
+            _ = try await client.send(preference)
+            guard let item = try await client.send(EngineRequest(command:"snapshot")).snapshot?.torrents.first,
+                  item.sequential == sequential, item.firstLastPieces == boundary,
+                  item.state == "paused", item.isPaused else { throw UserFacingError(message:"Runtime preferences changed pause intent or lost a value") }
+        }
+        let pendingPreferences = scratch.appendingPathComponent("state/session/session.json.tmp")
+        try FileManager.default.createDirectory(at:pendingPreferences,withIntermediateDirectories:false)
+        var failedPreference = EngineRequest(command:"piecePreferences"); failedPreference.id = id; failedPreference.sequential = false
+        do { _ = try await client.send(failedPreference); throw UserFacingError(message:"Preference save unexpectedly succeeded") }
+        catch let failure as UserFacingError where failure.message == "Preference save unexpectedly succeeded" { throw failure }
+        catch { /* The failed save must leave both saved preferences enabled. */ }
+        try FileManager.default.removeItem(at:pendingPreferences)
+        guard let afterFailedPreference = try await client.send(EngineRequest(command:"snapshot")).snapshot?.torrents.first,
+              afterFailedPreference.sequential == true, afterFailedPreference.firstLastPieces == true else { throw UserFacingError(message:"Preference save failure did not roll back") }
         var priorities = EngineRequest(command:"priorities"); priorities.id = id; priorities.priorities = [2]
         _ = try await client.send(priorities)
         let beforeRetry = try await client.send(EngineRequest(command:"snapshot")).snapshot?.torrents.first
@@ -149,7 +168,7 @@ import Foundation
         try await waitForPaused(client,id:id)
         try verifyImportOptions()
         guard let item = try await client.send(EngineRequest(command:"snapshot")).snapshot?.torrents.first,
-              item.id == id, item.files[0].priority == 2, item.files[0].name == "renamed-fixture.bin", item.destination == moved.path,
+              item.id == id, item.sequential == true, item.firstLastPieces == true, item.files[0].priority == 2, item.files[0].name == "renamed-fixture.bin", item.destination == moved.path,
               restored.maxActiveDownloads == 1, restored.peerEncryption == .require, restored.savedPeerEncryption == .require else { throw UserFacingError(message:"Restoration lost file management settings") }
         alternative.alternativeLimitsEnabled = false
         _ = try await client.send(alternative)

@@ -142,6 +142,7 @@ impl JsonSessionPersistenceStore {
             bail!("storages other than FilesystemStorageFactory are not supported");
         }
 
+        let (sequential, first_last_pieces) = torrent.piece_preferences();
         let st = SerializedTorrent {
             trackers: torrent
                 .shared()
@@ -172,8 +173,8 @@ impl JsonSessionPersistenceStore {
                     .unwrap_or(false),
             ),
             file_priorities: torrent.file_priorities(),
-            sequential: torrent.shared().options.sequential,
-            first_last_pieces: torrent.shared().options.first_last_pieces,
+            sequential,
+            first_last_pieces,
             output_folder: torrent.output_folder(),
         };
 

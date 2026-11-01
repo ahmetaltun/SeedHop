@@ -76,3 +76,41 @@ all 76 serial protocol tests; its production code was not changed.
 Native pointer/key delivery and VoiceOver speech remain manual acceptance checks.
 Public-swarm throughput and availability are not guaranteed by these controlled
 regressions.
+
+## Runtime context-menu controls (2026-11-01)
+
+The transfer context menu exposes independent checkmarked actions for Download in
+sequential order and Download first and last pieces first. Both can change while
+a torrent is downloading, waiting, paused, queued, checking, seeding, or in an
+error state. Existing connection and operation guards still apply. With multiple
+selected torrents, a mixed checkmark means values differ; clicking it enables
+that preference for every selected torrent. Clicking an entirely checked
+selection disables it. Each command changes only its explicit preference field.
+
+The engine stores both preferences under one lock and reads a consistent pair for
+each new piece acquisition. Updates do not quiesce transfers, reconnect peers,
+clear reservations, change pause intent, or restart verification. In-flight
+requests retain their ownership. Existing file priority, streaming priority,
+availability, and verification rules remain authoritative.
+
+Protocol v7 carries the `piecePreferences` command with a torrent ID and at least
+one explicit Boolean (`sequential` or `firstLastPieces`). Snapshots include both
+values. Core mutation serialization prevents concurrent field updates from
+clobbering each other. The existing session metadata stores the values; failed
+persistence restores the prior runtime pair and reports an error. Existing saved
+fields and import defaults remain compatible. No new settings store is added.
+
+Regression coverage includes all four combinations, active/paused/queued/seeding
+intent preservation, concurrent updates, failed persistence and retry, removal,
+restart, a controlled peer transfer with live piece-order assertions and exact payload
+verification, legacy saved-session defaults, native
+checkmarks and mixed selection, captured targets, and presentation error recovery.
+The packaged XPC check also covers runtime changes, persistence failure, and
+preservation through file operations and restart. Native pointer delivery and
+VoiceOver speech remain manual acceptance checks.
+
+Runtime validation evidence is recorded in
+[results/runtime-piece-preferences-2026-11-01.json](results/runtime-piece-preferences-2026-11-01.json).
+The full native interface gate could not activate its fixture window in this host
+session. Its focused `--verify-interface --transfer-controls-only` gate passed;
+this does not replace manual input and accessibility acceptance.

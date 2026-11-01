@@ -501,6 +501,16 @@ impl EngineBridge {
         let (core, rt) = self.handles()?;
         rt.block_on(core.retry_transfer(id)).map_err(error)
     }
+    pub fn set_piece_preferences(
+        &self,
+        id: String,
+        sequential: Option<bool>,
+        first_last_pieces: Option<bool>,
+    ) -> Result<(), BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.set_piece_preferences(id, sequential, first_last_pieces))
+            .map_err(error)
+    }
     pub fn set_file_priorities(&self, id: String, priorities: Vec<u8>) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;
         rt.block_on(core.set_file_priorities(id, priorities))
@@ -681,7 +691,7 @@ mod tests {
                 assert!(snapshot.listen_port > 0);
                 assert!(snapshot.torrents.is_empty());
                 let json: serde_json::Value = serde_json::from_str(&bridge.snapshot_json().unwrap()).unwrap();
-                assert_eq!(json["protocolVersion"], 6);
+                assert_eq!(json["protocolVersion"], 7);
                 assert!(json.get("statisticsMessage").unwrap().is_null());
                 assert!(json.get("schedulingMessage").unwrap().is_null());
                 let invalid = match bridge.inspect("localization".into(),Some("not a magnet".into()),vec![]) { Err(error) => error, Ok(_) => panic!("invalid magnet accepted") };

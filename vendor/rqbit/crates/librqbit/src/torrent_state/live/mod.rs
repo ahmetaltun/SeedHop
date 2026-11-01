@@ -1669,6 +1669,13 @@ impl PeerHandler {
                     ..
                 } = &mut **g;
                 let pieces = pieces.as_mut().ok_or(Error::ChunkTrackerEmpty)?;
+                let (sequential, first_last_pieces) = self
+                    .state
+                    .shared
+                    .options
+                    .piece_preferences
+                    .read()
+                    .to_owned();
                 let result = pieces.acquire_piece(AcquireRequest {
                     peer: self.addr,
                     peer_avg_time: self.counters.average_piece_download_time(),
@@ -1676,8 +1683,8 @@ impl PeerHandler {
                     file_priorities,
                     file_infos: &self.state.metadata.file_infos,
                     selection: PieceSelection {
-                        sequential: self.state.shared.options.sequential,
-                        first_last_pieces: self.state.shared.options.first_last_pieces,
+                        sequential,
+                        first_last_pieces,
                         availability: &self.state.peers.piece_availability.read(),
                         file_priority_levels: &self.state.shared.options.file_priorities.read(),
                     },

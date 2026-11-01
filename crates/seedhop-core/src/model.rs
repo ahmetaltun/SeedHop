@@ -80,6 +80,10 @@ pub struct TorrentRecord {
     pub error_kind: Option<String>,
     pub queue_position: u32,
     pub paused_intent: bool,
+    #[serde(default)]
+    pub sequential: bool,
+    #[serde(default)]
+    pub first_last_pieces: bool,
     pub network_downloaded_bytes: Option<u64>,
     pub network_uploaded_bytes: Option<u64>,
     pub added_at: Option<u64>,

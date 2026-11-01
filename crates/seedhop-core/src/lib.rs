@@ -25,7 +25,7 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-pub const PROTOCOL_VERSION: u32 = 6;
+pub const PROTOCOL_VERSION: u32 = 7;
 
 /// Owns library state. The FFI host retains this lease until its runtime has stopped.
 pub struct Engine {

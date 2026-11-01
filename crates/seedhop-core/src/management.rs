@@ -104,6 +104,24 @@ impl Engine {
         Ok(operation.is_some_and(|operation| operation.cancel(&operation_id)))
     }
 
+    pub async fn set_piece_preferences(
+        &self,
+        id: String,
+        sequential: Option<bool>,
+        first_last_pieces: Option<bool>,
+    ) -> Result<()> {
+        let _operation = self.operations.write().await;
+        self.ready()?;
+        if sequential.is_none() && first_last_pieces.is_none() {
+            return Err(CoreError::InvalidInput("Missing piece preference".into()));
+        }
+        let handle = self.handle(&id)?;
+        self.session
+            .update_piece_preferences(&handle, sequential, first_last_pieces)
+            .await
+            .map_err(adapter::engine_error)
+    }
+
     pub async fn set_file_priorities(&self, id: String, priorities: Vec<u8>) -> Result<()> {
         let _operation = self.operations.write().await;
         self.ready()?;

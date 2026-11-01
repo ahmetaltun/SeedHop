@@ -552,6 +552,23 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         var r = EngineRequest(command:"limits"); r.downloadLimit = download; r.uploadLimit = upload
         _ = try await perform(r); await refresh()
     }
+    func setPiecePreferences(ids: Set<String>, sequential: Bool? = nil, firstLastPieces: Bool? = nil) {
+        guard canChangeTransfers, !ids.isEmpty, sequential != nil || firstLastPieces != nil,
+              ids.isSubset(of:Set(torrents.map(\.id))), busyTransfers.isDisjoint(with:ids) else { return }
+        busyTransfers.formUnion(ids); error = nil
+        Task {
+            defer { busyTransfers.subtract(ids) }
+            var failures: [String] = []
+            for id in ids.sorted() {
+                var request = EngineRequest(command:"piecePreferences"); request.id = id
+                request.sequential = sequential; request.firstLastPieces = firstLastPieces
+                do { _ = try await perform(request) }
+                catch { failures.append(error.localizedDescription) }
+            }
+            self.error = failures.isEmpty ? nil : failures.joined(separator:"\n")
+            await refresh()
+        }
+    }
     func updateTransfer(_ request: EngineRequest) {
         guard let id = request.id, canChangeTransfers, !busyTransfers.contains(id), torrents.contains(where: { $0.id == id }) else { return }
         busyTransfers.insert(id); error = nil

@@ -108,6 +108,7 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
         }
         _ => None,
     });
+    let (sequential, first_last_pieces) = torrent.piece_preferences();
     TorrentRecord {
         id: torrent_id(torrent),
         name: torrent
@@ -132,6 +133,8 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
         error_kind,
         queue_position: 0,
         paused_intent: torrent.is_paused(),
+        sequential,
+        first_last_pieces,
         network_downloaded_bytes: None,
         network_uploaded_bytes: None,
         added_at: None,

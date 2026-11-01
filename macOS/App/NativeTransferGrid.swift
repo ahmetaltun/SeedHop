@@ -248,6 +248,18 @@ struct NativeTransferGrid: NSViewRepresentable {
             add(String(localized:"Force Recheck",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"recheck",allowed && !items.contains { $0.state == "checking" || parent.store.hasPendingCleanup($0.id) })
             add(parent.store.resumeLabel(for:items),"resume",allowed && items.contains { parent.store.canResumeOrRetry($0) })
             add(String(localized:"Pause",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"pause",allowed && items.contains { !$0.isPaused })
+            menu.addItem(.separator())
+            func preference(_ title: String, _ action: String, _ values: [Bool]) {
+                add(title,action,allowed)
+                guard let item = menu.items.last else { return }
+                let allEnabled = !values.isEmpty && values.allSatisfy { $0 }
+                item.state = allEnabled ? .on : (values.contains(true) ? .mixed : .off)
+                var value = item.representedObject as! [String:Any]
+                value["enabled"] = !allEnabled
+                item.representedObject = value
+            }
+            preference(String(localized:"Download in sequential order",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"sequential",items.map { $0.sequential ?? false })
+            preference(String(localized:"Download first and last pieces first",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"firstLastPieces",items.map { $0.firstLastPieces ?? false })
             menu.addItem(.separator()); add(String(localized:"Show in Finder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"finder",!ids.isEmpty)
             add(String(localized:"Remove…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"remove",allowed && !ids.contains(where:parent.store.hasPendingCleanup))
             return menu
@@ -261,6 +273,9 @@ struct NativeTransferGrid: NSViewRepresentable {
             guard canAct(targets) else { return }
             parent.store.selection = targets
             switch action {
+            case "sequential", "firstLastPieces":
+                guard let enabled = value["enabled"] as? Bool else { return }
+                parent.store.setPiecePreferences(ids:targets,sequential:action == "sequential" ? enabled : nil,firstLastPieces:action == "firstLastPieces" ? enabled : nil)
             case "queue": parent.store.moveSelectedToFront()
             case "move": parent.store.chooseRelocation()
             case "recheck": parent.store.recheckSelected()

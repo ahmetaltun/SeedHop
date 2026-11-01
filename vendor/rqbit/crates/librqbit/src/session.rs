@@ -1599,8 +1599,7 @@ impl Session {
                     file_names: RwLock::new(opts.file_names.clone()),
                     selected_files: RwLock::new(only_files.clone()),
                     file_priorities: RwLock::new(opts.file_priorities.clone()),
-                    sequential: opts.sequential,
-                    first_last_pieces: opts.first_last_pieces,
+                    piece_preferences: RwLock::new((opts.sequential, opts.first_last_pieces)),
                     ratelimits: opts.ratelimits,
                     initial_peers: opts.initial_peers.clone().unwrap_or_default(),
                     peer_limit: opts.peer_limit.or(self.peer_limit),
@@ -1980,6 +1979,30 @@ impl Session {
         }
         if !queued && !handle.is_paused() {
             handle.start(self.make_peer_rx_managed_torrent(handle, true), false)?;
+        }
+        Ok(())
+    }
+
+    /// Change picker preferences without interrupting transfers or changing pause intent.
+    /// Callers serialize mutations, including persistence rollback.
+    pub async fn update_piece_preferences(
+        &self,
+        handle: &ManagedTorrentHandle,
+        sequential: Option<bool>,
+        first_last_pieces: Option<bool>,
+    ) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            sequential.is_some() || first_last_pieces.is_some(),
+            "Missing piece preference"
+        );
+        let old = handle.piece_preferences();
+        *handle.shared.options.piece_preferences.write() = (
+            sequential.unwrap_or(old.0),
+            first_last_pieces.unwrap_or(old.1),
+        );
+        if let Err(error) = self.try_update_persistence_metadata(handle).await {
+            *handle.shared.options.piece_preferences.write() = old;
+            return Err(error);
         }
         Ok(())
     }

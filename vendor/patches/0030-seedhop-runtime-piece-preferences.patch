@@ -1,0 +1,123 @@
+diff --git a/vendor/rqbit/crates/librqbit/src/session.rs b/vendor/rqbit/crates/librqbit/src/session.rs
+index e74d33b..8299042 100644
+--- a/vendor/rqbit/crates/librqbit/src/session.rs
++++ b/vendor/rqbit/crates/librqbit/src/session.rs
+@@ -1599,8 +1599,7 @@ impl Session {
+                     file_names: RwLock::new(opts.file_names.clone()),
+                     selected_files: RwLock::new(only_files.clone()),
+                     file_priorities: RwLock::new(opts.file_priorities.clone()),
+-                    sequential: opts.sequential,
+-                    first_last_pieces: opts.first_last_pieces,
++                    piece_preferences: RwLock::new((opts.sequential, opts.first_last_pieces)),
+                     ratelimits: opts.ratelimits,
+                     initial_peers: opts.initial_peers.clone().unwrap_or_default(),
+                     peer_limit: opts.peer_limit.or(self.peer_limit),
+@@ -1984,6 +1983,30 @@ impl Session {
+         Ok(())
+     }
+ 
++    /// Change picker preferences without interrupting transfers or changing pause intent.
++    /// Callers serialize mutations, including persistence rollback.
++    pub async fn update_piece_preferences(
++        &self,
++        handle: &ManagedTorrentHandle,
++        sequential: Option<bool>,
++        first_last_pieces: Option<bool>,
++    ) -> anyhow::Result<()> {
++        anyhow::ensure!(
++            sequential.is_some() || first_last_pieces.is_some(),
++            "Missing piece preference"
++        );
++        let old = handle.piece_preferences();
++        *handle.shared.options.piece_preferences.write() = (
++            sequential.unwrap_or(old.0),
++            first_last_pieces.unwrap_or(old.1),
++        );
++        if let Err(error) = self.try_update_persistence_metadata(handle).await {
++            *handle.shared.options.piece_preferences.write() = old;
++            return Err(error);
++        }
++        Ok(())
++    }
++
+     pub async fn update_file_priorities(
+         self: &Arc<Self>,
+         handle: &ManagedTorrentHandle,
+diff --git a/vendor/rqbit/crates/librqbit/src/session_persistence/json.rs b/vendor/rqbit/crates/librqbit/src/session_persistence/json.rs
+index 73b8778..8a6a827 100644
+--- a/vendor/rqbit/crates/librqbit/src/session_persistence/json.rs
++++ b/vendor/rqbit/crates/librqbit/src/session_persistence/json.rs
+@@ -142,6 +142,7 @@ impl JsonSessionPersistenceStore {
+             bail!("storages other than FilesystemStorageFactory are not supported");
+         }
+ 
++        let (sequential, first_last_pieces) = torrent.piece_preferences();
+         let st = SerializedTorrent {
+             trackers: torrent
+                 .shared()
+@@ -172,8 +173,8 @@ impl JsonSessionPersistenceStore {
+                     .unwrap_or(false),
+             ),
+             file_priorities: torrent.file_priorities(),
+-            sequential: torrent.shared().options.sequential,
+-            first_last_pieces: torrent.shared().options.first_last_pieces,
++            sequential,
++            first_last_pieces,
+             output_folder: torrent.output_folder(),
+         };
+ 
+diff --git a/vendor/rqbit/crates/librqbit/src/torrent_state/live/mod.rs b/vendor/rqbit/crates/librqbit/src/torrent_state/live/mod.rs
+index f3f049a..df3715f 100644
+--- a/vendor/rqbit/crates/librqbit/src/torrent_state/live/mod.rs
++++ b/vendor/rqbit/crates/librqbit/src/torrent_state/live/mod.rs
+@@ -1669,6 +1669,13 @@ impl PeerHandler {
+                     ..
+                 } = &mut **g;
+                 let pieces = pieces.as_mut().ok_or(Error::ChunkTrackerEmpty)?;
++                let (sequential, first_last_pieces) = self
++                    .state
++                    .shared
++                    .options
++                    .piece_preferences
++                    .read()
++                    .to_owned();
+                 let result = pieces.acquire_piece(AcquireRequest {
+                     peer: self.addr,
+                     peer_avg_time: self.counters.average_piece_download_time(),
+@@ -1676,8 +1683,8 @@ impl PeerHandler {
+                     file_priorities,
+                     file_infos: &self.state.metadata.file_infos,
+                     selection: PieceSelection {
+-                        sequential: self.state.shared.options.sequential,
+-                        first_last_pieces: self.state.shared.options.first_last_pieces,
++                        sequential,
++                        first_last_pieces,
+                         availability: &self.state.peers.piece_availability.read(),
+                         file_priority_levels: &self.state.shared.options.file_priorities.read(),
+                     },
+diff --git a/vendor/rqbit/crates/librqbit/src/torrent_state/mod.rs b/vendor/rqbit/crates/librqbit/src/torrent_state/mod.rs
+index 4fe3a66..380b192 100644
+--- a/vendor/rqbit/crates/librqbit/src/torrent_state/mod.rs
++++ b/vendor/rqbit/crates/librqbit/src/torrent_state/mod.rs
+@@ -118,8 +118,7 @@ pub(crate) struct ManagedTorrentOptions {
+     pub file_names: RwLock<HashMap<usize, PathBuf>>,
+     pub selected_files: RwLock<Option<Vec<usize>>>,
+     pub file_priorities: RwLock<Vec<u8>>,
+-    pub sequential: bool,
+-    pub first_last_pieces: bool,
++    pub piece_preferences: RwLock<(bool, bool)>,
+     pub ratelimits: LimitsConfig,
+     pub initial_peers: Vec<SocketAddr>,
+     pub peer_limit: Option<usize>,
+@@ -267,6 +266,11 @@ impl ManagedTorrent {
+     pub fn file_priorities(&self) -> Vec<u8> {
+         self.shared.options.file_priorities.read().clone()
+     }
++    /// Sequential and first/last-piece preferences, read as one consistent pair.
++    pub fn piece_preferences(&self) -> (bool, bool) {
++        *self.shared.options.piece_preferences.read()
++    }
++
+     pub fn is_queued(&self) -> bool {
+         self.locked.read().queued
+     }
