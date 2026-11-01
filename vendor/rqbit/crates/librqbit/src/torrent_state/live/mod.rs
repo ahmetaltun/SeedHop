@@ -841,6 +841,7 @@ impl TorrentStateLive {
     }
 
     pub(crate) fn update_only_files(&self, only_files: &HashSet<usize>) -> anyhow::Result<()> {
+        self.files.prepare_selection(only_files)?;
         let mut g = self.lock_write("update_only_files");
         let pt = g.get_pieces_mut()?;
         let hns = pt.update_only_files(&self.metadata.file_infos, only_files)?;

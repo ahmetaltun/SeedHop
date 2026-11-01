@@ -116,6 +116,7 @@ pub(crate) struct ManagedTorrentOptions {
     pub allow_overwrite: AtomicBool,
     pub output_folder: RwLock<PathBuf>,
     pub file_names: RwLock<HashMap<usize, PathBuf>>,
+    pub selected_files: RwLock<Option<Vec<usize>>>,
     pub file_priorities: RwLock<Vec<u8>>,
     pub sequential: bool,
     pub first_last_pieces: bool,
@@ -772,6 +773,7 @@ impl ManagedTorrent {
         };
 
         g.only_files = Some(only_files.iter().copied().collect());
+        *self.shared.options.selected_files.write() = g.only_files.clone();
         Ok(())
     }
 }

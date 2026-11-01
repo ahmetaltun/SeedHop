@@ -118,6 +118,11 @@ impl<U: StorageFactory + ?Sized> StorageFactory for Box<U> {
 }
 
 pub trait TorrentStorage: Send + Sync {
+    /// Materialize newly selected files before scheduling their pieces.
+    fn prepare_selection(&self, _indices: &std::collections::HashSet<usize>) -> anyhow::Result<()> {
+        Ok(())
+    }
+
     // Create/open files etc.
     fn init(
         &mut self,
@@ -171,6 +176,9 @@ pub trait TorrentStorage: Send + Sync {
 }
 
 impl<U: TorrentStorage + ?Sized> TorrentStorage for Box<U> {
+    fn prepare_selection(&self, indices: &std::collections::HashSet<usize>) -> anyhow::Result<()> {
+        (**self).prepare_selection(indices)
+    }
     fn pread_exact(&self, file_id: usize, offset: u64, buf: &mut [u8]) -> anyhow::Result<()> {
         (**self).pread_exact(file_id, offset, buf)
     }

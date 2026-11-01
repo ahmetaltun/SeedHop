@@ -26,6 +26,15 @@ import Combine
         destination = UserDefaults.standard.string(forKey:"downloadDirectory") ?? FileManager.default.urls(for:.downloadsDirectory,in:.userDomainMask)[0].path
     }
 
+    var downloadPath: String {
+        guard let preview else { return destination }
+        let title = String(preview.name.unicodeScalars.map { scalar -> Character in
+            scalar == "/" || scalar == ":" || CharacterSet.controlCharacters.contains(scalar) ? "_" : Character(scalar)
+        }).trimmingCharacters(in:.whitespacesAndNewlines)
+        let folder = title.isEmpty || title == "." || title == ".." ? preview.id : title
+        return URL(fileURLWithPath:destination).appendingPathComponent(folder,isDirectory:true).path
+    }
+
     /// Native file-table keyboard actions affect captured rows, never another selection.
     func toggleFiles(_ indices: Set<UInt32>) {
         guard !adding, !resolving, let preview else { return }

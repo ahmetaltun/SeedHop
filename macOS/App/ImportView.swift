@@ -55,7 +55,7 @@ struct ImportView: View {
                         SectionEyebrow(title:String(localized:"Save to",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                         HStack(spacing:10) {
                             Image(systemName:"folder").foregroundStyle(Design.green)
-                            Text(session.destination.replacingOccurrences(of:NSHomeDirectory(),with:"~")).font(.system(size:11)).lineLimit(1).truncationMode(.middle)
+                            Text(session.downloadPath.replacingOccurrences(of:NSHomeDirectory(),with:"~")).font(.system(size:11)).lineLimit(1).truncationMode(.middle).help(session.downloadPath)
                             Spacer()
                             Button(String(localized:"Choose…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),action:chooseFolder).controlSize(.small).focused($focus,equals:.destination).accessibilityLabel(String(localized:"Choose download folder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                         }.padding(12).background(Design.card,in:RoundedRectangle(cornerRadius:8)).overlay(RoundedRectangle(cornerRadius:8).stroke(Design.line))

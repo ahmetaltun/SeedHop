@@ -30,6 +30,7 @@ impl StorageFactory for FilesystemStorageFactory {
         Ok(FilesystemStorage {
             output_folder: shared.options.output_folder.read().clone(),
             opened_files: Default::default(),
+            targets: Default::default(),
         })
     }
 
@@ -41,6 +42,7 @@ impl StorageFactory for FilesystemStorageFactory {
 pub struct FilesystemStorage {
     pub(crate) output_folder: PathBuf,
     pub(crate) opened_files: Vec<OpenedFile>,
+    targets: Vec<PathBuf>,
 }
 
 impl FilesystemStorage {
@@ -53,11 +55,32 @@ impl FilesystemStorage {
                 .map(|f| f.take_clone())
                 .collect::<anyhow::Result<Vec<_>>>()?,
             output_folder: self.output_folder.clone(),
+            targets: self.targets.clone(),
         })
     }
 }
 
 impl TorrentStorage for FilesystemStorage {
+    fn prepare_selection(&self, indices: &std::collections::HashSet<usize>) -> anyhow::Result<()> {
+        for &index in indices {
+            let target = self.targets.get(index).context("no such file")?;
+            self.opened_files[index].materialize(self.output_folder.join(target), |source| {
+                let source = source.strip_prefix(&self.output_folder)?;
+                #[cfg(unix)]
+                secure_promote(&self.output_folder, source, target)?;
+                #[cfg(not(unix))]
+                {
+                    let target = self.output_folder.join(target);
+                    std::fs::create_dir_all(target.parent().context("no parent")?)?;
+                    std::fs::hard_link(self.output_folder.join(source), target)?;
+                    std::fs::remove_file(self.output_folder.join(source))?;
+                }
+                Ok(())
+            })?;
+        }
+        Ok(())
+    }
+
     fn pread_exact(&self, file_id: usize, offset: u64, buf: &mut [u8]) -> anyhow::Result<()> {
         self.opened_files
             .get(file_id)
@@ -87,7 +110,16 @@ impl TorrentStorage for FilesystemStorage {
         return of.lock_read()?.pwrite_all_vectored(offset, bufs);
     }
 
-    fn remove_file(&self, _file_id: usize, filename: &Path) -> anyhow::Result<()> {
+    fn remove_file(&self, file_id: usize, _filename: &Path) -> anyhow::Result<()> {
+        let path = self
+            .opened_files
+            .get(file_id)
+            .context("no such file")?
+            .path();
+        if path.as_os_str().is_empty() {
+            return Ok(());
+        }
+        let filename = path.strip_prefix(&self.output_folder)?;
         #[cfg(unix)]
         return secure_remove(&self.output_folder, filename);
         #[cfg(not(unix))]
@@ -109,6 +141,7 @@ impl TorrentStorage for FilesystemStorage {
                 .map(|f| f.take_clone())
                 .collect::<anyhow::Result<Vec<_>>>()?,
             output_folder: self.output_folder.clone(),
+            targets: self.targets.clone(),
         }))
     }
 
@@ -132,9 +165,20 @@ impl TorrentStorage for FilesystemStorage {
     ) -> anyhow::Result<()> {
         let mut files = Vec::<OpenedFile>::new();
         let names = shared.options.file_names.read();
+        let selected = shared.options.selected_files.read();
+        let mut targets = Vec::new();
         for (index, file_details) in metadata.file_infos.iter().enumerate() {
             let mut full_path = self.output_folder.clone();
-            let relative_path = names.get(&index).unwrap_or(&file_details.relative_filename);
+            let target = names.get(&index).unwrap_or(&file_details.relative_filename);
+            targets.push(target.clone());
+            let wanted = selected.as_ref().is_none_or(|files| files.contains(&index));
+            // Adjacent v1 files can share a piece. Keep boundary bytes in private
+            // storage, without creating or opening an unchecked payload filename.
+            let part = PathBuf::from(format!(
+                ".seedhop-parts/{}/{index}",
+                shared.info_hash.as_string()
+            ));
+            let relative_path = if wanted { target } else { &part };
             full_path.push(relative_path);
 
             if file_details.attrs.padding {
@@ -145,18 +189,20 @@ impl TorrentStorage for FilesystemStorage {
             let f = secure_open(
                 &self.output_folder,
                 relative_path,
-                shared
-                    .options
-                    .allow_overwrite
-                    .load(std::sync::atomic::Ordering::Relaxed),
+                !wanted
+                    || shared
+                        .options
+                        .allow_overwrite
+                        .load(std::sync::atomic::Ordering::Relaxed),
             )?;
             #[cfg(not(unix))]
             std::fs::create_dir_all(full_path.parent().context("bug: no parent")?)?;
             #[cfg(not(unix))]
-            let f = if shared
-                .options
-                .allow_overwrite
-                .load(std::sync::atomic::Ordering::Relaxed)
+            let f = if !wanted
+                || shared
+                    .options
+                    .allow_overwrite
+                    .load(std::sync::atomic::Ordering::Relaxed)
             {
                 OpenOptions::new()
                     .create(true)
@@ -183,6 +229,7 @@ impl TorrentStorage for FilesystemStorage {
         }
 
         self.opened_files = files;
+        self.targets = targets;
         Ok(())
     }
 }
@@ -191,6 +238,28 @@ impl TorrentStorage for FilesystemStorage {
 /// preflight and open cannot redirect writes outside the selected directory.
 #[cfg(unix)]
 fn secure_open(root: &Path, relative: &Path, reuse: bool) -> anyhow::Result<std::fs::File> {
+    use nix::libc;
+    use std::os::fd::{AsRawFd, FromRawFd};
+    let (directory, name) = secure_parent(root, relative)?;
+    let flags = libc::O_NOFOLLOW
+        | libc::O_CLOEXEC
+        | libc::O_RDWR
+        | libc::O_CREAT
+        | if reuse { 0 } else { libc::O_EXCL };
+    // SAFETY: the parent descriptor is live and the leaf is a terminated name.
+    let fd = unsafe { libc::openat(directory.as_raw_fd(), name.as_ptr(), flags, 0o644) };
+    if fd < 0 {
+        return Err(std::io::Error::last_os_error())
+            .context("refused unsafe or unavailable torrent path");
+    }
+    Ok(unsafe { std::fs::File::from_raw_fd(fd) })
+}
+
+#[cfg(unix)]
+fn secure_parent(
+    root: &Path,
+    relative: &Path,
+) -> anyhow::Result<(std::fs::File, std::ffi::CString)> {
     use nix::libc;
     use std::{
         ffi::CString,
@@ -211,36 +280,58 @@ fn secure_open(root: &Path, relative: &Path, reuse: bool) -> anyhow::Result<std:
             anyhow::bail!("unsafe torrent path")
         };
         let name = CString::new(name.as_bytes())?;
-        let last = index + 1 == components.len();
-        if !last {
-            // SAFETY: names are terminated C strings; the parent descriptor is live.
-            let created = unsafe { libc::mkdirat(directory.as_raw_fd(), name.as_ptr(), 0o755) };
-            if created != 0
-                && std::io::Error::last_os_error().kind() != std::io::ErrorKind::AlreadyExists
-            {
-                return Err(std::io::Error::last_os_error().into());
-            }
+        if index + 1 == components.len() {
+            return Ok((directory, name));
         }
-        let flags = libc::O_NOFOLLOW
-            | libc::O_CLOEXEC
-            | if last {
-                libc::O_RDWR | libc::O_CREAT | if reuse { 0 } else { libc::O_EXCL }
-            } else {
-                libc::O_RDONLY | libc::O_DIRECTORY
-            };
+        // SAFETY: names are terminated C strings; the parent descriptor is live.
+        let created = unsafe { libc::mkdirat(directory.as_raw_fd(), name.as_ptr(), 0o755) };
+        if created != 0
+            && std::io::Error::last_os_error().kind() != std::io::ErrorKind::AlreadyExists
+        {
+            return Err(std::io::Error::last_os_error().into());
+        }
         // SAFETY: descriptor/name are valid; the returned owned fd is wrapped once.
-        let fd = unsafe { libc::openat(directory.as_raw_fd(), name.as_ptr(), flags, 0o644) };
+        let fd = unsafe {
+            libc::openat(
+                directory.as_raw_fd(),
+                name.as_ptr(),
+                libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            )
+        };
         if fd < 0 {
-            return Err(std::io::Error::last_os_error())
-                .context("refused unsafe or unavailable torrent path");
+            return Err(std::io::Error::last_os_error().into());
         }
-        let file = unsafe { std::fs::File::from_raw_fd(fd) };
-        if last {
-            return Ok(file);
-        }
-        directory = file;
+        directory = unsafe { std::fs::File::from_raw_fd(fd) };
     }
     unreachable!()
+}
+
+#[cfg(unix)]
+fn secure_promote(root: &Path, source: &Path, target: &Path) -> anyhow::Result<()> {
+    use std::os::fd::AsRawFd;
+    let (source_parent, source_name) = secure_parent(root, source)?;
+    let (target_parent, target_name) = secure_parent(root, target)?;
+    // Hard-linking preserves sparse boundary data and refuses an existing target.
+    // SAFETY: both descriptors and terminated names remain live for each call.
+    let result = unsafe {
+        nix::libc::linkat(
+            source_parent.as_raw_fd(),
+            source_name.as_ptr(),
+            target_parent.as_raw_fd(),
+            target_name.as_ptr(),
+            0,
+        )
+    };
+    if result != 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    target_parent.sync_all()?;
+    let result = unsafe { nix::libc::unlinkat(source_parent.as_raw_fd(), source_name.as_ptr(), 0) };
+    if result != 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    source_parent.sync_all()?;
+    Ok(())
 }
 
 #[cfg(unix)]

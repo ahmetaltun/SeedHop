@@ -22,3 +22,9 @@ randomized ties, and tracks connected-peer availability across bitfield, HAVE,
 reject, and disconnect events. File priority and explicit stream priority remain
 authoritative. It also repairs an obsolete unit-test call to the v2-aware metadata
 helper so focused upstream library tests compile.
+
+Patch `0029-seedhop-selected-file-storage.patch` keeps unchecked payload paths
+unopened. Shared-piece boundary bytes live in per-torrent hidden part storage.
+Selecting a file later links its sparse part data into place without replacing an
+existing file. Removal deletes the owned part rather than an unrelated unchecked
+file at the payload path.

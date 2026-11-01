@@ -471,7 +471,7 @@ impl EngineBridge {
         options: TorrentAddOptions,
     ) -> Result<String, BridgeError> {
         let (core, rt) = self.handles()?;
-        rt.block_on(core.add_with_options(
+        rt.block_on(core.import_with_options(
             bytes,
             destination,
             selected,

@@ -17,6 +17,7 @@ pub struct TorrentStatePaused {
 
 impl TorrentStatePaused {
     pub(crate) fn update_only_files(&mut self, only_files: &HashSet<usize>) -> anyhow::Result<()> {
+        self.files.prepare_selection(only_files)?;
         self.chunk_tracker
             .update_only_files(&self.metadata.file_infos, only_files)?;
         Ok(())

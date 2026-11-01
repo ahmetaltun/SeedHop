@@ -4536,7 +4536,11 @@ async fn stream_priority_cannot_reserve_a_piece_during_its_hash_verification() {
         .unwrap()
         .unwrap();
         assert_eq!(actual, data);
-        assert_eq!(std::fs::read(files.path().join("b")).unwrap(), data);
+        // Streaming an unchecked file uses part storage and preserves its payload path.
+        assert_eq!(
+            std::fs::read(files.path().join("b")).unwrap(),
+            vec![0; data.len()]
+        );
         drop(stream);
         drop(source);
         drop(other);

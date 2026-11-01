@@ -105,6 +105,31 @@ pub fn validate_destination(root: &Path, relative_paths: &[String]) -> Result<()
 
 // Descriptor-relative traversal keeps a concurrent symlink replacement from
 // redirecting file-management writes or cleanup outside the chosen folders.
+pub(crate) fn remove_empty_directory(root: &Path, name: &str) -> Result<()> {
+    let result = (|| {
+        let (parent, name) = relative_parent(root, name, false)?;
+        // SAFETY: owned parent descriptor and a validated, terminated component.
+        let result =
+            unsafe { libc::unlinkat(parent.as_raw_fd(), name.as_ptr(), libc::AT_REMOVEDIR) };
+        if result != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        parent.sync_all()
+    })();
+    match result {
+        Ok(()) => Ok(()),
+        Err(error)
+            if matches!(
+                error.kind(),
+                std::io::ErrorKind::NotFound | std::io::ErrorKind::DirectoryNotEmpty
+            ) =>
+        {
+            Ok(())
+        }
+        Err(error) => Err(io_error(error)),
+    }
+}
+
 pub(crate) fn relative_parent(
     root: &Path,
     name: &str,

@@ -70,10 +70,21 @@ impl Swarm {
     }
 
     pub async fn with_metadata(size: usize, make_metadata: impl FnOnce(&[u8]) -> Vec<u8>) -> Self {
+        Self::with_seed_files(size, make_metadata, |path, content| {
+            std::fs::write(path.join("payload.bin"), content).unwrap();
+        })
+        .await
+    }
+
+    pub async fn with_seed_files(
+        size: usize,
+        make_metadata: impl FnOnce(&[u8]) -> Vec<u8>,
+        seed_files: impl FnOnce(&Path, &[u8]),
+    ) -> Self {
         let state = tempfile::tempdir().unwrap();
         let files = tempfile::tempdir().unwrap();
         let content: Vec<u8> = (0..size).map(|i| (i % 251) as u8).collect();
-        std::fs::write(files.path().join("payload.bin"), &content).unwrap();
+        seed_files(files.path(), &content);
         let seed = Engine::open(config(state.path(), files.path()))
             .await
             .unwrap();
@@ -204,10 +215,16 @@ impl Swarm {
                 let _ = socket.write_all(&body).await;
             }
         });
+        let selected = adapter::preview(metadata.clone())
+            .unwrap()
+            .files
+            .iter()
+            .map(|file| file.index)
+            .collect();
         seed.add(
             metadata.clone(),
             files.path().to_string_lossy().into(),
-            vec![0],
+            selected,
             false,
             true,
         )

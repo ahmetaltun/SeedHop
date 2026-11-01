@@ -212,6 +212,24 @@ import SwiftUI
             try expect(store.selection == [first.id],"A live rate update lost selection")
         }
 
+        try await check("Default transfer order follows queue admission and preserves explicit sorts") {
+            let suite = "app.seedhop.transfer-order-test.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName:suite)!
+            defer { defaults.removePersistentDomain(forName:suite) }
+            let (store, _) = library()
+            var first = store.torrents[0], second = store.torrents[1]
+            first.name = "Z first addition"; first.queuePosition = 1
+            second.name = "A second addition"; second.queuePosition = 2
+            let sort = LibraryView.restoredSort(defaults:defaults)
+            try expect([second,first].sorted(using:sort).map(\.id) == [first.id,second.id],"Unchecked addition appeared above the earlier transfer")
+            second.queuePosition = 1; first.queuePosition = 2
+            try expect([first,second].sorted(using:sort).map(\.id) == [second.id,first.id],"Moving a transfer to the top did not change default list order")
+            defaults.set("name",forKey:"workspaceSort")
+            try expect(LibraryView.restoredSort(defaults:defaults) == [LibraryView.comparator(field:"name",order:.forward)],"Legacy explicit sort was lost")
+            defaults.set([["field":"added","reverse":true]],forKey:"workspaceSortOrder")
+            try expect(LibraryView.restoredSort(defaults:defaults) == [LibraryView.comparator(field:"added",order:.reverse)],"Saved column sort was lost")
+        }
+
         try await check("Newly added transfer is revealed outside the previous filter") {
             let (store, _) = library()
             store.filter = .paused; store.search = "does not match"
@@ -528,6 +546,7 @@ import SwiftUI
             let duplicate = await session.add(using:peer.send)
             session.cancel(using:peer.send)
             let request = peer.pending[0].request
+            try expect(session.downloadPath == URL(fileURLWithPath:session.destination).appendingPathComponent(PreviewFixtures.importPreview.name,isDirectory:true).path,"Import folder preview does not match torrent title")
             try expect(session.adding && duplicate == nil && request.selected == [0,2] && request.paused == true && request.reuse == true && request.destination == "/tmp/chosen-folder" && request.addToTop == true && request.sequential == true && request.firstLastPieces == true,"Add choices changed or duplicate was accepted")
             try expect(peer.commands("cancel").isEmpty,"A committed add was treated as cancellable metadata")
             peer.releaseFirst(reply:EngineReply(id:"added"))

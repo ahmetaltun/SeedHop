@@ -36,6 +36,7 @@ pub struct Engine {
     connection_settings: Mutex<connection_settings::ConnectionSettings>,
     lease: storage::LibraryLease,
     state_directory: PathBuf,
+    download_directory: PathBuf,
     instance_id: String,
     operations: RwLock<()>,
     file_operation: Mutex<Option<Arc<file_operation::Control>>>,
@@ -224,7 +225,7 @@ impl Engine {
             client_name_and_version: Some("SeedHop/0.1.0".into()),
             ..Default::default()
         };
-        let session = Session::new_with_opts(downloads, options)
+        let session = Session::new_with_opts(downloads.clone(), options)
             .await
             .map_err(adapter::engine_error)?;
         let engine = Arc::new(Self {
@@ -235,6 +236,7 @@ impl Engine {
             connection_settings: Mutex::new(connection_settings),
             lease,
             state_directory: dir,
+            download_directory: downloads.canonicalize().map_err(storage::io_error)?,
             instance_id: uuid::Uuid::new_v4().to_string(),
             operations: RwLock::new(()),
             file_operation: Mutex::new(None),
@@ -450,6 +452,27 @@ impl Engine {
         .await
     }
 
+    /// Native imports treat the chosen destination as a parent folder. Existing
+    /// library entries and explicit engine destinations retain their saved layout.
+    pub async fn import_with_options(
+        &self,
+        bytes: Vec<u8>,
+        destination: String,
+        selected: Vec<u32>,
+        options: TorrentAddOptions,
+    ) -> Result<String> {
+        let metadata = adapter::preview(bytes.clone())?;
+        let parent = PathBuf::from(destination)
+            .canonicalize()
+            .map_err(storage::io_error)?;
+        let folder = adapter::import_folder_name(&metadata.name, &metadata.id);
+        storage::validate_destination(&parent, std::slice::from_ref(&folder))?;
+        let root = parent.join(folder);
+        std::fs::create_dir_all(&root).map_err(storage::io_error)?;
+        self.add_with_options(bytes, root.to_string_lossy().into(), selected, options)
+            .await
+    }
+
     pub async fn add_with_options(
         &self,
         bytes: Vec<u8>,
@@ -496,7 +519,12 @@ impl Engine {
                 .map(|f| f.name.clone())
                 .collect::<Vec<_>>(),
         )?;
-        if !reuse && metadata.files.iter().any(|f| root.join(&f.name).exists()) {
+        if !reuse
+            && metadata
+                .files
+                .iter()
+                .any(|f| selected.contains(&f.index) && root.join(&f.name).exists())
+        {
             return Err(CoreError::Validation { code: "input.files_already_exist_here_enable_verification_of_existing", message: "Files already exist here. Enable verification of existing files or choose another folder.".into() });
         }
         let queued = self.queue.lock().unwrap().max_active > 0 || self.schedule_suspended();
@@ -719,6 +747,25 @@ impl Engine {
             .unwrap()
             .checkpoint(&self.state_directory, true);
         *self.statistics_warning.lock().unwrap() = saved.err().map(|_| "Transfer statistics could not be saved. Check space and access to the library folder. Totals remain in memory until saving succeeds.".into());
+        if delete_files {
+            let root = Path::new(&record.destination);
+            // Unselected boundary-piece files use private storage. The session
+            // deletes those files, but its metadata only lists payload folders.
+            storage::remove_empty_directory(
+                root,
+                &format!(".seedhop-parts/{}", handle.info_hash().as_string()),
+            )?;
+            storage::remove_empty_directory(root, ".seedhop-parts")?;
+            // Native imports create a folder named after the torrent. Keep the
+            // configured download parent and any folder containing other files.
+            let folder = adapter::import_folder_name(&record.name, &record.id);
+            if root.file_name().is_some_and(|name| name == folder.as_str())
+                && root != self.download_directory
+                && let Some(parent) = root.parent()
+            {
+                storage::remove_empty_directory(parent, &folder)?;
+            }
+        }
         Ok(())
     }
 

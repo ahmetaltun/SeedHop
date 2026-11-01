@@ -1597,6 +1597,7 @@ impl Session {
                     allow_overwrite: std::sync::atomic::AtomicBool::new(opts.overwrite),
                     output_folder: RwLock::new(output_folder),
                     file_names: RwLock::new(opts.file_names.clone()),
+                    selected_files: RwLock::new(only_files.clone()),
                     file_priorities: RwLock::new(opts.file_priorities.clone()),
                     sequential: opts.sequential,
                     first_last_pieces: opts.first_last_pieces,

@@ -227,3 +227,19 @@ queued piece list per request.
 
 Native import wiring, queue-admission semantics, and validation are recorded in
 [ADD-TORRENT-OPTIONS.md](ADD-TORRENT-OPTIONS.md).
+
+
+### Selected-file storage and native import folders — 2026-11-01
+
+Patch `0029-seedhop-selected-file-storage.patch` prevents unchecked payload files
+from being opened during storage initialization. V1 pieces spanning selected and
+unchecked files retain their boundary bytes under `.seedhop-parts/<hash>/<index>`.
+Later selection materializes those sparse files with an exclusive hard link;
+existing payload files remain protected. Torrent removal follows the owned
+storage path, preserving unrelated unchecked files with matching names.
+
+Native imports now create a torrent-named folder inside the selected parent.
+The import sheet previews that full path. Existing saved destinations and explicit
+engine destinations keep their layout. Collision checks apply to selected files.
+Recovery regressions cover a real shared-piece transfer, unchecked collisions,
+restart, later selection, removal, and separate native import folders.

@@ -383,11 +383,11 @@ struct LibraryView: View {
     private static func duration(_ value: UInt64) -> String { LocaleText.duration(value) }
     private static func date(_ value: UInt64) -> String { Date(timeIntervalSince1970:Double(value)).formatted(date:.abbreviated,time:.omitted) }
     static let sortFields: [(String, PartialKeyPath<TorrentItem>)] = [("name",\.name),("status",\.sortableStatus),("progress",\.progress),("download",\.downloadRate),("upload",\.uploadRate),("peers",\.peers),("eta",\.sortableETA),("ratio",\.sortableRatio),("queue",\.queuePosition),("size",\.fullBytes),("selected",\.totalBytes),("remaining",\.remainingBytes),("downloaded",\.sortableDownloaded),("uploaded",\.sortableUploaded),("added",\.sortableAdded),("completed",\.sortableCompleted),("path",\.destination)]
-    private static func restoredSort() -> [KeyPathComparator<TorrentItem>] {
-        if let saved = WorkspacePreferences.defaults.array(forKey:"workspaceSortOrder") as? [[String:Any]], !saved.isEmpty {
+    static func restoredSort(defaults: UserDefaults = WorkspacePreferences.defaults) -> [KeyPathComparator<TorrentItem>] {
+        if let saved = defaults.array(forKey:"workspaceSortOrder") as? [[String:Any]], !saved.isEmpty {
             return saved.map { comparator(field:$0["field"] as? String ?? "name",order:($0["reverse"] as? Bool ?? false) ? .reverse : .forward) }
         }
-        return [comparator(field:WorkspacePreferences.defaults.string(forKey:"workspaceSort") ?? "name",order:WorkspacePreferences.defaults.bool(forKey:"workspaceSortReverse") ? .reverse : .forward)]
+        return [comparator(field:defaults.string(forKey:"workspaceSort") ?? "queue",order:defaults.bool(forKey:"workspaceSortReverse") ? .reverse : .forward)]
     }
     static func comparator(field: String, order: SortOrder) -> KeyPathComparator<TorrentItem> {
         switch field {

@@ -152,6 +152,23 @@ impl OpenedFile {
         }
     }
 
+    pub fn path(&self) -> PathBuf {
+        self.file.read().path.clone()
+    }
+
+    pub fn materialize(
+        &self,
+        target: PathBuf,
+        promote: impl FnOnce(&std::path::Path) -> anyhow::Result<()>,
+    ) -> anyhow::Result<()> {
+        let mut file = self.file.write();
+        if file.path != target {
+            promote(&file.path)?;
+            file.path = target;
+        }
+        Ok(())
+    }
+
     pub fn take_clone(&self) -> anyhow::Result<Self> {
         let f = std::mem::take(&mut *self.file.write());
         Ok(Self {

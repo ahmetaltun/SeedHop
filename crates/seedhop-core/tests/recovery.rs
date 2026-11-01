@@ -298,3 +298,210 @@ async fn persistence_failure_is_reported_and_unrelated_files_are_retained() {
     );
     engine.shutdown().await.unwrap();
 }
+
+fn selective_fixture(name: &str, content: &[u8]) -> Vec<u8> {
+    use sha1::{Digest, Sha1};
+    let payload = content.len() - 127;
+    let mut bytes = format!("d4:infod5:filesld6:lengthi{payload}e4:pathl11:payload.bineed6:lengthi127e4:pathl10:shared.txteee4:name{}:{}12:piece lengthi16384e6:pieces{}:", name.len(), name, content.chunks(16384).count() * 20).into_bytes();
+    for piece in content.chunks(16384) {
+        bytes.extend_from_slice(&Sha1::digest(piece));
+    }
+    bytes.extend_from_slice(b"ee");
+    bytes
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn unchecked_collision_and_shared_piece_bytes_stay_out_of_payload_files() {
+    let swarm = support::Swarm::with_seed_files(
+        32768 + 211,
+        |content| selective_fixture("First torrent", content),
+        |path, content| {
+            let split = content.len() - 127;
+            std::fs::write(path.join("payload.bin"), &content[..split]).unwrap();
+            std::fs::write(path.join("shared.txt"), &content[split..]).unwrap();
+        },
+    )
+    .await;
+    for existing in [false, true] {
+        let state = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let cfg = config(state.path(), downloads.path());
+        if existing {
+            std::fs::write(downloads.path().join("shared.txt"), b"keep this").unwrap();
+        }
+        let engine = Engine::open(cfg.clone()).await.unwrap();
+        let id = engine
+            .add(
+                swarm.metadata.clone(),
+                cfg.download_directory,
+                vec![0],
+                false,
+                false,
+            )
+            .await
+            .unwrap();
+        support::wait_for(&engine, |item| item.state == "seeding").await;
+        assert_eq!(
+            std::fs::read(downloads.path().join("payload.bin")).unwrap(),
+            &swarm.content[..swarm.content.len() - 127]
+        );
+        if existing {
+            assert_eq!(
+                std::fs::read(downloads.path().join("shared.txt")).unwrap(),
+                b"keep this"
+            );
+            assert!(engine.select_files(id.clone(), vec![0, 1]).await.is_err());
+            engine.remove(id, true).await.unwrap();
+            assert_eq!(
+                std::fs::read(downloads.path().join("shared.txt")).unwrap(),
+                b"keep this"
+            );
+        } else {
+            assert!(!downloads.path().join("shared.txt").exists());
+            engine.shutdown().await.unwrap();
+            drop(engine);
+            let engine = Engine::open(config(state.path(), downloads.path()))
+                .await
+                .unwrap();
+            support::wait_for(&engine, |item| item.state == "seeding").await;
+            engine.select_files(id, vec![0, 1]).await.unwrap();
+            support::wait_for(&engine, |item| item.state == "seeding").await;
+            assert_eq!(
+                std::fs::read(downloads.path().join("shared.txt")).unwrap(),
+                &swarm.content[swarm.content.len() - 127..]
+            );
+            engine.shutdown().await.unwrap();
+            continue;
+        }
+        engine.shutdown().await.unwrap();
+    }
+    swarm.seed.shutdown().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn native_imports_use_torrent_folders_and_preserve_existing_library_layout() {
+    let state = tempfile::tempdir().unwrap();
+    let downloads = tempfile::tempdir().unwrap();
+    let cfg = config(state.path(), downloads.path());
+    let engine = Engine::open(cfg.clone()).await.unwrap();
+    for name in ["First torrent", "Second torrent"] {
+        engine
+            .import_with_options(
+                selective_fixture(name, &[42; 32768]),
+                cfg.download_directory.clone(),
+                vec![0],
+                seedhop_core::TorrentAddOptions {
+                    paused: true,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+    }
+    for item in engine.snapshot().unwrap().torrents {
+        assert_eq!(
+            std::path::Path::new(&item.destination),
+            downloads.path().canonicalize().unwrap().join(&item.name)
+        );
+        assert!(
+            std::path::Path::new(&item.destination)
+                .join("payload.bin")
+                .exists()
+        );
+        assert!(
+            !std::path::Path::new(&item.destination)
+                .join("shared.txt")
+                .exists()
+        );
+    }
+    assert!(!downloads.path().join("payload.bin").exists());
+    engine.shutdown().await.unwrap();
+    drop(engine);
+    let engine = Engine::open(cfg).await.unwrap();
+    assert_eq!(engine.snapshot().unwrap().torrents.len(), 2);
+    engine.shutdown().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn remove_native_import_cleans_empty_folders_and_preserves_other_files() {
+    for (delete_files, unrelated) in [(true, false), (true, true), (false, false)] {
+        let state = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let cfg = config(state.path(), downloads.path());
+        let engine = Engine::open(cfg.clone()).await.unwrap();
+        let mut metadata = selective_fixture("Folder cleanup", &[42; 32768]);
+        let needle = b"4:pathl11:payload.bin";
+        let offset = metadata
+            .windows(needle.len())
+            .position(|v| v == needle)
+            .unwrap();
+        metadata.splice(
+            offset..offset + needle.len(),
+            b"4:pathl6:nested11:payload.bin".iter().copied(),
+        );
+        let id = engine
+            .import_with_options(
+                metadata,
+                cfg.download_directory.clone(),
+                vec![0],
+                seedhop_core::TorrentAddOptions {
+                    paused: true,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        let root = downloads.path().join("Folder cleanup");
+        assert!(root.join("nested/payload.bin").exists());
+        if unrelated {
+            std::fs::write(root.join("keep.txt"), b"unrelated").unwrap();
+        }
+        engine.shutdown().await.unwrap();
+        drop(engine);
+        let engine = Engine::open(cfg).await.unwrap();
+        support::wait_for(&engine, |item| item.state == "paused").await;
+        engine.remove(id, delete_files).await.unwrap();
+        assert!(engine.snapshot().unwrap().torrents.is_empty());
+        assert!(downloads.path().is_dir(), "download parent was deleted");
+        if !delete_files {
+            assert!(root.join("nested/payload.bin").exists());
+        } else if unrelated {
+            assert_eq!(std::fs::read(root.join("keep.txt")).unwrap(), b"unrelated");
+            assert!(!root.join("nested").exists());
+            assert!(!root.join(".seedhop-parts").exists());
+        } else {
+            assert!(
+                !root.exists(),
+                "empty torrent destination survived deletion: {:?}",
+                std::fs::read_dir(&root).map(|entries| entries
+                    .map(|entry| entry.unwrap().path())
+                    .collect::<Vec<_>>())
+            );
+        }
+        engine.shutdown().await.unwrap();
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn remove_preserves_explicit_download_parent_even_when_named_after_torrent() {
+    let state = tempfile::tempdir().unwrap();
+    let downloads = tempfile::tempdir().unwrap();
+    let cfg = config(state.path(), downloads.path());
+    let engine = Engine::open(cfg.clone()).await.unwrap();
+    let name = downloads.path().file_name().unwrap().to_str().unwrap();
+    let id = engine
+        .add(
+            adapter::create_fixture(name, &[42; 32768]),
+            cfg.download_directory,
+            vec![0],
+            true,
+            false,
+        )
+        .await
+        .unwrap();
+    support::wait_for(&engine, |item| item.state == "paused").await;
+    engine.remove(id, true).await.unwrap();
+    assert!(downloads.path().is_dir());
+    assert_eq!(std::fs::read_dir(downloads.path()).unwrap().count(), 0);
+    engine.shutdown().await.unwrap();
+}

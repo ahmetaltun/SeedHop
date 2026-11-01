@@ -223,6 +223,26 @@ pub fn torrent_id(torrent: &ManagedTorrent) -> String {
         .unwrap_or_else(|| torrent.info_hash().as_string())
 }
 
+/// Keep a torrent title within one macOS path component.
+pub fn import_folder_name(name: &str, id: &str) -> String {
+    let name: String = name
+        .chars()
+        .map(|c| {
+            if c == '/' || c == ':' || c.is_control() {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let name = name.trim();
+    if name.is_empty() || name == "." || name == ".." {
+        id.into()
+    } else {
+        name.into()
+    }
+}
+
 #[cfg(test)]
 mod status_tests {
     use super::*;

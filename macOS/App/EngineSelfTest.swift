@@ -57,7 +57,7 @@ import Foundation
         importSession.addToTop = true; importSession.sequential = true; importSession.firstLastPieces = true
         await importSession.inspect(file:fixture.appendingPathComponent("fixture.torrent"),using:client.send)
         guard let preview = importSession.preview, preview.files.count == 1, let importedFile = preview.files.first else { throw UserFacingError(message:importSession.error ?? "Expected a single-file fixture preview") }
-        let importedPath = downloads.appendingPathComponent(importedFile.name)
+        let importedPath = URL(fileURLWithPath:importSession.downloadPath).appendingPathComponent(importedFile.name)
         guard let id = await importSession.add(using:client.send) else { throw UserFacingError(message:importSession.error ?? "Missing transfer ID") }
         func verifyImportOptions() throws {
             let saved = try JSONSerialization.jsonObject(with:Data(contentsOf:scratch.appendingPathComponent("state/session/session.json"))) as? [String:Any]
