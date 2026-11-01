@@ -54,7 +54,13 @@ import AppKit
             throw UserFacingError(message:"Library fixture store unavailable")
         }
         reopened.makeKeyAndOrderFront(nil)
-        try await invoke("Add Torrent…",key:"n"); try await settle()
+        try await invoke("Add Torrent…",key:"n")
+        // Hosted macOS can finish sheet presentation after the usual layout settle.
+        // Wait for the same native focus condition rather than a fixed animation delay.
+        try await waitUntil("Import did not focus the magnet input: \(String(describing:reopened.attachedSheet?.firstResponder))") {
+            guard let editor = reopened.attachedSheet?.firstResponder as? NSTextView else { return false }
+            return editor.isFieldEditor && editor.delegate is NSTextField
+        }
         guard let sheet = reopened.attachedSheet,
               let editor = sheet.firstResponder as? NSTextView, editor.isFieldEditor,
               editor.delegate is NSTextField else {

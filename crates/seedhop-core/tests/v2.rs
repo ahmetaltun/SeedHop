@@ -571,7 +571,9 @@ fn engine_config(
     }
 }
 async fn settled(engine: &seedhop_core::Engine) -> seedhop_core::TorrentRecord {
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    // This is fixture setup, not a throughput budget. Hosted macOS disk I/O can
+    // exceed five seconds while verifying the larger selective-storage fixtures.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
     loop {
         let item = engine
             .snapshot()

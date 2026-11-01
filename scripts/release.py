@@ -53,10 +53,12 @@ def validate_secrets(environ):
         raise ValueError("Certificate and Sparkle private key must be valid base64") from None
     if not certificate: raise ValueError("APPLE_CERTIFICATE is empty")
     if len(seed) != 32: raise ValueError("SPARKLE_PRIVATE_KEY must be a Sparkle-generated 32-byte seed in base64")
-    public_der = run("openssl", "pkey", "-inform", "DER", "-pubout", "-outform", "DER",
-                     input=bytes.fromhex("302e020100300506032b657004220420") + seed, sensitive=True)
+    # macOS's system LibreSSL cannot decode Ed25519 keys. CryptoKit is part of macOS.
+    (ROOT / ".cache/swift").mkdir(parents=True, exist_ok=True)
+    public = run("swift", "-module-cache-path", ROOT / ".cache/swift", ROOT / "scripts/SparklePublicKey.swift",
+                 input=(environ["SPARKLE_PRIVATE_KEY"].strip() + "\n").encode(), sensitive=True).decode().strip()
     public_key = json.loads((ROOT / "macOS/Resources/Updates.json").read_text())["publicKey"]
-    if base64.b64encode(public_der[-32:]).decode() != public_key:
+    if public != public_key:
         raise ValueError("SPARKLE_PRIVATE_KEY does not match the committed public key")
     return certificate
 
