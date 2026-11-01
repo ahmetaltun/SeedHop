@@ -8,10 +8,12 @@ import json
 import shutil
 import subprocess
 import hashlib
+import platform
 from localization import LANGUAGES, check as check_localizations, normalize as normalize_localizations, pseudolocalize
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SIGNING_CONFIG = ROOT / '.build/signing-identity'
+RUST_TARGET = "aarch64-apple-darwin"
 
 def run(*args):
     print("+", " ".join(map(str,args)),flush=True)
@@ -20,6 +22,11 @@ def run(*args):
 def write_plist(path,value):
     path.parent.mkdir(parents=True,exist_ok=True)
     path.write_bytes(plistlib.dumps(value))
+
+def verify_arm64(path):
+    architectures = subprocess.check_output(["lipo", "-archs", str(path)], text=True).split()
+    if architectures != ["arm64"]:
+        raise RuntimeError(f"{path} must contain only arm64; found: {' '.join(architectures)}")
 
 def main():
     parser = argparse.ArgumentParser()
@@ -35,6 +42,8 @@ def main():
         parser.error("Pseudolocalization is only available in development builds.")
     if args.release and args.update_localizations:
         parser.error("Update catalogs in a development build before running release validation.")
+    if platform.system() != "Darwin" or platform.machine() != "arm64":
+        parser.error("SeedHop builds require Apple Silicon macOS and native arm64 tools. Run outside Rosetta.")
     if args.identity != '-':
         identities = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'], text=True)
         if args.identity not in identities:
@@ -45,15 +54,16 @@ def main():
         SIGNING_CONFIG.parent.mkdir(parents=True, exist_ok=True)
         SIGNING_CONFIG.write_text(args.identity + '\n')
     profile = "release" if args.release else "debug"
-    target = ROOT/"target"/profile
+    target = ROOT/"target"/RUST_TARGET/profile
     generated = ROOT/"macOS/Generated"
     generated.mkdir(parents=True,exist_ok=True)
     (ROOT/".cache/swift").mkdir(parents=True,exist_ok=True)
     if not args.skip_rust:
-        cargo = ["cargo","build","--locked","-p","seedhop-ffi","--features","bindgen"]
+        cargo = ["cargo","build","--locked","--target",RUST_TARGET,"--target-dir",ROOT/"target","-p","seedhop-ffi","--features","bindgen"]
         if args.release: cargo.append("--release")
         run(*cargo)
         run(target/"uniffi-bindgen","generate","--library",target/"libseedhop_ffi.dylib","--language","swift","--out-dir",generated)
+    verify_arm64(target/"libseedhop_ffi.dylib")
     validation_root = args.validation_root.resolve() if args.validation_root else None
     app_id = 'app.seedhop.validation.' + hashlib.sha256(str(validation_root).encode()).hexdigest()[:12] if validation_root else 'app.seedhop.mac'
     app = (validation_root or ROOT/'.build') / 'SeedHop.app'
@@ -76,7 +86,7 @@ def main():
     iconset=ROOT/".build/AppIcon.iconset"
     run("swift","-module-cache-path",ROOT/".cache/swift",ROOT/"scripts/Icon.swift",iconset,ROOT/"macOS/Resources/AppIcon.png")
     run("iconutil","-c","icns",iconset,"-o",contents/"Resources/AppIcon.icns")
-    base = {"CFBundleVersion":"1","CFBundleShortVersionString":"0.1.0","LSMinimumSystemVersion":"15.0","CFBundleDevelopmentRegion":"en","CFBundleLocalizations":LANGUAGES + (["en-XA"] if args.pseudolocalization else []),"NSLocalNetworkUsageDescription":"SeedHop connects to torrent peers and trackers on networks you use."}
+    base = {"CFBundleVersion":"1","CFBundleShortVersionString":"0.1.0","LSMinimumSystemVersion":"15.0","LSArchitecturePriority":["arm64"],"LSRequiresNativeExecution":True,"CFBundleDevelopmentRegion":"en","CFBundleLocalizations":LANGUAGES + (["en-XA"] if args.pseudolocalization else []),"NSLocalNetworkUsageDescription":"SeedHop connects to torrent peers and trackers on networks you use."}
     write_plist(contents/"Info.plist",dict(base,CFBundleIdentifier=app_id,CFBundleName="SeedHop",CFBundleDisplayName="SeedHop",CFBundleExecutable="SeedHop",CFBundlePackageType="APPL",NSPrincipalClass="NSApplication",LSApplicationCategoryType="public.app-category.utilities",NSHighResolutionCapable=True,CFBundleIconFile="AppIcon",CFBundleURLTypes=[{"CFBundleURLName":"BitTorrent magnet link","CFBundleURLSchemes":["magnet"]}],CFBundleDocumentTypes=[{"CFBundleTypeName":"BitTorrent torrent","CFBundleTypeRole":"Viewer","LSHandlerRank":"Alternate","LSItemContentTypes":["org.bittorrent.torrent"],"CFBundleTypeExtensions":["torrent"]}],UTImportedTypeDeclarations=[{"UTTypeIdentifier":"org.bittorrent.torrent","UTTypeConformsTo":["public.data"],"UTTypeTagSpecification":{"public.filename-extension":["torrent"],"public.mime-type":"application/x-bittorrent"}}]))
     xpc = contents/"XPCServices/SeedHopEngine.xpc"
     write_plist(xpc/"Contents/Info.plist",dict(base,CFBundleIdentifier=app_id+".engine",CFBundleExecutable="SeedHopEngine",CFBundlePackageType="XPC!",XPCService={"ServiceType":"Application","RunLoopType":"NSRunLoop","JoinExistingSession":True}))
@@ -122,6 +132,8 @@ def main():
         pseudolocalize(pseudo)
         shutil.copytree(pseudo/"en-XA.lproj",contents/"Resources/en-XA.lproj")
     if not args.update_localizations: check_localizations(bundle=app,extraction=extraction)
+    for binary in [contents/"MacOS/SeedHop", contents/"MacOS/SeedHopAgent", xpc/"Contents/MacOS/SeedHopEngine", contents/"Frameworks/libseedhop_ffi.dylib"]:
+        verify_arm64(binary)
     debug_entitlements = ROOT/".build/debug.entitlements"
     write_plist(debug_entitlements,{"com.apple.security.cs.disable-library-validation":True})
     for name,path in [(app_id+".rust",contents/"Frameworks/libseedhop_ffi.dylib"),(app_id+".agent",contents/"MacOS/SeedHopAgent"),(app_id+".engine",xpc),(app_id,app)]:

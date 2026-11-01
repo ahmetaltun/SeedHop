@@ -18,6 +18,11 @@ export. See [workspace behavior and validation](docs/POWER-USER-WORKSPACE.md).
 
 Requires Xcode 26.3 command-line tools, Python 3.12+, and Rustup.
 The pinned Rust toolchain is installed by Rustup if it is not available.
+Build and run on Apple Silicon with macOS 15 or later, using native arm64 tools
+outside Rosetta. Development and release apps support only arm64; Intel Macs
+are not supported. The build pins Rust to `aarch64-apple-darwin`, Swift to arm64,
+and rejects bundled executables or libraries containing any other architecture,
+including when reusing Rust output with `--skip-rust`.
 
 ```sh
 make build
