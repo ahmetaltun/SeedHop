@@ -1,6 +1,7 @@
 /target/
 /.build/
 /.cache/
+/graphify-out/
 .DS_Store
 /macOS/Generated/
 *.xcuserstate
