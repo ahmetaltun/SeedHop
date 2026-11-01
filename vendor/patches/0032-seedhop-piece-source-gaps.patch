@@ -1,0 +1,57 @@
+--- a/crates/librqbit/src/torrent_state/mod.rs
++++ b/crates/librqbit/src/torrent_state/mod.rs
+@@ -72,6 +72,8 @@
+     pub verified: u32,
+     pub downloading: u32,
+     pub minimum_availability: u32,
++    /// Missing locally and absent from all connected peers. None while paused.
++    pub unavailable_pieces: Option<u32>,
+ }
+ 
+ impl PieceMap {
+@@ -79,6 +81,7 @@
+         let mut bins = vec![
+             PieceMapBin {
+                 minimum_availability: u32::MAX,
++                unavailable_pieces: remote.then_some(0),
+                 ..Default::default()
+             };
+             (total as usize).min(512)
+@@ -92,6 +95,12 @@
+             bin.verified += u32::from(verified);
+             bin.downloading += u32::from(!verified && downloading);
+             bin.minimum_availability = bin.minimum_availability.min(available);
++            if !verified
++                && available == 0
++                && let Some(count) = bin.unavailable_pieces.as_mut()
++            {
++                *count += 1;
++            }
+             verified_pieces += u32::from(verified);
+             if available < minimum {
+                 minimum = available;
+@@ -113,6 +122,24 @@
+ #[cfg(test)]
+ mod piece_map_tests {
+     use super::PieceMap;
++
++    #[test]
++    fn gaps_require_the_same_piece_to_be_missing_locally_and_remotely() {
++        let map = PieceMap::collect(
++            1024,
++            true,
++            (0..1024).map(|i| match i {
++                0 | 3 => (true, false, 0),
++                2 => (false, false, 0),
++                _ => (false, false, 2),
++            }),
++        );
++        assert_eq!(map.bins[0].minimum_availability, 0);
++        assert_eq!(map.bins[0].unavailable_pieces, Some(0));
++        assert_eq!(map.bins[1].unavailable_pieces, Some(1));
++        let paused = PieceMap::collect(1, false, [(false, false, 0)].into_iter());
++        assert_eq!(paused.bins[0].unavailable_pieces, None);
++    }
+ 
+     #[test]
+     fn piece_map_preserves_order_and_distributed_copies() {

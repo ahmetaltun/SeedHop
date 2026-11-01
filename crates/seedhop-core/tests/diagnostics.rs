@@ -46,6 +46,20 @@ async fn diagnostics_preserve_unknown_history_and_reused_files_are_not_network_t
     assert!(details.v2_hash.is_none());
     assert!(!details.dht && !details.local_discovery);
     assert!(details.peers.is_empty() && details.trackers.is_empty());
+    let map = details.piece_map.as_ref().unwrap();
+    assert_eq!(map.total_pieces, 1);
+    assert_eq!(map.verified_pieces, 1);
+    assert_eq!(map.availability, None);
+    assert_eq!(map.bins[0].verified, 1);
+    assert_eq!(map.bins[0].downloading, 0);
+    assert_eq!(map.bins[0].unavailable_pieces, None);
+    assert!(
+        engine
+            .torrent_details(id.clone(), "peers".into(), false)
+            .unwrap()
+            .piece_map
+            .is_none()
+    );
     assert!(
         engine
             .torrent_details(id.clone(), "wrong".into(), false)

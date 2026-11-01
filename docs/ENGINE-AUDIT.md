@@ -45,6 +45,25 @@ patches reconstruct current source and reverse/reapply byte-identically.
 
 ## Reliability changes
 
+The General tab's piece maps use
+`vendor/patches/0031-seedhop-piece-map-diagnostics.patch`. Snapshots are requested
+only for General, contain at most 512 bins, and count verified pieces across the
+full torrent, including unselected files. In-flight pieces are separate from
+verified content. Availability uses connected remote peers only: minimum copies
+plus the fraction of pieces with more than that minimum. A bin uses its minimum
+availability so a rare missing piece remains visible. Paused transfers have no
+live availability; checking/error states have no map. Unit tests cover aggregation
+and bounds; local wire tests cover v2 and hybrid bitfields and verified completion.
+
+`vendor/patches/0032-seedhop-piece-source-gaps.patch` counts local/remote gaps
+per piece before grouping. The native view hatches only ranges with a positive
+count, suppresses highlights for paused, disconnected, stale, and older-engine
+observations, and exposes the count to accessibility. Hover cards describe the
+inclusive piece range, verified percentage, in-flight count, minimum remote copies,
+and source-gap count. Hover lookup uses the same piece-weighted range boundaries
+as drawing, including unequal bins and the rightmost edge. The snapshot remains
+bounded to 512 bins; hovering performs no network or disk access.
+
 1. `session.rs`: retain JoinHandles for session-owned tasks; expose
    `stop_and_wait`; await cancellation instead of sleeping for one second.
    Propagate metadata persistence and session deletion failures to callers.

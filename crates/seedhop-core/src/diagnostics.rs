@@ -181,6 +181,7 @@ pub struct TorrentDetails {
     pub peers: Vec<PeerDetails>,
     pub trackers: Vec<TrackerDetails>,
     pub events: Vec<DiagnosticEvent>,
+    pub piece_map: Option<librqbit::PieceMap>,
 }
 
 impl Engine {
@@ -361,6 +362,11 @@ impl Engine {
         } else {
             Vec::new()
         };
+        let piece_map = if section == "general" {
+            torrent.piece_map()
+        } else {
+            None
+        };
         Ok(TorrentDetails {
             torrent_id: id,
             instance_id: self.instance_id.clone(),
@@ -379,6 +385,7 @@ impl Engine {
             peers,
             trackers,
             events,
+            piece_map,
         })
     }
 }

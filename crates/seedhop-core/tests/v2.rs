@@ -5478,12 +5478,43 @@ async fn empty_peers_receive_new_piece_announcements_and_can_download_them() {
             }
             // An empty client may legally omit its initial bitfield. It must
             // learn about newly verified pieces before it can request uploads.
+            let id = engine.snapshot().unwrap().torrents[0].id.clone();
+            let map = engine
+                .torrent_details(id, "general".into(), false)
+                .unwrap()
+                .piece_map
+                .unwrap();
+            assert_eq!(
+                map.bins
+                    .iter()
+                    .map(|b| b.unavailable_pieces.unwrap())
+                    .sum::<u32>(),
+                2
+            );
             let mut source = wire::connect(port, hash).await;
             wire::send(&mut source, Message::Bitfield((&[0xc0u8][..]).into())).await;
             peer_interest(&mut source, true).await;
+            let id = engine.snapshot().unwrap().torrents[0].id.clone();
+            let map = engine
+                .torrent_details(id.clone(), "general".into(), false)
+                .unwrap()
+                .piece_map
+                .unwrap();
+            assert_eq!(map.total_pieces, 2);
+            assert_eq!(map.verified_pieces, 0);
+            assert_eq!(map.availability, Some(1.0));
+            assert!(map.bins.iter().all(|bin| bin.minimum_availability == 1));
+            assert!(map.bins.iter().all(|bin| bin.unavailable_pieces == Some(0)));
             wire::send(&mut source, Message::Unchoke).await;
             for index in 0..2 {
                 let request = peer_request(&mut source, index).await;
+                let map = engine
+                    .torrent_details(id.clone(), "general".into(), false)
+                    .unwrap()
+                    .piece_map
+                    .unwrap();
+                assert_eq!(map.bins[index as usize].downloading, 1);
+                assert_eq!(map.bins[index as usize].verified, 0);
                 peer_payload(
                     &mut source,
                     request,
@@ -5492,6 +5523,17 @@ async fn empty_peers_receive_new_piece_announcements_and_can_download_them() {
                 .await;
             }
             support::wait_for(&engine, |t| t.state == "seeding").await;
+            let map = engine
+                .torrent_details(id.clone(), "general".into(), false)
+                .unwrap()
+                .piece_map
+                .unwrap();
+            assert_eq!(map.verified_pieces, 2);
+            assert!(
+                map.bins
+                    .iter()
+                    .all(|bin| bin.verified == 1 && bin.downloading == 0)
+            );
             loop {
                 let frame = wire::frame(&mut empty).await;
                 match Message::deserialize(&frame, &[]).unwrap().0 {
@@ -5522,8 +5564,9 @@ async fn empty_peers_receive_new_piece_announcements_and_can_download_them() {
                 }
             }
             support::wait_for(&engine, |t| t.network_uploaded_bytes.unwrap_or(0) >= 16384).await;
-            let id = engine.snapshot().unwrap().torrents[0].id.clone();
-            let details = engine.torrent_details(id, "peers".into(), false).unwrap();
+            let details = engine
+                .torrent_details(id.clone(), "peers".into(), false)
+                .unwrap();
             let recipient = details.peers.iter().find(|p| p.uploaded >= 16384).unwrap();
             assert_eq!(recipient.interested, Some(true));
             assert_eq!(recipient.pending_requests, Some(0));
@@ -5531,6 +5574,24 @@ async fn empty_peers_receive_new_piece_announcements_and_can_download_them() {
                 recipient.available_pieces,
                 explicit_empty_bitfield.then_some(0)
             );
+            drop(source);
+            tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                loop {
+                    let map = engine
+                        .torrent_details(id.clone(), "general".into(), false)
+                        .unwrap()
+                        .piece_map
+                        .unwrap();
+                    if map.availability == Some(0.0) {
+                        assert_eq!(map.verified_pieces, 2);
+                        assert!(map.bins.iter().all(|bin| bin.unavailable_pieces == Some(0)));
+                        break;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                }
+            })
+            .await
+            .unwrap();
             engine.shutdown().await.unwrap();
         }
     }

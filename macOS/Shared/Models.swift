@@ -275,6 +275,47 @@ struct TorrentDetails: Codable, Equatable {
     var peers: [PeerDetails]
     var trackers: [TrackerDetails]
     var events: [DiagnosticEvent]? = nil
+    var pieceMap: PieceMap? = nil
+}
+struct PieceMap: Codable, Equatable {
+    var totalPieces: UInt32
+    var verifiedPieces: UInt32
+    var availability: Double?
+    var bins: [PieceMapBin]
+
+    func region(at fraction: Double) -> PieceMapRegion? {
+        guard fraction.isFinite, totalPieces > 0 else { return nil }
+        let piece = UInt64(min(max(0,fraction),1) * Double(totalPieces))
+        let target = min(piece,UInt64(totalPieces) - 1)
+        var first: UInt64 = 0
+        for (index,bin) in bins.enumerated() {
+            let end = first + UInt64(bin.pieces)
+            if first <= target && target < end {
+                return PieceMapRegion(index:index,firstPiece:first,lastPiece:end - 1,bin:bin)
+            }
+            first = end
+        }
+        return nil
+    }
+
+    func region(index: Int) -> PieceMapRegion? {
+        guard bins.indices.contains(index), bins[index].pieces > 0 else { return nil }
+        let first = bins.prefix(index).reduce(UInt64(0)) { $0 + UInt64($1.pieces) }
+        return PieceMapRegion(index:index,firstPiece:first,lastPiece:first + UInt64(bins[index].pieces) - 1,bin:bins[index])
+    }
+}
+struct PieceMapBin: Codable, Equatable {
+    var pieces: UInt32
+    var verified: UInt32
+    var downloading: UInt32
+    var minimumAvailability: UInt32
+    var unavailablePieces: UInt32? = nil
+}
+struct PieceMapRegion: Equatable {
+    var index: Int
+    var firstPiece: UInt64
+    var lastPiece: UInt64
+    var bin: PieceMapBin
 }
 struct DiagnosticEvent: Codable, Equatable { var sequence: UInt64; var timestamp: UInt64; var message: String }
 struct TrafficSample: Identifiable {

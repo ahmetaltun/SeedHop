@@ -33,3 +33,14 @@ Patch `0030-seedhop-runtime-piece-preferences.patch` makes the existing per-torr
 sequential and first/last-piece preferences mutable without restarting peers or
 changing transfer intent. It reads both flags consistently for new piece
 acquisitions and restores prior preferences if session persistence fails.
+
+Patch `0031-seedhop-piece-map-diagnostics.patch` exposes read-only piece maps
+for the selected torrent's General tab. At most 512 ordered bins preserve
+verified and in-flight counts and the minimum connected-peer availability in
+each range. Distributed copies exclude local files; paused transfers retain
+verified progress but report no live availability. Checking and error states
+report no map. This does not change piece selection or transfer behavior.
+
+Patch `0032-seedhop-piece-source-gaps.patch` adds exact per-bin counts of pieces
+missing locally and absent from every connected peer. Paused observations omit
+this count. Grouping never infers a gap from unrelated local/remote minima.

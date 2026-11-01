@@ -12,6 +12,62 @@ import SwiftUI
             try await body(); passed += 1; print("PASS: \(name)")
         }
 
+        try await check("Piece maps decode without breaking older details replies") {
+            let details = PreviewFixtures.diagnostics(PreviewFixtures.torrents[0],section:"general")
+            let encoded = try JSONEncoder().encode(details)
+            let decoded = try JSONDecoder().decode(TorrentDetails.self,from:encoded)
+            try expect(decoded.pieceMap == details.pieceMap,"Piece map did not survive transport")
+            var legacy = try JSONSerialization.jsonObject(with:encoded) as! [String:Any]
+            legacy.removeValue(forKey:"pieceMap")
+            let restored = try JSONDecoder().decode(TorrentDetails.self,from:JSONSerialization.data(withJSONObject:legacy))
+            try expect(restored.pieceMap == nil,"Legacy reply invented piece information")
+            let paused = PreviewFixtures.diagnostics(PreviewFixtures.torrents[4],section:"general")
+            try expect(paused.pieceMap != nil && paused.pieceMap?.availability == nil,"Paused transfer invented live availability")
+            var oldMap = try JSONSerialization.jsonObject(with:encoded) as! [String:Any]
+            var payload = oldMap["pieceMap"] as! [String:Any]
+            var bins = payload["bins"] as! [[String:Any]]
+            for index in bins.indices { bins[index].removeValue(forKey:"unavailablePieces") }
+            payload["bins"] = bins; oldMap["pieceMap"] = payload
+            let oldDetails = try JSONDecoder().decode(TorrentDetails.self,from:JSONSerialization.data(withJSONObject:oldMap))
+            try expect(oldDetails.pieceMap?.bins.allSatisfy { $0.unavailablePieces == nil } == true,"Old engine invented gap counts")
+        }
+
+        try await check("Piece hover hit testing follows unequal ranges and clamps edges") {
+            let bins = [PieceMapBin(pieces:3,verified:2,downloading:1,minimumAvailability:0,unavailablePieces:0),PieceMapBin(pieces:2,verified:0,downloading:0,minimumAvailability:0,unavailablePieces:2)]
+            let map = PieceMap(totalPieces:5,verifiedPieces:2,availability:0.4,bins:bins)
+            try expect(map.region(at:0)?.firstPiece == 0 && map.region(at:0.59)?.lastPiece == 2,"First range did not match its rendered width")
+            try expect(map.region(at:0.6)?.index == 1 && map.region(at:1)?.lastPiece == 4,"Range boundary or right edge was incorrect")
+            try expect(map.region(at:-1)?.index == 0 && map.region(at:2)?.index == 1,"Pointer overshoot was not clamped")
+            try expect(map.region(at:.nan) == nil && map.region(index:2) == nil,"Invalid pointer or range produced details")
+            try expect(map.region(index:0)?.bin.unavailablePieces == 0,"Owned pieces without peers became gaps")
+            try expect(map.region(index:1)?.bin.unavailablePieces == 2,"Source gaps were lost")
+            try expect(PieceMap(totalPieces:0,verifiedPieces:0,availability:nil,bins:[]).region(at:0) == nil,"Empty map produced hover details")
+        }
+
+        try await check("Piece hover waits for rest and cancels pending reveals") {
+            let dwell = PieceMapHoverDelay(delay:.milliseconds(100))
+            let first = PieceMapHover(index:0,availability:false)
+            let second = PieceMapHover(index:1,availability:true)
+            dwell.update(first,location:CGPoint(x:10,y:4))
+            try expect(dwell.hover == nil,"Hover details appeared immediately")
+            dwell.cancel(availability:false)
+            try await Task.sleep(for:.milliseconds(150))
+            try expect(dwell.hover == nil,"Leaving the bar allowed a delayed popup")
+            dwell.update(first,location:CGPoint(x:10,y:4))
+            dwell.update(second,location:CGPoint(x:20,y:4))
+            try await Task.sleep(for:.milliseconds(150))
+            try expect(dwell.hover == second,"An older hover request replaced the current range")
+            dwell.update(second,location:CGPoint(x:21,y:4))
+            try expect(dwell.hover == nil,"Movement within the same range did not hide details")
+            dwell.cancel(availability:false)
+            try await Task.sleep(for:.milliseconds(150))
+            try expect(dwell.hover == second,"Leaving the other row canceled the active row")
+            dwell.update(first,location:CGPoint(x:10,y:4))
+            dwell.cancel()
+            try await Task.sleep(for:.milliseconds(150))
+            try expect(dwell.hover == nil,"Closing the view left a pending popup")
+        }
+
         try await check("Appearance defaults to dark and persists every choice") {
             let suite = "app.seedhop.appearance-test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName:suite)!

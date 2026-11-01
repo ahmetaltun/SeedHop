@@ -784,6 +784,29 @@ impl TorrentStateLive {
         }
     }
 
+    pub(crate) fn piece_map(&self) -> Option<super::PieceMap> {
+        // Match acquisition lock order: piece tracker, then availability. Do not
+        // acquire individual peer locks while holding either guard.
+        let locked = self.lock_read("piece_map");
+        let pieces = locked.get_pieces().ok()?;
+        let chunks = pieces.chunks();
+        let lengths = chunks.get_lengths();
+        let have = chunks.get_have_pieces().as_slice();
+        let availability = self.peers.piece_availability.read();
+        Some(super::PieceMap::collect(
+            lengths.total_pieces(),
+            true,
+            (0..lengths.total_pieces()).map(|i| {
+                let index = lengths.validate_piece_index(i).expect("in-range piece");
+                (
+                    have[i as usize],
+                    pieces.is_inflight(index),
+                    availability.get(i as usize).copied().unwrap_or(0),
+                )
+            }),
+        ))
+    }
+
     pub fn per_peer_stats_snapshot(&self, filter: PeerStatsFilter) -> PeerStatsSnapshot {
         PeerStatsSnapshot {
             peers: self

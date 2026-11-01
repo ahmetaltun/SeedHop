@@ -9734,6 +9734,90 @@
         }
       }
     },
+    "Amber hatching marks ranges containing pieces missing locally with no connected source. Hover over a range for details.": {
+      "comment": "SeedHop piece-map hover details. Piece ranges are inclusive and start at 1. Copies are the minimum across the range, counting connected remote peers only. No source counts pieces missing both locally and remotely.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bernsteinfarbene Schraffuren markieren Bereiche mit lokal fehlenden Stücken ohne verbundene Quelle. Bewegen Sie den Zeiger über einen Bereich, um Details zu sehen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amber hatching marks ranges containing pieces missing locally with no connected source. Hover over a range for details."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El rayado ámbar marca rangos con piezas que faltan localmente y no tienen una fuente conectada. Pasa el cursor sobre un rango para ver los detalles."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les hachures ambrées indiquent les plages contenant des pièces absentes localement sans source connectée. Survolez une plage pour voir les détails."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il tratteggio ambra indica intervalli con parti mancanti localmente e senza una fonte connessa. Passa il puntatore su un intervallo per i dettagli."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "琥珀色の斜線は、ローカルに存在せず、接続中のソースもないピースを含む範囲を示します。範囲にポインタを合わせると詳細が表示されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "호박색 빗금은 로컬에 없고 연결된 소스도 없는 조각이 포함된 범위를 나타냅니다. 범위에 포인터를 올리면 세부 정보가 표시됩니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bursztynowe kreskowanie oznacza zakresy z częściami brakującymi lokalnie i bez połączonego źródła. Najedź na zakres, aby zobaczyć szczegóły."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As hachuras âmbar indicam intervalos com partes ausentes localmente e sem fonte conectada. Passe o cursor sobre um intervalo para ver os detalhes."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Янтарная штриховка отмечает диапазоны с отсутствующими локально частями без подключённого источника. Наведите указатель на диапазон, чтобы увидеть подробности."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kehribar tarama, yerel olarak eksik ve bağlı kaynağı olmayan parçaları içeren aralıkları gösterir. Ayrıntılar için imleci bir aralığın üzerine getirin."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Бурштинове штрихування позначає діапазони з відсутніми локально частинами без підключеного джерела. Наведіть вказівник на діапазон, щоб побачити подробиці."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "琥珀色斜线标记包含本地缺失且无已连接来源分块的范围。将指针悬停在范围上可查看详情。"
+          }
+        }
+      }
+    },
     "An optional background engine continues your downloads.": {
       "comment": "SeedHop macOS UI (SettingsView.swift).",
       "localizations": {
@@ -10145,6 +10229,90 @@
           "stringUnit": {
             "state": "translated",
             "value": "外观更改会立即生效。"
+          }
+        }
+      }
+    },
+    "Availability": {
+      "comment": "SeedHop torrent details piece map. Availability counts connected remote peers only; progress includes the full torrent.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verfügbarkeit"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Availability"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disponibilidad"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disponibilité"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disponibilità"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可用性"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "가용성"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dostępność"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disponibilidade"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Доступность"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kullanılabilirlik"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Доступність"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可用性"
           }
         }
       }
@@ -15386,6 +15554,90 @@
           "stringUnit": {
             "state": "translated",
             "value": "已复制字节数"
+          }
+        }
+      }
+    },
+    "Copies across connected peers, excluding your files. Darker blue means more copies; gray means no peer has a piece. Paused transfers have no live availability.": {
+      "comment": "SeedHop torrent details piece map. Availability counts connected remote peers only; progress includes the full torrent.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kopien bei verbundenen Peers, ohne Ihre Dateien. Dunkleres Blau bedeutet mehr Kopien; Grau bedeutet, dass kein Peer das Stück hat. Pausierte Übertragungen haben keine Live-Verfügbarkeit."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copies across connected peers, excluding your files. Darker blue means more copies; gray means no peer has a piece. Paused transfers have no live availability."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copias entre pares conectados, sin contar tus archivos. El azul más oscuro indica más copias; el gris indica que ningún par tiene esa pieza. Las transferencias en pausa no tienen disponibilidad en vivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copies chez les pairs connectés, hors de vos fichiers. Un bleu plus foncé indique plus de copies ; le gris indique qu’aucun pair ne possède la pièce. Les transferts en pause n’ont pas de disponibilité en direct."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copie sui peer connessi, esclusi i tuoi file. Un blu più scuro indica più copie; il grigio indica che nessun peer possiede la parte. I trasferimenti in pausa non hanno disponibilità in tempo reale."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自分のファイルを除く、接続中のピア上のコピー数。青が濃いほどコピーが多く、灰色はそのピースを持つピアがいないことを示します。一時停止中は現在の可用性を取得できません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "내 파일을 제외하고 연결된 피어에 있는 복사본 수입니다. 진한 파란색일수록 복사본이 많고, 회색은 해당 조각을 가진 피어가 없음을 나타냅니다. 일시 정지된 전송에는 실시간 가용성이 없습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kopie u połączonych peerów, bez Twoich plików. Ciemniejszy niebieski oznacza więcej kopii; szary oznacza, że żaden peer nie ma danej części. Wstrzymane transfery nie mają bieżącej dostępności."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cópias nos pares conectados, excluindo seus arquivos. Azul mais escuro indica mais cópias; cinza indica que nenhum par tem a parte. Transferências pausadas não têm disponibilidade ao vivo."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Копии у подключённых пиров, без учёта ваших файлов. Более тёмный синий означает больше копий; серый — части нет ни у одного пира. Для приостановленных передач текущая доступность неизвестна."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosyalarınız hariç, bağlı eşlerdeki kopyalar. Koyu mavi daha fazla kopya olduğunu, gri ise parçanın hiçbir eşte olmadığını gösterir. Duraklatılan aktarımların anlık kullanılabilirliği yoktur."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Копії в підключених пірів, без урахування ваших файлів. Темніший синій означає більше копій; сірий — частини немає в жодного піра. Для призупинених передач поточна доступність невідома."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已连接节点中的副本数，不含您的文件。蓝色越深表示副本越多；灰色表示没有节点拥有该分块。暂停的传输没有实时可用性数据。"
           }
         }
       }
@@ -22279,6 +22531,90 @@
         }
       }
     },
+    "Full torrent piece map, including unselected files. Green: verified. Blue: downloading. Gray: missing. Pieces run from left to right.": {
+      "comment": "SeedHop torrent details piece map. Availability counts connected remote peers only; progress includes the full torrent.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stückkarte des gesamten Torrents, einschließlich nicht ausgewählter Dateien. Grün: verifiziert. Blau: wird geladen. Grau: fehlend. Stücke verlaufen von links nach rechts."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full torrent piece map, including unselected files. Green: verified. Blue: downloading. Gray: missing. Pieces run from left to right."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mapa de piezas de todo el torrent, incluidos los archivos no seleccionados. Verde: verificado. Azul: descargando. Gris: faltante. Las piezas van de izquierda a derecha."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carte des pièces du torrent complet, y compris les fichiers non sélectionnés. Vert : vérifié. Bleu : téléchargement. Gris : manquant. Les pièces vont de gauche à droite."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mappa delle parti dell’intero torrent, inclusi i file non selezionati. Verde: verificato. Blu: in download. Grigio: mancante. Le parti vanno da sinistra a destra."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未選択ファイルを含むトレント全体のピースマップ。緑：検証済み。青：ダウンロード中。灰色：未取得。ピースは左から右に並びます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "선택하지 않은 파일을 포함한 전체 토렌트 조각 지도입니다. 녹색: 검증됨. 파란색: 다운로드 중. 회색: 누락됨. 조각은 왼쪽에서 오른쪽으로 표시됩니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mapa części całego torrenta, w tym niewybranych plików. Zielony: zweryfikowane. Niebieski: pobierane. Szary: brakujące. Części biegną od lewej do prawej."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mapa de partes do torrent completo, incluindo arquivos não selecionados. Verde: verificado. Azul: baixando. Cinza: ausente. As partes vão da esquerda para a direita."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Карта частей всего торрента, включая невыбранные файлы. Зелёный: проверено. Синий: скачивается. Серый: отсутствует. Части расположены слева направо."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçilmemiş dosyalar dahil tüm torrentin parça haritası. Yeşil: doğrulandı. Mavi: indiriliyor. Gri: eksik. Parçalar soldan sağa sıralanır."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Карта частин усього торента, включно з невибраними файлами. Зелений: перевірено. Синій: завантажується. Сірий: відсутнє. Частини розташовані зліва направо."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整个种子的分块图，包含未选择的文件。绿色：已验证。蓝色：下载中。灰色：缺失。分块从左向右排列。"
+          }
+        }
+      }
+    },
     "Full torrent size": {
       "comment": "SeedHop macOS UI (TorrentDiagnosticsView.swift).",
       "localizations": {
@@ -26690,6 +27026,174 @@
         }
       }
     },
+    "Minimum copies": {
+      "comment": "SeedHop piece-map hover details. Piece ranges are inclusive and start at 1. Copies are the minimum across the range, counting connected remote peers only. No source counts pieces missing both locally and remotely.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minimale Kopien"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minimum copies"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copias mínimas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copies minimales"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copie minime"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最小コピー数"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "최소 복사본 수"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minimum kopii"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mínimo de cópias"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Минимум копий"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En az kopya"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Мінімум копій"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最少副本数"
+          }
+        }
+      }
+    },
+    "Missing": {
+      "comment": "SeedHop torrent details piece map. Availability counts connected remote peers only; progress includes the full torrent.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fehlend"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Missing"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faltante"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manquant"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mancante"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未取得"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "누락됨"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brakujące"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausente"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отсутствует"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eksik"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відсутнє"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缺失"
+          }
+        }
+      }
+    },
     "Missing alternative bandwidth limits.": {
       "comment": "SeedHop macOS UI (EngineMessage.swift).",
       "localizations": {
@@ -27769,6 +28273,90 @@
         }
       }
     },
+    "No connected source": {
+      "comment": "SeedHop piece-map hover details. Piece ranges are inclusive and start at 1. Copies are the minimum across the range, counting connected remote peers only. No source counts pieces missing both locally and remotely.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine verbundene Quelle"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No connected source"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin fuente conectada"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune source connectée"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna fonte connessa"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接続中のソースなし"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "연결된 소스 없음"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brak połączonego źródła"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sem fonte conectada"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нет подключённого источника"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlı kaynak yok"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Немає підключеного джерела"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无已连接来源"
+          }
+        }
+      }
+    },
     "No downloads in progress": {
       "comment": "SeedHop macOS UI (LibraryStore.swift).",
       "localizations": {
@@ -28512,6 +29100,90 @@
           "stringUnit": {
             "state": "translated",
             "value": "没有已记录的事件"
+          }
+        }
+      }
+    },
+    "No source": {
+      "comment": "SeedHop piece-map hover details. Piece ranges are inclusive and start at 1. Copies are the minimum across the range, counting connected remote peers only. No source counts pieces missing both locally and remotely.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Quelle"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No source"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin fuente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sans source"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna fonte"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ソースなし"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "소스 없음"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brak źródła"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sem fonte"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нет источника"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaynak yok"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Немає джерела"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无来源"
           }
         }
       }
@@ -32081,6 +32753,90 @@
           "stringUnit": {
             "state": "translated",
             "value": "返回的节点数"
+          }
+        }
+      }
+    },
+    "Pieces %@–%@": {
+      "comment": "SeedHop piece-map hover details. Piece ranges are inclusive and start at 1. Copies are the minimum across the range, counting connected remote peers only. No source counts pieces missing both locally and remotely.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stücke %@–%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pieces %@–%@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Piezas %@–%@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pièces %@–%@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parti %@–%@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ピース %@–%@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "조각 %@–%@"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Części %@–%@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partes %@–%@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Части %@–%@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parçalar %@–%@"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Частини %@–%@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分块 %@–%@"
           }
         }
       }
@@ -52172,6 +52928,90 @@
           "stringUnit": {
             "state": "translated",
             "value": "仅使用明文节点连接。仅支持加密的节点无法连接。"
+          }
+        }
+      }
+    },
+    "Verified": {
+      "comment": "SeedHop torrent details piece map. Availability counts connected remote peers only; progress includes the full torrent.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifiziert"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verified"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérifié"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificato"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "検証済み"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "검증됨"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zweryfikowane"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificado"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Проверено"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Doğrulandı"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перевірено"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已验证"
           }
         }
       }

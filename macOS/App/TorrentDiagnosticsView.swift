@@ -32,6 +32,9 @@ struct TorrentDiagnosticsView: View {
     private var general: some View {
         ScrollView {
             VStack(alignment:.leading,spacing:14) {
+                TorrentPieceMapView(map:currentSection && !status.isChecking ? details?.pieceMap : nil,live:store.connected && store.detailsError == nil)
+                    .zIndex(1)
+                Divider()
                 HStack(alignment:.top) {
                     VStack(alignment:.leading,spacing:4) {
                         Text(status.label).font(.system(size:12,weight:.semibold))

@@ -55,6 +55,139 @@ use self::paused::TorrentStatePaused;
 pub use self::stats::{TorrentStats, TorrentStatsState};
 pub use self::streaming::FileStream;
 
+/// Bounded, ordered piece observations. Availability counts remote peers only.
+#[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PieceMap {
+    pub total_pieces: u32,
+    pub verified_pieces: u32,
+    pub availability: Option<f64>,
+    pub bins: Vec<PieceMapBin>,
+}
+
+#[derive(Clone, Debug, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PieceMapBin {
+    pub pieces: u32,
+    pub verified: u32,
+    pub downloading: u32,
+    pub minimum_availability: u32,
+    /// Missing locally and absent from all connected peers. None while paused.
+    pub unavailable_pieces: Option<u32>,
+}
+
+impl PieceMap {
+    fn collect(total: u32, remote: bool, pieces: impl Iterator<Item = (bool, bool, u32)>) -> Self {
+        let mut bins = vec![
+            PieceMapBin {
+                minimum_availability: u32::MAX,
+                unavailable_pieces: remote.then_some(0),
+                ..Default::default()
+            };
+            (total as usize).min(512)
+        ];
+        let mut verified_pieces = 0;
+        let mut minimum = u32::MAX;
+        let mut at_minimum = 0u32;
+        for (index, (verified, downloading, available)) in pieces.take(total as usize).enumerate() {
+            let bin = &mut bins[index * (total as usize).min(512) / total as usize];
+            bin.pieces += 1;
+            bin.verified += u32::from(verified);
+            bin.downloading += u32::from(!verified && downloading);
+            bin.minimum_availability = bin.minimum_availability.min(available);
+            if !verified
+                && available == 0
+                && let Some(count) = bin.unavailable_pieces.as_mut()
+            {
+                *count += 1;
+            }
+            verified_pieces += u32::from(verified);
+            if available < minimum {
+                minimum = available;
+                at_minimum = 1;
+            } else if available == minimum {
+                at_minimum += 1;
+            }
+        }
+        Self {
+            total_pieces: total,
+            verified_pieces,
+            availability: (remote && total > 0)
+                .then(|| minimum as f64 + 1.0 - at_minimum as f64 / total as f64),
+            bins,
+        }
+    }
+}
+
+#[cfg(test)]
+mod piece_map_tests {
+    use super::PieceMap;
+
+    #[test]
+    fn gaps_require_the_same_piece_to_be_missing_locally_and_remotely() {
+        let map = PieceMap::collect(
+            1024,
+            true,
+            (0..1024).map(|i| match i {
+                0 | 3 => (true, false, 0),
+                2 => (false, false, 0),
+                _ => (false, false, 2),
+            }),
+        );
+        assert_eq!(map.bins[0].minimum_availability, 0);
+        assert_eq!(map.bins[0].unavailable_pieces, Some(0));
+        assert_eq!(map.bins[1].unavailable_pieces, Some(1));
+        let paused = PieceMap::collect(1, false, [(false, false, 0)].into_iter());
+        assert_eq!(paused.bins[0].unavailable_pieces, None);
+    }
+
+    #[test]
+    fn piece_map_preserves_order_and_distributed_copies() {
+        let map = PieceMap::collect(
+            4,
+            true,
+            [
+                (true, true, 2),
+                (false, true, 3),
+                (false, false, 4),
+                (true, false, 2),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(map.verified_pieces, 2);
+        assert_eq!(map.availability, Some(2.5));
+        assert_eq!(map.bins[0].downloading, 0);
+        assert_eq!(map.bins[1].downloading, 1);
+        assert_eq!(map.bins[2].minimum_availability, 4);
+    }
+
+    #[test]
+    fn piece_map_is_bounded_and_keeps_rare_missing_pieces_visible() {
+        let map = PieceMap::collect(
+            100_003,
+            true,
+            (0..100_003).map(|i| (i % 2 == 0, false, if i == 100_002 { 0 } else { 30 })),
+        );
+        assert_eq!(map.bins.len(), 512);
+        assert_eq!(map.bins.iter().map(|b| b.pieces).sum::<u32>(), 100_003);
+        assert_eq!(map.bins.iter().map(|b| b.verified).sum::<u32>(), 50_002);
+        assert_eq!(map.bins.last().unwrap().minimum_availability, 0);
+        assert!(map.availability.unwrap() < 1.0);
+        assert_eq!(
+            PieceMap::collect(0, true, std::iter::empty()).availability,
+            None
+        );
+        assert_eq!(
+            PieceMap::collect(1, false, [(false, false, 0)].into_iter()).availability,
+            None
+        );
+        assert_eq!(
+            PieceMap::collect(1, true, [(false, false, 0)].into_iter()).availability,
+            Some(0.0)
+        );
+    }
+}
+
 // State machine transitions.
 //
 // - error -> initializing
@@ -370,6 +503,24 @@ impl ManagedTorrent {
                 .context("error getting chunks")?)),
             _ => bail!("no chunk tracker, torrent neither paused nor live"),
         }
+    }
+
+    /// Sample only when requested by the selected torrent's General tab.
+    pub fn piece_map(&self) -> Option<PieceMap> {
+        self.with_state(|state| match state {
+            ManagedTorrentState::Live(live) => live.piece_map(),
+            ManagedTorrentState::Paused(paused) => {
+                let chunks = &paused.chunk_tracker;
+                let total = chunks.get_lengths().total_pieces();
+                let have = chunks.get_have_pieces().as_slice();
+                Some(PieceMap::collect(
+                    total,
+                    false,
+                    (0..total as usize).map(|i| (have[i], false, 0)),
+                ))
+            }
+            _ => None,
+        })
     }
 
     /// Get the live state if the torrent is live.

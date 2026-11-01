@@ -39,7 +39,16 @@ enum PreviewFixtures {
             let leechers: UInt64? = index == 2 ? nil : UInt64(index)
             trackers.append(TrackerDetails(id:"sample-tracker-\(index)",address:address,endpoint:nil,hash:item.id,state:index == 1 ? "error" : "working",message:index == 1 ? "Tracker connection timed out" : nil,lastAnnounce:1_792_900_000,nextAnnounce:1_792_900_900,peers:UInt64(index) * 8,seeds:seeds,leechers:leechers))
         }
-        return TorrentDetails(torrentId:item.id,instanceId:"sample",observedAt:1_792_900_000,section:section,format:"v1",private:false,v1Hash:item.id,v2Hash:nil,dht:true,pex:true,localDiscovery:false,sessionDownloaded:120_000_000,sessionUploaded:32_000_000,seedingSeconds:7200,peers:section == "peers" ? peers : [],trackers:["trackers","activity"].contains(section) ? trackers : [])
+        var details = TorrentDetails(torrentId:item.id,instanceId:"sample",observedAt:1_792_900_000,section:section,format:"v1",private:false,v1Hash:item.id,v2Hash:nil,dht:true,pex:true,localDiscovery:false,sessionDownloaded:120_000_000,sessionUploaded:32_000_000,seedingSeconds:7200,peers:section == "peers" ? peers : [],trackers:["trackers","activity"].contains(section) ? trackers : [])
+        if section == "general", item.state != "checking" {
+            let bins = (0..<256).map { index in
+                let verified = item.progress >= 1 || (index * 73 % 256) < Int(item.progress * 256)
+                let copies: UInt32 = (64..<80).contains(index) ? 0 : UInt32(index < 40 ? 2 : index % 7 + 3)
+                return PieceMapBin(pieces:4,verified:verified ? 4 : 0,downloading:!item.isPaused && copies > 0 && !verified && index % 11 == 0 ? 2 : 0,minimumAvailability:copies,unavailablePieces:item.isPaused ? nil : (!verified && copies == 0 ? 4 : 0))
+            }
+            details.pieceMap = PieceMap(totalPieces:1024,verifiedPieces:bins.reduce(0) { $0 + $1.verified },availability:item.isPaused ? nil : 0.9375,bins:bins)
+        }
+        return details
     }
     static func trafficHistory() -> [TrafficSample] {
         let now = Date()
@@ -115,6 +124,16 @@ enum PreviewFixtures {
         try FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
         for (name,appearance) in [("light",NSAppearance.Name.aqua),("dark",.darkAqua)] {
             let store = LibraryStore(designPreview:true)
+            for (label, width) in [("narrow",360.0),("wide",760.0)] {
+                store.details = PreviewFixtures.diagnostics(store.torrents[0],section:"general")
+                try capture(TorrentDiagnosticsView(torrent:store.torrents[0],tab:"general").environmentObject(store).background(Design.canvas),size:NSSize(width:width,height:470),appearance:appearance,to:output.appendingPathComponent("piece-map-\(label)-\(name).png"))
+            }
+            let pieceMap = PreviewFixtures.diagnostics(store.torrents[0],section:"general").pieceMap
+            for availability in [false,true] {
+                try capture(TorrentPieceMapView(map:pieceMap,hover:PieceMapHover(index:66,availability:availability)).font(.system(size:11)).padding(14).frame(maxHeight:.infinity,alignment:.top).background(Design.canvas),size:NSSize(width:420,height:240),appearance:appearance,to:output.appendingPathComponent("piece-map-hover-\(availability ? "availability" : "progress")-\(name).png"))
+            }
+            store.details = PreviewFixtures.diagnostics(store.torrents[4],section:"general")
+            try capture(TorrentDiagnosticsView(torrent:store.torrents[4],tab:"general").environmentObject(store).background(Design.canvas),size:NSSize(width:460,height:470),appearance:appearance,to:output.appendingPathComponent("piece-map-paused-\(name).png"))
             try capture(LibraryView().environmentObject(store),size:NSSize(width:1240,height:780),appearance:appearance,to:output.appendingPathComponent("library-\(name).png"))
             store.showInspector = false
             try capture(LibraryView().environmentObject(store),size:NSSize(width:820,height:620),appearance:appearance,to:output.appendingPathComponent("compact-\(name).png"))
