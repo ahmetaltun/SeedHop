@@ -28,10 +28,10 @@ extension EnvironmentValues {
     static var announcementObserver: ((String, NSAccessibilityPriorityLevel) -> Void)?
     #endif
     static func announce(_ message: String, priority: NSAccessibilityPriorityLevel = .high) {
-        guard NSApp.isActive, let window = NSApp.keyWindow, window.isVisible else { return }
         #if SEEDHOP_DEVELOPMENT
         if let announcementObserver { announcementObserver(message,priority); return }
         #endif
+        guard NSApp.isActive, let window = NSApp.keyWindow, window.isVisible else { return }
         NSAccessibility.post(element:window,notification:.announcementRequested,userInfo:[
             .announcement:message,
             .priority:priority.rawValue

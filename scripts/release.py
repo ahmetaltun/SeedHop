@@ -118,8 +118,14 @@ def signing_keychain(directory, certificate, environ):
 def notarize(path, environ, output):
     credentials = ["--apple-id", environ["APPLE_ID"], "--password", environ["APPLE_PASSWORD"],
                    "--team-id", environ["APPLE_TEAM_ID"]]
-    response = json.loads(run("xcrun", "notarytool", "submit", path, *credentials,
-                              "--wait", "--timeout", "45m", "--output-format", "json", sensitive=True))
+    print(f"Submitting {path.name} for notarization", flush=True)
+    submission = json.loads(run("xcrun", "notarytool", "submit", path, *credentials,
+                               "--output-format", "json", sensitive=True))
+    # Preserve the ID before waiting: Apple continues processing after a timeout.
+    (output / f"{path.stem}-notary.json").write_text(json.dumps(submission, indent=2) + "\n")
+    print(f"Notarization submission: {submission['id']}", flush=True)
+    response = json.loads(run("xcrun", "notarytool", "wait", submission["id"], *credentials,
+                              "--timeout", "45m", "--output-format", "json", sensitive=True))
     (output / f"{path.stem}-notary.json").write_text(json.dumps(response, indent=2) + "\n")
     if response.get("status") != "Accepted":
         if response.get("id"):
@@ -206,6 +212,7 @@ def package(tag, number, output):
         private_key = directory / "sparkle.key"
         private_key.write_text(os.environ["SPARKLE_PRIVATE_KEY"].strip()); private_key.chmod(0o600)
         with signing_keychain(directory, certificate, os.environ):
+            print("Signing identity imported; building optimized app", flush=True)
             # Fresh bundle avoids carrying development-only resources into distribution.
             app = ROOT / ".build/SeedHop.app"
             if app.exists():
@@ -213,12 +220,14 @@ def package(tag, number, output):
                 shutil.rmtree(app)
             run("python3", "scripts/build.py", "--release", "--identity", identity, "--build-number", number)
             verify_app(app, os.environ["APPLE_TEAM_ID"])
+            print("Nested signatures, entitlements, timestamps, and architecture verified", flush=True)
             submission = directory / "SeedHop-notarization.zip"
             run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, submission)
             app_submission = notarize(submission, os.environ, output)
             run("xcrun", "stapler", "staple", app)
             run("xcrun", "stapler", "validate", app)
             run("spctl", "--assess", "--type", "execute", "--verbose=4", app)
+            print("App notarization, stapling, and Gatekeeper verification passed; creating DMG", flush=True)
             updates = directory / "updates"; updates.mkdir()
             archive = updates / f"SeedHop-{version}-arm64.zip"
             run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, archive)
@@ -234,6 +243,7 @@ def package(tag, number, output):
             run("codesign", "--verify", "--strict", dmg)
             run("spctl", "--assess", "--type", "open", "--context", "context:primary-signature", dmg)
             verify_dmg(dmg, app, os.environ["APPLE_TEAM_ID"])
+            print("DMG mounted and verified; generating signed Sparkle appcast", flush=True)
             distribution = sparkle.distribution()
             run(distribution / "bin/generate_appcast", "--ed-key-file", private_key, "--maximum-deltas", "0",
                 "--download-url-prefix", f"https://github.com/{REPOSITORY}/releases/download/{tag}/",

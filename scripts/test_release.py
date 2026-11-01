@@ -62,7 +62,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_notarization_rejection_retains_log_and_stops(self):
         with tempfile.TemporaryDirectory() as directory, \
-             patch.object(release, "run", side_effect=[b'{"status":"Invalid","id":"submission"}', b'{"issues":[]}']) as run:
+             patch.object(release, "run", side_effect=[b'{"id":"submission"}', b'{"status":"Invalid","id":"submission"}', b'{"issues":[]}']) as run:
             root = pathlib.Path(directory)
             with self.assertRaisesRegex(ValueError, "not accepted"):
                 release.notarize(root / "SeedHop.zip", self.secrets(), root)
@@ -71,9 +71,17 @@ class ReleaseTests(unittest.TestCase):
 
     def test_notarization_acceptance(self):
         with tempfile.TemporaryDirectory() as directory, \
-             patch.object(release, "run", return_value=b'{"status":"Accepted","id":"submission"}'):
+             patch.object(release, "run", side_effect=[b'{"id":"submission"}', b'{"status":"Accepted","id":"submission"}']):
             root = pathlib.Path(directory)
             self.assertEqual(release.notarize(root / "SeedHop.zip", self.secrets(), root), "submission")
+
+    def test_notarization_timeout_preserves_submission_id(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(release, "run", side_effect=[b'{"id":"submission"}', RuntimeError("Timed out")]):
+            root = pathlib.Path(directory)
+            with self.assertRaisesRegex(RuntimeError, "Timed out"):
+                release.notarize(root / "SeedHop.zip", self.secrets(), root)
+            self.assertEqual(json.loads((root / "SeedHop-notary.json").read_text())["id"], "submission")
 
     def test_keychain_cleanup_restores_search_list_after_import_failure(self):
         calls = []

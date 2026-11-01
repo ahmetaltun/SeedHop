@@ -373,7 +373,9 @@ import AppKit
         window.isReleasedWhenClosed = false; window.title = "Files inspector · native fixture"
         window.contentView = NSHostingView(rootView:FilesInterfaceFixture(store:store,session:session))
         window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps:true)
         defer { window.close() }
+        try await waitUntil("Files fixture did not become active and key") { NSApp.isActive && NSApp.keyWindow === window }
         try await settle()
         guard let outline = descendants(window.contentView).compactMap({ $0 as? NSOutlineView }).first else {
             throw UserFacingError(message:"Files inspector did not create a native outline")
@@ -396,10 +398,21 @@ import AppKit
               let popup = priorityCell.subviews.compactMap({ $0 as? NSPopUpButton }).first,
               let initialCheck = initialCell.subviews.compactMap({ $0 as? NSButton }).first(where:{ !($0 is NSPopUpButton) }),
               let name = initialCell.subviews.compactMap({ $0 as? NSTextField }).first(where:{ $0.stringValue == file.name }),
-              let icon = initialCell.subviews.compactMap({ $0 as? NSImageView }).first,
-              popup.isEnabled, session.selection.isEmpty,
-              abs(initialCheck.frame.midY-name.frame.midY) < 0.5, abs(icon.frame.midY-name.frame.midY) < 0.5,
-              outline.rowHeight == 28 else { throw UserFacingError(message:"Compact row controls are misaligned or priority requires row selection") }
+              let icon = initialCell.subviews.compactMap({ $0 as? NSImageView }).first else {
+            throw UserFacingError(message:"Compact file row controls unavailable at row \(initialRow)")
+        }
+        initialCell.layoutSubtreeIfNeeded(); priorityCell.layoutSubtreeIfNeeded()
+        // Native controls with odd pixel heights can differ by half a backing pixel.
+        // Compare rendered geometry after layout, including newly materialized cells.
+        let tolerance = 0.5 / window.backingScaleFactor + 0.01
+        let geometry = "scale=\(window.backingScaleFactor), height=\(outline.rowHeight), checkbox=\(initialCheck.frame), name=\(name.frame), icon=\(icon.frame), priorityEnabled=\(popup.isEnabled), selection=\(session.selection)"
+        print("Files row geometry: \(geometry)")
+        guard popup.isEnabled, session.selection.isEmpty,
+              abs(initialCheck.frame.midY-name.frame.midY) <= tolerance,
+              abs(icon.frame.midY-name.frame.midY) <= tolerance,
+              outline.rowHeight == 28 else {
+            throw UserFacingError(message:"Compact row controls are misaligned or priority requires row selection: \(geometry)")
+        }
         popup.selectItem(withTag:2)
         NSApp.sendAction(popup.action!,to:popup.target,from:popup); try await settle()
         guard UXSelfTest.nativeRequests.last(where:{ $0.command == "priorities" })?.priorities == [2,1,1,1], session.selection.isEmpty else {
@@ -420,14 +433,22 @@ import AppKit
         if let menu = outline.menu {
             menu.delegate?.menuNeedsUpdate?(menu)
             guard let rename = menu.items.firstIndex(where:{ $0.identifier?.rawValue == "files-rename" }) else { throw UserFacingError(message:"File context menu omitted Rename") }
-            menu.performActionForItem(at:rename); try await settle()
+            menu.performActionForItem(at:rename)
+            try await waitUntil("File outline Rename did not focus its selected file") {
+                guard let editor = window.attachedSheet?.firstResponder as? NSTextView,
+                      let input = editor.delegate as? NSTextField else { return false }
+                return editor.isFieldEditor && input.stringValue == file.name
+            }
             guard let sheet = window.attachedSheet,
                   let editor = sheet.firstResponder as? NSTextView, editor.isFieldEditor,
                   let input = editor.delegate as? NSTextField, input.stringValue == file.name,
                   let cancel = descendants(sheet.contentView).compactMap({ $0 as? NSButton }).first(where:{ $0.identifier?.rawValue == "rename-cancel" }) else {
                 throw UserFacingError(message:"File outline Rename did not capture its selected file")
             }
-            cancel.performClick(nil); try await settle()
+            cancel.performClick(nil)
+            try await waitUntil("Rename did not restore outline focus") {
+                window.attachedSheet == nil && window.firstResponder === outline
+            }
             guard window.firstResponder === outline else { throw UserFacingError(message:"Rename did not restore outline focus") }
         }
         guard let space = NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:window.windowNumber,context:nil,characters:" ",charactersIgnoringModifiers:" ",isARepeat:false,keyCode:49) else {
@@ -516,13 +537,21 @@ import AppKit
             throw UserFacingError(message:"Metadata did not focus its native file table: \(String(describing:sheet.firstResponder))")
         }
         print("PASS: Resolved metadata moves native focus to file selection.")
-        store.showImport = false; try await settle()
+        store.showImport = false
+        try await waitUntil("Metadata import did not close before Rename") {
+            window.attachedSheet == nil && NSApp.keyWindow === window
+        }
         guard let table = descendants(window.contentView).compactMap({ $0 as? NSTableView }).first else {
             throw UserFacingError(message:"Controlled transfer table unavailable")
         }
         window.makeFirstResponder(table)
         let item = store.torrents[0]
-        store.requestRename(item,file:item.files[0]); try await settle()
+        store.requestRename(item,file:item.files[0])
+        try await waitUntil("Rename did not focus its captured file name") {
+            guard let editor = window.attachedSheet?.firstResponder as? NSTextView,
+                  let input = editor.delegate as? NSTextField else { return false }
+            return editor.isFieldEditor && input.stringValue == URL(fileURLWithPath:item.files[0].name).lastPathComponent
+        }
         guard let rename = window.attachedSheet,
               let editor = rename.firstResponder as? NSTextView, editor.isFieldEditor,
               let input = editor.delegate as? NSTextField,
@@ -532,7 +561,10 @@ import AppKit
         guard let cancel = descendants(rename.contentView).compactMap({ $0 as? NSButton }).first(where:{ $0.identifier?.rawValue == "rename-cancel" }) else {
             throw UserFacingError(message:"Native rename Cancel button unavailable")
         }
-        cancel.performClick(nil); try await settle()
+        cancel.performClick(nil)
+        try await waitUntil("Rename cancellation did not restore original native focus") {
+            window.attachedSheet == nil && window.firstResponder === table
+        }
         guard window.attachedSheet == nil, window.firstResponder === table else {
             throw UserFacingError(message:"Rename cancellation did not restore original native focus")
         }
@@ -561,7 +593,7 @@ import AppKit
         let movingTitle = String(localized:"Moving files…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         guard copyingCount == 3, announcements.count == copyingCount,
               announcements.last == String(localized:"File change. \(movingTitle)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), priorities.last == .medium else {
-            throw UserFacingError(message:"File copying did not announce its phase once or announced byte updates")
+            throw UserFacingError(message:"File copying did not announce its phase once or announced byte updates: \(announcements)")
         }
         store.fileOperation?.cancelRequested = true; try await settle()
         let cancellingTitle = String(localized:"Cancelling…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
