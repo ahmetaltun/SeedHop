@@ -57,6 +57,10 @@ Notarization and distribution require your own Developer ID and Apple account.
 No certificates, signing keys, credentials, or automatic service registrations
 are added by the build script.
 
+GitHub Actions builds signed, notarized DMG and ZIP assets as draft releases.
+Sparkle provides user-approved updates through appcasts attached to GitHub
+Releases. See [release setup, update behavior, and acceptance](docs/RELEASING.md).
+
 ## Explore the design
 
 ```sh

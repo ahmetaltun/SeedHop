@@ -14,8 +14,9 @@ class ArchitectureTests(unittest.TestCase):
         for flags in ([], ["--release"]):
             with self.subTest(flags=flags), tempfile.TemporaryDirectory() as directory:
                 root = pathlib.Path(directory)
-                with patch("sys.argv", ["build.py", "--identity", "-", *flags]), \
+                with patch("sys.argv", ["build.py", "--identity", "Developer ID Application: Test (ABCDEFGHIJ)" if flags else "-", *flags]), \
                      patch.object(build, "ROOT", root), \
+                     patch.object(build.subprocess, "check_output", return_value="Developer ID Application: Test (ABCDEFGHIJ)"), \
                      patch.object(build.platform, "system", return_value="Darwin"), \
                      patch.object(build.platform, "machine", return_value="arm64"), \
                      patch.object(build, "run", side_effect=InterruptedError) as run:

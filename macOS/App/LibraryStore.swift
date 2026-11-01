@@ -101,6 +101,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     @Published var resumeAtLogin = UserDefaults.standard.bool(forKey:"resumeAtLogin")
     @Published var downloadDirectory = UserDefaults.standard.string(forKey:"downloadDirectory") ?? FileManager.default.urls(for:.downloadsDirectory,in:.userDomainMask)[0].path
     @Published var completionNotifications = UserDefaults.standard.object(forKey:"completionNotifications") as? Bool ?? false
+    private(set) var updatePrepared = false
     let designPreview: Bool
     let client: any EngineTransport
     // Derived from the current snapshot, never a second source of transfer state.
@@ -278,6 +279,19 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     func start() async {
         guard !designPreview, !connected, !connecting, !switching else { return }
         connecting = true; defer { connecting = false }
+        if UserDefaults.standard.bool(forKey:"updateRestoreBackground") {
+            let service = SMAppService.agent(plistName:SeedHopIdentity.agentPlist)
+            do {
+                if service.status == .notRegistered || service.status == .notFound { try service.register() }
+                guard service.status == .enabled else { throw UserFacingError(message:String(localized:"Allow SeedHop in System Settings → General → Login Items & Extensions, then try again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
+                backgroundEnabled = true
+                UserDefaults.standard.removeObject(forKey:"updateRestoreBackground")
+            } catch {
+                // Keep the saved preference and marker so a later launch can retry.
+                backgroundEnabled = false
+                self.error = error.localizedDescription
+            }
+        }
         do {
             let service = SMAppService.agent(plistName:SeedHopIdentity.agentPlist)
             if backgroundEnabled && service.status != .enabled {
@@ -752,6 +766,63 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     func setLogin(_ enabled: Bool) async {
         do { var r = EngineRequest(command:"login"); r.resumeAtLogin = enabled; _ = try await perform(r); resumeAtLogin = enabled; UserDefaults.standard.set(enabled,forKey:"resumeAtLogin") }
         catch { self.error = error.localizedDescription }
+    }
+    var canPrepareForUpdate: Bool {
+        !designPreview && connected && !switching && !connecting && !hasFileOperation &&
+        !showImport && !savingEncryption && !savingSchedule && !savingBandwidth &&
+        !savingQueue && busyTransfers.isEmpty
+    }
+    static func waitForEngineExit(_ pid: Int32) async throws {
+        guard pid > 1, pid != ProcessInfo.processInfo.processIdentifier else {
+            throw UserFacingError(message:String(localized:"The engine could not stop for the update. Try again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+        }
+        for _ in 0..<100 {
+            if kill(pid, 0) != 0 && errno == ESRCH { return }
+            try await Task.sleep(for:.milliseconds(100))
+        }
+        throw UserFacingError(message:String(localized:"The engine could not stop for the update. Try again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+    }
+    func prepareForUpdate(
+        unregisterAgent: () async throws -> Void = {
+            let service = SMAppService.agent(plistName:SeedHopIdentity.agentPlist)
+            if service.status != .notRegistered && service.status != .notFound { try await service.unregister() }
+        },
+        waitForExit: (Int32) async throws -> Void = LibraryStore.waitForEngineExit
+    ) async -> Bool {
+        if updatePrepared { return true }
+        guard canPrepareForUpdate else {
+            error = String(localized:"Finish the current operation before installing the update.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            return false
+        }
+        switching = true; polling?.cancel(); reconnect?.cancel()
+        do {
+            // A normal shutdown preserves paused intent; explicitStop would pause all transfers.
+            let reply = try await client.send(EngineRequest(command:"shutdown"))
+            guard let pid = reply.stoppedProcessID else {
+                throw UserFacingError(message:String(localized:"The engine could not stop for the update. Try again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+            }
+            client.invalidate(); connected = false
+            try await waitForExit(pid)
+            if backgroundEnabled {
+                UserDefaults.standard.set(true,forKey:"updateRestoreBackground")
+                UserDefaults.standard.synchronize()
+            }
+            // Successful shutdown exits with status zero, so KeepAlive does not respawn it.
+            // Unregister before replacement to prevent a login or launchd restart of old code.
+            try await unregisterAgent()
+            updatePrepared = true
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            await resumeAfterFailedUpdate()
+            return false
+        }
+    }
+    func resumeAfterFailedUpdate() async {
+        guard switching || updatePrepared else { return }
+        updatePrepared = false; switching = false
+        client.invalidate(); connected = false
+        await start()
     }
     func prepareToQuit(stopEverything: Bool) async -> Bool {
         polling?.cancel(); reconnect?.cancel()

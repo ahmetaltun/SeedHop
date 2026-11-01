@@ -95,6 +95,7 @@
       "Another SeedHop engine is already using this library.": "c2b9606790a881b29d621599eba58ccccd1856741fe55c836cac25c6fda00386",
       "Appearance": "c247f720dc087106e916ef13f69711572db116f833c63493e6bb380b80f0ede8",
       "Appearance changes apply immediately.": "1bbe28e43862e01e711e318d0f77a5c44b7783e2aa51b7d1617fbed57f4046ae",
+      "Automatically check for updates": "dfc1153b5dce227ec3c830f022e599eb50da8024a36b02a0cbe34671fb4190d5",
       "Availability": "40ca99ccf818eace62d3ee4f653b44a753d4c45ebb368f8cf9ba36d47a48e535",
       "Background access is unavailable. Transfers will run while SeedHop is open. You can enable background access in Settings.": "0b6ee3e5efbcc6200447f0e853287096bd07d5b97088b2b06084661f51e9b150",
       "Bandwidth Limits": "130c7d0e864f73be2d7ca3c661073a556eee41828725612386d49a5821bdbe4a",
@@ -109,6 +110,7 @@
       "Cancel file change": "0a8f89ab7979e15350346331e97974bc5a747d5d9cc7d0ab190f7210a095a6e3",
       "Cancelling": "86a59090abb799fda486dafe4a947a2a92ebeb8e833b9e56f840805bd7b06c31",
       "Cancelling…": "3753f938a46c5bd81937b70b305b041e0eaf9e560c8668de2b12183df41441f9",
+      "Check for Updates…": "0a7739fee1d89fdd845e2c6d12f059b4517ebffe729c1b2cf4fb319cc974210c",
       "Check the destination disk and folder, then retry.": "74d692fecd91b4e25ef211b206e2158b6ae82e3ffe7d8ec67518ab3f5c765058",
       "Check the destination disk and folder, then retry. %@": "5086fe0735294050860e483a8f5e2e2d7599b9069f9f2d8459034753ab29c1dd",
       "Check the entered values and try again.": "de6f1d0d0703dba9714752681584aefb833131cfd7428fccaddfcd7cb08922b6",
@@ -236,6 +238,7 @@
       "Find Transfer…": "a3dd7ed3054a3d432412465244085a415b550dc7b6015575837125817d61bc32",
       "Finding peers": "4507332b82b744b6547da9a304d4f259b56585e74509d0e06b1ad095a9fd924a",
       "Finding the file list…": "26825d6c0ee2cc4a5485ab1e5c8e0517a8cb966cb5a9beaa5282185c1cd8e810",
+      "Finish the current operation before installing the update.": "24c0cda562b960cfebd497096e54608eb251077835b5615ad5d504134f9e497e",
       "Finishing this change. File verification is shown separately in the transfer list.": "35a6e07a2a20f3150ce965e8094b0f2156fdfc2070f32485487fb5e7ea94c965",
       "Focus Transfer List": "1f1f55ced0e651c49f82ccd71e04a64de1821f2735cb416e3362a6f53a2bd6a5",
       "Follow macOS": "c6566cee67a92a9e926cea5adfbead2e5ff337ff4eead99a093ba7348fd8e11c",
@@ -507,6 +510,7 @@
       "Size for %@: %@": "0b6e8cebb65c67657bc27a127c117c8a5fed52933e12b2cbb73019db6ac040a4",
       "Skip Download": "20058bf349b6ce04415103c95c9567e068d33bda4e3805e72dc8024a3c3c1086",
       "Skipped": "d093be2e8d0290514429de02624d07612141e6060a42eb2b82d1c6d8b6856da2",
+      "Software updates": "c2bd69f883e09a237cc143cc53bdf58d25b328ac19de66a466df5e1d0ef844f6",
       "Something good starts here.": "21f077d35061c15c6bbf5550dde1f75975b0c6e5d6cedf946f8b1bc01f348233",
       "Something needs attention": "43daa72b25ebd94cbf292b4b6282fd0bbcf5b8f3f7f3e379ad1ab5857bad4a93",
       "Something needs attention. %@": "36af4ccfeafa3cf6facda32bb4463a62429e501f4e51562deba06248fbb6001c",
@@ -528,6 +532,7 @@
       "The active location could not be established. All copies were retained. Inspect the folders before changing files.": "35e1438306356cff64dddab4cfae96ccf06cc7e9e372da1a33e2dade655f70dd",
       "The engine could not complete this action. Check the details, then try again.": "d7bdd32967a32afcd9f873147ddcc250dd79b1f56b7ba593fb40cc537a49e9e7",
       "The engine could not restart. Your library has been preserved.": "53ac1f709c295998e46253f507ffb22b791d7641dc74f9a75684e444604c05ea",
+      "The engine could not stop for the update. Try again.": "3e0c1027ab81dfbdf30c3303e193f67e7c113c81855d5d6117b2a38e255a6646",
       "The engine did not confirm this transfer. Check your library before trying again.": "00c8ca872db4d4e558748d4e673903b236a15d40a50e9aa8f12fc0c84c7c9a0b",
       "The engine did not return transfer details. Try again.": "a5a13e78832a84f1d3869d080b6c31fb3029f88aebfdad4c290c57fd883dcf1b",
       "The engine is not connected yet.": "e085546ed51d7d0d1900992aca792e58953ec189e857b232a2ff401b333805cf",
@@ -745,6 +750,6 @@
       "origin": "AI draft"
     }
   },
-  "sourceDigest": "62dc1824978bc18911a296eb44f1557d07fc63e034dc583cbec93b0d3614f359",
+  "sourceDigest": "73a9228521c8de64d07295e68914c313e3855693d4fa13641f7194eb68524fcc",
   "sourceLanguage": "en"
 }

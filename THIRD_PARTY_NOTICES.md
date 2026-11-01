@@ -1,5 +1,10 @@
 # Third-party notices
 
+SeedHop bundles [Sparkle 2.10.1](https://github.com/sparkle-project/Sparkle/releases/tag/2.10.1)
+for software updates. Sparkle and its bundled components retain their upstream
+licenses and notices. The full distribution license is included in the app as
+`Contents/Resources/Sparkle-LICENSE`.
+
 SeedHop uses the following resolved Rust packages. Upstream source and license files are retained in the vendored source or Cargo registry distributions.
 
 | Package | Version | License |

@@ -1,5 +1,18 @@
 # Release validation — 2026-10-26
 
+## Release automation added 2026-11-02
+
+The GitHub Release workflow signs and notarizes distribution artifacts and
+generates a Sparkle update feed. See [releasing](RELEASING.md) for credentials,
+draft creation, and update acceptance. Historical credential availability below
+describes the earlier local checkpoint. It does not establish current CI signing
+success. Automated packaging does not close any manual gate listed here.
+
+Before publication, also validate a two-build Sparkle upgrade with foreground and
+background transfers, helper replacement, shutdown failure, cancellation, offline
+checks, and rejection of a corrupted update. Retain results against the exact
+artifact hashes. Development fixture results alone do not certify an upgrade.
+
 ## Localization gate added 2026-10-30
 
 Run `make localization-check`, `make localization-test`, and

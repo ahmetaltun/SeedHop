@@ -111,7 +111,7 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             if let activity { ProcessInfo.processInfo.endActivity(activity); self.activity = nil }
             // Reply first; process exit is the final disk-ownership barrier.
             DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) { exit(0) }
-            return EngineReply()
+            return EngineReply(stoppedProcessID:ProcessInfo.processInfo.processIdentifier)
         }
         let core = try start(destination: r.destination,stateDirectory:r.stateDirectory)
         switch r.command {

@@ -88,6 +88,9 @@ struct SettingsView: View {
                                 Toggle(isOn:Binding(get:{store.resumeAtLogin},set:{ enabled in Task { await store.setLogin(enabled) } })) { settingText(String(localized:"Resume transfers when I log in",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), String(localized:"Previously paused transfers will stay paused.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }.disabled(!store.backgroundEnabled || store.switching || store.savingEncryption)
                             }.toggleStyle(.switch).controlSize(.small)
                         }
+                        group(String(localized:"Software updates",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
+                            SoftwareUpdateSettings()
+                        }
                         group(String(localized:"Notifications",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
                             Toggle(isOn:Binding(get:{store.completionNotifications},set:{ enabled in
                                 if enabled { UNUserNotificationCenter.current().requestAuthorization(options:[.alert,.sound]) { granted,_ in Task { @MainActor in store.completionNotifications = granted; UserDefaults.standard.set(granted,forKey:"completionNotifications") } } }
@@ -137,7 +140,7 @@ struct SettingsView: View {
                         Text(String(localized:"SeedHop rechecks saved files after an engine restart.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:11)).foregroundStyle(.secondary)
 
                     } else {
-                        VStack(spacing:15) { BrandMark(size:72); Text("SeedHop").font(.system(size:30,weight:.semibold,design:.rounded)); Text("0.1.0 · Milestone 0").font(.system(size:12)).foregroundStyle(.secondary); Text(String(localized:"A thoughtful home for your torrents.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:13)); Text(String(localized:"Built with SwiftUI, AppKit, and Rust.\nFree and open source.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:11)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(5) }.frame(maxWidth:.infinity).padding(.vertical,20)
+                        VStack(spacing:15) { BrandMark(size:72); Text("SeedHop").font(.system(size:30,weight:.semibold,design:.rounded)); Text(verbatim:Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "").font(.system(size:12)).foregroundStyle(.secondary); Text(String(localized:"A thoughtful home for your torrents.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:13)); Text(String(localized:"Built with SwiftUI, AppKit, and Rust.\nFree and open source.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).font(.system(size:11)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(5) }.frame(maxWidth:.infinity).padding(.vertical,20)
                     }
                 }.padding(26)
             }

@@ -208,10 +208,11 @@ struct EngineReply: Codable {
     var cancelled: Bool?
     var cancellationAccepted: Bool?
     var details: TorrentDetails?
-    init(snapshot: LibrarySnapshot? = nil, preview: ImportPreview? = nil, id: String? = nil, error: String? = nil, errorMessage: EngineMessage? = nil, cancelled: Bool? = nil, cancellationAccepted: Bool? = nil, details: TorrentDetails? = nil) {
+    var stoppedProcessID: Int32?
+    init(snapshot: LibrarySnapshot? = nil, preview: ImportPreview? = nil, id: String? = nil, error: String? = nil, errorMessage: EngineMessage? = nil, cancelled: Bool? = nil, cancellationAccepted: Bool? = nil, details: TorrentDetails? = nil, stoppedProcessID: Int32? = nil) {
         self.snapshot = snapshot; self.preview = preview; self.id = id; self.error = error
         self.cancelled = cancelled; self.cancellationAccepted = cancellationAccepted; self.details = details
-        self.errorMessage = errorMessage
+        self.errorMessage = errorMessage; self.stoppedProcessID = stoppedProcessID
     }
 }
 struct UserFacingError: LocalizedError {

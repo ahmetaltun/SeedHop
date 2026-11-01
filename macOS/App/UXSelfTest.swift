@@ -12,6 +12,82 @@ import SwiftUI
             try await body(); passed += 1; print("PASS: \(name)")
         }
 
+        try await check("Updates defer during import and file operations without stopping transfers") {
+            let (store, peer) = library()
+            store.showImport = true
+            let imported = await store.prepareForUpdate()
+            try expect(!imported && peer.commands("shutdown").isEmpty,"Update interrupted import")
+            store.showImport = false; store.savingBandwidth = true
+            try expect(!store.canPrepareForUpdate,"Update interrupted settings save")
+            store.savingBandwidth = false; store.switching = true
+            try expect(!store.canPrepareForUpdate,"Update overlapped a host handoff")
+            store.switching = false
+            store.fileOperation = FileOperationItem(id:"fixture",torrentId:"fixture",kind:"move",phase:"copying",completedBytes:0,totalBytes:1,cancelRequested:false)
+            try expect(!store.canPrepareForUpdate,"Update interrupted file changes")
+            store.fileOperation = nil
+        }
+
+        try await check("Update shutdown preserves transfer intent and waits for process exit before unregistering") {
+            let (store, peer) = library(); store.backgroundEnabled = false
+            let original = store.torrents
+            var steps: [String] = []
+            let ready = await store.prepareForUpdate(unregisterAgent:{ steps.append("unregister") },waitForExit:{ pid in
+                try expect(pid == 42,"Wrong process shutdown barrier")
+                steps.append("exited")
+            })
+            try expect(ready && store.updatePrepared && !store.connected,"Update did not prepare shutdown")
+            try expect(steps == ["exited","unregister"],"Agent unregistered before persistence and process exit")
+            try expect(peer.commands("shutdown").count == 1 && peer.commands("shutdown")[0].explicitStop == nil,"Update paused running transfers")
+            try expect(store.torrents.map(\.pausedIntent) == original.map(\.pausedIntent),"Update changed pause intent")
+            let repeated = await store.prepareForUpdate(unregisterAgent:{ steps.append("duplicate") },waitForExit:{ _ in })
+            try expect(repeated && steps.count == 2,"Repeated termination duplicated shutdown")
+            await store.resumeAfterFailedUpdate()
+            try expect(store.connected && !store.switching && !store.updatePrepared,"Failed installation could not restore session")
+        }
+
+        try await check("Failed update shutdown cancels installation and reconnects the current engine") {
+            let (store, peer) = library(); store.backgroundEnabled = false
+            peer.hold = ["shutdown"]
+            var unregistered = false
+            let preparation = Task { await store.prepareForUpdate(unregisterAgent:{ unregistered = true },waitForExit:{ _ in }) }
+            try await eventually { peer.pending.count == 1 }
+            peer.releaseFirst(error:UserFacingError(message:"Controlled shutdown failure"))
+            let ready = await preparation.value
+            try expect(!ready && !unregistered && !store.updatePrepared,"Failed shutdown allowed replacement")
+            try expect(store.connected && !store.switching && store.error != nil,"Failed shutdown left transfers disconnected")
+        }
+
+        try await check("Process exit failure prevents agent removal and app replacement") {
+            let (store, _) = library(); store.backgroundEnabled = false
+            var unregistered = false
+            let ready = await store.prepareForUpdate(unregisterAgent:{ unregistered = true },waitForExit:{ _ in
+                throw UserFacingError(message:"Controlled process exit timeout")
+            })
+            try expect(!ready && !unregistered && !store.updatePrepared && store.connected,"Exit timeout permitted replacement")
+        }
+
+        try await check("Background updates retain a durable restoration marker and the saved preference") {
+            let defaults = UserDefaults.standard
+            let saved = defaults.object(forKey:"updateRestoreBackground")
+            defer {
+                if let saved { defaults.set(saved,forKey:"updateRestoreBackground") }
+                else { defaults.removeObject(forKey:"updateRestoreBackground") }
+            }
+            let (store, _) = library(); store.backgroundEnabled = true
+            let ready = await store.prepareForUpdate(unregisterAgent:{
+                try expect(defaults.bool(forKey:"updateRestoreBackground"),"Agent removed before durable restoration marker")
+            },waitForExit:{ _ in })
+            try expect(ready && store.backgroundEnabled,"Update discarded background preference")
+        }
+
+        try await check("Unregistration failure cancels replacement and restores foreground transfers") {
+            let (store, _) = library(); store.backgroundEnabled = false
+            let ready = await store.prepareForUpdate(unregisterAgent:{
+                throw UserFacingError(message:"Controlled unregister failure")
+            },waitForExit:{ _ in })
+            try expect(!ready && store.connected && !store.updatePrepared && !store.switching,"Unregister failure permitted replacement")
+        }
+
         try await check("Piece maps decode without breaking older details replies") {
             let details = PreviewFixtures.diagnostics(PreviewFixtures.torrents[0],section:"general")
             let encoded = try JSONEncoder().encode(details)
@@ -1035,7 +1111,7 @@ import SwiftUI
             var details = PreviewFixtures.diagnostics(item,section:request.section ?? "general")
             details.instanceId = "fixture"
             return EngineReply(details:details)
-        case "shutdown": stopped = true
+        case "shutdown": stopped = true; return EngineReply(stoppedProcessID:42)
         case "limits":
             normalDownloadLimit = request.downloadLimit ?? normalDownloadLimit
             normalUploadLimit = request.uploadLimit ?? normalUploadLimit

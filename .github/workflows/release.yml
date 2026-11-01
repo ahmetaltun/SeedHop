@@ -1,0 +1,128 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing stable version tag (v0.1.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ inputs.tag || github.ref_name }}
+
+  package:
+    needs: checks
+    runs-on: macos-15
+    timeout-minutes: 150
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      BUILD_NUMBER: ${{ github.run_number }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Select native toolchain
+        run: |
+          test "$(uname -m)" = arm64
+          sudo xcode-select --switch /Applications/Xcode_26.3.app
+          rustup show active-toolchain
+          rustup target add aarch64-apple-darwin
+      - name: Validate release tag before accessing signing secrets
+        run: |
+          python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, 'scripts')
+          import release
+          release.preflight(os.environ['RELEASE_TAG'], os.environ['BUILD_NUMBER'])
+          PY
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-${{ runner.os }}-${{ runner.arch }}-xcode26.3-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock', 'Cargo.toml', 'crates/**/Cargo.toml', 'vendor/rqbit/**/*.rs') }}
+          restore-keys: release-${{ runner.os }}-${{ runner.arch }}-xcode26.3-
+      - name: Sign, notarize, package, and verify
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: python3 scripts/release.py --tag "$RELEASE_TAG" --build-number "$BUILD_NUMBER"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-assets
+          path: .build/release/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Retain failed notarization results
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: notarization-diagnostics
+          path: .build/release/*notary*.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  draft:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: release-assets
+      - name: Create or refresh draft only
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          tag = os.environ['RELEASE_TAG']
+          result = subprocess.run(['gh', 'api', f'repos/{os.environ["GH_REPO"]}/releases/tags/{tag}'], capture_output=True)
+          existing = None
+          if result.returncode == 0:
+              existing = json.loads(result.stdout)
+              if not existing['draft']:
+                  raise SystemExit('Refusing to overwrite a published release')
+          elif b'404' not in result.stderr:
+              raise SystemExit('Could not inspect existing release')
+          notes = pathlib.Path('release-notes.md')
+          notes.write_text('SeedHop ' + tag[1:] + '\n\nmacOS 15+, Apple Silicon.\n\n'
+                           'Signed and notarized. Manual release acceptance remains pending. '
+                           'Complete docs/RELEASE-VALIDATION.md before publishing.\n\n'
+                           'The update feed becomes public when this stable release is published.\n')
+          assets = sorted(str(p) for p in pathlib.Path('release-assets').iterdir() if p.is_file())
+          if existing:
+              subprocess.run(['gh', 'release', 'upload', tag, '--clobber', *assets], check=True)
+          else:
+              subprocess.run(['gh', 'release', 'create', tag, '--verify-tag', '--draft', '--title', 'SeedHop ' + tag[1:],
+                              '--notes-file', str(notes), *assets], check=True)
+          PY

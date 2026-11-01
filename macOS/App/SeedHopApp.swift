@@ -27,6 +27,7 @@ import SwiftUI
                 Button(String(localized:"Open Torrent File…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.openFiles() }.keyboardShortcut("o").disabled(store.hasFileOperation)
                 Button(String(localized:"Paste Magnet Link…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.pasteMagnet() }.keyboardShortcut("v",modifiers:[.command,.shift]).disabled(store.hasFileOperation)
             }
+            SoftwareUpdateCommands()
             LibraryNavigationCommands(store:store)
             CommandMenu(String(localized:"Transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
                 Button(store.resumeSelectedLabel) { store.toggleSelected(paused:false) }.keyboardShortcut("r").disabled(!store.canResumeSelection)
@@ -81,13 +82,24 @@ struct LibraryNavigationCommands: Commands {
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender:NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender:NSApplication) -> NSApplication.TerminateReply {
-        guard let store, !quitting else { return quitting ? .terminateCancel : .terminateNow }
+        guard let store else { return SoftwareUpdate.shared.installing ? .terminateCancel : .terminateNow }
+        guard !quitting else { return .terminateCancel }
         quitting = true
-        Task { let ready = await store.prepareToQuit(stopEverything:stopEverything); quitting = false; stopEverything = false; sender.reply(toApplicationShouldTerminate:ready) }
+        Task {
+            let ready = SoftwareUpdate.shared.installing
+                ? await store.prepareForUpdate()
+                : await store.prepareToQuit(stopEverything:stopEverything)
+            quitting = false; stopEverything = false
+            sender.reply(toApplicationShouldTerminate:ready)
+        }
         return .terminateLater
     }
     func applicationDidFinishLaunching(_ notification:Notification) {
         menuLocalization.install()
+        SoftwareUpdate.shared.installationFailed = { [weak self] in
+            Task { await self?.store?.resumeAfterFailedUpdate() }
+        }
+        SoftwareUpdate.shared.start()
         #if SEEDHOP_DEVELOPMENT
         if ProcessInfo.processInfo.arguments.contains("--verify-menus") {
             Task {

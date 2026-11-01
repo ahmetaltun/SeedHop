@@ -9,11 +9,25 @@ import shutil
 import subprocess
 import hashlib
 import platform
+import re
+import tomllib
+import sparkle
 from localization import LANGUAGES, check as check_localizations, normalize as normalize_localizations, pseudolocalize
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SIGNING_CONFIG = ROOT / '.build/signing-identity'
 RUST_TARGET = "aarch64-apple-darwin"
+
+def workspace_version():
+    version = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
+    if not re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", version):
+        raise ValueError("Distribution requires a stable major.minor.patch workspace version.")
+    return version
+
+def build_number(value):
+    if not re.fullmatch(r"[1-9]\d{0,17}", value):
+        raise argparse.ArgumentTypeError("Build number must be a positive integer of at most 18 digits.")
+    return value
 
 def run(*args):
     print("+", " ".join(map(str,args)),flush=True)
@@ -31,6 +45,7 @@ def verify_arm64(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--release",action="store_true")
+    parser.add_argument("--build-number", type=build_number, default="1", help="Increasing distribution build number")
     parser.add_argument("--identity", default=os.environ.get('SEEDHOP_SIGNING_IDENTITY') or (SIGNING_CONFIG.read_text().strip() if SIGNING_CONFIG.exists() else '-'), help="Signing identity; defaults to SEEDHOP_SIGNING_IDENTITY, saved local identity, then ad-hoc")
     parser.add_argument("--save-identity", action="store_true", help="Save the validated identity locally for subsequent builds")
     parser.add_argument("--validation-root", type=pathlib.Path, help="Build an isolated development lifecycle fixture with a distinct service namespace and library")
@@ -48,6 +63,8 @@ def main():
         identities = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'], text=True)
         if args.identity not in identities:
             parser.error('The requested signing identity is not valid or its private key is unavailable in this keychain.')
+    if args.release and not args.identity.startswith('Developer ID Application:'):
+        parser.error('Release builds require a Developer ID Application signing identity.')
     if args.validation_root and (args.release or args.identity == '-'):
         parser.error('Lifecycle fixtures require a certificate-backed development build.')
     if args.save_identity:
@@ -86,8 +103,19 @@ def main():
     iconset=ROOT/".build/AppIcon.iconset"
     run("swift","-module-cache-path",ROOT/".cache/swift",ROOT/"scripts/Icon.swift",iconset,ROOT/"macOS/Resources/AppIcon.png")
     run("iconutil","-c","icns",iconset,"-o",contents/"Resources/AppIcon.icns")
-    base = {"CFBundleVersion":"1","CFBundleShortVersionString":"0.1.0","LSMinimumSystemVersion":"15.0","LSArchitecturePriority":["arm64"],"LSRequiresNativeExecution":True,"CFBundleDevelopmentRegion":"en","CFBundleLocalizations":LANGUAGES + (["en-XA"] if args.pseudolocalization else []),"NSLocalNetworkUsageDescription":"SeedHop connects to torrent peers and trackers on networks you use."}
+    base = {"CFBundleVersion":args.build_number,"CFBundleShortVersionString":workspace_version(),"LSMinimumSystemVersion":"15.0","LSArchitecturePriority":["arm64"],"LSRequiresNativeExecution":True,"CFBundleDevelopmentRegion":"en","CFBundleLocalizations":LANGUAGES + (["en-XA"] if args.pseudolocalization else []),"NSLocalNetworkUsageDescription":"SeedHop connects to torrent peers and trackers on networks you use."}
     write_plist(contents/"Info.plist",dict(base,CFBundleIdentifier=app_id,CFBundleName="SeedHop",CFBundleDisplayName="SeedHop",CFBundleExecutable="SeedHop",CFBundlePackageType="APPL",NSPrincipalClass="NSApplication",LSApplicationCategoryType="public.app-category.utilities",NSHighResolutionCapable=True,CFBundleIconFile="AppIcon",CFBundleURLTypes=[{"CFBundleURLName":"BitTorrent magnet link","CFBundleURLSchemes":["magnet"]}],CFBundleDocumentTypes=[{"CFBundleTypeName":"BitTorrent torrent","CFBundleTypeRole":"Viewer","LSHandlerRank":"Alternate","LSItemContentTypes":["org.bittorrent.torrent"],"CFBundleTypeExtensions":["torrent"]}],UTImportedTypeDeclarations=[{"UTTypeIdentifier":"org.bittorrent.torrent","UTTypeConformsTo":["public.data"],"UTTypeTagSpecification":{"public.filename-extension":["torrent"],"public.mime-type":"application/x-bittorrent"}}]))
+    updates = json.loads((ROOT/"macOS/Resources/Updates.json").read_text())
+    if args.release and not updates.get("publicKey"):
+        parser.error("A Sparkle public key is required for distribution.")
+    app_plist = plistlib.loads((contents/"Info.plist").read_bytes())
+    app_plist.update(SUFeedURL=updates["feedURL"], SUPublicEDKey=updates["publicKey"],
+                     SUAllowsAutomaticUpdates=False, SUAutomaticallyUpdate=False,
+                     SUEnableSystemProfiling=False)
+    write_plist(contents/"Info.plist", app_plist)
+    sparkle_distribution = sparkle.distribution()
+    sparkle.embed(sparkle_distribution, contents/"Frameworks/Sparkle.framework", args.identity)
+    shutil.copy2(sparkle_distribution/"LICENSE", contents/"Resources/Sparkle-LICENSE")
     xpc = contents/"XPCServices/SeedHopEngine.xpc"
     write_plist(xpc/"Contents/Info.plist",dict(base,CFBundleIdentifier=app_id+".engine",CFBundleExecutable="SeedHopEngine",CFBundlePackageType="XPC!",XPCService={"ServiceType":"Application","RunLoopType":"NSRunLoop","JoinExistingSession":True}))
     write_plist(contents/f"Library/LaunchAgents/{app_id}.agent.plist",{"Label":app_id+".agent","BundleProgram":"Contents/MacOS/SeedHopAgent","ProgramArguments":["SeedHopAgent","--agent"],"MachServices":{app_id+".agent":True},"RunAtLoad":True,"KeepAlive":{"SuccessfulExit":False},"ThrottleInterval":5,"ProcessType":"Background","AssociatedBundleIdentifiers":[app_id]})
@@ -112,7 +140,7 @@ def main():
     if extraction.exists(): shutil.rmtree(extraction)
     extraction.mkdir(parents=True)
     localization_args = ["-emit-localized-strings","-emit-localized-strings-path",extraction]
-    run(*common,*localization_args,"-module-name","SeedHop",*shared,*sorted((ROOT/"macOS/App").glob("*.swift")),"-framework","SwiftUI","-framework","AppKit","-framework","ServiceManagement","-framework","Security","-framework","UserNotifications","-o",contents/"MacOS/SeedHop")
+    run(*common,*localization_args,"-module-name","SeedHop",*shared,*sorted((ROOT/"macOS/App").glob("*.swift")),"-F",contents/"Frameworks","-framework","Sparkle","-Xlinker","-rpath","-Xlinker","@executable_path/../Frameworks","-framework","SwiftUI","-framework","AppKit","-framework","ServiceManagement","-framework","Security","-framework","UserNotifications","-o",contents/"MacOS/SeedHop")
     catalogs = ROOT/"macOS/Resources/Localization"
     if args.update_localizations:
         run("xcrun","xcstringstool","sync",catalogs/"Localizable.xcstrings","--stringsdata",*sorted(extraction.glob("*.stringsdata")))
@@ -138,6 +166,7 @@ def main():
     write_plist(debug_entitlements,{"com.apple.security.cs.disable-library-validation":True})
     for name,path in [(app_id+".rust",contents/"Frameworks/libseedhop_ffi.dylib"),(app_id+".agent",contents/"MacOS/SeedHopAgent"),(app_id+".engine",xpc),(app_id,app)]:
         sign=["codesign","--force","--options","runtime","--sign",args.identity,"--identifier",name]
+        if args.identity != "-": sign += ["--timestamp"]
         if not args.release and args.identity=="-" and path!=contents/"Frameworks/libseedhop_ffi.dylib": sign += ["--entitlements",debug_entitlements]
         run(*sign,path)
     run("codesign","--verify","--deep","--strict",app)
