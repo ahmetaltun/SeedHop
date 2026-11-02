@@ -33,6 +33,7 @@ struct LibraryView: View {
             // changes cannot remount announcement gates or repeat speech.
             .announceAccessibility(store.statisticsWarning)
             .announceAccessibility(store.schedulingWarning)
+            .announceAccessibility(store.reannounceNotice)
             .announceAccessibility(store.error.map { String(localized:"Something needs attention. \($0)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) })
             .announceAccessibility(store.fileOperation.map { store.connected ? String(localized:"File change. \($0.title)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Last known file change. \($0.title)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) },priority:.medium)
             .announceAccessibility(store.storageRecovery.map { String(localized:"File cleanup needs attention. \($0.localizedMessage)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) })
@@ -234,6 +235,10 @@ struct LibraryView: View {
                     Text(activeFilterDescription).font(.system(size:10)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                         .help(activeFilterDescription).accessibilityLabel(String(localized:"Active filters: \(activeFilterDescription)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).layoutPriority(-1)
                     Button(String(localized:"Clear Filters",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.clearFilters() }.controlSize(.mini).fixedSize()
+                }
+                if let notice = store.reannounceNotice {
+                    Text(notice).font(.system(size:10)).foregroundStyle(.secondary).lineLimit(1).help(notice)
+                        .accessibilityIdentifier("reannounce-summary")
                 }
                 Spacer(minLength:0)
                 ViewThatFits(in:.horizontal) {

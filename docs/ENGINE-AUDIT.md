@@ -262,3 +262,49 @@ The import sheet previews that full path. Existing saved destinations and explic
 engine destinations keep their layout. Collision checks apply to selected files.
 Recovery regressions cover a real shared-piece transfer, unchecked collisions,
 restart, later selection, removal, and separate native import folders.
+
+
+## Force Reannounce — 2026-11-02
+
+Patch `0033-seedhop-force-reannounce.patch` wakes existing tracker monitors through
+bounded, coalescing controls. The native command targets live downloads and seeds;
+it cannot resume a paused torrent, bypass queue admission, or create a tracker
+stream. Commands resolve opaque, generation-scoped IDs against the effective live
+tracker/hash registry and reject stale engine instances. IPv4/IPv6 observations
+share one target per tracker and wire hash. Private torrents retain the engine's
+single effective tracker; hybrid torrents retain independent swarm identities.
+
+HTTP regular scheduling uses the greater of the advertised interval, minimum
+interval, and five seconds. Manual scheduling respects the minimum interval,
+existing retry deadline, and a 60-second local cooldown. UDP has no separate
+minimum, so manual refresh waits for its advertised interval. Existing scheduled
+and in-flight requests satisfy repeated clicks. At most four manual transports
+run concurrently, including sequential address-family attempts for manual UDP.
+Pending requests live only with their monitor and are retired on stream teardown.
+
+Ordinary announces omit HTTP events and use UDP event zero. Started/completed
+lifecycle state is committed only after successful requests. A per-monitor payload
+baseline detects a download finishing after metadata-only registration and avoids
+replaying completion for a seed resumed with retained lifetime counters. Request
+acknowledgments report scheduling, not tracker success. Credentials stay inside
+the engine; display and errors retain existing redaction.
+
+Protocol version 9 adds the native reannounce command, request summary, tracker
+control metadata, and snapshot eligibility. No persisted library format changes.
+Native transfer menus and tracker-row actions use the same engine checks. Mixed
+selections skip unavailable transfers and continue after per-transfer failures.
+
+Verification uses the production tracker sources via
+`python3 scripts/test_tracker_comms.py`, local HTTP/UDP fixtures and controlled
+scheduling clocks, `cargo test -p seedhop-core --test reannounce`, bridge/core unit
+checks, and native UX regressions. Local fixtures cover rate limits, ordinary and
+lifecycle events, peer delivery, coalescing, concurrency, v1/v2/hybrid targeting,
+private isolation, credential redaction, and retired monitor generations.
+
+Known boundaries: public tracker tiers still use the existing flattened tracker
+set; complete BEP 12 scheduling is separate work. UDP transport still uses a single
+10-second request timeout rather than BEP 15's complete retransmission schedule.
+Public tracker interoperability, manual pointer/keyboard input, and VoiceOver
+require separate acceptance; automated presentation checks do not certify them.
+
+Validation results: [Force Reannounce — 2026-11-02](results/force-reannounce-2026-11-02.md).

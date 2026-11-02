@@ -21,6 +21,8 @@ use tracing::trace;
 use tracing::trace_span;
 use url::Url;
 
+use crate::TrackerControl;
+use crate::reannounce::{AnnounceLifecycle, MonitorLifetime, http_intervals};
 use crate::tracker_comms_http;
 use crate::tracker_comms_udp;
 use crate::tracker_comms_udp::UdpTrackerClient;
@@ -50,6 +52,9 @@ pub enum TrackerCommsStatsState {
 #[derive(Default)]
 pub struct TrackerCommsStats {
     pub uploaded_bytes: u64,
+    /// Payload received since torrent creation, independent of verified progress.
+    /// A monitor baseline detects completion after metadata-only registration.
+    pub payload_downloaded_bytes: u64,
     pub downloaded_bytes: u64,
     pub total_bytes: u64,
     pub torrent_state: TrackerCommsStatsState,
@@ -135,6 +140,14 @@ pub trait TorrentStatsProvider: Send + Sync {
     /// Called synchronously before peer delivery. Implementations must remain
     /// lightweight and must not perform disk or network I/O.
     fn observe(&self, _observation: TrackerObservation) {}
+
+    fn register_control(&self, _control: std::sync::Weak<TrackerControl>) {}
+
+    fn unregister_control(&self, _control: &Arc<TrackerControl>) {}
+
+    fn manual_gate(&self) -> Arc<tokio::sync::Semaphore> {
+        Arc::new(tokio::sync::Semaphore::new(4))
+    }
 }
 
 impl TorrentStatsProvider for () {
@@ -247,7 +260,10 @@ impl TrackerComms {
             });
             let mut futures = FuturesUnordered::new();
             for tracker in trackers {
-                futures.push(comms.add_tracker(tracker, &udp_client))
+                let url = match &tracker { SupportedTracker::Http(url) | SupportedTracker::Udp(url) => url.to_string() };
+                let control = Arc::new(TrackerControl::new(info_hash, url, comms.stats.manual_gate()));
+                comms.stats.register_control(Arc::downgrade(&control));
+                futures.push(comms.add_tracker(tracker, &udp_client, control))
             }
             while !(futures.is_empty()) {
                 tokio::select! {
@@ -272,6 +288,7 @@ impl TrackerComms {
         &self,
         url: SupportedTracker,
         client: &UdpTrackerClient,
+        control: Arc<TrackerControl>,
     ) -> Either<
         impl std::future::Future<Output = anyhow::Result<()>> + '_ + Send,
         impl std::future::Future<Output = anyhow::Result<()>> + '_ + Send,
@@ -280,7 +297,7 @@ impl TrackerComms {
         match url {
             SupportedTracker::Udp(url) => {
                 let span = debug_span!(parent: None, "udp_tracker", tracker = %url, info_hash = ?info_hash);
-                self.task_single_tracker_monitor_udp(url, client.clone())
+                self.task_single_tracker_monitor_udp(url, client.clone(), control)
                     .instrument(span)
                     .right_future()
             }
@@ -291,51 +308,65 @@ impl TrackerComms {
                     tracker = %url,
                     info_hash = ?info_hash
                 );
-                self.task_single_tracker_monitor_http(url)
+                self.task_single_tracker_monitor_http(url, control)
                     .instrument(span)
                     .left_future()
             }
         }
     }
 
-    async fn task_single_tracker_monitor_http(&self, tracker_url: Url) -> anyhow::Result<()> {
+    async fn task_single_tracker_monitor_http(
+        &self,
+        tracker_url: Url,
+        control: Arc<TrackerControl>,
+    ) -> anyhow::Result<()> {
+        let _lifetime = MonitorLifetime(control.clone(), self.stats.as_ref());
         trace!(url=%tracker_url, "starting monitor");
-        let mut event = Some(tracker_comms_http::TrackerRequestEvent::Started);
-
+        let mut lifecycle = AnnounceLifecycle::new(self.stats.get().payload_downloaded_bytes);
         loop {
-            let interval = (|| self.tracker_one_request_http(&tracker_url, event))
-                .retry(
-                    ExponentialBuilder::new()
-                        .without_max_times()
-                        .with_jitter()
-                        .with_factor(2.)
-                        .with_min_delay(Duration::from_secs(10))
-                        .with_max_delay(Duration::from_secs(600)),
-                )
-                .notify(|err, retry_in| {
-                    debug!(?retry_in, "error calling tracker: {err:#}");
-                    self.stats.observe(TrackerObservation::retry(
-                        &tracker_url,
-                        None,
-                        retry_in,
-                        http_failure_message(err),
-                    ));
-                })
-                .await
-                .context("this shouldn't fail")?;
-
-            event = None;
-            let interval = self.force_tracker_interval.unwrap_or(interval);
-            debug!("sleeping for {:?} after calling tracker", interval);
-            tokio::time::sleep(interval).await;
+            let complete = (async || {
+                let _permit = control.begin().await?;
+                if _permit.is_some()
+                    && !matches!(self.stats.get().torrent_state, TrackerCommsStatsState::Live)
+                {
+                    control.close();
+                    anyhow::bail!("Tracker monitor retired");
+                }
+                self.tracker_one_request_http(&tracker_url, &lifecycle, &control)
+                    .await
+            })
+            .retry(
+                ExponentialBuilder::new()
+                    .without_max_times()
+                    .with_jitter()
+                    .with_factor(2.)
+                    .with_min_delay(Duration::from_secs(10))
+                    .with_max_delay(Duration::from_secs(600)),
+            )
+            .when(|_| !control.snapshot().closed)
+            .notify(|err, retry_in| {
+                debug!(?retry_in, "error calling tracker: {err:#}");
+                control.failed(retry_in);
+                self.stats.observe(TrackerObservation::retry(
+                    &tracker_url,
+                    None,
+                    retry_in,
+                    http_failure_message(err),
+                ));
+            })
+            .await?;
+            lifecycle.succeeded(complete.0, complete.1);
+            control.finish();
+            control.wait().await?;
         }
     }
 
     async fn tracker_one_request_http(
         &self,
         tracker_url: &Url,
-        event: Option<tracker_comms_http::TrackerRequestEvent>,
-    ) -> anyhow::Result<Duration> {
+        lifecycle: &AnnounceLifecycle,
+        control: &TrackerControl,
+    ) -> anyhow::Result<(bool, u64)> {
         self.stats
             .observe(TrackerObservation::new(tracker_url, None, "contacting"));
         let stats = self.stats.get();
@@ -348,7 +379,7 @@ impl TrackerComms {
             left: stats.get_left_to_download_bytes(),
             compact: true,
             no_peer_id: false,
-            event,
+            event: lifecycle.event(stats.is_completed(), stats.payload_downloaded_bytes),
             ip: None,
             numwant: None,
             key: Some(self.key),
@@ -380,9 +411,12 @@ impl TrackerComms {
             })?
             .0;
 
-        let interval = self.force_tracker_interval.unwrap_or(Duration::from_secs(
-            response.min_interval.unwrap_or(response.interval),
-        ));
+        let (interval, minimum) = http_intervals(
+            response.interval,
+            response.min_interval,
+            self.force_tracker_interval,
+        )?;
+        control.succeeded(interval, minimum);
         let warning = response
             .warning_message
             .as_ref()
@@ -405,14 +439,17 @@ impl TrackerComms {
         for peer in response.iter_peers() {
             self.tx.send(peer).await?;
         }
-        Ok(interval)
+        Ok((stats.is_completed(), stats.payload_downloaded_bytes))
     }
 
     async fn task_single_tracker_monitor_udp(
         &self,
         url: Url,
         client: UdpTrackerClient,
+        control: Arc<TrackerControl>,
     ) -> anyhow::Result<()> {
+        let _lifetime = MonitorLifetime(control.clone(), self.stats.as_ref());
+        let mut lifecycles = std::collections::HashMap::<SocketAddr, AnnounceLifecycle>::new();
         if url.scheme() != "udp" {
             bail!("expected UDP scheme in {}", url);
         }
@@ -426,9 +463,16 @@ impl TrackerComms {
         loop {
             if let Some(i) = sleep_interval {
                 trace!(interval=?sleep_interval, "sleeping");
-                tokio::time::sleep(i).await;
+                let _ = i;
+                control.wait().await?;
             }
 
+            let _permit = control.begin().await?;
+            let manual = _permit.is_some();
+            if manual && !matches!(self.stats.get().torrent_state, TrackerCommsStatsState::Live) {
+                control.close();
+                return Ok(());
+            }
             self.stats
                 .observe(TrackerObservation::new(&url, None, "resolving"));
             // This should retry forever until the addrs are resolved.
@@ -467,19 +511,63 @@ impl TrackerComms {
 
             prev_addrs = Some(addrs);
 
+            if manual && !matches!(self.stats.get().torrent_state, TrackerCommsStatsState::Live) {
+                control.close();
+                return Ok(());
+            }
+            let stats = self.stats.get();
+            let complete = stats.is_completed();
+            let payload = stats.payload_downloaded_bytes;
+            let endpoints = match addrs {
+                UdpTrackerResolveResult::One(addr) => vec![addr],
+                UdpTrackerResolveResult::Two(v4, v6) => vec![v4.into(), v6.into()],
+            };
+            for addr in endpoints {
+                lifecycles
+                    .entry(addr)
+                    .or_insert_with(|| AnnounceLifecycle::new(payload));
+            }
+            let event_for = |addr: SocketAddr| {
+                lifecycles
+                    .get(&addr)
+                    .and_then(|l| l.event(complete, payload))
+                    .or_else(|| {
+                        (!lifecycles.contains_key(&addr))
+                            .then_some(tracker_comms_http::TrackerRequestEvent::Started)
+                    })
+            };
             let results = match addrs {
                 UdpTrackerResolveResult::One(addr) => vec![(
                     addr,
-                    self.tracker_one_request_udp(&url, addr, &client)
+                    self.tracker_one_request_udp(&url, addr, &client, event_for(addr))
                         .instrument(trace_span!("udp request", ?addr))
                         .await,
                 )],
+                UdpTrackerResolveResult::Two(v4, v6) if manual => {
+                    let r4 = self
+                        .tracker_one_request_udp(&url, v4.into(), &client, event_for(v4.into()))
+                        .await;
+                    let r6 = self
+                        .tracker_one_request_udp(&url, v6.into(), &client, event_for(v6.into()))
+                        .await;
+                    vec![(v4.into(), r4), (v6.into(), r6)]
+                }
                 UdpTrackerResolveResult::Two(v4, v6) => {
                     let (r4, r6) = tokio::join!(
-                        self.tracker_one_request_udp(&url, v4.into(), &client)
-                            .instrument(trace_span!("udp request", addr=?v4)),
-                        self.tracker_one_request_udp(&url, v6.into(), &client)
-                            .instrument(trace_span!("udp request", addr=?v6))
+                        self.tracker_one_request_udp(
+                            &url,
+                            v4.into(),
+                            &client,
+                            event_for(v4.into())
+                        )
+                        .instrument(trace_span!("udp request", addr=?v4)),
+                        self.tracker_one_request_udp(
+                            &url,
+                            v6.into(),
+                            &client,
+                            event_for(v6.into())
+                        )
+                        .instrument(trace_span!("udp request", addr=?v6))
                     );
                     vec![(v4.into(), r4), (v6.into(), r6)]
                 }
@@ -488,13 +576,23 @@ impl TrackerComms {
             // Retain each outcome separately so one family cannot hide another's failure.
             let delay = results
                 .iter()
-                .find_map(|(_, result)| result.as_ref().ok().map(|(delay, _)| *delay))
+                .filter_map(|(_, result)| result.as_ref().ok().map(|(delay, _)| *delay))
+                .max()
                 .or(sleep_interval)
                 .unwrap_or(Duration::from_secs(60));
             sleep_interval = Some(delay);
+            if results.iter().any(|(_, r)| r.is_ok()) {
+                control.succeeded(delay, delay);
+            } else {
+                control.failed(delay);
+            }
             for (addr, result) in results {
                 match result {
                     Ok((_, mut observation)) => {
+                        lifecycles
+                            .entry(addr)
+                            .or_default()
+                            .succeeded(complete, payload);
                         observation.next_announce =
                             Some(epoch_seconds().saturating_add(delay.as_secs()));
                         self.stats.observe(observation);
@@ -507,6 +605,7 @@ impl TrackerComms {
                     )),
                 }
             }
+            control.finish();
         }
     }
 
@@ -515,6 +614,7 @@ impl TrackerComms {
         url: &Url,
         addr: SocketAddr,
         client: &UdpTrackerClient,
+        event: Option<tracker_comms_http::TrackerRequestEvent>,
     ) -> anyhow::Result<(Duration, TrackerObservation)> {
         use tracker_comms_udp::*;
 
@@ -527,17 +627,11 @@ impl TrackerComms {
             downloaded: stats.downloaded_bytes,
             left: stats.get_left_to_download_bytes(),
             uploaded: stats.uploaded_bytes,
-            event: match stats.torrent_state {
-                TrackerCommsStatsState::None => EVENT_NONE,
-                TrackerCommsStatsState::Initializing => EVENT_STARTED,
-                TrackerCommsStatsState::Paused => EVENT_STOPPED,
-                TrackerCommsStatsState::Live => {
-                    if stats.is_completed() {
-                        EVENT_COMPLETED
-                    } else {
-                        EVENT_STARTED
-                    }
-                }
+            event: match event {
+                Some(tracker_comms_http::TrackerRequestEvent::Started) => EVENT_STARTED,
+                Some(tracker_comms_http::TrackerRequestEvent::Completed) => EVENT_COMPLETED,
+                Some(tracker_comms_http::TrackerRequestEvent::Stopped) => EVENT_STOPPED,
+                None => EVENT_NONE,
             },
             key: self.key,
             port: self.announce_port,

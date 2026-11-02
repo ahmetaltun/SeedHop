@@ -277,6 +277,21 @@ import AppKit
               let row = coordinator.rows.firstIndex(where:{ !$0.isPaused }) else { throw UserFacingError(message:"Transfer action fixture has no running row") }
         let target = coordinator.rows[row].id
         table.selectRowIndexes(IndexSet(integer:row),byExtendingSelection:false); try await settle()
+        let busyTarget = coordinator.rows.first(where:{$0.id != target})!.id
+        store.selection = [busyTarget]; store.toggleSelected(paused:true)
+        guard store.busyTransfers.contains(busyTarget),
+              let reannounce = table.menuProvider?([target,busyTarget])?.items.first(where:{ ($0.representedObject as? [String:Any])?["action"] as? String == "reannounce" }) else {
+            throw UserFacingError(message:"Mixed reannounce fixture did not retain a busy transfer")
+        }
+        try invoke(reannounce)
+        try await waitUntil("Mixed native reannounce did not reach the eligible transfer") {
+            store.reannouncing.isEmpty && UXSelfTest.nativeRequests.contains { $0.command == "reannounce" && $0.id == target && $0.engineInstanceId == "fixture" }
+        }
+        guard !UXSelfTest.nativeRequests.contains(where:{ $0.command == "reannounce" && $0.id == busyTarget }) else {
+            throw UserFacingError(message:"Mixed native reannounce contacted a busy transfer")
+        }
+        print("PASS: Native Force Reannounce captures eligible targets and skips busy transfers.")
+        store.selection = [target]; try await settle()
         guard store.selection == [target], let menu = table.menuProvider?([target]),
               let pause = menu.items.first(where:{ ($0.representedObject as? [String:Any])?["action"] as? String == "pause" }) else { throw UserFacingError(message:"Native selection or context menu did not capture the row") }
         store.selection = [coordinator.rows.first(where:{$0.id != target})!.id]

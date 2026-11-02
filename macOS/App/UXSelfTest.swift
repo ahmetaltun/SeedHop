@@ -12,6 +12,70 @@ import SwiftUI
             try await body(); passed += 1; print("PASS: \(name)")
         }
 
+        try await check("Reannounce skips inactive transfers and preserves captured targets") {
+            let (store, peer) = library()
+            peer.torrents[0].state = "waiting"; peer.torrents[0].pausedIntent = false; peer.torrents[0].canReannounce = true
+            peer.torrents[1].state = "paused"; peer.torrents[1].pausedIntent = true; peer.torrents[1].canReannounce = true
+            await store.refresh()
+            let id = store.torrents[0].id
+            store.selection = Set(store.torrents.prefix(2).map(\.id)); peer.hold = ["reannounce"]
+            try expect(store.canReannounceSelection,"Mixed selection disabled eligible reannounce")
+            store.reannounceSelected()
+            try await eventually { peer.pending.count == 1 }
+            let request = peer.pending[0].request
+            try expect(request.id == id && request.targetIds == nil && request.engineInstanceId == "fixture","Reannounce changed targets or lost engine identity")
+            store.selection = [store.torrents[1].id]
+            try expect(!store.canReannounceSelection,"Paused transfer accepted reannounce")
+            peer.releaseFirst()
+            try await eventually { store.reannouncing.isEmpty }
+            try expect(peer.commands("reannounce").count == 1 && store.reannounceNotice?.contains("Transfers skipped: 1") == true,"Mixed action omitted skip feedback")
+            try expect(store.torrents[0].state == "waiting" && store.torrents[1].isPaused,"Reannounce changed transfer state")
+        }
+
+        try await check("Reannounce continues after errors and rejects duplicate or stale feedback") {
+            let (store, peer) = library()
+            for index in 0..<2 { peer.torrents[index].state = "waiting"; peer.torrents[index].pausedIntent = false; peer.torrents[index].canReannounce = true }
+            await store.refresh(); store.selection = Set(store.torrents.prefix(2).map(\.id)); peer.hold = ["reannounce"]
+            store.reannounceSelected(); store.reannounceSelected()
+            try await eventually { peer.pending.count == 1 }
+            peer.releaseFirst(error:UserFacingError(message:"Controlled tracker failure"))
+            try await eventually { peer.pending.count == 1 }
+            peer.releaseFirst()
+            try await eventually { store.reannouncing.isEmpty }
+            try expect(peer.commands("reannounce").count == 2 && store.error != nil && store.reannounceNotice != nil,"Batch stopped after first failure")
+            peer.instanceId = "replacement"; await store.refresh()
+            try expect(store.reannounceNotice == nil,"Engine replacement retained stale request feedback")
+        }
+
+        try await check("Retired reannounce batches cannot clear replacement engine requests") {
+            let (store, peer) = library()
+            peer.torrents[0].state = "waiting"; peer.torrents[0].pausedIntent = false; peer.torrents[0].canReannounce = true
+            await store.refresh(); store.selection = [store.torrents[0].id]; peer.hold = ["reannounce"]
+            store.reannounceSelected(); try await eventually { peer.pending.count == 1 }
+            peer.instanceId = "replacement"; await store.refresh()
+            store.reannounceSelected(); try await eventually { peer.pending.count == 2 }
+            peer.releaseFirst()
+            try await Task.sleep(for:.milliseconds(30))
+            try expect(!store.reannouncing.isEmpty && store.reannounceNotice == nil,"Retired batch changed replacement engine state")
+            peer.releaseFirst(); try await eventually { store.reannouncing.isEmpty }
+        }
+
+        try await check("Tracker actions deduplicate target IDs and disable pending or contacting rows") {
+            let (store, peer) = library()
+            peer.torrents[0].state = "seeding"; peer.torrents[0].pausedIntent = false; peer.torrents[0].canReannounce = true
+            await store.refresh(); let torrent = store.torrents[0]
+            var row = TrackerDetails(reannounceTargetId:"opaque-target",id:"row",address:"https://tracker.test",hash:"wire",state:"working")
+            try expect(store.canReannounceTracker(row,torrent:torrent),"Active tracker action disabled")
+            row.reannouncePending = true; try expect(!store.canReannounceTracker(row,torrent:torrent),"Pending tracker accepted duplicate")
+            row.reannouncePending = false; row.state = "contacting"; try expect(!store.canReannounceTracker(row,torrent:torrent),"Contacting tracker accepted duplicate")
+            peer.hold = ["reannounce"]
+            store.reannounceTrackers(torrent:torrent,targetIds:Set(["opaque-target","opaque-target"]))
+            try await eventually { peer.pending.count == 1 }
+            try expect(peer.pending[0].request.targetIds == ["opaque-target"],"Tracker targets were not deduplicated")
+            peer.releaseFirst(); try await eventually { store.reannouncing.isEmpty }
+            store.connected = false; try expect(!store.canReannounceSelection,"Disconnected action enabled")
+        }
+
         try await check("Updates defer during import and file operations without stopping transfers") {
             let (store, peer) = library()
             store.showImport = true
@@ -486,7 +550,7 @@ import SwiftUI
             }
             var request = EngineRequest(command:"forceStart"); request.id = item.id; request.forceStarted = false
             let decoded = try JSONDecoder().decode(EngineRequest.self,from:JSONEncoder().encode(request))
-            try expect(decoded.version == 8 && decoded.forceStarted == false,"Force Start request lost explicit false or protocol version")
+            try expect(decoded.version == SeedHopIdentity.protocolVersion && decoded.forceStarted == false,"Force Start request lost explicit false or protocol version")
             item.forceStarted = nil
             let old = try JSONDecoder().decode(TorrentItem.self,from:JSONEncoder().encode(item))
             try expect(old.forceStarted == nil,"Legacy snapshot invented a queue override")
@@ -1121,6 +1185,8 @@ import SwiftUI
     static func nativeFixture() -> LibraryStore {
         nativeRequests = []
         let (store, peer) = library(); peer.captureNativeRequests = true
+        for index in peer.torrents.indices { peer.torrents[index].canReannounce = !peer.torrents[index].trackers.isEmpty }
+        store.torrents = peer.torrents
         peer.metadata = PreviewFixtures.importPreview
         return store
     }
@@ -1167,6 +1233,7 @@ import SwiftUI
     var stopped = false
     var failConnect = false
     var missingDetails = false
+    var instanceId = "fixture"
     func connect(background: Bool) throws {
         connections.append(background)
         if failConnect { throw UserFacingError(message:"Engine connection unavailable.") }
@@ -1190,12 +1257,13 @@ import SwiftUI
         switch request.command {
         case "connect", "snapshot":
             if request.command == "connect" && stopped { peerEncryption = savedPeerEncryption; stopped = false }
-            return EngineReply(snapshot:LibrarySnapshot(protocolVersion:UInt32(SeedHopIdentity.protocolVersion),engineVersion:"test",instanceId:"fixture",listenPort:0,downloadLimit:alternativeLimitsEnabled ? alternativeDownloadLimit : normalDownloadLimit,uploadLimit:alternativeLimitsEnabled ? alternativeUploadLimit : normalUploadLimit,maxActiveDownloads:maxActiveDownloads,torrents:torrents,fileOperation:fileOperation,storageRecovery:storageRecovery,peerEncryption:peerEncryption,savedPeerEncryption:savedPeerEncryption,schedule:schedule,normalDownloadLimit:normalDownloadLimit,normalUploadLimit:normalUploadLimit,alternativeDownloadLimit:alternativeDownloadLimit,alternativeUploadLimit:alternativeUploadLimit,alternativeLimitsEnabled:alternativeLimitsEnabled))
+            return EngineReply(snapshot:LibrarySnapshot(protocolVersion:UInt32(SeedHopIdentity.protocolVersion),engineVersion:"test",instanceId:instanceId,listenPort:0,downloadLimit:alternativeLimitsEnabled ? alternativeDownloadLimit : normalDownloadLimit,uploadLimit:alternativeLimitsEnabled ? alternativeUploadLimit : normalUploadLimit,maxActiveDownloads:maxActiveDownloads,torrents:torrents,fileOperation:fileOperation,storageRecovery:storageRecovery,peerEncryption:peerEncryption,savedPeerEncryption:savedPeerEncryption,schedule:schedule,normalDownloadLimit:normalDownloadLimit,normalUploadLimit:normalUploadLimit,alternativeDownloadLimit:alternativeDownloadLimit,alternativeUploadLimit:alternativeUploadLimit,alternativeLimitsEnabled:alternativeLimitsEnabled))
         case "torrentDetails":
             guard !missingDetails, let item = torrents.first(where:{ $0.id == request.id }) else { return EngineReply() }
             var details = PreviewFixtures.diagnostics(item,section:request.section ?? "general")
             details.instanceId = "fixture"
             return EngineReply(details:details)
+        case "reannounce": return EngineReply(reannounce:ReannounceSummary(scheduled:1,alreadyPending:0,unavailable:0))
         case "shutdown": stopped = true; return EngineReply(stoppedProcessID:42)
         case "limits":
             normalDownloadLimit = request.downloadLimit ?? normalDownloadLimit

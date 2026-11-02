@@ -130,3 +130,6 @@ pub use librqbit_core::v2;
 
 // Read-only peer diagnostics used by native frontends.
 pub use torrent_state::live::peer::stats::snapshot::{PeerStatsFilter, PeerStatsFilterState};
+
+// Native manual tracker controls; no new HTTP API surface.
+pub use tracker_comms::ReannounceDisposition;

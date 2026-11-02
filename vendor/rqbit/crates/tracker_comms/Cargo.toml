@@ -17,7 +17,7 @@ async-stream.workspace = true
 buffers.workspace = true
 librqbit-core.workspace = true
 byteorder.workspace = true
-serde.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_derive.workspace = true
 urlencoding.workspace = true
 rand.workspace = true
@@ -31,3 +31,6 @@ librqbit-dualstack-sockets.workspace = true
 backon.workspace = true
 itertools.workspace = true
 serde_with.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "test-util", "net", "io-util", "sync", "time"] }

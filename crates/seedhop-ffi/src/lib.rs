@@ -119,6 +119,7 @@ pub struct Transfer {
     pub destination: String,
     pub files: Vec<TransferFile>,
     pub trackers: Vec<String>,
+    pub can_reannounce: bool,
     pub error: Option<String>,
     pub error_kind: Option<String>,
     pub error_message: Option<UserNotice>,
@@ -142,6 +143,7 @@ impl From<seedhop_core::TorrentRecord> for Transfer {
             destination: t.destination,
             files: t.files.into_iter().map(Into::into).collect(),
             trackers: t.trackers,
+            can_reannounce: t.can_reannounce,
             error: t.error,
             error_kind: t.error_kind,
             queue_position: t.queue_position,
@@ -500,6 +502,18 @@ impl EngineBridge {
         let (core, rt) = self.handles()?;
         rt.block_on(core.select_files(id, indices)).map_err(error)
     }
+    pub fn force_reannounce(
+        &self,
+        id: String,
+        target_ids: Option<Vec<String>>,
+        instance_id: String,
+    ) -> Result<String, BridgeError> {
+        let (core, rt) = self.handles()?;
+        let summary = rt
+            .block_on(core.force_reannounce(id, target_ids, instance_id))
+            .map_err(error)?;
+        serde_json::to_string(&summary).map_err(error)
+    }
     pub fn force_recheck(&self, id: String) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;
         rt.block_on(core.force_recheck(id)).map_err(error)
@@ -710,9 +724,28 @@ mod tests {
         bridge.set_force_started(id.clone(), true).unwrap();
         let transfer = &bridge.snapshot().unwrap().torrents[0];
         assert!(transfer.force_started && !transfer.paused_intent);
+        assert!(
+            !transfer.can_reannounce,
+            "Trackerless transfer exposed reannounce"
+        );
+        let instance = bridge.snapshot().unwrap().instance_id;
+        assert!(
+            matches!(bridge.force_reannounce(id.clone(), None, "retired".into()),
+            Err(super::BridgeError::Operation { notice, .. }) if notice.code == "input.reannounce_stale")
+        );
+        assert!(
+            matches!(bridge.force_reannounce(id.clone(), Some(vec![]), instance.clone()),
+            Err(super::BridgeError::Operation { notice, .. }) if notice.code == "input.reannounce_empty")
+        );
+        assert!(
+            matches!(bridge.force_reannounce(id.clone(), None, instance),
+            Err(super::BridgeError::Operation { notice, .. }) if notice.code == "input.reannounce_unavailable")
+        );
         let json: serde_json::Value =
             serde_json::from_str(&bridge.snapshot_json().unwrap()).unwrap();
         assert_eq!(json["torrents"][0]["forceStarted"], true);
+        assert_eq!(json["torrents"][0]["canReannounce"], false);
+        assert_eq!(json["protocolVersion"], 9);
         bridge.set_paused(id, false).unwrap();
         assert!(!bridge.snapshot().unwrap().torrents[0].force_started);
         bridge.shutdown().unwrap();

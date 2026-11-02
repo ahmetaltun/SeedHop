@@ -253,9 +253,6 @@ struct NativeTransferGrid: NSViewRepresentable {
                 let item = NSMenuItem(title:title,action:#selector(menuAction(_:)),keyEquivalent:"")
                 item.target = self; item.representedObject = ["action":action,"ids":Array(ids)] as [String:Any]; item.isEnabled = enabled; menu.addItem(item)
             }
-            add(String(localized:"Move to Front of Queue",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"queue",allowed && ids.count == 1)
-            add(String(localized:"Move Files…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"move",allowed && parent.store.storageRecovery == nil && ids.count == 1 && !items.contains { $0.state == "checking" })
-            add(String(localized:"Force Recheck",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"recheck",allowed && !items.contains { $0.state == "checking" || parent.store.hasPendingCleanup($0.id) })
             add(parent.store.resumeLabel(for:items),"resume",allowed && items.contains { parent.store.canResumeOrRetry($0) })
             add(String(localized:"Pause",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"pause",allowed && items.contains { !$0.isPaused || $0.forceStarted == true })
             let allForced = !items.isEmpty && items.allSatisfy { $0.forceStarted == true }
@@ -265,6 +262,11 @@ struct NativeTransferGrid: NSViewRepresentable {
                 item.toolTip = String(localized:"Bypasses the download queue. Scheduled suspensions and speed limits still apply.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
                 var value = item.representedObject as! [String:Any]; value["enabled"] = !allForced; item.representedObject = value
             }
+            add(String(localized:"Move to Front of Queue",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"queue",allowed && ids.count == 1)
+            menu.addItem(.separator())
+            add(String(localized:"Force Reannounce",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"reannounce",items.contains(where:parent.store.canReannounce))
+            menu.items.last?.toolTip = String(localized:"Requests tracker updates when tracker limits allow.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            add(String(localized:"Force Recheck",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"recheck",allowed && !items.contains { $0.state == "checking" || parent.store.hasPendingCleanup($0.id) })
             menu.addItem(.separator())
             func preference(_ title: String, _ action: String, _ values: [Bool]) {
                 add(title,action,allowed)
@@ -277,7 +279,10 @@ struct NativeTransferGrid: NSViewRepresentable {
             }
             preference(String(localized:"Download in sequential order",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"sequential",items.map { $0.sequential ?? false })
             preference(String(localized:"Download first and last pieces first",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"firstLastPieces",items.map { $0.firstLastPieces ?? false })
-            menu.addItem(.separator()); add(String(localized:"Show in Finder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"finder",!ids.isEmpty)
+            menu.addItem(.separator())
+            add(String(localized:"Move Files…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"move",allowed && parent.store.storageRecovery == nil && ids.count == 1 && !items.contains { $0.state == "checking" })
+            add(String(localized:"Show in Finder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"finder",!ids.isEmpty)
+            menu.addItem(.separator())
             add(String(localized:"Remove…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"remove",allowed && !ids.contains(where:parent.store.hasPendingCleanup))
             return menu
         }
@@ -286,6 +291,11 @@ struct NativeTransferGrid: NSViewRepresentable {
             let targets = Set(ids)
             if action == "finder" {
                 if let target = parent.store.torrents.first(where:{ targets.contains($0.id) }) { NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:target.destination) }; return
+            }
+            if action == "reannounce" {
+                parent.store.selection = targets
+                parent.store.reannounceSelected()
+                return
             }
             guard canAct(targets) else { return }
             parent.store.selection = targets

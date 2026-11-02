@@ -23435,6 +23435,255 @@
         }
       }
     },
+    "Force Reannounce": {
+      "comment": "SeedHop macOS UI (NativeTransferGrid.swift, SeedHopApp.swift). Requests a regular tracker announce without bypassing tracker rate limits.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erneute Tracker-Ankündigung erzwingen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Force Reannounce"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forzar nuevo anuncio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forcer une nouvelle annonce"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forza nuovo annuncio"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "強制再通知"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "강제 재알림"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wymuś ponowne ogłoszenie"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forçar novo anúncio"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Принудительный анонс"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeniden Duyurmaya Zorla"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Примусовий анонс"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "强制重新通告"
+          }
+        }
+      }
+    },
+    "Force Reannounce to All Trackers": {
+      "comment": "SeedHop macOS UI (TorrentDiagnosticsView.swift). Requests an announce for all eligible tracker targets of the current torrent.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erneute Ankündigung bei allen Trackern erzwingen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Force Reannounce to All Trackers"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forzar nuevo anuncio a todos los rastreadores"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forcer une nouvelle annonce à tous les trackers"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forza nuovo annuncio a tutti i tracker"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべてのトラッカーに強制再通知"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모든 트래커에 강제 재알림"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wymuś ponowne ogłoszenie do wszystkich trackerów"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forçar novo anúncio a todos os rastreadores"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Принудительный анонс всем трекерам"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm İzleyicilere Yeniden Duyurmaya Zorla"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Примусовий анонс усім трекерам"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向所有 Tracker 强制重新通告"
+          }
+        }
+      }
+    },
+    "Force Reannounce to Selected Trackers": {
+      "comment": "SeedHop macOS UI (TorrentDiagnosticsView.swift). Requests an announce for selected tracker and torrent wire-hash targets.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erneute Ankündigung bei ausgewählten Trackern erzwingen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Force Reannounce to Selected Trackers"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forzar nuevo anuncio a los rastreadores seleccionados"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forcer une nouvelle annonce aux trackers sélectionnés"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forza nuovo annuncio ai tracker selezionati"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択したトラッカーに強制再通知"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "선택한 트래커에 강제 재알림"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wymuś ponowne ogłoszenie do wybranych trackerów"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forçar novo anúncio aos rastreadores selecionados"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Принудительный анонс выбранным трекерам"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçili İzleyicilere Yeniden Duyurmaya Zorla"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Примусовий анонс вибраним трекерам"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向所选 Tracker 强制重新通告"
+          }
+        }
+      }
+    },
     "Force Recheck": {
       "comment": "SeedHop macOS UI (NativeTransferGrid.swift, SeedHopApp.swift).",
       "localizations": {
@@ -36650,6 +36899,89 @@
         }
       }
     },
+    "Reannounce scheduled": {
+      "comment": "SeedHop macOS UI (TorrentDiagnosticsView.swift). A manual tracker request is queued for its allowed deadline; no network result is implied.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erneute Ankündigung geplant"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reannounce scheduled"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuevo anuncio programado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouvelle annonce programmée"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuovo annuncio programmato"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再通知を予約済み"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "재알림 예약됨"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zaplanowano ponowne ogłoszenie"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Novo anúncio agendado"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Повторный анонс запланирован"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeniden duyurma zamanlandı"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Повторний анонс заплановано"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安排重新通告"
+          }
+        }
+      }
+    },
     "Receiving data for your selected files.": {
       "comment": "SeedHop macOS UI (TransferPresentation.swift).",
       "localizations": {
@@ -38836,6 +39168,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在重命名文件…"
+          }
+        }
+      }
+    },
+    "Requests tracker updates when tracker limits allow.": {
+      "comment": "SeedHop macOS UI. Help for manual tracker updates; requests wait for tracker limits rather than bypassing them.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fordert Tracker-Aktualisierungen an, sobald die Tracker-Limits es erlauben."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Requests tracker updates when tracker limits allow."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solicita actualizaciones cuando los límites del rastreador lo permiten."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demande une mise à jour dès que les limites des trackers le permettent."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Richiede aggiornamenti quando i limiti dei tracker lo consentono."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "トラッカーの制限で許可された時点で更新をリクエストします。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "트래커 제한이 허용할 때 트래커 업데이트를 요청합니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Żąda aktualizacji, gdy pozwalają na to limity trackerów."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solicita atualizações quando os limites dos rastreadores permitem."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Запрашивает обновления, когда ограничения трекеров это позволяют."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İzleyici sınırları izin verdiğinde izleyici güncellemeleri ister."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Запитує оновлення, коли обмеження трекерів це дозволяють."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Tracker 限制允许时请求更新。"
           }
         }
       }
@@ -44077,6 +44492,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "请至少选择一个要下载的文件。"
+          }
+        }
+      }
+    },
+    "Select at least one tracker.": {
+      "comment": "SeedHop macOS UI (EngineMessage.swift). An explicitly empty tracker selection is invalid.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wähle mindestens einen Tracker aus."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select at least one tracker."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selecciona al menos un rastreador."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionnez au moins un tracker."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seleziona almeno un tracker."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "トラッカーを1つ以上選択してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "트래커를 하나 이상 선택하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wybierz co najmniej jeden tracker."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selecione pelo menos um rastreador."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите хотя бы один трекер."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En az bir izleyici seçin."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Виберіть принаймні один трекер."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请至少选择一个 Tracker。"
           }
         }
       }
@@ -49490,6 +49988,89 @@
         }
       }
     },
+    "The torrent engine changed. Refresh and try again.": {
+      "comment": "SeedHop macOS UI (EngineMessage.swift). Stale tracker request after engine replacement.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Torrent-Engine hat sich geändert. Aktualisiere die Ansicht und versuche es erneut."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The torrent engine changed. Refresh and try again."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El motor de torrents ha cambiado. Actualiza e inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le moteur de torrents a changé. Actualisez et réessayez."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il motore torrent è cambiato. Aggiorna e riprova."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "トレントエンジンが変更されました。更新してからやり直してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "토렌트 엔진이 변경되었습니다. 새로 고친 후 다시 시도하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silnik torrentów się zmienił. Odśwież i spróbuj ponownie."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O mecanismo de torrents mudou. Atualize e tente novamente."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Движок торрентов изменился. Обновите данные и повторите попытку."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torrent motoru değişti. Yenileyip tekrar deneyin."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Рушій торрентів змінився. Оновіть дані та повторіть спробу."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "种子引擎已更改。请刷新后重试。"
+          }
+        }
+      }
+    },
     "The torrent metadata exceeds 32 MB.": {
       "comment": "SeedHop macOS UI (EngineMessage.swift).",
       "localizations": {
@@ -52257,6 +52838,172 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ 的 Tracker 观测信息"
+          }
+        }
+      }
+    },
+    "Tracker updates are unavailable for this transfer.": {
+      "comment": "SeedHop macOS UI (EngineMessage.swift). Manual tracker updates require an active eligible transfer.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracker-Aktualisierungen sind für diese Übertragung nicht verfügbar."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracker updates are unavailable for this transfer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las actualizaciones de rastreadores no están disponibles para esta transferencia."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les mises à jour des trackers sont indisponibles pour ce transfert."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gli aggiornamenti dei tracker non sono disponibili per questo trasferimento."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この転送ではトラッカーの更新を利用できません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 전송에서는 트래커 업데이트를 사용할 수 없습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktualizacje trackerów są niedostępne dla tego transferu."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As atualizações dos rastreadores não estão disponíveis para esta transferência."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Обновления трекеров недоступны для этой передачи."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu aktarım için izleyici güncellemeleri kullanılamıyor."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Оновлення трекерів недоступні для цієї передачі."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此传输无法更新 Tracker。"
+          }
+        }
+      }
+    },
+    "Tracker updates: scheduled %lld, pending %lld, unavailable %lld. Transfers skipped: %lld.": {
+      "comment": "SeedHop macOS UI (LibraryStore.swift). Counts refer to tracker targets for scheduled/pending/unavailable, and transfers for skipped. Preserve placeholder types and positions; use positional placeholders when reordering.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracker-Aktualisierungen: geplant %lld, ausstehend %lld, nicht verfügbar %lld. Übersprungene Übertragungen: %lld."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracker updates: scheduled %lld, pending %lld, unavailable %lld. Transfers skipped: %lld."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizaciones de rastreadores: programadas %lld, pendientes %lld, no disponibles %lld. Transferencias omitidas: %lld."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mises à jour des trackers : programmées %lld, en attente %lld, indisponibles %lld. Transferts ignorés : %lld."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiornamenti dei tracker: programmati %lld, in attesa %lld, non disponibili %lld. Trasferimenti ignorati: %lld."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "トラッカー更新：予約済み %lld、保留中 %lld、利用不可 %lld。スキップした転送：%lld。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "트래커 업데이트: 예약됨 %lld, 대기 중 %lld, 사용 불가 %lld. 건너뛴 전송: %lld."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktualizacje trackerów: zaplanowane %lld, oczekujące %lld, niedostępne %lld. Pominięte transfery: %lld."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atualizações dos rastreadores: agendadas %lld, pendentes %lld, indisponíveis %lld. Transferências ignoradas: %lld."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Обновления трекеров: запланировано %lld, ожидает %lld, недоступно %lld. Пропущено передач: %lld."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İzleyici güncellemeleri: zamanlanan %lld, bekleyen %lld, kullanılamayan %lld. Atlanan aktarımlar: %lld."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Оновлення трекерів: заплановано %lld, очікує %lld, недоступно %lld. Пропущено передач: %lld."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracker 更新：已安排 %lld，等待中 %lld，不可用 %lld。已跳过的传输：%lld。"
           }
         }
       }

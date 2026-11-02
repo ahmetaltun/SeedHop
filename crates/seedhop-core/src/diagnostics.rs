@@ -144,6 +144,9 @@ pub struct PeerDetails {
 pub struct TrackerDetails {
     pub id: String,
     pub address: String,
+    pub reannounce_target_id: Option<String>,
+    pub reannounce_pending: bool,
+    pub manual_allowed_at: Option<u64>,
     pub endpoint: Option<String>,
     pub hash: String,
     pub state: String,
@@ -300,26 +303,50 @@ impl Engine {
             Vec::new()
         };
         let trackers = if section == "trackers" || section == "activity" {
+            let controls = self.session.tracker_controls(&torrent);
             let observations = torrent.shared().tracker_observations.read();
             let mut records: Vec<_> = observations
                 .iter()
-                .map(|(key, (hash, o))| TrackerDetails {
-                    id: tracker_identity(key),
-                    address: redact_tracker(&o.url),
-                    endpoint: o.endpoint.clone(),
-                    hash: hash.clone(),
-                    state: o.state.clone(),
-                    message: o.message.as_ref().map(|m| sanitize_message(m, &o.url)),
-                    last_announce: o.last_announce,
-                    next_announce: o.next_announce,
-                    peers: o.peers,
-                    seeds: o.seeds,
-                    leechers: o.leechers,
+                .map(|(key, (hash, o))| {
+                    let control = controls
+                        .iter()
+                        .find(|c| c.info_hash.as_string() == *hash && c.url == o.url);
+                    let schedule = control.map(|c| c.snapshot());
+                    TrackerDetails {
+                        reannounce_target_id: control.filter(|c| !c.snapshot().in_flight).map(
+                            |c| {
+                                crate::reannounce::target_id(
+                                    &c.info_hash.as_string(),
+                                    &c.url,
+                                    c.generation,
+                                )
+                            },
+                        ),
+                        reannounce_pending: schedule.is_some_and(|s| s.pending),
+                        manual_allowed_at: schedule.map(|s| s.manual_allowed_at),
+                        id: tracker_identity(key),
+                        address: redact_tracker(&o.url),
+                        endpoint: o.endpoint.clone(),
+                        hash: hash.clone(),
+                        state: o.state.clone(),
+                        message: o.message.as_ref().map(|m| sanitize_message(m, &o.url)),
+                        last_announce: o.last_announce,
+                        next_announce: schedule
+                            .filter(|s| s.pending)
+                            .map(|s| s.next_announce)
+                            .or(o.next_announce),
+                        peers: o.peers,
+                        seeds: o.seeds,
+                        leechers: o.leechers,
+                    }
                 })
                 .collect();
             for url in &torrent.shared().trackers {
                 if !observations.values().any(|(_, o)| o.url == url.as_str()) {
                     records.push(TrackerDetails {
+                        reannounce_target_id: None,
+                        reannounce_pending: false,
+                        manual_allowed_at: None,
                         id: tracker_identity(&format!("uncontacted:{}", url.as_str())),
                         address: redact_tracker(url.as_str()),
                         endpoint: None,
@@ -403,7 +430,7 @@ pub fn redact_tracker(raw: &str) -> String {
         })
         .unwrap_or_else(|| "Tracker".into())
 }
-fn tracker_identity(raw: &str) -> String {
+pub(crate) fn tracker_identity(raw: &str) -> String {
     format!("{:x}", Sha256::digest(raw.as_bytes()))
 }
 fn sanitize_message(message: &str, raw: &str) -> String {

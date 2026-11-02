@@ -76,6 +76,8 @@ pub struct TorrentRecord {
     pub destination: String,
     pub files: Vec<FileRecord>,
     pub trackers: Vec<String>,
+    #[serde(default)]
+    pub can_reannounce: bool,
     pub error: Option<String>,
     pub error_kind: Option<String>,
     pub queue_position: u32,

@@ -254,6 +254,9 @@
       "Finishing this change. File verification is shown separately in the transfer list.": "35a6e07a2a20f3150ce965e8094b0f2156fdfc2070f32485487fb5e7ea94c965",
       "Focus Transfer List": "1f1f55ced0e651c49f82ccd71e04a64de1821f2735cb416e3362a6f53a2bd6a5",
       "Follow macOS": "c6566cee67a92a9e926cea5adfbead2e5ff337ff4eead99a093ba7348fd8e11c",
+      "Force Reannounce": "4b4b82a2f3eeb7f2e7bd7d47a5618db5d5fe799b0a51b77511ef3db56a1e2832",
+      "Force Reannounce to All Trackers": "82b40ad0c7f398daf9c1c4ebb5b7904205a4c11cb35f49a192b2bc51c06d4e64",
+      "Force Reannounce to Selected Trackers": "abae9ba2c85c8ad5b544c5de06e367cbf166f0f6179db56a47864388865cf012",
       "Force Recheck": "298eda06ac1f6da035b16ab92139fad246c49a904fa598457f88ead64bb420fd",
       "Force Start": "5f3185ab3e52e29cd9f71515ae48bc4ef7582abc175a154cf2038ce4a03b978a",
       "Format": "65bb8e9261eef2a475712bc34b0f4b3e353ba8df0ceaa1822606d32fa11567d2",
@@ -413,6 +416,7 @@
       "Rates use observed payload-counter changes. Encryption describes peer payloads and does not hide your IP address.": "5388c3ab77f9d33a493ac13d18c039ec1d4bbe0570da2b9ccb9924564cb4e72b",
       "Ratio": "0aa505afc493145e62c76336e4631c3efdf29a2b6b9a41a8642fc55b5ed065b9",
       "Reading your torrent file…": "f79dddce1f53b2d9a2e8be24e90b7563247144e9a30c37ed055badb4b5ad6f47",
+      "Reannounce scheduled": "ace06b6ae8ff3e768ef02c704273119c58f8a924059639006f1234873cc52f15",
       "Receiving data for your selected files.": "96691cb11ff8844de73f53b19797013c33f3b8b0c31ce97131f7e62445d4d06c",
       "Recent transfer events": "043b97e3c71ec1157b15618729e5d6fc780edbbb78df5afd94c157020d002596",
       "Reconnect the drive or restore the saved path, then retry. SeedHop will keep the saved location. %@": "7baa3c4621e3f739f32ff43f6bfe204dcb037f196903ee213d317aaa87093b3f",
@@ -437,6 +441,7 @@
       "Rename…": "0e9d414c7670fa88531404d1b45a997eb818c06c1443243b6715624376ef1b6a",
       "Renaming file": "fd673986f2e46fc5186fa1686159a61fd13df1dc6906db7e347ceb272681b684",
       "Renaming file…": "38e815844f66b6b839fe1b25acc43c9441c50c528c547c8bb4a84f5c2fabc2b5",
+      "Requests tracker updates when tracker limits allow.": "11519030d98e918e1e625b6b7c6d31d440609cb359ee1f9b17c1c081958a046e",
       "Require encrypted peer payloads. Peers that only support plaintext cannot connect, which may reduce available peers.": "53329543f4f6a37adf40c964c47aa0f92528e4319ef435f2ed14d04b29241d13",
       "Require encryption": "193aab64f828108be582dda30644c994da81f73322a210b79d9f9051ea8bcf85",
       "Resolving": "43dbac423496f29057e3036733d2a05800313ffb092196b74a3075b459c1a0de",
@@ -500,6 +505,7 @@
       "Select a transfer": "3ef69e23dd4db6b542799866b2486e8cc05d4f82b9ccb7dedc444f8a4be0f755",
       "Select all": "b15b30860385c911f3cd1bf435bc005f2bfefb0287d72014d9fd64dbc2d38d78",
       "Select at least one file to download.": "5c537784b861c2bc4043773132fceef3b29125281f9c47faceb4880d34f42a67",
+      "Select at least one tracker.": "459cce24cdf17dbe1deb46ea921caee64e0fbc4c1e38ba1f14a15627775c0f8d",
       "Select valid files.": "a3345c342b918331801279de8dddc2dc080a880cc72e4d0f2d5ac5cffa8379e5",
       "Selected Size": "d9e63d9f5b9a3a0c6bf32b548f3e286438fef8c963de81c1602f589509856d6a",
       "Selected size": "c4628a2af0a5927b7d763f5fc53cd188d96fd81a0723c73c663fe4d6d674e509",
@@ -565,6 +571,7 @@
       "The recovery record changed. Refresh and try again.": "11dca610b1c70c5ad7bc64afe1cfb04f12c22aab15cace6f39f5d54a35e027b7",
       "The saved library could not be read. Your files have been preserved.": "18172f4d8ba2c9da949c9450fdd5204ae3a2d09fe44d87321ad98931436b863f",
       "The torrent contains an unsafe file path.": "6add77a73a573db9ed98dda7eaf1b8f99c6d50a738cc5c9c9f38198b9421860c",
+      "The torrent engine changed. Refresh and try again.": "d42b9c997faec46a4273467ec35b09636caf47c6ba5c421e6f2c65bcb42b24e8",
       "The torrent metadata exceeds 32 MB.": "9b6655825b030350757c3eaf75ea4cef6e40172be9328b89d838913c7e893dd2",
       "The torrent metadata exceeds 32 MB. Choose a smaller .torrent file.": "5311c2d11365d0a071ca8f89b616126ce59c5fc15efcd3fd5c45ada48e175e71",
       "The weekly schedule could not be applied. Check the details and transfer settings.": "503476c3c4810eea5a8d631879a01a82bf4f9a40eadff0bdd0613575ac0b13d3",
@@ -596,6 +603,8 @@
       "Tracker": "091e0e222f3fca10ebc2a80d59031dacc3875bffa31a3ad295c4954a12afb857",
       "Tracker host": "e781cf47c1bca68efc18a75df31d60ba0b45d18d8fad0eda165b08c01f13f7e6",
       "Tracker observations for %@": "2d5926b1d38436c2ff66d87ba0249ce3db673925fba3029e4d892da9ab24f039",
+      "Tracker updates are unavailable for this transfer.": "dd0de10a27c7e071c2534000c3aaa64b5cafe1cf2f270ddcac42c8c16809b4ba",
+      "Tracker updates: scheduled %lld, pending %lld, unavailable %lld. Transfers skipped: %lld.": "2292c2d5f521f8f082b9f21dfa289a1f9e55a74077a34467dbf9918eb9ed3930",
       "Tracker: %@": "380cdbaf1c575289403a6af36ff7013447280713ca11d48d60e060121649bf4b",
       "Trackers": "038d859a1d617c40c75ab96cf3eb1c110a65cc7cb28d46eb9ed5538a66855685",
       "Traffic history appears as live snapshots arrive.": "2a4cfcb03b02d4bbab91520aea8d181323d8166e76d505252544a22708fa069a",
@@ -773,6 +782,6 @@
       "origin": "AI draft"
     }
   },
-  "sourceDigest": "5444e16ca774f708b2a94efdd380be67fcca3d6a4c57319e10f65c1c2c8aa73f",
+  "sourceDigest": "131dfa36f9b84e70d480806623ae4c7c5fa432bd3fb8354a25d86c03c3791187",
   "sourceLanguage": "en"
 }

@@ -123,6 +123,9 @@ pub struct Session {
     reqwest_client: reqwest::Client,
     udp_tracker_client: UdpTrackerClient,
     disable_trackers: bool,
+    tracker_controls:
+        parking_lot::Mutex<HashMap<Id20, Vec<std::sync::Weak<tracker_comms::TrackerControl>>>>,
+    manual_announce_gate: Arc<tokio::sync::Semaphore>,
 
     // Lifecycle management
     cancellation_token: CancellationToken,
@@ -848,6 +851,8 @@ impl Session {
                 ipv4_only: opts.ipv4_only,
                 trackers: opts.trackers,
                 disable_trackers: opts.disable_trackers,
+                tracker_controls: Default::default(),
+                manual_announce_gate: Arc::new(tokio::sync::Semaphore::new(4)),
                 peer_limit: opts.peer_limit,
                 client_name_and_version,
 
@@ -1803,6 +1808,44 @@ impl Session {
         Ok(())
     }
 
+    /// Only live monitor generations are actionable. Configuration-only and
+    /// private backup tracker rows must never create additional network work.
+    pub fn tracker_controls(
+        &self,
+        torrent: &ManagedTorrent,
+    ) -> Vec<Arc<tracker_comms::TrackerControl>> {
+        if self.cancellation_token.is_cancelled()
+            || !matches!(torrent.stats().state, crate::TorrentStatsState::Live)
+        {
+            return Vec::new();
+        }
+        let legacy = torrent
+            .with_metadata(|m| {
+                m.info
+                    .info()
+                    .v2
+                    .as_ref()
+                    .filter(|v| v.is_hybrid())
+                    .map(|_| m.v1_info_hash)
+            })
+            .ok()
+            .flatten();
+        let mut controls = self.tracker_controls.lock();
+        let mut live = Vec::new();
+        for hash in std::iter::once(torrent.info_hash()).chain(legacy) {
+            if let Some(entries) = controls.get_mut(&hash) {
+                entries.retain(|c| c.strong_count() > 0);
+                live.extend(
+                    entries
+                        .iter()
+                        .filter_map(|c| c.upgrade())
+                        .filter(|c| !c.snapshot().closed),
+                );
+            }
+        }
+        live
+    }
+
     pub(crate) fn make_peer_rx_managed_torrent(
         self: &Arc<Self>,
         t: &Arc<ManagedTorrent>,
@@ -2435,6 +2478,28 @@ struct PeerRxTorrentInfo {
 }
 
 impl tracker_comms::TorrentStatsProvider for PeerRxTorrentInfo {
+    fn register_control(&self, control: std::sync::Weak<tracker_comms::TrackerControl>) {
+        let Some(live) = control.upgrade() else {
+            return;
+        };
+        let mut controls = self.session.tracker_controls.lock();
+        let entries = controls.entry(live.info_hash).or_default();
+        entries.retain(|c| c.strong_count() > 0);
+        entries.push(control);
+    }
+    fn unregister_control(&self, control: &Arc<tracker_comms::TrackerControl>) {
+        let mut controls = self.session.tracker_controls.lock();
+        if let Some(entries) = controls.get_mut(&control.info_hash) {
+            entries.retain(|c| c.upgrade().is_some_and(|live| !Arc::ptr_eq(&live, control)));
+            if entries.is_empty() {
+                controls.remove(&control.info_hash);
+            }
+        }
+    }
+    fn manual_gate(&self) -> Arc<tokio::sync::Semaphore> {
+        self.session.manual_announce_gate.clone()
+    }
+
     fn observe(&self, observation: tracker_comms::TrackerObservation) {
         self.session.with_torrents(|torrents| {
             for (_, mt) in torrents {
@@ -2552,6 +2617,11 @@ impl tracker_comms::TorrentStatsProvider for PeerRxTorrentInfo {
         use tracker_comms::TrackerCommsStatsState as S;
 
         tracker_comms::TrackerCommsStats {
+            payload_downloaded_bytes: mt
+                .shared()
+                .payload_counters
+                .downloaded
+                .load(Ordering::Relaxed),
             downloaded_bytes: legacy_bytes.map(|v| v.0).unwrap_or(stats.progress_bytes),
             total_bytes: legacy_bytes.map(|v| v.1).unwrap_or(stats.total_bytes),
             uploaded_bytes: stats.uploaded_bytes,

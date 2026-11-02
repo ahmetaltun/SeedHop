@@ -7,6 +7,7 @@ struct TorrentDiagnosticsView: View {
     let torrent: TorrentItem
     let tab: String
     @State private var peerSort = [KeyPathComparator(\DiagnosticPeerRow.endpoint)]
+    @State private var trackerSelection = Set<String>()
     @State private var trackerSort = [KeyPathComparator(\DiagnosticTrackerRow.address)]
 
     private var details: TorrentDetails? { store.details.flatMap { $0.torrentId == torrent.id ? $0 : nil } }
@@ -111,6 +112,14 @@ struct TorrentDiagnosticsView: View {
                 discovery("PEX",details?.pex)
                 Text(String(localized:"Local discovery: \(details == nil ? "Unknown" : "Not supported")",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).foregroundStyle(.secondary)
                 Spacer()
+                Menu {
+                    trackerActions(selected:trackerSelection,trackers:details?.trackers ?? [])
+                } label: {
+                    Label(String(localized:"Force Reannounce",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:"arrow.clockwise")
+                }
+                .menuStyle(.borderlessButton).fixedSize()
+                .help(String(localized:"Requests tracker updates when tracker limits allow.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                .accessibilityIdentifier("tracker-reannounce")
             }.padding(.horizontal,12).padding(.vertical,8)
             if currentSection, let details, !details.trackers.isEmpty {
                 trackerTable(details.trackers)
@@ -122,9 +131,22 @@ struct TorrentDiagnosticsView: View {
         }
     }
 
+    private func trackerTargets(_ rows: Set<String>, trackers: [TrackerDetails]) -> Set<String> {
+        Set(trackers.filter { rows.contains($0.id) && store.canReannounceTracker($0,torrent:torrent) }.compactMap(\.reannounceTargetId))
+    }
+    @ViewBuilder private func trackerActions(selected: Set<String>, trackers: [TrackerDetails]) -> some View {
+        let targets = trackerTargets(selected,trackers:trackers)
+        Button(String(localized:"Force Reannounce to Selected Trackers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
+            store.reannounceTrackers(torrent:torrent,targetIds:targets)
+        }.disabled(targets.isEmpty)
+        Button(String(localized:"Force Reannounce to All Trackers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
+            store.reannounceTorrent(torrent)
+        }.disabled(!store.canReannounce(torrent))
+    }
+
     private func trackerTable(_ trackers: [TrackerDetails]) -> some View {
         let rows = trackers.map { DiagnosticTrackerRow($0,v1Hash:details?.v1Hash,v2Hash:details?.v2Hash) }.sorted(using:trackerSort)
-        return Table(rows,sortOrder:$trackerSort) {
+        return Table(rows,selection:$trackerSelection,sortOrder:$trackerSort) {
             TableColumn(String(localized:"Tracker",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),value:\.address) { Text($0.address).textSelection(.enabled).lineLimit(1).help($0.address) }.width(min:165,ideal:210)
             TableColumn(String(localized:"Format",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),value:\.format) { Text($0.format) }.width(65)
             TableColumn(String(localized:"State",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),value:\.state) { Text($0.state) }.width(min:80,ideal:90)
@@ -135,7 +157,14 @@ struct TorrentDiagnosticsView: View {
             TableColumn(String(localized:"Seeds reported",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),value:\.seedsSort) { Text(count($0.tracker.seeds)).monospacedDigit() }.width(110)
             TableColumn(String(localized:"Leechers reported",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),value:\.leechersSort) { Text(count($0.tracker.leechers)).monospacedDigit() }.width(125)
             TableColumn(String(localized:"Wire hash",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),value:\.hash) { Text($0.hash).font(.system(size:10,design:.monospaced)).lineLimit(1).truncationMode(.middle).textSelection(.enabled).help(String(localized:"Announced wire identity: \($0.hash)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }.width(min:100,ideal:140)
-        }.tableStyle(.inset(alternatesRowBackgrounds:true)).accessibilityLabel(String(localized:"Tracker observations for \(torrent.name)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+        }
+        .contextMenu(forSelectionType:String.self) { selected in
+            trackerActions(selected:selected,trackers:trackers)
+        }
+        .onChange(of:torrent.id) { _, _ in trackerSelection = [] }
+        .onChange(of:store.engineInstance) { _, _ in trackerSelection = [] }
+        .onChange(of:Set(trackers.map(\.id))) { _, ids in trackerSelection.formIntersection(ids) }
+        .tableStyle(.inset(alternatesRowBackgrounds:true)).accessibilityLabel(String(localized:"Tracker observations for \(torrent.name)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
     }
 
     private var activity: some View {
@@ -260,6 +289,7 @@ private struct DiagnosticTrackerRow: Identifiable {
     var id: String { tracker.id }
     var address: String { tracker.address + (tracker.endpoint.map { " · " + $0 } ?? "") }
     var state: String {
+        if tracker.reannouncePending == true { return String(localized:"Reannounce scheduled",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
         switch tracker.state {
         case "not contacted": return String(localized:"Not contacted",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         case "contacting": return String(localized:"Contacting",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)

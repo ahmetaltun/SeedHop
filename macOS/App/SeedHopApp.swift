@@ -36,6 +36,9 @@ import Combine
                 Toggle(String(localized:"Force Start",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),isOn:Binding(get:{ store.selectionForceStarted },set:{ store.setForceStarted(ids:store.selection,enabled:$0) }))
                     .disabled(!store.canSetForceStarted(ids:store.selection,enabled:!store.selectionForceStarted))
                 Divider()
+                Button(String(localized:"Force Reannounce",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.reannounceSelected() }
+                    .disabled(!store.canReannounceSelection)
+                    .help(String(localized:"Requests tracker updates when tracker limits allow.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                 Button(String(localized:"Force Recheck",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.recheckSelected() }.disabled(!store.canRecheckSelection)
                 Button(String(localized:"Move to Front of Queue",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.moveSelectedToFront() }.disabled(!store.canActOnSelection || store.selected.count != 1)
                 Button(String(localized:"Move Files…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.chooseRelocation() }.disabled(!store.canMoveSelection)

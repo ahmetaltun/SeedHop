@@ -110,6 +110,7 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
     });
     let (sequential, first_last_pieces) = torrent.piece_preferences();
     TorrentRecord {
+        can_reannounce: false,
         id: torrent_id(torrent),
         name: torrent
             .name()

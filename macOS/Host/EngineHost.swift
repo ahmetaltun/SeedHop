@@ -131,6 +131,8 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             guard let enabled = r.forceStarted else { throw HostFailure(code:"host.unsupported") }
             try core.setForceStarted(id:r.id ?? "", enabled:enabled)
         case "select": try core.selectFiles(id:r.id ?? "", indices:r.selected ?? [])
+        case "reannounce":
+            return EngineReply(reannounce:try JSONDecoder().decode(ReannounceSummary.self, from:Data(core.forceReannounce(id:r.id ?? "",targetIds:r.targetIds,instanceId:r.engineInstanceId ?? "").utf8)))
         case "recheck": try core.forceRecheck(id:r.id ?? "")
         case "retry": try core.retryTransfer(id:r.id ?? "")
         case "piecePreferences": try core.setPiecePreferences(id:r.id ?? "", sequential:r.sequential, firstLastPieces:r.firstLastPieces)
@@ -175,7 +177,7 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             listenPort:s.listenPort,downloadLimit:s.downloadLimit,uploadLimit:s.uploadLimit,maxActiveDownloads:s.maxActiveDownloads,torrents:s.torrents.map { t in
                 TorrentItem(id:t.id,name:t.name,state:t.state,totalBytes:t.totalBytes,downloadedBytes:t.downloadedBytes,
                     uploadedBytes:t.uploadedBytes,downloadRate:t.downloadRate,uploadRate:t.uploadRate,peers:t.peers,
-                    destination:t.destination,files:t.files.map(file),trackers:t.trackers,error:t.error,queuePosition:t.queuePosition,pausedIntent:t.pausedIntent,forceStarted:t.forceStarted,errorKind:t.errorKind)
+                    destination:t.destination,files:t.files.map(file),trackers:t.trackers,canReannounce:t.canReannounce,error:t.error,queuePosition:t.queuePosition,pausedIntent:t.pausedIntent,forceStarted:t.forceStarted,errorKind:t.errorKind)
             },fileOperation:s.fileOperation.map { operation in
                 FileOperationItem(id:operation.id,torrentId:operation.torrentId,kind:operation.kind,
                     phase:operation.phase,completedBytes:operation.completedBytes,totalBytes:operation.totalBytes,

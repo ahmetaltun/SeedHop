@@ -6,6 +6,8 @@ mod file_operation;
 mod layout_journal;
 mod management;
 mod model;
+mod reannounce;
+pub use reannounce::ReannounceSummary;
 mod scheduling;
 pub use scheduling::{ScheduleConfig, ScheduleRule};
 pub mod storage;
@@ -25,7 +27,7 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-pub const PROTOCOL_VERSION: u32 = 8;
+pub const PROTOCOL_VERSION: u32 = 9;
 
 /// Owns library state. The FFI host retains this lease until its runtime has stopped.
 pub struct Engine {
@@ -297,9 +299,17 @@ impl Engine {
     pub fn snapshot(&self) -> Result<Snapshot> {
         self.ready()?;
         self.sample_accounting();
-        let mut torrents = self
-            .session
-            .with_torrents(|ts| ts.map(|(_, t)| adapter::record(t)).collect::<Vec<_>>());
+        let mut torrents = self.session.with_torrents(|ts| {
+            ts.map(|(_, t)| {
+                let mut record = adapter::record(t);
+                record.can_reannounce = self.session.tracker_controls(t).iter().any(|c| {
+                    let state = c.snapshot();
+                    !state.pending && !state.in_flight && !state.closed
+                });
+                record
+            })
+            .collect::<Vec<_>>()
+        });
         torrents.sort_by_key(|a| a.name.to_lowercase());
         let accounting = self.accounting.lock().unwrap();
         let queue = self.queue.lock().unwrap();

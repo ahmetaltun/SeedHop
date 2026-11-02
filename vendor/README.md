@@ -44,3 +44,12 @@ report no map. This does not change piece selection or transfer behavior.
 Patch `0032-seedhop-piece-source-gaps.patch` adds exact per-bin counts of pieces
 missing locally and absent from every connected peer. Paused observations omit
 this count. Grouping never infers a gap from unrelated local/remote minima.
+
+Patch `0033-seedhop-force-reannounce.patch` adds ephemeral, generation-scoped
+controls to the existing tracker monitors. HTTP regular and minimum intervals
+remain distinct; manual requests respect minimum intervals, a 60-second local
+cooldown, and retry backoff. UDP manual requests retain the advertised interval.
+Tracker lifecycle events are committed after successful requests, with payload
+baselines covering fast completion after metadata discovery. A hash-indexed weak
+registry and monitor-drop cleanup avoid retaining retired streams or scanning the
+whole session for each torrent snapshot. Manual transports share four slots.

@@ -79,6 +79,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     @Published var removalDeletesFiles = false
     @Published private(set) var removalTargets: [TorrentItem] = []
     @Published private(set) var busyTransfers = Set<String>()
+    @Published private(set) var reannouncing = Set<String>()
+    @Published private(set) var reannounceNotice: String?
     @Published var fileOperation: FileOperationItem? { didSet { rebuildCounts() } }
     @Published var storageRecovery: StorageRecoveryItem? { didSet { rebuildCounts() } }
     @Published private(set) var resolvingStorageRecovery = false
@@ -203,6 +205,58 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
     var selectionForceStarted: Bool { !selected.isEmpty && selected.allSatisfy { $0.forceStarted == true } }
     func hasPendingCleanup(_ id: String) -> Bool { storageRecovery.map { $0.torrentId.isEmpty || $0.torrentId == id } ?? false }
+    func canReannounce(_ item: TorrentItem) -> Bool {
+        canChangeTransfers && !engineInstance.isEmpty && item.canReannounce == true
+            && ["downloading", "waiting", "seeding"].contains(item.state) && !item.isPaused
+            && !hasPendingCleanup(item.id) && !busyTransfers.contains(item.id) && !reannouncing.contains(item.id)
+    }
+    var canReannounceSelection: Bool { selected.contains(where:canReannounce) }
+    func canReannounceTracker(_ tracker: TrackerDetails, torrent: TorrentItem) -> Bool {
+        canChangeTransfers && !engineInstance.isEmpty && ["downloading", "waiting", "seeding"].contains(torrent.state)
+            && !torrent.isPaused && !hasPendingCleanup(torrent.id) && !busyTransfers.contains(torrent.id)
+            && !reannouncing.contains(torrent.id) && tracker.reannounceTargetId != nil
+            && tracker.reannouncePending != true && !["contacting", "resolving"].contains(tracker.state)
+    }
+    func reannounceSelected() { reannounce(items:selected) }
+    func reannounceTorrent(_ torrent: TorrentItem) { reannounce(items:[torrent]) }
+    func reannounceTrackers(torrent: TorrentItem, targetIds: Set<String>) {
+        guard !targetIds.isEmpty else { return }
+        reannounce(items:[torrent],targetIds:Array(targetIds).sorted())
+    }
+    private func reannounce(items: [TorrentItem], targetIds: [String]? = nil) {
+        guard canChangeTransfers, !engineInstance.isEmpty else { return }
+        let instance = engineInstance
+        let eligible = items.filter { item in
+            if targetIds != nil {
+                return !item.isPaused && ["downloading", "waiting", "seeding"].contains(item.state)
+                    && !hasPendingCleanup(item.id) && !busyTransfers.contains(item.id) && !reannouncing.contains(item.id)
+            }
+            return canReannounce(item)
+        }
+        guard !eligible.isEmpty else { return }
+        let ids = Set(eligible.map(\.id))
+        reannouncing.formUnion(ids); reannounceNotice = nil
+        Task {
+            defer { if engineInstance == instance { reannouncing.subtract(ids) } }
+            var scheduled = 0, pending = 0, unavailable = 0, skipped = items.count - eligible.count
+            var failure: String?
+            for item in eligible {
+                guard engineInstance == instance, connected, !switching else { return }
+                do {
+                    var request = EngineRequest(command:"reannounce")
+                    request.id = item.id; request.targetIds = targetIds; request.engineInstanceId = instance
+                    guard let summary = try await perform(request).reannounce else {
+                        throw UserFacingError(message:String(localized:"Tracker updates are unavailable for this transfer.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                    }
+                    scheduled += Int(summary.scheduled); pending += Int(summary.alreadyPending); unavailable += Int(summary.unavailable)
+                } catch { skipped += 1; failure = error.localizedDescription }
+            }
+            guard engineInstance == instance else { return }
+            reannounceNotice = String(localized:"Tracker updates: scheduled \(scheduled), pending \(pending), unavailable \(unavailable). Transfers skipped: \(skipped).",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+            if let failure { error = failure }
+            await refresh()
+        }
+    }
     var canRecheckSelection: Bool { canActOnSelection && selected.allSatisfy { $0.state != "checking" && !hasPendingCleanup($0.id) } }
     var canMoveSelection: Bool { canRecheckSelection && storageRecovery == nil && selected.count == 1 }
     var canRemoveSelection: Bool { canActOnSelection && selected.allSatisfy { !hasPendingCleanup($0.id) } }
@@ -340,7 +394,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
     private func apply(_ snapshot: LibrarySnapshot) {
         if engineInstance != snapshot.instanceId {
-            engineInstance = snapshot.instanceId; detailsContext = UUID(); details = nil; peerBaselines = [:]; peerRates = [:]; lastTrackerEvent = [:]
+            engineInstance = snapshot.instanceId; reannounceNotice = nil; reannouncing = []; detailsContext = UUID(); details = nil; peerBaselines = [:]; peerRates = [:]; lastTrackerEvent = [:]
         }
         let statisticsText = snapshot.statisticsMessage?.displayText ?? snapshot.statisticsWarning.map { EngineMessage(code:"statistics.save_failed",diagnostic:$0).displayText }
         if statisticsWarning != statisticsText { statisticsWarning = statisticsText }
@@ -468,7 +522,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
 
     func perform(_ request: EngineRequest) async throws -> EngineReply {
         guard !designPreview else { throw UserFacingError(message:String(localized:"This is a design preview with sample data. Launch the app normally for real transfers.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
-        if hasFileOperation && ["add", "inspect", "pause", "forceStart", "select", "priorities", "queue", "queueMove", "recheck", "retry", "remove", "limits", "peerEncryption"].contains(request.command) {
+        if hasFileOperation && ["add", "inspect", "pause", "forceStart", "select", "priorities", "queue", "queueMove", "reannounce", "recheck", "retry", "remove", "limits", "peerEncryption"].contains(request.command) {
             throw UserFacingError(message:String(localized:"Wait for the current file change to finish, or cancel it, then try again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
         }
         return try await client.send(request)

@@ -10,7 +10,7 @@ enum SeedHopIdentity {
     #endif
     static let foreground = app + ".engine"
     static let background = app + ".agent"
-    static let protocolVersion = 8
+    static let protocolVersion = 9
     static let agentPlist = background + ".plist"
 }
 
@@ -36,6 +36,7 @@ struct TorrentItem: Codable, Identifiable, Equatable {
     var destination: String
     var files: [FileItem]
     var trackers: [String]
+    var canReannounce: Bool? = nil
     var error: String?
     var queuePosition: UInt32 = 0
     var pausedIntent: Bool? = nil
@@ -173,6 +174,8 @@ struct EngineRequest: Codable {
     var version = SeedHopIdentity.protocolVersion
     var alternativeLimitsEnabled: Bool? = nil
     var command: String
+    var targetIds: [String]? = nil
+    var engineInstanceId: String? = nil
     var requestId = UUID().uuidString
     var id: String?
     var magnet: String?
@@ -211,10 +214,11 @@ struct EngineReply: Codable {
     var cancellationAccepted: Bool?
     var details: TorrentDetails?
     var stoppedProcessID: Int32?
-    init(snapshot: LibrarySnapshot? = nil, preview: ImportPreview? = nil, id: String? = nil, error: String? = nil, errorMessage: EngineMessage? = nil, cancelled: Bool? = nil, cancellationAccepted: Bool? = nil, details: TorrentDetails? = nil, stoppedProcessID: Int32? = nil) {
+    var reannounce: ReannounceSummary?
+    init(snapshot: LibrarySnapshot? = nil, preview: ImportPreview? = nil, id: String? = nil, error: String? = nil, errorMessage: EngineMessage? = nil, cancelled: Bool? = nil, cancellationAccepted: Bool? = nil, details: TorrentDetails? = nil, stoppedProcessID: Int32? = nil, reannounce: ReannounceSummary? = nil) {
         self.snapshot = snapshot; self.preview = preview; self.id = id; self.error = error
         self.cancelled = cancelled; self.cancellationAccepted = cancellationAccepted; self.details = details
-        self.errorMessage = errorMessage; self.stoppedProcessID = stoppedProcessID
+        self.errorMessage = errorMessage; self.stoppedProcessID = stoppedProcessID; self.reannounce = reannounce
     }
 }
 struct UserFacingError: LocalizedError {
@@ -247,7 +251,15 @@ struct PeerDetails: Codable, Identifiable, Equatable {
     var downloaded: UInt64
     var uploaded: UInt64
 }
+struct ReannounceSummary: Codable, Equatable {
+    var scheduled: UInt32
+    var alreadyPending: UInt32
+    var unavailable: UInt32
+}
 struct TrackerDetails: Codable, Identifiable, Equatable {
+    var reannounceTargetId: String? = nil
+    var reannouncePending: Bool? = nil
+    var manualAllowedAt: UInt64? = nil
     var id: String
     var address: String
     var endpoint: String?
