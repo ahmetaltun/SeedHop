@@ -43,7 +43,10 @@ necessary.
 
 1. Set `[workspace.package].version` in `Cargo.toml` to a stable `major.minor.patch`
    version. The app's About screen and bundle metadata derive from that version.
-2. Merge the release changes into `master`. Review CI results.
+2. Run tests, formatting, Clippy, packaging, localization, and native UI checks
+   locally before committing. Merge the validated release changes into `master`.
+   GitHub Actions runs only the release workflow; branch pushes and pull requests
+   do not run tests or builds.
 3. Tag the intended commit and push the tag:
 
    ```sh
@@ -61,11 +64,17 @@ not greater than all published stable release metadata. Reruns may refresh draft
 assets; a published release cannot be overwritten. Do not publish an older draft
 after a newer stable version, or manually mark an older release as latest.
 
-The workflow runs CI without Apple secrets, then imports the certificate into a
-temporary keychain. It restores the keychain search list and deletes temporary
+The workflow validates the tag and version, then builds the release app once.
+It caches Rust dependencies, build outputs, and the checksum-verified Sparkle
+distribution between runs. It does not run the local test suite or native UI
+fixtures. Signing, notarization, archive integrity, and update-signature checks
+remain required release gates.
+
+The workflow imports the certificate into a temporary keychain.
+It restores the keychain search list and deletes temporary
 signing material even on ordinary failures. GitHub destroys the runner after
 cancellation. No personal keychain or signing identity is required on a developer's
-machine to run ordinary CI.
+machine to run local tests.
 
 Expected draft assets:
 
@@ -118,7 +127,7 @@ session. Normal Quit continues to honor the background-transfer setting.
 
 ## Acceptance before publication
 
-CI is automated evidence, not completion of the manual release gates in
+Automated packaging checks do not complete the manual release gates in
 `docs/RELEASE-VALIDATION.md`. Test the exact downloaded artifact and retain its
 hash, macOS version, and observations.
 
