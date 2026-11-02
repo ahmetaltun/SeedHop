@@ -147,6 +147,7 @@ struct LibraryNavigationCommands: Commands {
         if ProcessInfo.processInfo.arguments.contains("--verify-desktop-integration") {
             Task {
                 do {
+                    try await ExternalOpenSelfTest.verifyWindowRouting(store:{ self.store })
                     try await FileAssociationSelfTest.run()
                     try DockSpeedSelfTest.run()
                     try await ExternalOpenSelfTest.run()

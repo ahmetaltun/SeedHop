@@ -3,6 +3,52 @@ import AppKit
 import SwiftUI
 
 @MainActor enum ExternalOpenSelfTest {
+    /// Send real Launch Services events; coordinator-only tests cannot detect extra SwiftUI scenes.
+    static func verifyWindowRouting(store: () -> LibraryStore?) async throws {
+        func expect(_ condition: Bool, _ message: String) throws {
+            if !condition { throw UserFacingError(message:message) }
+        }
+        func settle() async throws { try await Task.sleep(for:.milliseconds(500)) }
+        func libraries() -> [NSWindow] { NSApp.windows.filter { $0.isVisible && $0.title == "SeedHop" } }
+        func open(_ url: URL) async throws {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+            let application = try await NSWorkspace.shared.open([url],withApplicationAt:Bundle.main.bundleURL,configuration:configuration)
+            try expect(application.processIdentifier == ProcessInfo.processInfo.processIdentifier,"External URL launched another app process")
+            try await settle()
+        }
+        try await settle()
+        guard let store = store(), let library = libraries().first else {
+            throw UserFacingError(message:"No library window for external URL verification")
+        }
+        try expect(libraries().count == 1,"External URL fixture started with multiple libraries")
+        let first = URL(string:"magnet:?xt=urn:btih:0123456789012345678901234567890123456789")!
+        let second = URL(string:"magnet:?xt=urn:btih:1123456789012345678901234567890123456789")!
+        try await open(first)
+        try expect(libraries().count == 1 && libraries().first === library,"Magnet link created another library window")
+        try expect(store.showImport && store.incomingMagnet == first.absoluteString,"Magnet link did not reach existing library")
+        try await open(second)
+        try expect(libraries().count == 1 && libraries().first === library,"Repeated magnet link created another library window")
+        try expect(store.incomingMagnet == first.absoluteString && store.externalOpenCoordinator?.pendingCount == 1,"Repeated magnet replaced active import or lost queued link")
+        store.showImport = false
+        try await settle()
+        try expect(store.showImport && store.incomingMagnet == second.absoluteString,"Queued magnet did not reach existing library")
+        store.showImport = false
+        try await settle()
+        library.miniaturize(nil)
+        try await open(first)
+        try expect(libraries().count == 1 && libraries().first === library && !library.isMiniaturized,"Magnet did not reveal minimized library")
+        store.showImport = false
+        try await settle()
+        library.close()
+        try await settle()
+        try await open(second)
+        try expect(libraries().count == 1 && store.showImport && store.incomingMagnet == second.absoluteString,"Magnet did not reopen exactly one library")
+        store.showImport = false
+        try await settle()
+        print("PASS: Launch Services magnets reuse the existing library, queue during review, reveal minimized windows, and reopen one closed library")
+    }
+
     static func run() async throws {
         func expect(_ condition: Bool, _ message: String) throws {
             if !condition { throw UserFacingError(message:message) }

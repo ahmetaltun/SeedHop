@@ -87,6 +87,8 @@ struct ExternalOpenBridge: ViewModifier {
             coordinator.attach(store)
             attached()
         }
+        // Route external URLs to this library before SwiftUI creates another group window.
+        .handlesExternalEvents(preferring:["*"],allowing:["*"])
         .onOpenURL { coordinator.receive([$0]) }
     }
 }
