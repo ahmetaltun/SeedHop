@@ -131,12 +131,14 @@ import SwiftUI
             try expect(dwell.hover == nil,"Leaving the bar allowed a delayed popup")
             dwell.update(first,location:CGPoint(x:10,y:4))
             dwell.update(second,location:CGPoint(x:20,y:4))
-            try await Task.sleep(for:.milliseconds(150))
+            // A hosted runner may schedule the timer task after this test yields.
+            // Observe its first reveal; keep the stale-target assertion unchanged.
+            try await eventually { dwell.hover != nil }
             try expect(dwell.hover == second,"An older hover request replaced the current range")
             dwell.update(second,location:CGPoint(x:21,y:4))
             try expect(dwell.hover == nil,"Movement within the same range did not hide details")
             dwell.cancel(availability:false)
-            try await Task.sleep(for:.milliseconds(150))
+            try await eventually { dwell.hover != nil }
             try expect(dwell.hover == second,"Leaving the other row canceled the active row")
             dwell.update(first,location:CGPoint(x:10,y:4))
             dwell.cancel()

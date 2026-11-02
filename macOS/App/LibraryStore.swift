@@ -737,6 +737,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
             apply(try await reconnectAfterHandoff(background:enabled))
             backgroundEnabled = enabled; connected = true
             UserDefaults.standard.set(enabled,forKey:"backgroundEnabled")
+            // An explicit user choice supersedes a pending update restoration.
+            UserDefaults.standard.removeObject(forKey:"updateRestoreBackground")
             var login = EngineRequest(command:"login"); login.resumeAtLogin = resumeAtLogin
             _ = try await client.send(login)
         } catch {
