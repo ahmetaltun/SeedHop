@@ -80,6 +80,7 @@
       "All transfers": "1df55265e5b280dfe3ad4f02f2c370de8d69ec8d0dc6c7ddefd3e13f2ad03164",
       "Allow SeedHop in System Settings → General → Login Items & Extensions, then try again.": "4d8abbad1ce0b7733f4659555d33663906c3fea7c3a8bcdbd85fd48072ceb5e8",
       "Allow encrypted peers": "f9e07677578d07f2ed5b584af24c1ed643a14acd8f5ba905505e38d4a0af2f26",
+      "Also delete downloaded files": "9d528b3e6d0b9c7cff80345a5f42d30a189679260d6be2dfc4c2fd479dfc74ef",
       "Alternative": "b65aeaff93e5fe9eefa919f9618c12772231cacdee85949844f52ff7d43158a1",
       "Alternative bandwidth limits": "a9b24716458514d5cb61fd21a59d07ba76c3731d2d383318ec08b2a590d470bd",
       "Alternative download limit in kilobytes per second": "33197bae4a154cce776746bef6fcf31d8e4f3f8a339e6955ed9c46a7bc22d605",
@@ -423,6 +424,7 @@
       "Remove %lld transfers?": "4a304fab04b4bfe1ed5c516b1f0b859f8d08b14ce9c7d2a44d22e4cd9c9dc6ce",
       "Remove Selected…": "c48defa1e6d70fb48ee178ff78b8481f9c4fbaa54fdeb2c2151122414b0f1607",
       "Remove and Delete Downloaded Files": "46ce445f35c22e96f9b62bcac81422c0736c3197bc1e5eb5de0e13cb4b9fcbb9",
+      "Remove and Delete Files": "f9dbb032db179c3a7aa3c54d8e76d4af172dc9495c0f53c397723a03b2023e43",
       "Remove from Library": "6e5512529207c9001e5b66ce63b669262c5098ff34f227473f38dd2aea073aac",
       "Remove schedule window %lld": "3ec7af8f19372f1661d43ebf8b81a9415a18a0305081d033103724e31a0c4d2f",
       "Remove selected transfers": "9accf1e998aa70ae3e7947d74998ea48df6bef23d6799a21ca80db61180a691f",
@@ -768,6 +770,6 @@
       "origin": "AI draft"
     }
   },
-  "sourceDigest": "71b365b8327a6d18d7faf899c98bc45c1cad043b5c5692a4a691598f4b79dad2",
+  "sourceDigest": "b9ac92f81056a6a052846c566bd1a81c94840ddbc0cc1907a3158cc585e091c1",
   "sourceLanguage": "en"
 }

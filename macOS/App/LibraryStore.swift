@@ -76,6 +76,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     @Published var incomingMagnet = ""
     @Published var incomingFile: URL?
     @Published var showRemoval = false
+    @Published var removalDeletesFiles = false
     @Published private(set) var removalTargets: [TorrentItem] = []
     @Published private(set) var busyTransfers = Set<String>()
     @Published var fileOperation: FileOperationItem? { didSet { rebuildCounts() } }
@@ -486,6 +487,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     func requestRemoval() {
         guard canRemoveSelection else { return }
         removalTargets = selected
+        removalDeletesFiles = false
         showRemoval = true
     }
     func recheckSelected() {

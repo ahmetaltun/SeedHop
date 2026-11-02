@@ -64,10 +64,37 @@ struct LibraryView: View {
     private var presentedWorkspace: some View {
         searchableWorkspace
             .sheet(isPresented:$store.showImport,onDismiss:{ focusTransfers(); store.externalOpenCoordinator?.didDismissImport() }) { ImportView().environmentObject(store) }
-            .confirmationDialog(removalTitle,isPresented:$store.showRemoval,titleVisibility:.visible) {
-                Button(String(localized:"Remove from Library",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.removeConfirmed(deleteFiles:false) }
-                Button(String(localized:"Remove and Delete Downloaded Files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),role:.destructive) { store.removeConfirmed(deleteFiles:true) }
-            } message: { Text(removalMessage) }
+            .sheet(isPresented:$store.showRemoval,onDismiss:focusTransfers) { removalConfirmation }
+    }
+    private var removalConfirmation: some View {
+        VStack(alignment:.leading,spacing:20) {
+            HStack(alignment:.top,spacing:16) {
+                Image(nsImage:NSApplication.shared.applicationIconImage)
+                    .resizable().frame(width:64,height:64).accessibilityHidden(true)
+                VStack(alignment:.leading,spacing:8) {
+                    Text(removalTitle).font(.headline)
+                    Text(removalMessage).fixedSize(horizontal:false,vertical:true)
+                }
+            }
+            Toggle(String(localized:"Also delete downloaded files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),isOn:$store.removalDeletesFiles)
+                .toggleStyle(.checkbox)
+                .accessibilityIdentifier("removal-delete-files")
+            HStack {
+                Spacer()
+                Button(String(localized:"Cancel",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.showRemoval = false }
+                    .keyboardShortcut(.cancelAction)
+                Button(role:store.removalDeletesFiles ? .destructive : nil) {
+                    store.removeConfirmed(deleteFiles:store.removalDeletesFiles)
+                    store.showRemoval = false
+                } label: {
+                    Text(store.removalDeletesFiles ? String(localized:"Remove and Delete Files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Remove",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                }
+                .keyboardShortcut(.defaultAction)
+                .accessibilityIdentifier("removal-confirm")
+            }
+        }
+        .padding(24)
+        .frame(width:460)
     }
     private var removalTitle: String { String(localized:"Remove \(store.removalTargets.count) transfers?",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
     private var removalMessage: String {

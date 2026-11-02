@@ -371,6 +371,25 @@ import SwiftUI
             try expect(store.filter == .all && store.search.isEmpty && store.selection == [id],"Added transfer remained hidden")
         }
 
+        try await check("Removal requires fresh opt-in before deleting files") {
+            for deleteFiles in [false,true] {
+                let (store, peer) = library()
+                let first = store.torrents[0].id
+                store.selection = [first]
+                store.requestRemoval()
+                try expect(!store.removalDeletesFiles,"Removal defaulted to deleting files")
+                store.removalDeletesFiles = true
+                store.showRemoval = false
+                try expect(peer.commands("remove").isEmpty,"Cancel removed a transfer")
+                store.requestRemoval()
+                try expect(!store.removalDeletesFiles,"Removal remembered a previous deletion choice")
+                store.removalDeletesFiles = deleteFiles
+                store.removeConfirmed(deleteFiles:store.removalDeletesFiles)
+                try await eventually { store.busyTransfers.isEmpty }
+                try expect(peer.commands("remove").count == 1 && peer.commands("remove")[0].deleteFiles == deleteFiles,"Removal ignored the checkbox choice")
+            }
+        }
+
         try await check("Pause captures its targets and suppresses duplicate in-flight commands") {
             let (store, peer) = library(); peer.hold = ["pause"]
             let first = store.torrents[0].id, other = store.torrents[1].id
