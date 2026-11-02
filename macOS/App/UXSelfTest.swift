@@ -428,6 +428,70 @@ import SwiftUI
             try expect(store.busyTransfers.isEmpty,"Invalid preference request reserved targets")
         }
 
+        try await check("Force Start captures targets, reports partial failure, and refreshes confirmed state") {
+            let (store, peer) = library(); peer.hold = ["forceStart"]
+            for index in peer.torrents.indices { peer.torrents[index].state = "queued"; peer.torrents[index].pausedIntent = false }
+            store.torrents = peer.torrents
+            let ids = Set(store.torrents.prefix(2).map(\.id))
+            store.setForceStarted(ids:ids,enabled:true)
+            store.setForceStarted(ids:ids,enabled:true)
+            store.selection = [store.torrents.last!.id]
+            try await eventually { peer.pending.count == 1 }
+            try expect(store.torrents.allSatisfy { $0.forceStarted != true },"Force Start updated before engine confirmation")
+            try expect(ids.contains(peer.pending[0].request.id ?? "") && peer.pending[0].request.forceStarted == true,"Force Start lost its captured target or Boolean")
+            peer.releaseFirst(error:UserFacingError(message:"Controlled save failure"))
+            try await eventually { peer.pending.count == 1 }
+            peer.releaseFirst()
+            try await eventually { store.busyTransfers.isEmpty }
+            try expect(peer.commands("forceStart").count == 2 && store.error != nil,"Partial failure stopped the remaining targets or duplicated commands")
+            try expect(store.torrents.filter { $0.forceStarted == true }.count == 1,"Confirmed partial state was not refreshed")
+            try expect(store.selection == [store.torrents.last!.id],"Force Start changed a later selection")
+        }
+
+        try await check("Force Start eligibility and Resume distinguish queue intent from transfer state") {
+            let (store, peer) = library()
+            for index in peer.torrents.indices { peer.torrents[index].state = "waiting"; peer.torrents[index].pausedIntent = false }
+            peer.torrents[0].forceStarted = true; store.torrents = peer.torrents
+            let first = store.torrents[0].id, second = store.torrents[1].id
+            store.selection = [first, second]
+            try expect(!store.selectionForceStarted && store.canSetForceStarted(ids:store.selection,enabled:true),"Mixed selection cannot enable Force Start")
+            store.selection = [first]
+            try expect(store.selectionForceStarted && store.canResumeSelection,"Active forced transfer cannot return to normal admission")
+            store.toggleSelected(paused:false)
+            try await eventually { store.busyTransfers.isEmpty && peer.commands("pause").count == 1 }
+            try expect(store.torrents[0].forceStarted == false && peer.commands("pause")[0].paused == false,"Resume did not clear Force Start")
+            store.setForceStarted(ids:[first],enabled:true)
+            try await eventually { store.busyTransfers.isEmpty && store.torrents[0].forceStarted == true }
+            store.toggleSelected(paused:true)
+            try await eventually { store.busyTransfers.isEmpty && store.torrents[0].isPaused }
+            try expect(store.torrents[0].forceStarted == false,"Pause did not clear Force Start")
+            var checking = store.torrents[0]; checking.state = "checking"; checking.forceStarted = true
+            store.torrents[0] = checking
+            try expect(!store.canSetForceStarted(ids:[first],enabled:true) && store.canSetForceStarted(ids:[first],enabled:false),"Checking state cannot safely clear the override")
+            store.torrents[0].state = "error"
+            try expect(!store.canSetForceStarted(ids:[first],enabled:true),"Force Start bypassed error recovery")
+            store.connected = false
+            try expect(!store.canSetForceStarted(ids:[first],enabled:false),"Disconnected Force Start remained enabled")
+        }
+
+        try await check("Force Start preserves primary status and crosses the versioned request boundary") {
+            let (store, _) = library()
+            var item = store.torrents[0]
+            for state in ["waiting", "downloading", "seeding", "checking", "scheduled", "error"] {
+                item.state = state; item.forceStarted = false
+                let primary = TransferPresentation(torrent:item).label
+                item.forceStarted = true
+                let forced = TransferPresentation(torrent:item)
+                try expect(forced.label == primary && forced.accessibleLabel.contains("Force Start"),"Force Start hid primary status or accessible intent")
+            }
+            var request = EngineRequest(command:"forceStart"); request.id = item.id; request.forceStarted = false
+            let decoded = try JSONDecoder().decode(EngineRequest.self,from:JSONEncoder().encode(request))
+            try expect(decoded.version == 8 && decoded.forceStarted == false,"Force Start request lost explicit false or protocol version")
+            item.forceStarted = nil
+            let old = try JSONDecoder().decode(TorrentItem.self,from:JSONEncoder().encode(item))
+            try expect(old.forceStarted == nil,"Legacy snapshot invented a queue override")
+        }
+
         try await check("Recheck captures targets, preserves choices, and allows retry after failure") {
             let (store, peer) = library(); peer.hold = ["recheck"]
             let first = store.torrents[0], other = store.torrents[1].id
@@ -1177,7 +1241,16 @@ import SwiftUI
                 torrents[at].error = nil; torrents[at].errorKind = nil
             }
         case "pause":
-            if let at = torrents.firstIndex(where: { $0.id == request.id }) { torrents[at].state = request.paused == true ? "paused" : "downloading" }
+            if let at = torrents.firstIndex(where: { $0.id == request.id }) {
+                torrents[at].state = request.paused == true ? "paused" : "downloading"
+                if torrents[at].pausedIntent != nil { torrents[at].pausedIntent = request.paused }
+                if torrents[at].forceStarted != nil { torrents[at].forceStarted = false }
+            }
+        case "forceStart":
+            if let at = torrents.firstIndex(where: { $0.id == request.id }), let enabled = request.forceStarted {
+                torrents[at].forceStarted = enabled
+                if enabled { torrents[at].pausedIntent = false }
+            }
         default: break
         }
         return EngineReply()

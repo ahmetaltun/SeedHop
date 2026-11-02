@@ -309,6 +309,24 @@ import AppKit
             try invoke(on)
             try await waitUntil("Bulk piece preferences did not disable") { store.busyTransfers.isEmpty && store.torrents.filter { both.contains($0.id) }.allSatisfy { action == "sequential" ? $0.sequential == false : $0.firstLastPieces == false } }
         }
+        let forceOff = try preferenceMenu([target],"forceStart")
+        guard forceOff.state == .off, forceOff.isEnabled else { throw UserFacingError(message:"Default Force Start state incorrect") }
+        store.selection = [other]
+        try invoke(forceOff)
+        try await waitUntil("Force Start did not retain its captured target") { store.busyTransfers.isEmpty && store.torrents.first(where:{$0.id == target})?.forceStarted == true }
+        guard try preferenceMenu([target],"forceStart").state == .on,
+              UXSelfTest.nativeRequests.contains(where:{ $0.command == "forceStart" && $0.id == target && $0.forceStarted == true }) else { throw UserFacingError(message:"Force Start checkmark or captured request incorrect") }
+        let forceMixed = try preferenceMenu(both,"forceStart")
+        guard forceMixed.state == .mixed else { throw UserFacingError(message:"Mixed Force Start state missing") }
+        try invoke(forceMixed)
+        try await waitUntil("Mixed Force Start did not enable every target") { store.busyTransfers.isEmpty && store.torrents.filter { both.contains($0.id) }.allSatisfy { $0.forceStarted == true } }
+        let forceOn = try preferenceMenu(both,"forceStart")
+        guard forceOn.state == .on else { throw UserFacingError(message:"Bulk Force Start checkmark missing") }
+        try invoke(forceOn)
+        try await waitUntil("Force Start did not clear every target") { store.busyTransfers.isEmpty && store.torrents.filter { both.contains($0.id) }.allSatisfy { $0.forceStarted == false } }
+        store.selection = [target]; store.toggleSelected(paused:true)
+        try await waitUntil("Force Start fixture did not return to paused intent") { store.busyTransfers.isEmpty && store.torrents.first(where:{$0.id == target})?.isPaused == true }
+        print("PASS: Native Force Start menu off/on/mixed states, captured target, bulk enable/clear, and retained pause controls.")
         let original = store.torrents
         for state in ["downloading","paused","queued","waiting","checking","seeding","error"] {
             let at = store.torrents.firstIndex(where:{$0.id == target})!

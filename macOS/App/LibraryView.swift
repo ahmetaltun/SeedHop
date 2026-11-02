@@ -457,6 +457,11 @@ struct LibraryView: View {
             }
             HStack(alignment:.firstTextBaseline,spacing:8) {
                 StateBadge(torrent:item,presentation:status)
+                if item.forceStarted == true {
+                    Label(String(localized:"Force Start",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),systemImage:"bolt.fill")
+                        .font(.system(size:10,weight:.medium)).foregroundStyle(.secondary)
+                        .help(String(localized:"Bypasses the download queue. Scheduled suspensions and speed limits still apply.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                }
                 Spacer(minLength:0)
                 if let progress = status.progress {
                     Text(LocaleText.percent(progress))
@@ -478,8 +483,14 @@ struct LibraryView: View {
                     .fixedSize(horizontal:false,vertical:true)
             }
             if status.isQueued {
+                Button(String(localized:"Force Start",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.setForceStarted(ids:[item.id],enabled:true) }
+                    .controlSize(.small).disabled(!store.canSetForceStarted(ids:[item.id],enabled:true))
                 Button(String(localized:"Move to Front of Queue",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.moveToFront(item) }
                     .controlSize(.small).disabled(!store.canChangeTransfers || store.busyTransfers.contains(item.id))
+            }
+            if item.forceStarted == true {
+                Button(String(localized:"Use Normal Queue",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.setForceStarted(ids:[item.id],enabled:false) }
+                    .controlSize(.small).disabled(!store.canSetForceStarted(ids:[item.id],enabled:false))
             }
             if status.isError && !status.hasRecovery {
                 // Keep recovery reachable without letting long diagnostics displace the tab content.

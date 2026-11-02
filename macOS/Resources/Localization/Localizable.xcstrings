@@ -11148,6 +11148,89 @@
         }
       }
     },
+    "Bypasses the download queue. Scheduled suspensions and speed limits still apply.": {
+      "comment": "SeedHop transfer queue override. Force Start bypasses queue admission only; schedules and speed limits remain effective.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Umgeht die Download-Warteschlange. Geplante Unterbrechungen und Geschwindigkeitslimits gelten weiterhin."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bypasses the download queue. Scheduled suspensions and speed limits still apply."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Omite la cola de descargas. Se siguen aplicando las suspensiones programadas y los límites de velocidad."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ignore la file de téléchargement. Les suspensions programmées et les limites de vitesse restent applicables."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ignora la coda dei download. Le sospensioni programmate e i limiti di velocità restano attivi."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ダウンロードキューを無視します。スケジュールによる一時停止と速度制限は引き続き適用されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다운로드 대기열을 건너뜁니다. 예약된 일시 정지와 속도 제한은 계속 적용됩니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pomija kolejkę pobierania. Zaplanowane wstrzymania i limity prędkości nadal obowiązują."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ignora a fila de downloads. As suspensões programadas e os limites de velocidade continuam valendo."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Обходит очередь загрузки. Приостановки по расписанию и ограничения скорости остаются в силе."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İndirme kuyruğunu atlar. Zamanlanmış duraklatmalar ve hız sınırları geçerliliğini korur."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Обходить чергу завантаження. Призупинення за розкладом і обмеження швидкості залишаються чинними."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "绕过下载队列。计划暂停和速度限制仍然有效。"
+          }
+        }
+      }
+    },
     "Bytes per second": {
       "comment": "SeedHop macOS UI (TorrentDiagnosticsView.swift).",
       "localizations": {
@@ -23431,6 +23514,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "强制重新校验"
+          }
+        }
+      }
+    },
+    "Force Start": {
+      "comment": "SeedHop transfer queue override. Force Start bypasses queue admission only; schedules and speed limits remain effective.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erzwungener Start"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Force Start"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forzar inicio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forcer le démarrage"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvio forzato"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "強制開始"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "강제 시작"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wymuś uruchomienie"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forçar início"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Принудительный запуск"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zorla Başlat"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Примусовий запуск"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "强制启动"
           }
         }
       }
@@ -54498,6 +54664,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "上传流量 · 累计"
+          }
+        }
+      }
+    },
+    "Use Normal Queue": {
+      "comment": "SeedHop transfer queue override. Force Start bypasses queue admission only; schedules and speed limits remain effective.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Normale Warteschlange verwenden"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use Normal Queue"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar la cola normal"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utiliser la file normale"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa la coda normale"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通常のキューを使用"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "일반 대기열 사용"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Użyj zwykłej kolejki"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar fila normal"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вернуть в обычную очередь"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Normal Kuyruğu Kullan"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Повернути до звичайної черги"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用正常队列"
           }
         }
       }

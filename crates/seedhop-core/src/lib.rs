@@ -25,7 +25,7 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-pub const PROTOCOL_VERSION: u32 = 7;
+pub const PROTOCOL_VERSION: u32 = 8;
 
 /// Owns library state. The FFI host retains this lease until its runtime has stopped.
 pub struct Engine {
@@ -304,6 +304,7 @@ impl Engine {
         let accounting = self.accounting.lock().unwrap();
         let queue = self.queue.lock().unwrap();
         for torrent in &mut torrents {
+            torrent.force_started = queue.force_started.contains(&torrent.id);
             if let Some(totals) = accounting.entries.get(&torrent.id) {
                 torrent.network_downloaded_bytes = totals.downloaded;
                 torrent.network_uploaded_bytes = totals.uploaded;
@@ -540,6 +541,7 @@ impl Engine {
             .checkpoint(&self.state_directory, true)?;
         // Save admission order before membership: a failed queue write must never
         // report an unsuccessful Add after the torrent has already been added.
+        self.save_force_started(&metadata.id, false)?;
         if add_to_top {
             self.prepare_top_of_queue(&metadata.id)?;
         }
@@ -583,48 +585,77 @@ impl Engine {
         let _operation = self.operations.write().await;
         self.ready()?;
         let handle = self.handle(&id)?;
-        let record = adapter::record(&handle);
         if !paused {
-            let root = Path::new(&record.destination);
-            if !root.is_dir() {
-                return Err(CoreError::Storage(format!(
-                    "The saved destination is unavailable: {}. Reconnect the drive and retry.",
-                    record.destination
-                )));
-            }
-            storage::validate_destination(
-                root,
-                &record
-                    .files
-                    .iter()
-                    .map(|file| file.name.clone())
-                    .collect::<Vec<_>>(),
-            )?;
+            self.validate_resume_destination(&handle)?;
         }
+        self.save_force_started(&id, false)?;
+        self.apply_pause_intent(&handle, paused).await?;
+        self.reconcile_queue().await
+    }
+
+    fn validate_resume_destination(&self, handle: &Arc<librqbit::ManagedTorrent>) -> Result<()> {
+        if self
+            .storage_recovery
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|notice| {
+                notice.torrent_id == adapter::torrent_id(handle) || notice.torrent_id.is_empty()
+            })
+        {
+            return Err(CoreError::Storage(
+                "Resolve the retained-file cleanup before resuming this transfer.".into(),
+            ));
+        }
+        let record = adapter::record(handle);
+        let root = Path::new(&record.destination);
+        if !root.is_dir() {
+            return Err(CoreError::Storage(format!(
+                "The saved destination is unavailable: {}. Reconnect the drive and retry.",
+                record.destination
+            )));
+        }
+        storage::validate_destination(
+            root,
+            &record
+                .files
+                .iter()
+                .map(|file| file.name.clone())
+                .collect::<Vec<_>>(),
+        )?;
+        Ok(())
+    }
+
+    async fn apply_pause_intent(
+        &self,
+        handle: &Arc<librqbit::ManagedTorrent>,
+        paused: bool,
+    ) -> Result<()> {
+        let record = adapter::record(handle);
         // A fatal storage error retains the previous running intent. Resume must
         // restart and recheck it even when that intent already says "running".
         let retry_error = !paused && record.state == "error";
         if paused == handle.is_paused() && !retry_error {
             return self
                 .session
-                .try_update_persistence_metadata(&handle)
+                .try_update_persistence_metadata(handle)
                 .await
                 .map_err(adapter::engine_error);
         }
         if paused {
-            self.session.pause(&handle).await
+            self.session.pause(handle).await
         } else {
             let queued = self.queue.lock().unwrap().max_active > 0 || self.schedule_suspended();
             if queued {
                 self.session
-                    .set_queued(&handle, true)
+                    .set_queued(handle, true)
                     .await
                     .map_err(adapter::engine_error)?;
             }
-            self.session.unpause(&handle).await
+            self.session.unpause(handle).await
         }
         .map_err(adapter::engine_error)?;
-        self.reconcile_queue().await
+        Ok(())
     }
 
     pub async fn select_files(&self, id: String, indices: Vec<u32>) -> Result<()> {
@@ -741,6 +772,7 @@ impl Engine {
             .await
             .map_err(adapter::engine_error)?;
         self.accounting.lock().unwrap().entries.remove(&id);
+        self.reconcile_queue().await?;
         let saved = self
             .accounting
             .lock()

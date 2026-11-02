@@ -81,6 +81,8 @@ pub struct TorrentRecord {
     pub queue_position: u32,
     pub paused_intent: bool,
     #[serde(default)]
+    pub force_started: bool,
+    #[serde(default)]
     pub sequential: bool,
     #[serde(default)]
     pub first_last_pieces: bool,

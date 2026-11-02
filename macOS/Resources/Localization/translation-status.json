@@ -106,6 +106,7 @@
       "BitTorrent v1, v2, and hybrid": "5d231374de501e5d484e6368e22fa557ab065a5b8c42c11c3e611c17f97b230e",
       "BitTorrent v2 info hash": "6b832a902a527724ccf0d53785482fcdf4f7c4a8dfbefa92a56f233c5d1728c4",
       "Built with SwiftUI, AppKit, and Rust.\nFree and open source.": "000c755a5d8056b23b2a6412bcf6db2dc6525db0548ef19ea6cd68cbc434d02d",
+      "Bypasses the download queue. Scheduled suspensions and speed limits still apply.": "623b7b6b08e28523b21c6b536eacc5bf8635266a512fb196087dc70604cde5ef",
       "Bytes per second": "65f8e49c2116427a24a22b2c81745ff0a83ecbb5a2f37815896c30663f1d2c89",
       "Cancel": "523cd7c6f09220ea8e8436572c68692cc6b9e0b33e18393fd05950c1edce44de",
       "Cancel file change": "0a8f89ab7979e15350346331e97974bc5a747d5d9cc7d0ab190f7210a095a6e3",
@@ -254,6 +255,7 @@
       "Focus Transfer List": "1f1f55ced0e651c49f82ccd71e04a64de1821f2735cb416e3362a6f53a2bd6a5",
       "Follow macOS": "c6566cee67a92a9e926cea5adfbead2e5ff337ff4eead99a093ba7348fd8e11c",
       "Force Recheck": "298eda06ac1f6da035b16ab92139fad246c49a904fa598457f88ead64bb420fd",
+      "Force Start": "5f3185ab3e52e29cd9f71515ae48bc4ef7582abc175a154cf2038ce4a03b978a",
       "Format": "65bb8e9261eef2a475712bc34b0f4b3e353ba8df0ceaa1822606d32fa11567d2",
       "Free space on the destination disk, then retry. %@": "a7360dab91254f4dcc4184c4178bbaa75200593a5d474b6fc54923a1d0fe90a9",
       "From": "5794145fa5dfb72475100b7fd5db024b41fb4ce39e8ca0780be2adb86c73c55a",
@@ -623,6 +625,7 @@
       "Uploaded Traffic": "0a91b9bdb08b1c5b93185b7003bcf8e66fa21ae25c82ac148a50bdc695823961",
       "Uploaded traffic · engine session": "88b9343668ebc76f28ebe7e6fdab130cd30abf546519ccaf8156bad473eda9e2",
       "Uploaded traffic · lifetime": "16aa2c6650a28b1c4691d31bac6419aaceee402e72e2d5037da32ba37a796d0f",
+      "Use Normal Queue": "1abfaed2e195b7c457f663b0ceb9a0bde04db64f9c83eb4d07bd98566c7de08d",
       "Use Selected App": "6b7ec2f240f037b92c088e870a462765d48ec7f2cb24689b4d2d980c7a685500",
       "Use alternative limits": "acd6da860aad0cf1b1d349fe82926f3ce2d1844f8b2db1c72dd3cb51f85386af",
       "Use arrow keys to choose rows. Space toggles whether those files will download.": "f0505d2af4c5e0d08337fc341721cbcd9506b0d57bfa5928f3eb7a23235d3b93",
@@ -770,6 +773,6 @@
       "origin": "AI draft"
     }
   },
-  "sourceDigest": "b9ac92f81056a6a052846c566bd1a81c94840ddbc0cc1907a3158cc585e091c1",
+  "sourceDigest": "5444e16ca774f708b2a94efdd380be67fcca3d6a4c57319e10f65c1c2c8aa73f",
   "sourceLanguage": "en"
 }

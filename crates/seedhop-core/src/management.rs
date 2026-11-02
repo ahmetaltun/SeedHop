@@ -1,11 +1,14 @@
 use crate::{CoreError, Engine, Result, adapter, storage};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub(crate) struct QueueConfig {
     pub max_active: u32,
     pub order: Vec<String>,
+    #[serde(default)]
+    pub force_started: BTreeSet<String>,
 }
 impl QueueConfig {
     pub fn load(root: &Path) -> Result<Self> {
@@ -19,6 +22,45 @@ impl QueueConfig {
 }
 
 impl Engine {
+    pub(crate) fn save_force_started(&self, id: &str, enabled: bool) -> Result<()> {
+        let mut config = self.queue.lock().unwrap().clone();
+        let changed = if enabled {
+            config.force_started.insert(id.to_owned())
+        } else {
+            config.force_started.remove(id)
+        };
+        if changed {
+            self.save_queue(config)?;
+        }
+        Ok(())
+    }
+
+    /// Override download admission without overriding scheduling or storage checks.
+    pub async fn set_force_started(&self, id: String, enabled: bool) -> Result<()> {
+        let _operation = self.operations.write().await;
+        self.ready()?;
+        let handle = self.handle(&id)?;
+        if enabled {
+            if matches!(
+                handle.stats().state,
+                librqbit::TorrentStatsState::Initializing { .. }
+                    | librqbit::TorrentStatsState::Error
+            ) {
+                return Err(CoreError::InvalidInput(
+                    "Wait for checking or retry the transfer before using Force Start.".into(),
+                ));
+            }
+            self.validate_resume_destination(&handle)?;
+        }
+        // Persist intent before changing runtime admission. On failure the caller
+        // sees the error and a snapshot of the actual saved and running state.
+        self.save_force_started(&id, enabled)?;
+        if enabled {
+            self.apply_pause_intent(&handle, false).await?;
+        }
+        self.reconcile_queue().await
+    }
+
     async fn refresh_storage_recovery(&self) -> Result<()> {
         let state = self.state_directory.clone();
         let recovery = tokio::task::spawn_blocking(move || crate::layout_journal::recover(&state))
@@ -217,6 +259,10 @@ impl Engine {
         handles.sort_by_key(|t| t.id());
         let mut config = self.queue.lock().unwrap().clone();
         let old = config.order.clone();
+        let old_forced = config.force_started.clone();
+        config
+            .force_started
+            .retain(|id| handles.iter().any(|t| adapter::torrent_id(t) == *id));
         config
             .order
             .retain(|id| handles.iter().any(|t| adapter::torrent_id(t) == *id));
@@ -226,7 +272,7 @@ impl Engine {
                 config.order.push(id);
             }
         }
-        if old != config.order {
+        if old != config.order || old_forced != config.force_started {
             self.save_queue(config.clone())?;
         }
         handles.sort_by_key(|t| {
@@ -256,7 +302,11 @@ impl Engine {
             }
             let queued = if suspended {
                 true
-            } else if handle.is_paused() || stats.finished || config.max_active == 0 {
+            } else if handle.is_paused()
+                || stats.finished
+                || config.max_active == 0
+                || config.force_started.contains(&adapter::torrent_id(&handle))
+            {
                 false
             } else {
                 slots += 1;

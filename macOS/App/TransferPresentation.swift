@@ -28,7 +28,11 @@ struct TransferPresentation {
         if needsAttention { return "error" }
         return torrent.state
     }
+    private var displayLabel: String {
+        torrent.forceStarted == true ? "\(currentLabel) · \(String(localized:"Force Start",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))" : currentLabel
+    }
     var label: String { connected ? currentLabel : String(localized:"Last: \(currentLabel)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+    var rowLabel: String { connected ? displayLabel : String(localized:"Last: \(displayLabel)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
     private var currentLabel: String {
         if let change = fileChange {
             if change.cancelRequested { return String(localized:"Cancelling",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
@@ -51,7 +55,7 @@ struct TransferPresentation {
         if isQueued && torrent.queuePosition > 0 {
             return connected ? String(localized:"Queued, position \(torrent.queuePosition)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Last known: Queued, position \(torrent.queuePosition)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         }
-        return label
+        return rowLabel
     }
     var detail: String {
         if !connected { return String(localized:"This is the last known state. Reconnect to see current activity.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }

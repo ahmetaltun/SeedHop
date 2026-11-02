@@ -33,6 +33,8 @@ import Combine
             CommandMenu(String(localized:"Transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
                 Button(store.resumeSelectedLabel) { store.toggleSelected(paused:false) }.keyboardShortcut("r").disabled(!store.canResumeSelection)
                 Button(String(localized:"Pause Selected",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.toggleSelected(paused:true) }.keyboardShortcut(".").disabled(!store.canPauseSelection)
+                Toggle(String(localized:"Force Start",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),isOn:Binding(get:{ store.selectionForceStarted },set:{ store.setForceStarted(ids:store.selection,enabled:$0) }))
+                    .disabled(!store.canSetForceStarted(ids:store.selection,enabled:!store.selectionForceStarted))
                 Divider()
                 Button(String(localized:"Force Recheck",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.recheckSelected() }.disabled(!store.canRecheckSelection)
                 Button(String(localized:"Move to Front of Queue",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.moveSelectedToFront() }.disabled(!store.canActOnSelection || store.selected.count != 1)

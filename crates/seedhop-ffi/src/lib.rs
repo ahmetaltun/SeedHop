@@ -124,6 +124,7 @@ pub struct Transfer {
     pub error_message: Option<UserNotice>,
     pub queue_position: u32,
     pub paused_intent: bool,
+    pub force_started: bool,
 }
 impl From<seedhop_core::TorrentRecord> for Transfer {
     fn from(t: seedhop_core::TorrentRecord) -> Self {
@@ -145,6 +146,7 @@ impl From<seedhop_core::TorrentRecord> for Transfer {
             error_kind: t.error_kind,
             queue_position: t.queue_position,
             paused_intent: t.paused_intent,
+            force_started: t.force_started,
         }
     }
 }
@@ -489,6 +491,11 @@ impl EngineBridge {
         let (core, rt) = self.handles()?;
         rt.block_on(core.set_paused(id, paused)).map_err(error)
     }
+    pub fn set_force_started(&self, id: String, enabled: bool) -> Result<(), BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.set_force_started(id, enabled))
+            .map_err(error)
+    }
     pub fn select_files(&self, id: String, indices: Vec<u32>) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;
         rt.block_on(core.select_files(id, indices)).map_err(error)
@@ -674,6 +681,44 @@ mod tests {
         assert_eq!(super::recovery_notice(&recovery).code, "recovery.unknown");
     }
     #[test]
+    fn force_start_crosses_typed_and_json_snapshots() {
+        let state = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let bridge = super::EngineBridge::new(
+            state.path().display().to_string(),
+            downloads.path().display().to_string(),
+            false,
+        )
+        .unwrap();
+        let id = bridge
+            .add(
+                seedhop_core::adapter::create_fixture("forced", b"content"),
+                downloads.path().display().to_string(),
+                vec![0],
+                true,
+                false,
+            )
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while bridge.snapshot().unwrap().torrents[0].state == "checking" {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "initial check did not finish"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        bridge.set_force_started(id.clone(), true).unwrap();
+        let transfer = &bridge.snapshot().unwrap().torrents[0];
+        assert!(transfer.force_started && !transfer.paused_intent);
+        let json: serde_json::Value =
+            serde_json::from_str(&bridge.snapshot_json().unwrap()).unwrap();
+        assert_eq!(json["torrents"][0]["forceStarted"], true);
+        bridge.set_paused(id, false).unwrap();
+        assert!(!bridge.snapshot().unwrap().torrents[0].force_started);
+        bridge.shutdown().unwrap();
+    }
+
+    #[test]
     fn bridge_initializes_utp_and_shuts_down_from_a_small_host_stack() {
         let state = tempfile::tempdir().unwrap();
         let downloads = tempfile::tempdir().unwrap();
@@ -691,7 +736,7 @@ mod tests {
                 assert!(snapshot.listen_port > 0);
                 assert!(snapshot.torrents.is_empty());
                 let json: serde_json::Value = serde_json::from_str(&bridge.snapshot_json().unwrap()).unwrap();
-                assert_eq!(json["protocolVersion"], 7);
+                assert_eq!(json["protocolVersion"], seedhop_core::PROTOCOL_VERSION);
                 assert!(json.get("statisticsMessage").unwrap().is_null());
                 assert!(json.get("schedulingMessage").unwrap().is_null());
                 let invalid = match bridge.inspect("localization".into(),Some("not a magnet".into()),vec![]) { Err(error) => error, Ok(_) => panic!("invalid magnet accepted") };

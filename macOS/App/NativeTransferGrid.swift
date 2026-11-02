@@ -208,10 +208,13 @@ struct NativeTransferGrid: NSViewRepresentable {
             cell.label.lineBreakMode = (id == "name" || id == "destination") ? .byTruncatingMiddle : .byTruncatingTail
             cell.secondary = ["download","upload","peers"].contains(id)
             cell.statusTint = id == "status" ? NSColor(Design.stateColor(status.colorState)) : nil
+            cell.forceStarted = id == "status" && item.forceStarted == true
             var text = "—", help: String?
             switch id {
             case "name": text = item.name; help = item.name
-            case "status": text = status.label; help = status.detail
+            case "status":
+                text = status.label; help = status.detail
+                if item.forceStarted == true { help = status.detail + "\n" + String(localized:"Bypasses the download queue. Scheduled suspensions and speed limits still apply.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
             case "download": text = SizeText.rate(parent.store.connected ? item.downloadRate : 0)
             case "upload": text = SizeText.rate(parent.store.connected ? item.uploadRate : 0)
             case "peers": text = String(item.peers)
@@ -254,7 +257,14 @@ struct NativeTransferGrid: NSViewRepresentable {
             add(String(localized:"Move Files…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"move",allowed && parent.store.storageRecovery == nil && ids.count == 1 && !items.contains { $0.state == "checking" })
             add(String(localized:"Force Recheck",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"recheck",allowed && !items.contains { $0.state == "checking" || parent.store.hasPendingCleanup($0.id) })
             add(parent.store.resumeLabel(for:items),"resume",allowed && items.contains { parent.store.canResumeOrRetry($0) })
-            add(String(localized:"Pause",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"pause",allowed && items.contains { !$0.isPaused })
+            add(String(localized:"Pause",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"pause",allowed && items.contains { !$0.isPaused || $0.forceStarted == true })
+            let allForced = !items.isEmpty && items.allSatisfy { $0.forceStarted == true }
+            add(String(localized:"Force Start",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),"forceStart",parent.store.canSetForceStarted(ids:ids,enabled:!allForced))
+            if let item = menu.items.last {
+                item.state = allForced ? .on : (items.contains { $0.forceStarted == true } ? .mixed : .off)
+                item.toolTip = String(localized:"Bypasses the download queue. Scheduled suspensions and speed limits still apply.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+                var value = item.representedObject as! [String:Any]; value["enabled"] = !allForced; item.representedObject = value
+            }
             menu.addItem(.separator())
             func preference(_ title: String, _ action: String, _ values: [Bool]) {
                 add(title,action,allowed)
@@ -280,6 +290,9 @@ struct NativeTransferGrid: NSViewRepresentable {
             guard canAct(targets) else { return }
             parent.store.selection = targets
             switch action {
+            case "forceStart":
+                guard let enabled = value["enabled"] as? Bool else { return }
+                parent.store.setForceStarted(ids:targets,enabled:enabled)
             case "sequential", "firstLastPieces":
                 guard let enabled = value["enabled"] as? Bool else { return }
                 parent.store.setPiecePreferences(ids:targets,sequential:action == "sequential" ? enabled : nil,firstLastPieces:action == "firstLastPieces" ? enabled : nil)
@@ -365,6 +378,7 @@ private class NativeTransferCell: NSTableCellView {
     let label = NSTextField(labelWithString:"")
     var secondary = false
     var statusTint: NSColor? { didSet { needsDisplay = true } }
+    var forceStarted = false { didSet { needsDisplay = true } }
     override var backgroundStyle: NSView.BackgroundStyle { didSet { updateColor() } }
     override init(frame frameRect: NSRect) {
         super.init(frame:frameRect); textField = label
@@ -389,7 +403,13 @@ private class NativeTransferCell: NSTableCellView {
         guard let tint = statusTint else { return }
         let rect = NSRect(x:2,y:(bounds.height-20)/2,width:min(bounds.width-4,label.intrinsicContentSize.width+26),height:20)
         tint.withAlphaComponent(0.075).setFill(); NSBezierPath(roundedRect:rect,xRadius:10,yRadius:10).fill()
-        tint.setFill(); NSBezierPath(ovalIn:NSRect(x:10,y:(bounds.height-5)/2,width:5,height:5)).fill()
+        if forceStarted {
+            NSImage(systemSymbolName:"bolt.fill",accessibilityDescription:nil)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors:[tint]))?
+                .draw(in:NSRect(x:8,y:(bounds.height-12)/2,width:9,height:12))
+        } else {
+            tint.setFill(); NSBezierPath(ovalIn:NSRect(x:10,y:(bounds.height-5)/2,width:5,height:5)).fill()
+        }
     }
 }
 private final class NativeProgressCell: NativeTransferCell {

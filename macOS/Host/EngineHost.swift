@@ -88,7 +88,7 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             catch let BridgeError.Operation(message, notice) { response = EngineReply(error:message,errorMessage:Self.message(notice)) }
             catch let failure as HostFailure { response = EngineReply(errorMessage:EngineMessage(code:failure.code)) }
             catch { response = EngineReply(errorMessage:EngineMessage(code:"engine.failed",diagnostic:error.localizedDescription)) }
-            reply((try? JSONEncoder().encode(response)) ?? Data("{\"version\":7,\"errorMessage\":{\"code\":\"engine.failed\",\"arguments\":[],\"diagnostic\":\"Could not encode engine response.\"}}".utf8))
+            reply((try? JSONEncoder().encode(response)) ?? Data("{\"version\":\(SeedHopIdentity.protocolVersion),\"errorMessage\":{\"code\":\"engine.failed\",\"arguments\":[],\"diagnostic\":\"Could not encode engine response.\"}}".utf8))
         }
     }
     private func handle(_ r: EngineRequest) throws -> EngineReply {
@@ -102,7 +102,7 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         if r.command == "shutdown" {
             lifecycle.lock(); stopping = true; let current = engine; lifecycle.unlock()
             if r.explicitStop == true, let current {
-                for t in try current.snapshot().torrents where t.state != "paused" { try current.setPaused(id: t.id, paused: true) }
+                for t in try current.snapshot().torrents where t.state != "paused" || t.forceStarted { try current.setPaused(id: t.id, paused: true) }
             }
             try current?.shutdown()
             lifecycle.lock(); defer { lifecycle.unlock() }; engine = nil
@@ -127,6 +127,9 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             let id = try core.addWithOptions(bytes:r.bytes ?? Data(), destination:r.destination ?? "", selected:r.selected ?? [], options:TorrentAddOptions(paused:r.paused ?? false, reuse:r.reuse ?? false, addToTop:r.addToTop ?? false, sequential:r.sequential ?? false, firstLastPieces:r.firstLastPieces ?? false))
             return EngineReply(id:id)
         case "pause": try core.setPaused(id:r.id ?? "", paused:r.paused ?? true)
+        case "forceStart":
+            guard let enabled = r.forceStarted else { throw HostFailure(code:"host.unsupported") }
+            try core.setForceStarted(id:r.id ?? "", enabled:enabled)
         case "select": try core.selectFiles(id:r.id ?? "", indices:r.selected ?? [])
         case "recheck": try core.forceRecheck(id:r.id ?? "")
         case "retry": try core.retryTransfer(id:r.id ?? "")
@@ -172,7 +175,7 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             listenPort:s.listenPort,downloadLimit:s.downloadLimit,uploadLimit:s.uploadLimit,maxActiveDownloads:s.maxActiveDownloads,torrents:s.torrents.map { t in
                 TorrentItem(id:t.id,name:t.name,state:t.state,totalBytes:t.totalBytes,downloadedBytes:t.downloadedBytes,
                     uploadedBytes:t.uploadedBytes,downloadRate:t.downloadRate,uploadRate:t.uploadRate,peers:t.peers,
-                    destination:t.destination,files:t.files.map(file),trackers:t.trackers,error:t.error,queuePosition:t.queuePosition,pausedIntent:t.pausedIntent,errorKind:t.errorKind)
+                    destination:t.destination,files:t.files.map(file),trackers:t.trackers,error:t.error,queuePosition:t.queuePosition,pausedIntent:t.pausedIntent,forceStarted:t.forceStarted,errorKind:t.errorKind)
             },fileOperation:s.fileOperation.map { operation in
                 FileOperationItem(id:operation.id,torrentId:operation.torrentId,kind:operation.kind,
                     phase:operation.phase,completedBytes:operation.completedBytes,totalBytes:operation.totalBytes,

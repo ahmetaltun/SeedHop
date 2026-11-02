@@ -192,10 +192,16 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     var totalDownloaded: UInt64 { torrents.reduce(0) { $0 + $1.downloadedBytes } }
     var canActOnSelection: Bool { canChangeTransfers && !selected.isEmpty && selected.allSatisfy { !busyTransfers.contains($0.id) } }
     func canResumeOrRetry(_ item: TorrentItem) -> Bool {
-        item.state == "error" ? presentation(item).canRetry : item.isPaused && item.state != "checking"
+        item.state == "error" ? presentation(item).canRetry : (item.isPaused || item.forceStarted == true) && item.state != "checking"
     }
     var canResumeSelection: Bool { canActOnSelection && selected.contains(where:canResumeOrRetry) }
-    var canPauseSelection: Bool { canActOnSelection && selected.contains { !$0.isPaused } }
+    var canPauseSelection: Bool { canActOnSelection && selected.contains { !$0.isPaused || $0.forceStarted == true } }
+    func canSetForceStarted(ids: Set<String>, enabled: Bool) -> Bool {
+        let items = torrents.filter { ids.contains($0.id) }
+        return canChangeTransfers && !ids.isEmpty && items.count == ids.count && busyTransfers.isDisjoint(with:ids)
+            && (!enabled || items.allSatisfy { $0.state != "error" && $0.state != "checking" && !hasPendingCleanup($0.id) })
+    }
+    var selectionForceStarted: Bool { !selected.isEmpty && selected.allSatisfy { $0.forceStarted == true } }
     func hasPendingCleanup(_ id: String) -> Bool { storageRecovery.map { $0.torrentId.isEmpty || $0.torrentId == id } ?? false }
     var canRecheckSelection: Bool { canActOnSelection && selected.allSatisfy { $0.state != "checking" && !hasPendingCleanup($0.id) } }
     var canMoveSelection: Bool { canRecheckSelection && storageRecovery == nil && selected.count == 1 }
@@ -462,14 +468,14 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
 
     func perform(_ request: EngineRequest) async throws -> EngineReply {
         guard !designPreview else { throw UserFacingError(message:String(localized:"This is a design preview with sample data. Launch the app normally for real transfers.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
-        if hasFileOperation && ["add", "inspect", "pause", "select", "priorities", "queue", "queueMove", "recheck", "retry", "remove", "limits", "peerEncryption"].contains(request.command) {
+        if hasFileOperation && ["add", "inspect", "pause", "forceStart", "select", "priorities", "queue", "queueMove", "recheck", "retry", "remove", "limits", "peerEncryption"].contains(request.command) {
             throw UserFacingError(message:String(localized:"Wait for the current file change to finish, or cancel it, then try again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
         }
         return try await client.send(request)
     }
     func toggleSelected(paused: Bool) {
         guard canActOnSelection else { return }
-        let items = selected.filter { paused ? !$0.isPaused : canResumeOrRetry($0) }
+        let items = selected.filter { paused ? (!$0.isPaused || $0.forceStarted == true) : canResumeOrRetry($0) }
         let ids = Set(items.map(\.id))
         guard !ids.isEmpty else { return }
         error = nil
@@ -588,6 +594,21 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
             for id in ids.sorted() {
                 var request = EngineRequest(command:"piecePreferences"); request.id = id
                 request.sequential = sequential; request.firstLastPieces = firstLastPieces
+                do { _ = try await perform(request) }
+                catch { failures.append(error.localizedDescription) }
+            }
+            self.error = failures.isEmpty ? nil : failures.joined(separator:"\n")
+            await refresh()
+        }
+    }
+    func setForceStarted(ids: Set<String>, enabled: Bool) {
+        guard canSetForceStarted(ids:ids,enabled:enabled) else { return }
+        busyTransfers.formUnion(ids); error = nil
+        Task {
+            defer { busyTransfers.subtract(ids) }
+            var failures: [String] = []
+            for id in ids.sorted() {
+                var request = EngineRequest(command:"forceStart"); request.id = id; request.forceStarted = enabled
                 do { _ = try await perform(request) }
                 catch { failures.append(error.localizedDescription) }
             }

@@ -76,6 +76,21 @@ import Foundation
               snapshot.torrents[0].networkDownloadedBytes == 0 else { throw UserFacingError(message:"Typed XPC diagnostics lost identity or invented traffic") }
         // Wait for the initial hash before issuing the explicit recheck.
         try await waitForPaused(client, id:id)
+        var force = EngineRequest(command:"forceStart"); force.id = id
+        var rejectedMissingForceValue = false
+        do { _ = try await client.send(force) }
+        catch { rejectedMissingForceValue = true }
+        guard rejectedMissingForceValue else { throw UserFacingError(message:"Force Start accepted a missing Boolean") }
+        force.forceStarted = true
+        _ = try await client.send(force)
+        guard let forced = try await client.send(EngineRequest(command:"snapshot")).snapshot?.torrents.first,
+              forced.forceStarted == true, !forced.isPaused else { throw UserFacingError(message:"XPC Force Start lost its saved override or did not resume") }
+        force.forceStarted = false
+        _ = try await client.send(force)
+        guard try await client.send(EngineRequest(command:"snapshot")).snapshot?.torrents.first?.forceStarted == false else { throw UserFacingError(message:"XPC Force Start lost explicit false") }
+        var pause = EngineRequest(command:"pause"); pause.id = id; pause.paused = true
+        _ = try await client.send(pause)
+        try await waitForPaused(client,id:id)
         let content = try Data(contentsOf:fixture.appendingPathComponent("seedhop-fixture.bin"))
         try content.write(to:importedPath)
         var recheck = EngineRequest(command:"recheck"); recheck.id = id

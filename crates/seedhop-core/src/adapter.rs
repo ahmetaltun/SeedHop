@@ -133,6 +133,7 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
         error_kind,
         queue_position: 0,
         paused_intent: torrent.is_paused(),
+        force_started: false,
         sequential,
         first_last_pieces,
         network_downloaded_bytes: None,
