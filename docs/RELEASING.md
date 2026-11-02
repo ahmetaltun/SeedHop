@@ -96,6 +96,9 @@ attachment. Its nested app relies on the DMG's ticket, following Apple's standar
 container flow. The ZIP contains a directly stapled app for offline checks.
 Both payloads retain full signature and Gatekeeper checks. Metadata records
 `strategy: outermost-dmg`, `submissionCount: 1`, and the shared submission ID.
+Transient ticket-service connection failures receive at most two stapling retries
+with 15- and 30-second delays. Invalid or missing tickets still stop the release.
+Retries fetch the existing ticket; they never resubmit to notarization.
 
 The workflow checks out the requested tag, including its release scripts.
 Rerunning an old tag therefore uses its old scripts. New pipeline code must be

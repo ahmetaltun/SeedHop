@@ -27,6 +27,12 @@ SECRETS = ("APPLE_CERTIFICATE", "APPLE_CERTIFICATE_PASSWORD", "APPLE_ID", "APPLE
            "APPLE_SIGNING_IDENTITY", "APPLE_TEAM_ID", "SPARKLE_PRIVATE_KEY")
 
 
+class ToolError(RuntimeError):
+    def __init__(self, message, returncode):
+        super().__init__(message)
+        self.returncode = returncode
+
+
 def run(*command, input=None, sensitive=False, stream=False, timeout=300, heartbeat=None):
     if sensitive and stream:
         raise ValueError("Credential-bearing commands cannot stream raw output")
@@ -59,9 +65,24 @@ def run(*command, input=None, sensitive=False, stream=False, timeout=300, heartb
         raise RuntimeError(f"{pathlib.Path(arguments[0]).name} timed out after {timeout}s") from None
     if result.returncode:
         # Tool failures can echo credentials supplied as arguments. Never forward those outputs.
-        detail = "" if sensitive or stream else result.stderr.decode(errors="replace")[-4000:]
-        raise RuntimeError(f"{pathlib.Path(str(command[0])).name} failed ({result.returncode}). {detail}")
+        detail = "" if sensitive or stream else (result.stdout + result.stderr).decode(errors="replace")[-4000:]
+        raise ToolError(f"{pathlib.Path(str(command[0])).name} failed ({result.returncode}). {detail}", result.returncode)
     return result.stdout or b""
+
+
+def staple(path):
+    for attempt in range(1, 4):
+        try:
+            run("xcrun", "stapler", "staple", path, timeout=120,
+                heartbeat=f"Stapling {path.name}")
+            return
+        except ToolError as error:
+            # stapler uses sysexits: host/service unavailable or temporary failure.
+            # Invalid/missing tickets (65) and signature errors must still fail.
+            if error.returncode not in (68, 69, 75) or attempt == 3:
+                raise
+            print(f"Apple ticket service temporarily unavailable; retry {attempt}/2 in {15 * attempt}s", flush=True)
+            time.sleep(15 * attempt)
 
 
 def validate_tag(tag, version):
@@ -294,7 +315,7 @@ def package(tag, number, output, phase="all"):
                 # The DMG submission already generated this app's ticket.
                 # Stapling adds it to the standalone bundle without rebuilding
                 # or re-signing either the app or the already verified DMG.
-                run("xcrun", "stapler", "staple", app)
+                staple(app)
                 run("xcrun", "stapler", "validate", app)
                 verify_app(app, os.environ["APPLE_TEAM_ID"])
                 run("spctl", "--assess", "--type", "execute", "--verbose=4", app)
@@ -306,7 +327,7 @@ def package(tag, number, output, phase="all"):
                     stream=True, timeout=600, heartbeat="Creating branded installer")
                 run("codesign", "--force", "--timestamp", "--sign", identity, dmg)
                 dmg_submission = notarize(dmg, os.environ, output)
-                run("xcrun", "stapler", "staple", dmg)
+                staple(dmg)
                 run("xcrun", "stapler", "validate", dmg)
                 run("codesign", "--verify", "--strict", dmg)
                 run("spctl", "--assess", "--type", "open", "--context", "context:primary-signature", dmg)

@@ -122,6 +122,20 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn(("xcrun", "stapler", "staple", release.ROOT / ".build/SeedHop.app"),
                       [call.args for call in run.call_args_list])
 
+    def test_stapling_retries_only_transient_apple_service_errors(self):
+        failure = release.ToolError("Ticket service unavailable", 68)
+        with patch.object(release, "run", side_effect=[failure, b""]) as run, \
+             patch.object(release.time, "sleep") as sleep:
+            release.staple(pathlib.Path("SeedHop.app"))
+            self.assertEqual(run.call_count, 2)
+            sleep.assert_called_once_with(15)
+        for code, attempts in [(65, 1), (68, 3)]:
+            with self.subTest(code=code), \
+                 patch.object(release, "run", side_effect=release.ToolError("Controlled failure", code)) as run, \
+                 patch.object(release.time, "sleep"), self.assertRaises(release.ToolError):
+                release.staple(pathlib.Path("SeedHop.app"))
+            self.assertEqual(run.call_count, attempts)
+
     def test_notarization_timeout_preserves_submission_id(self):
         with tempfile.TemporaryDirectory() as directory, \
              patch.object(release, "run", side_effect=[b'{"id":"submission"}', RuntimeError("Timed out")]):
