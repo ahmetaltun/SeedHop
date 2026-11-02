@@ -79,6 +79,7 @@ struct NativeTransferGrid: NSViewRepresentable {
         let table = NativeTransfersTable()
         table.identifier = NSUserInterfaceItemIdentifier("transfers-table")
         table.style = .inset; table.usesAlternatingRowBackgroundColors = true
+        table.selectionHighlightStyle = .none
         table.usesAutomaticRowHeights = false; table.rowSizeStyle = .custom; table.intercellSpacing = NSSize(width:0,height:0)
         table.columnAutoresizingStyle = .noColumnAutoresizing; table.allowsMultipleSelection = true; table.allowsEmptySelection = true
         table.allowsColumnReordering = true; table.setAccessibilityLabel(String(localized:"Transfers",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
@@ -171,6 +172,12 @@ struct NativeTransferGrid: NSViewRepresentable {
             }
         }
         func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
+        func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+            let identifier = NSUserInterfaceItemIdentifier("transfer-row")
+            let view = (tableView.makeView(withIdentifier:identifier,owner:self) as? NativeTransferRowView) ?? NativeTransferRowView()
+            view.identifier = identifier
+            return view
+        }
         func tableViewSelectionDidChange(_ notification: Notification) {
             guard !updating, let table else { return }
             let ids = Set(table.selectedRowIndexes.compactMap { rows.indices.contains($0) ? rows[$0].id : nil })
@@ -318,6 +325,39 @@ final class NativeTransfersTable: NSTableView {
         guard let coordinator = dataSource as? NativeTransferGrid.Coordinator else { return nil }
         let ids = Set(selectedRowIndexes.compactMap { coordinator.rows.indices.contains($0) ? coordinator.rows[$0].id : nil })
         return menuProvider?(ids)
+    }
+}
+
+private final class NativeTransferRowView: NSTableRowView {
+    // Soft selection keeps the normal text and semantic status colors readable.
+    override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }
+    override var isEmphasized: Bool { didSet { needsDisplay = true } }
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+    override var isSelected: Bool { didSet { needsDisplay = true } }
+    override func drawBackground(in dirtyRect: NSRect) {
+        // Inset rows can draw a native selection even with highlight style .none.
+        backgroundColor.setFill()
+        bounds.fill()
+        if isSelected { drawSelection(in:dirtyRect) }
+    }
+    override func drawSelection(in dirtyRect: NSRect) {
+        let appearance = effectiveAppearance.bestMatch(from:[.aqua,.darkAqua,.accessibilityHighContrastAqua,.accessibilityHighContrastDarkAqua])
+        let dark = appearance == .darkAqua || appearance == .accessibilityHighContrastDarkAqua
+        let contrast = appearance == .accessibilityHighContrastAqua || appearance == .accessibilityHighContrastDarkAqua || NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+        let color: NSColor = isEmphasized ? .controlAccentColor : .secondaryLabelColor
+        let opacity: CGFloat = isEmphasized ? (dark ? 0.24 : 0.14) : (dark ? 0.10 : 0.07)
+        let path = NSBezierPath(roundedRect:bounds.insetBy(dx:10,dy:1),xRadius:6,yRadius:6)
+        color.withAlphaComponent(opacity).setFill()
+        path.fill()
+        if contrast {
+            color.withAlphaComponent(0.7).setStroke()
+            let outline = NSBezierPath(roundedRect:bounds.insetBy(dx:10.5,dy:1.5),xRadius:6,yRadius:6)
+            outline.lineWidth = 1
+            outline.stroke()
+        }
     }
 }
 
