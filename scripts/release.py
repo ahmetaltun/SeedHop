@@ -70,11 +70,11 @@ def run(*command, input=None, sensitive=False, stream=False, timeout=300, heartb
     return result.stdout or b""
 
 
-def staple(path):
+def stapler(action, path):
     for attempt in range(1, 4):
         try:
-            run("xcrun", "stapler", "staple", path, timeout=120,
-                heartbeat=f"Stapling {path.name}")
+            run("xcrun", "stapler", action, path, timeout=120,
+                heartbeat=f"Apple ticket {action}: {path.name}")
             return
         except ToolError as error:
             # stapler uses sysexits: host/service unavailable or temporary failure.
@@ -315,8 +315,8 @@ def package(tag, number, output, phase="all"):
                 # The DMG submission already generated this app's ticket.
                 # Stapling adds it to the standalone bundle without rebuilding
                 # or re-signing either the app or the already verified DMG.
-                staple(app)
-                run("xcrun", "stapler", "validate", app)
+                stapler("staple", app)
+                stapler("validate", app)
                 verify_app(app, os.environ["APPLE_TEAM_ID"])
                 run("spctl", "--assess", "--type", "execute", "--verbose=4", app)
                 print("App ticket from DMG submission stapled and verified; no second upload required", flush=True)
@@ -327,8 +327,8 @@ def package(tag, number, output, phase="all"):
                     stream=True, timeout=600, heartbeat="Creating branded installer")
                 run("codesign", "--force", "--timestamp", "--sign", identity, dmg)
                 dmg_submission = notarize(dmg, os.environ, output)
-                staple(dmg)
-                run("xcrun", "stapler", "validate", dmg)
+                stapler("staple", dmg)
+                stapler("validate", dmg)
                 run("codesign", "--verify", "--strict", dmg)
                 run("spctl", "--assess", "--type", "open", "--context", "context:primary-signature", dmg)
                 verify_dmg(dmg, app, os.environ["APPLE_TEAM_ID"])
@@ -359,7 +359,7 @@ def package(tag, number, output, phase="all"):
                 extracted = directory / "extracted"; extracted.mkdir()
                 run("ditto", "-x", "-k", archive, extracted)
                 verify_app(extracted / "SeedHop.app", os.environ["APPLE_TEAM_ID"])
-                run("xcrun", "stapler", "validate", extracted / "SeedHop.app")
+                stapler("validate", extracted / "SeedHop.app")
                 run("spctl", "--assess", "--type", "execute", extracted / "SeedHop.app")
                 if bundle_manifest(extracted / "SeedHop.app") != bundle_manifest(app):
                     raise ValueError("ZIP app differs from the verified build")
