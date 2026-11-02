@@ -70,9 +70,9 @@ distribution between runs. It does not run the local test suite or native UI
 fixtures. Signing, notarization, archive integrity, and update-signature checks
 remain required release gates.
 
-GitHub shows four separate stages: **Build and sign optimized app**, **Notarize
-and staple app**, **Create, sign, notarize, and verify DMG**, and **Create signed
-ZIP, appcast, and checksums**. Compiler output streams immediately. The build
+GitHub shows four separate stages: **Build and sign optimized app**, **Create,
+sign, notarize, and verify DMG**, **Staple and verify app using the DMG submission**,
+and **Create signed ZIP, appcast, and checksums**. Compiler output streams immediately. The build
 and Apple requests print a heartbeat every 30 seconds, with elapsed time and
 the notarization submission ID where available. Each command and stage has a
 deadline. A cold optimized build can take several minutes; silence is no longer
@@ -83,6 +83,19 @@ compiled dependencies. Each stage checks the preceding stage, commit, build
 number, and app hashes. The final stage also checks the DMG hash. Only temporary
 signing keychains hold imported private identities; neither those keychains nor
 the exported Sparkle key enter the cache or uploaded artifacts.
+
+Only the signed DMG is submitted to Apple. Notarizing that outermost container
+also generates a ticket for the unchanged signed app inside it. The workflow
+staples and verifies the DMG, mounts it, verifies the nested app and exact bundle
+contents, then staples the standalone app using the same submission's ticket.
+The final ZIP is created from that stapled app and signed for Sparkle afterward.
+There is no temporary notarization ZIP and no second Apple upload or queue wait.
+
+The DMG remains immutable after signing except for its supported outer ticket
+attachment. Its nested app relies on the DMG's ticket, following Apple's standard
+container flow. The ZIP contains a directly stapled app for offline checks.
+Both payloads retain full signature and Gatekeeper checks. Metadata records
+`strategy: outermost-dmg`, `submissionCount: 1`, and the shared submission ID.
 
 The workflow checks out the requested tag, including its release scripts.
 Rerunning an old tag therefore uses its old scripts. New pipeline code must be

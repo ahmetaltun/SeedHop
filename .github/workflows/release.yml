@@ -20,7 +20,7 @@ concurrency:
 jobs:
   package:
     runs-on: macos-15
-    timeout-minutes: 185
+    timeout-minutes: 140
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
       BUILD_NUMBER: ${{ github.run_number }}
@@ -48,7 +48,7 @@ jobs:
           import os, sys
           sys.path.insert(0, 'scripts')
           import release
-          if getattr(release, 'PHASES', None) != ('build', 'app', 'dmg', 'finalize'):
+          if getattr(release, 'PHASES', None) != ('build', 'dmg', 'app', 'finalize'):
               raise SystemExit('This tag contains the old release scripts. Tag the updated pipeline commit before running this workflow.')
           release.preflight(os.environ['RELEASE_TAG'], os.environ['BUILD_NUMBER'])
           PY
@@ -85,17 +85,6 @@ jobs:
             target
             .cache/sparkle
           key: ${{ steps.build-cache.outputs.cache-primary-key }}
-      - name: Notarize and staple app
-        timeout-minutes: 60
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-        run: python3 -u scripts/release.py --phase app --tag "$RELEASE_TAG" --build-number "$BUILD_NUMBER"
       - name: Create, sign, notarize, and verify DMG
         timeout-minutes: 65
         env:
@@ -109,6 +98,17 @@ jobs:
         run: |
           python3 -m pip install --require-hashes --only-binary=:all: -r scripts/requirements-dmg.txt
           python3 -u scripts/release.py --phase dmg --tag "$RELEASE_TAG" --build-number "$BUILD_NUMBER"
+      - name: Staple and verify app using the DMG submission
+        timeout-minutes: 10
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: python3 -u scripts/release.py --phase app --tag "$RELEASE_TAG" --build-number "$BUILD_NUMBER"
       - name: Create signed ZIP, appcast, and checksums
         timeout-minutes: 10
         env:

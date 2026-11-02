@@ -4,6 +4,7 @@ import base64
 import contextlib
 import io
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -83,13 +84,13 @@ class ReleaseTests(unittest.TestCase):
             binary = app / "binary"; binary.write_bytes(b"signed fixture")
             path = root / "state.json"
             release.save_state(path, dict(commit="abc", buildNumber="2"), app, "build")
-            self.assertEqual(release.load_state(path, app, "app", "abc", "2")["phase"], "build")
-            for phase, commit, number in [("dmg", "abc", "2"), ("app", "other", "2"), ("app", "abc", "3")]:
+            self.assertEqual(release.load_state(path, app, "dmg", "abc", "2")["phase"], "build")
+            for phase, commit, number in [("app", "abc", "2"), ("dmg", "other", "2"), ("dmg", "abc", "3")]:
                 with self.subTest(phase=phase, commit=commit, number=number), self.assertRaisesRegex(ValueError, "mismatch"):
                     release.load_state(path, app, phase, commit, number)
             binary.write_bytes(b"changed")
             with self.assertRaisesRegex(ValueError, "changed"):
-                release.load_state(path, app, "app", "abc", "2")
+                release.load_state(path, app, "dmg", "abc", "2")
 
     def test_sensitive_commands_cannot_stream_and_timeouts_redact_credentials(self):
         with self.assertRaisesRegex(ValueError, "cannot stream"):
@@ -104,6 +105,22 @@ class ReleaseTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()), self.assertRaisesRegex(RuntimeError, "timed out"):
             release.run(sys.executable, "-c", "import time; time.sleep(10)",
                         timeout=0.05, heartbeat="Fixture", sensitive=True)
+
+    def test_app_stapling_reuses_dmg_submission_without_uploading_again(self):
+        state = dict(dmgSubmission="one-apple-submission")
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.dict(os.environ, self.secrets()), \
+             patch.object(release, "preflight", return_value=("0.1.0", "abc")), \
+             patch.object(release, "validate_secrets", return_value=b"certificate"), \
+             patch.object(release, "load_state", return_value=state), \
+             patch.object(release, "save_state"), patch.object(release, "verify_app"), \
+             patch.object(release, "run", return_value=b"") as run, \
+             patch.object(release, "notarize") as notarize:
+            release.package("v0.1.0", "2", pathlib.Path(directory), "app")
+        notarize.assert_not_called()
+        self.assertEqual(state["appSubmission"], "one-apple-submission")
+        self.assertIn(("xcrun", "stapler", "staple", release.ROOT / ".build/SeedHop.app"),
+                      [call.args for call in run.call_args_list])
 
     def test_notarization_timeout_preserves_submission_id(self):
         with tempfile.TemporaryDirectory() as directory, \

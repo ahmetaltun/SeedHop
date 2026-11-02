@@ -225,7 +225,8 @@ def verify_dmg(dmg, app, team):
         if len(mounts) != 1: raise ValueError("Expected one mounted release volume")
         mounted_app = mounts[0] / "SeedHop.app"
         verify_app(mounted_app, team)
-        run("xcrun", "stapler", "validate", mounted_app)
+        # The stapled outer DMG carries the ticket for its nested app. Keep the
+        # signed image immutable; staple the standalone app later for ZIP users.
         run("spctl", "--assess", "--type", "execute", mounted_app)
         if bundle_manifest(mounted_app) != bundle_manifest(app):
             raise ValueError("DMG app differs from the verified build")
@@ -236,7 +237,7 @@ def verify_dmg(dmg, app, team):
         for mount in mounts: run("hdiutil", "detach", mount)
 
 
-PHASES = ("build", "app", "dmg", "finalize")
+PHASES = ("build", "dmg", "app", "finalize")
 
 
 def save_state(path, state, app, phase):
@@ -290,14 +291,15 @@ def package(tag, number, output, phase="all"):
                 verify_app(app, os.environ["APPLE_TEAM_ID"])
                 print("Nested signatures, entitlements, timestamps, and architecture verified", flush=True)
             elif phase == "app":
-                submission = directory / "SeedHop-notarization.zip"
-                run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, submission)
-                app_submission = notarize(submission, os.environ, output)
+                # The DMG submission already generated this app's ticket.
+                # Stapling adds it to the standalone bundle without rebuilding
+                # or re-signing either the app or the already verified DMG.
                 run("xcrun", "stapler", "staple", app)
                 run("xcrun", "stapler", "validate", app)
+                verify_app(app, os.environ["APPLE_TEAM_ID"])
                 run("spctl", "--assess", "--type", "execute", "--verbose=4", app)
-                print("App notarization, stapling, and Gatekeeper verification passed; creating DMG", flush=True)
-                state["appSubmission"] = app_submission
+                print("App ticket from DMG submission stapled and verified; no second upload required", flush=True)
+                state["appSubmission"] = state["dmgSubmission"]
             elif phase == "dmg":
                 dmg = output / f"SeedHop-{version}-arm64.dmg"
                 run("python3", "-u", "scripts/dmg.py", "--app", app, "--output", dmg,
@@ -309,7 +311,7 @@ def package(tag, number, output, phase="all"):
                 run("codesign", "--verify", "--strict", dmg)
                 run("spctl", "--assess", "--type", "open", "--context", "context:primary-signature", dmg)
                 verify_dmg(dmg, app, os.environ["APPLE_TEAM_ID"])
-                print("DMG mounted and verified; generating signed Sparkle appcast", flush=True)
+                print("DMG ticket, mounted app, and installer layout verified", flush=True)
                 state["dmgSubmission"] = dmg_submission
             else:
                 app_submission, dmg_submission = state["appSubmission"], state["dmgSubmission"]
@@ -345,7 +347,8 @@ def package(tag, number, output, phase="all"):
                 metadata = dict(version=version, buildNumber=number, commit=commit, tag=tag,
                                 architecture="arm64", minimumSystemVersion="15.0", sparkleVersion=sparkle.VERSION,
                                 signingIdentity=identity, teamID=os.environ["APPLE_TEAM_ID"],
-                                notarization=dict(app=app_submission, dmg=dmg_submission),
+                                notarization=dict(app=app_submission, dmg=dmg_submission,
+                                                  strategy="outermost-dmg", submissionCount=1),
                                 xcode=run("xcodebuild", "-version").decode().strip(),
                                 rust=run("rustc", "--version").decode().strip(),
                                 automatedVerification="passed", corruptUpdateRejected=True, manualAcceptance="pending")
