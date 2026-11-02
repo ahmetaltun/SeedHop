@@ -66,6 +66,11 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     @Published var switching = false
     @Published var statisticsWarning: String?
     @Published var error: String?
+    var externalOpenCoordinator: ExternalOpenCoordinator?
+    @Published var showDockSpeeds = WorkspacePreferences.defaults.object(forKey:"showDockSpeeds") as? Bool ?? true {
+        didSet { WorkspacePreferences.defaults.set(showDockSpeeds,forKey:"showDockSpeeds") }
+    }
+    var shouldPollSnapshots: Bool { showDockSpeeds || NSApp.windows.contains(where:{ $0.isVisible && $0.title == "SeedHop" }) }
     @Published var showImport = false
     @Published var showInspector = WorkspacePreferences.defaults.object(forKey:"showTransferDetails") as? Bool ?? true { didSet { WorkspacePreferences.defaults.set(showInspector,forKey:"showTransferDetails") } }
     @Published var incomingMagnet = ""
@@ -312,13 +317,18 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
             while !Task.isCancelled {
                 try? await Task.sleep(for:.seconds(1))
                 guard !Task.isCancelled, let self else { break }
-                if NSApp.windows.contains(where:{ $0.isVisible && $0.title == "SeedHop" }) { await self.refresh() }
+                if self.shouldPollSnapshots { await self.refresh() }
             }
         }
     }
     func refresh() async {
         guard !designPreview, connected, !switching else { return }
-        do { if let snapshot = try await client.send(EngineRequest(command:"snapshot")).snapshot { apply(snapshot) } }
+        do {
+            guard let snapshot = try await client.send(EngineRequest(command:"snapshot")).snapshot else {
+                throw UserFacingError(message:String(localized:"Could not reach the torrent engine.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+            }
+            apply(snapshot)
+        }
         catch { connected = false; self.error = error.localizedDescription }
     }
     private func apply(_ snapshot: LibrarySnapshot) {
@@ -847,9 +857,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         beginImport(magnet:URLComponents(string:link)?.scheme?.lowercased() == "magnet" ? link : "")
     }
     func open(_ urls: [URL]) {
-        guard let url = urls.first else { return }
-        if url.scheme?.lowercased() == "magnet" { beginImport(magnet:url.absoluteString) }
-        else if url.isFileURL && url.pathExtension.lowercased() == "torrent" { beginImport(file:url) }
-        else { error = String(localized:"Choose a .torrent file or a magnet link to add a transfer.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        let coordinator = externalOpenCoordinator ?? ExternalOpenCoordinator()
+        coordinator.attach(self)
+        coordinator.receive(urls)
     }
 }

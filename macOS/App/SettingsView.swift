@@ -78,6 +78,14 @@ struct SettingsView: View {
                                     .font(.system(size:10)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
                             }
                         }
+                        group(String(localized:"File associations",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
+                            FileAssociationSettings()
+                        }
+                        group(String(localized:"Dock",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
+                            Toggle(isOn:$store.showDockSpeeds) {
+                                settingText(String(localized:"Show transfer speeds in Dock",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),String(localized:"Show download and upload speeds while SeedHop is running. Hidden when idle.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).frame(maxWidth:.infinity,alignment:.leading)
+                            }.toggleStyle(.switch).controlSize(.small)
+                        }
                         group(String(localized:"Download location",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
                             HStack(spacing:12) { Image(systemName:"folder").foregroundStyle(Design.green); VStack(alignment:.leading,spacing:4) { Text(URL(fileURLWithPath:store.downloadDirectory).lastPathComponent).font(.system(size:12,weight:.medium)); Text(store.downloadDirectory.replacingOccurrences(of:NSHomeDirectory(),with:"~")).font(.system(size:10)).foregroundStyle(.secondary) }; Spacer(); Button(String(localized:"Choose…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),action:chooseFolder).focused($focusedField,equals:.folder).accessibilityLabel(String(localized:"Choose default download folder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
                         }

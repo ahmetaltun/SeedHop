@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 @main struct SeedHopApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
@@ -6,7 +7,7 @@ import SwiftUI
     @State private var localization = AppLocalization.shared
     @MainActor private static func makeStore() -> LibraryStore {
         #if SEEDHOP_DEVELOPMENT
-        if ProcessInfo.processInfo.arguments.contains("--verify-localization") || ProcessInfo.processInfo.arguments.contains("--verify-live-language") || ProcessInfo.processInfo.arguments.contains("--verify-menus") || ProcessInfo.processInfo.arguments.contains("--render-localizations") { return LibraryStore(designPreview:true) }
+        if ProcessInfo.processInfo.arguments.contains("--verify-desktop-integration") || ProcessInfo.processInfo.arguments.contains("--verify-localization") || ProcessInfo.processInfo.arguments.contains("--verify-live-language") || ProcessInfo.processInfo.arguments.contains("--verify-menus") || ProcessInfo.processInfo.arguments.contains("--render-localizations") { return LibraryStore(designPreview:true) }
         if ProcessInfo.processInfo.arguments.contains("--verify-performance") { return PerformanceSelfTest.fixtureStore() }
         if ProcessInfo.processInfo.arguments.contains("--verify-interface") { return UXSelfTest.nativeFixture() }
         #endif
@@ -14,9 +15,9 @@ import SwiftUI
     }
     var body: some Scene {
         WindowGroup("SeedHop",id:"library",for:String.self) { _ in
-            LibraryView().environmentObject(store).onAppear { delegate.store = store }
+            LibraryView().environmentObject(store)
+                .modifier(ExternalOpenBridge(coordinator:delegate.externalOpens,store:store,attached:{ delegate.store = store }))
                 .task { await store.start() }
-                .onOpenURL { store.open([$0]) }
         } defaultValue: { "library" }
         .defaultSize(width:1200,height:760)
         .windowToolbarStyle(.unified)
@@ -74,7 +75,43 @@ struct LibraryNavigationCommands: Commands {
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
     private let menuLocalization = NativeMenuLocalization()
-    weak var store: LibraryStore?
+    let externalOpens = ExternalOpenCoordinator()
+    private let dockSpeeds = DockSpeedController()
+    private var dockObservations = Set<AnyCancellable>()
+    weak var store: LibraryStore? {
+        didSet { if oldValue !== store { observeDock() } }
+    }
+    private func observeDock() {
+        dockObservations.removeAll()
+        guard let store, !store.designPreview, !WorkspacePreferences.isFixture else { return }
+        store.objectWillChange.sink { [weak self] in
+            Task { @MainActor [weak self] in self?.updateDock() }
+        }.store(in:&dockObservations)
+        store.$showDockSpeeds.dropFirst().sink { [weak store] enabled in
+            if enabled { Task { @MainActor in await store?.refresh() } }
+        }.store(in:&dockObservations)
+        NotificationCenter.default.publisher(for:AppLocalization.didChange).sink { [weak self] _ in
+            Task { @MainActor [weak self] in self?.updateDock() }
+        }.store(in:&dockObservations)
+        NSWorkspace.shared.notificationCenter.publisher(for:NSWorkspace.willSleepNotification).sink { [weak self] _ in
+            Task { @MainActor [weak self] in self?.dockSpeeds.reset() }
+        }.store(in:&dockObservations)
+        NSWorkspace.shared.notificationCenter.publisher(for:NSWorkspace.didWakeNotification).sink { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, let store = self.store, store.showDockSpeeds else { return }
+                await store.refresh()
+                self.updateDock()
+            }
+        }.store(in:&dockObservations)
+        updateDock()
+    }
+    private func updateDock() {
+        guard let store else { dockSpeeds.reset(); return }
+        dockSpeeds.update(enabled:store.showDockSpeeds,connected:store.connected && !store.switching,
+                          download:store.downloadRate,upload:store.uploadRate)
+    }
+    func applicationWillTerminate(_ notification: Notification) { dockSpeeds.reset() }
+
     var stopEverything = false
     private var quitting = false
     func applicationWillFinishLaunching(_ notification:Notification) {
@@ -90,6 +127,7 @@ struct LibraryNavigationCommands: Commands {
                 ? await store.prepareForUpdate()
                 : await store.prepareToQuit(stopEverything:stopEverything)
             quitting = false; stopEverything = false
+            if ready { dockSpeeds.reset() }
             sender.reply(toApplicationShouldTerminate:ready)
         }
         return .terminateLater
@@ -101,6 +139,17 @@ struct LibraryNavigationCommands: Commands {
         }
         SoftwareUpdate.shared.start()
         #if SEEDHOP_DEVELOPMENT
+        if ProcessInfo.processInfo.arguments.contains("--verify-desktop-integration") {
+            Task {
+                do {
+                    try await FileAssociationSelfTest.run()
+                    try DockSpeedSelfTest.run()
+                    try await ExternalOpenSelfTest.run()
+                    exit(0)
+                } catch { fputs("Desktop integration verification failed: \(error)\n",stderr); exit(1) }
+            }
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--verify-menus") {
             Task {
                 do { try await NativeMenuSelfTest.run(); exit(0) }
@@ -164,5 +213,5 @@ struct LibraryNavigationCommands: Commands {
             }
         }
     }
-    func application(_ application:NSApplication,open urls:[URL]) { store?.open(urls) }
+    func application(_ application:NSApplication,open urls:[URL]) { externalOpens.receive(urls) }
 }

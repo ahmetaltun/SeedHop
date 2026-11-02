@@ -5987,18 +5987,6 @@
         }
       }
     },
-    "0.1.0 · Milestone 0": {
-      "comment": "SeedHop macOS UI (SettingsView.swift).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "0.1.0 · Milestone 0"
-          }
-        }
-      },
-      "shouldTranslate": false
-    },
     "1 file change": {
       "comment": "SeedHop macOS UI (LibraryStore.swift).",
       "localizations": {
@@ -11492,6 +11480,89 @@
         }
       }
     },
+    "Changing default app": {
+      "comment": "SeedHop macOS UI (FileAssociationSettings.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standard-App wird geändert"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changing default app"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambiando la app predeterminada"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modification de l’app par défaut"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifica dell’app predefinita"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デフォルトのアプリを変更中"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기본 앱 변경 중"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zmienianie domyślnej aplikacji"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alterando o app padrão"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Изменение приложения по умолчанию"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsayılan uygulama değiştiriliyor"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Зміна типової програми"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在更改默认应用"
+          }
+        }
+      }
+    },
     "Check for Updates…": {
       "comment": "SeedHop software update controls and installation errors. Translations are AI drafts.",
       "extractionState": "manual",
@@ -13070,6 +13141,89 @@
         }
       }
     },
+    "Choose a replacement app": {
+      "comment": "SeedHop macOS UI (FileAssociationSettings.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ersatz-App auswählen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a replacement app"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige una app de reemplazo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir une app de remplacement"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli un’app sostitutiva"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代わりのアプリを選択"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대체 앱 선택"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wybierz aplikację zastępczą"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolher um app substituto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите другое приложение"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yerine kullanılacak uygulamayı seçin"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Виберіть іншу програму"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择替代应用"
+          }
+        }
+      }
+    },
     "Choose a supported peer encryption policy.": {
       "comment": "SeedHop macOS UI (EngineMessage.swift).",
       "localizations": {
@@ -14643,6 +14797,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "宽松行距"
+          }
+        }
+      }
+    },
+    "Compatible apps": {
+      "comment": "SeedHop macOS UI (FileAssociationSettings.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kompatible Apps"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compatible apps"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apps compatibles"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apps compatibles"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App compatibili"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "対応するアプリ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "호환되는 앱"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zgodne aplikacje"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apps compatíveis"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Совместимые приложения"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uyumlu uygulamalar"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сумісні програми"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "兼容的应用"
           }
         }
       }
@@ -16474,6 +16711,89 @@
         }
       }
     },
+    "Current default: %@": {
+      "comment": "SeedHop macOS UI (FileAssociationSettings.swift). Preserve placeholder types and positions; use positional placeholders when reordering. Text arguments may be verbatim user names, paths, or formatted quantities.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktuelle Standard-App: %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current default: %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App predeterminada actual: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App par défaut actuelle : %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App predefinita attuale: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在のデフォルト：%@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "현재 기본 앱: %@"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bieżąca aplikacja domyślna: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App padrão atual: %@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сейчас по умолчанию: %@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geçerli varsayılan: %@"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поточна типова програма: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前默认应用：%@"
+          }
+        }
+      }
+    },
     "DESIGN PREVIEW · SAMPLE DATA": {
       "comment": "SeedHop macOS UI (LibraryView.swift).",
       "localizations": {
@@ -16636,6 +16956,255 @@
           "stringUnit": {
             "state": "translated",
             "value": "深色"
+          }
+        }
+      }
+    },
+    "Default app for .torrent files": {
+      "comment": "SeedHop macOS UI (FileAssociationSettings.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standard-App für .torrent-Dateien"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default app for .torrent files"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App predeterminada para archivos .torrent"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App par défaut pour les fichiers .torrent"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App predefinita per i file .torrent"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ".torrentファイルのデフォルトのアプリ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ".torrent 파일의 기본 앱"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Domyślna aplikacja dla plików .torrent"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App padrão para arquivos .torrent"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Приложение по умолчанию для файлов .torrent"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ".torrent dosyaları için varsayılan uygulama"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Типова програма для файлів .torrent"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ".torrent 文件的默认应用"
+          }
+        }
+      }
+    },
+    "Default app for magnet links": {
+      "comment": "SeedHop macOS UI (FileAssociationSettings.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standard-App für Magnet-Links"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default app for magnet links"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App predeterminada para enlaces magnet"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App par défaut pour les liens magnet"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App predefinita per i link magnet"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "magnetリンクのデフォルトのアプリ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "magnet 링크의 기본 앱"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Domyślna aplikacja dla łączy magnet"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App padrão para links magnet"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Приложение по умолчанию для magnet-ссылок"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Magnet bağlantıları için varsayılan uygulama"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Типова програма для magnet-посилань"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "magnet 链接的默认应用"
+          }
+        }
+      }
+    },
+    "Default apps cannot be changed in a preview or test.": {
+      "comment": "SeedHop macOS UI (FileAssociationSettings.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standard-Apps können in einer Vorschau oder einem Test nicht geändert werden."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default apps cannot be changed in a preview or test."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pueden cambiar las apps predeterminadas en una vista previa o prueba."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les apps par défaut ne peuvent pas être modifiées dans un aperçu ou un test."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è possibile modificare le app predefinite in un’anteprima o in un test."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プレビューやテストではデフォルトのアプリを変更できません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "미리보기 또는 테스트에서는 기본 앱을 변경할 수 없습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nie można zmieniać aplikacji domyślnych w podglądzie ani podczas testu."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não é possível alterar os apps padrão em uma prévia ou teste."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нельзя менять приложения по умолчанию в режиме предпросмотра или теста."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsayılan uygulamalar önizleme veya test sırasında değiştirilemez."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не можна змінювати типові програми в режимі попереднього перегляду або тесту."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法在预览或测试中更改默认应用。"
           }
         }
       }
@@ -17636,6 +18205,89 @@
         }
       }
     },
+    "Dock": {
+      "comment": "SeedHop macOS UI (SettingsView.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "程序坞"
+          }
+        }
+      }
+    },
     "Download": {
       "comment": "SeedHop macOS UI (BandwidthSettingsView.swift, LibraryView.swift, SchedulingSettingsView.swift, TorrentDiagnosticsView.swift).",
       "localizations": {
@@ -18545,6 +19197,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "下载速率"
+          }
+        }
+      }
+    },
+    "Download: %@. Upload: %@.": {
+      "comment": "SeedHop macOS UI (DockSpeedController.swift). Preserve placeholder types and positions; use positional placeholders when reordering. Text arguments may be verbatim user names, paths, or formatted quantities.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download: %@. Upload: %@."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download: %1$@. Upload: %2$@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descarga: %@. Subida: %@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Téléchargement : %@. Envoi : %@."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download: %@. Upload: %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ダウンロード：%@。アップロード：%@。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다운로드: %@. 업로드: %@."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pobieranie: %@. Wysyłanie: %@."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download: %@. Upload: %@."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Загрузка: %@. Отдача: %@."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İndirme: %@. Yükleme: %@."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Завантаження: %@. Віддавання: %@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载：%@。上传：%@。"
           }
         }
       }
@@ -20786,6 +21521,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "文件操作"
+          }
+        }
+      }
+    },
+    "File associations": {
+      "comment": "SeedHop macOS UI (SettingsView.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dateizuordnungen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File associations"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asociaciones de archivos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Associations de fichiers"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Associazioni dei file"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファイルの関連付け"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일 연결"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skojarzenia plików"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Associações de arquivos"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ассоциации файлов"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosya ilişkilendirmeleri"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Асоціації файлів"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件关联"
           }
         }
       }
@@ -24108,6 +24926,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "在此查看文件、节点、Tracker 和活动。"
+          }
+        }
+      }
+    },
+    "Install another compatible app before changing this default.": {
+      "comment": "SeedHop macOS UI (FileAssociationSettings.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installiere eine andere kompatible App, bevor du diese Standardzuordnung änderst."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install another compatible app before changing this default."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instala otra app compatible antes de cambiar esta asociación predeterminada."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installez une autre app compatible avant de modifier cette association par défaut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installa un’altra app compatibile prima di modificare questa associazione predefinita."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデフォルト設定を変更する前に、別の対応アプリをインストールしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 기본 설정을 변경하기 전에 호환되는 다른 앱을 설치하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zainstaluj inną zgodną aplikację przed zmianą tego skojarzenia domyślnego."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instale outro app compatível antes de alterar esta associação padrão."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прежде чем менять это приложение по умолчанию, установите другое совместимое приложение."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu varsayılanı değiştirmeden önce başka bir uyumlu uygulama yükleyin."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перш ніж змінювати цю типову програму, інсталюйте іншу сумісну програму."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更改此默认设置前，请先安装其他兼容的应用。"
           }
         }
       }
@@ -28605,6 +29506,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "无已连接来源"
+          }
+        }
+      }
+    },
+    "No default app": {
+      "comment": "SeedHop macOS UI (FileAssociationSettings.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Standard-App"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No default app"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin app predeterminada"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune app par défaut"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna app predefinita"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デフォルトのアプリなし"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기본 앱 없음"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brak aplikacji domyślnej"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum app padrão"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нет приложения по умолчанию"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsayılan uygulama yok"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Немає типової програми"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有默认应用"
           }
         }
       }
@@ -44093,6 +45077,89 @@
         }
       }
     },
+    "Show download and upload speeds while SeedHop is running. Hidden when idle.": {
+      "comment": "SeedHop macOS UI (SettingsView.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download- und Upload-Geschwindigkeit anzeigen, solange SeedHop läuft. Im Leerlauf ausgeblendet."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show download and upload speeds while SeedHop is running. Hidden when idle."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muestra las velocidades de descarga y subida mientras SeedHop está en ejecución. Se ocultan cuando no hay actividad."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher les débits de téléchargement et d’envoi lorsque SeedHop est en cours d’exécution. Masqués en l’absence d’activité."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra le velocità di download e upload mentre SeedHop è in esecuzione. Nascoste quando non c’è attività."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SeedHopの実行中にダウンロード速度とアップロード速度を表示します。通信がないときは非表示になります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SeedHop이 실행 중일 때 다운로드 및 업로드 속도를 표시합니다. 전송이 없으면 숨깁니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pokazuj szybkość pobierania i wysyłania, gdy SeedHop jest uruchomiony. Ukrywaj przy braku aktywności."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra as velocidades de download e upload enquanto o SeedHop está em execução. Ocultas quando não há atividade."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показывать скорость загрузки и отдачи, пока работает SeedHop. Скрывать при отсутствии активности."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SeedHop çalışırken indirme ve yükleme hızlarını gösterir. Etkinlik yokken gizlenir."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показувати швидкість завантаження й віддавання, поки працює SeedHop. Приховувати за відсутності активності."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SeedHop 运行时显示下载和上传速度。空闲时隐藏。"
+          }
+        }
+      }
+    },
     "Show download folder in Finder": {
       "comment": "SeedHop macOS UI (LibraryView.swift).",
       "localizations": {
@@ -44504,6 +45571,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "显示或隐藏传输详情（⌥⌘I）"
+          }
+        }
+      }
+    },
+    "Show transfer speeds in Dock": {
+      "comment": "SeedHop macOS UI (SettingsView.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Übertragungsgeschwindigkeiten im Dock anzeigen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show transfer speeds in Dock"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar velocidades de transferencia en el Dock"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher les débits de transfert dans le Dock"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra le velocità di trasferimento nel Dock"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dockに転送速度を表示"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock에 전송 속도 표시"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pokazuj szybkość przesyłania w Docku"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar velocidades de transferência no Dock"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показывать скорость передачи в Dock"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktarım hızlarını Dock’ta göster"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показувати швидкість передавання в Dock"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在程序坞中显示传输速度"
           }
         }
       }
@@ -48870,6 +50020,89 @@
         }
       }
     },
+    "This app is no longer available. Choose another app.": {
+      "comment": "SeedHop macOS UI (FileAssociationSettings.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese App ist nicht mehr verfügbar. Wähle eine andere App."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This app is no longer available. Choose another app."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta app ya no está disponible. Elige otra app."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette app n’est plus disponible. Choisissez une autre app."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa app non è più disponibile. Scegli un’altra app."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアプリは利用できなくなりました。別のアプリを選択してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 앱은 더 이상 사용할 수 없습니다. 다른 앱을 선택하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ta aplikacja nie jest już dostępna. Wybierz inną aplikację."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este app não está mais disponível. Escolha outro app."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Это приложение больше недоступно. Выберите другое приложение."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu uygulama artık kullanılamıyor. Başka bir uygulama seçin."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ця програма більше недоступна. Виберіть іншу програму."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此应用已不可用。请选择其他应用。"
+          }
+        }
+      }
+    },
     "This is a design preview with sample data. Launch the app normally for real transfers.": {
       "comment": "SeedHop macOS UI (LibraryStore.swift).",
       "localizations": {
@@ -51858,6 +53091,89 @@
         }
       }
     },
+    "Turning this off restores another default app. You can still use Open With SeedHop or add torrents in the app.": {
+      "comment": "SeedHop macOS UI (FileAssociationSettings.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beim Ausschalten wird eine andere Standard-App wiederhergestellt. Du kannst weiterhin „Öffnen mit SeedHop“ verwenden oder Torrents in der App hinzufügen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turning this off restores another default app. You can still use Open With SeedHop or add torrents in the app."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Al desactivar esta opción se restablece otra app predeterminada. Puedes seguir usando Abrir con SeedHop o añadir torrents en la app."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La désactivation rétablit une autre app par défaut. Vous pouvez toujours utiliser Ouvrir avec SeedHop ou ajouter des torrents dans l’app."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disattivando questa opzione viene ripristinata un’altra app predefinita. Puoi continuare a usare Apri con SeedHop o ad aggiungere torrent nell’app."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフにすると、別のデフォルトのアプリに戻ります。「SeedHopで開く」の使用や、アプリ内でのトレントの追加は引き続き可能です。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 옵션을 끄면 다른 기본 앱이 복원됩니다. SeedHop으로 열기를 사용하거나 앱에서 토렌트를 추가하는 기능은 계속 사용할 수 있습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wyłączenie przywraca inną aplikację domyślną. Nadal możesz używać opcji Otwórz w SeedHop lub dodawać torrenty w aplikacji."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desativar esta opção restaura outro app padrão. Você ainda pode usar Abrir com SeedHop ou adicionar torrents no app."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "При выключении восстанавливается другое приложение по умолчанию. Вы по-прежнему можете использовать «Открыть в SeedHop» или добавлять торренты в приложении."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu seçeneği kapatmak başka bir varsayılan uygulamayı geri yükler. SeedHop ile Aç seçeneğini kullanmaya veya uygulamada torrent eklemeye devam edebilirsiniz."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вимкнення відновлює іншу типову програму. Ви й надалі можете використовувати «Відкрити в SeedHop» або додавати торенти в програмі."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭后会恢复其他默认应用。你仍可使用“使用 SeedHop 打开”，或在应用内添加种子。"
+          }
+        }
+      }
+    },
     "Two files cannot share a path or contain one another.": {
       "comment": "SeedHop macOS UI (EngineMessage.swift).",
       "localizations": {
@@ -53016,6 +54332,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "上传流量 · 累计"
+          }
+        }
+      }
+    },
+    "Use Selected App": {
+      "comment": "SeedHop macOS UI (FileAssociationSettings.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausgewählte App verwenden"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use Selected App"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar app seleccionada"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utiliser l’app sélectionnée"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa l’app selezionata"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択したアプリを使用"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "선택한 앱 사용"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Użyj wybranej aplikacji"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar app selecionado"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Использовать выбранное приложение"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçili Uygulamayı Kullan"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Використати вибрану програму"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用所选应用"
           }
         }
       }
@@ -55673,6 +57072,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "init(coder:) has not been implemented"
+          }
+        }
+      }
+    },
+    "macOS did not change the default app. Try again.": {
+      "comment": "SeedHop macOS UI (FileAssociationSettings.swift).",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS hat die Standard-App nicht geändert. Versuche es erneut."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS did not change the default app. Try again."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS no ha cambiado la app predeterminada. Inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS n’a pas modifié l’app par défaut. Réessayez."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS non ha modificato l’app predefinita. Riprova."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOSでデフォルトのアプリが変更されませんでした。もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS가 기본 앱을 변경하지 않았습니다. 다시 시도하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS nie zmienił aplikacji domyślnej. Spróbuj ponownie."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O macOS não alterou o app padrão. Tente novamente."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS не изменила приложение по умолчанию. Повторите попытку."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS varsayılan uygulamayı değiştirmedi. Yeniden deneyin."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS не змінила типову програму. Спробуйте ще раз."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 未更改默认应用。请重试。"
           }
         }
       }

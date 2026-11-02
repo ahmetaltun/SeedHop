@@ -63,7 +63,7 @@ struct LibraryView: View {
     }
     private var presentedWorkspace: some View {
         searchableWorkspace
-            .sheet(isPresented:$store.showImport,onDismiss:focusTransfers) { ImportView().environmentObject(store) }
+            .sheet(isPresented:$store.showImport,onDismiss:{ focusTransfers(); store.externalOpenCoordinator?.didDismissImport() }) { ImportView().environmentObject(store) }
             .confirmationDialog(removalTitle,isPresented:$store.showRemoval,titleVisibility:.visible) {
                 Button(String(localized:"Remove from Library",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.removeConfirmed(deleteFiles:false) }
                 Button(String(localized:"Remove and Delete Downloaded Files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),role:.destructive) { store.removeConfirmed(deleteFiles:true) }
