@@ -20,11 +20,13 @@ concurrency:
 jobs:
   package:
     runs-on: macos-15
-    timeout-minutes: 150
+    timeout-minutes: 185
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
       BUILD_NUMBER: ${{ github.run_number }}
       GH_TOKEN: ${{ github.token }}
+      PYTHONUNBUFFERED: '1'
+      CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,6 +48,8 @@ jobs:
           import os, sys
           sys.path.insert(0, 'scripts')
           import release
+          if getattr(release, 'PHASES', None) != ('build', 'app', 'dmg', 'finalize'):
+              raise SystemExit('This tag contains the old release scripts. Tag the updated pipeline commit before running this workflow.')
           release.preflight(os.environ['RELEASE_TAG'], os.environ['BUILD_NUMBER'])
           PY
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -57,8 +61,11 @@ jobs:
             target
             .cache/sparkle
           key: release-${{ runner.os }}-${{ runner.arch }}-xcode26.3-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock', 'Cargo.toml', 'crates/**/Cargo.toml', 'vendor/rqbit/**/*.rs') }}
-          restore-keys: release-${{ runner.os }}-${{ runner.arch }}-xcode26.3-
-      - name: Sign, notarize, package, and verify
+          restore-keys: |
+            release-${{ runner.os }}-${{ runner.arch }}-xcode26.3-
+            native-${{ runner.os }}-${{ runner.arch }}-xcode26.3-
+      - name: Build and sign optimized app
+        timeout-minutes: 45
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -67,8 +74,8 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-        run: python3 scripts/release.py --tag "$RELEASE_TAG" --build-number "$BUILD_NUMBER"
-      - name: Retain build cache even if notarization fails
+        run: python3 -u scripts/release.py --phase build --tag "$RELEASE_TAG" --build-number "$BUILD_NUMBER"
+      - name: Save compiled dependencies before notarization
         if: always() && steps.build-cache.outcome == 'success' && steps.build-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -78,6 +85,39 @@ jobs:
             target
             .cache/sparkle
           key: ${{ steps.build-cache.outputs.cache-primary-key }}
+      - name: Notarize and staple app
+        timeout-minutes: 60
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: python3 -u scripts/release.py --phase app --tag "$RELEASE_TAG" --build-number "$BUILD_NUMBER"
+      - name: Create, sign, notarize, and verify DMG
+        timeout-minutes: 65
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: python3 -u scripts/release.py --phase dmg --tag "$RELEASE_TAG" --build-number "$BUILD_NUMBER"
+      - name: Create signed ZIP, appcast, and checksums
+        timeout-minutes: 10
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: python3 -u scripts/release.py --phase finalize --tag "$RELEASE_TAG" --build-number "$BUILD_NUMBER"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-assets

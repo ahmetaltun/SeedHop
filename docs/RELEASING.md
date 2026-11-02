@@ -70,6 +70,35 @@ distribution between runs. It does not run the local test suite or native UI
 fixtures. Signing, notarization, archive integrity, and update-signature checks
 remain required release gates.
 
+GitHub shows four separate stages: **Build and sign optimized app**, **Notarize
+and staple app**, **Create, sign, notarize, and verify DMG**, and **Create signed
+ZIP, appcast, and checksums**. Compiler output streams immediately. The build
+and Apple requests print a heartbeat every 30 seconds, with elapsed time and
+the notarization submission ID where available. Each command and stage has a
+deadline. A cold optimized build can take several minutes; silence is no longer
+the only indication that work continues.
+
+The build cache is saved before notarization, so an Apple failure does not discard
+compiled dependencies. Each stage checks the preceding stage, commit, build
+number, and app hashes. The final stage also checks the DMG hash. Only temporary
+signing keychains hold imported private identities; neither those keychains nor
+the exported Sparkle key enter the cache or uploaded artifacts.
+
+The workflow checks out the requested tag, including its release scripts.
+Rerunning an old tag therefore uses its old scripts. New pipeline code must be
+included in the tagged commit. Never move a published tag; an unpublished draft
+tag may be corrected deliberately before rebuilding and reviewing its assets.
+
+Apple processing time is outside the runner's control. A wait expires after
+45 minutes, with a separate hard process deadline. Download the retained
+notarization diagnostics and use the recorded ID to inspect that submission;
+Apple continues processing after a client timeout. Inspect notarization logs
+for warnings even after acceptance. Do not repeatedly submit the same payload
+merely because Apple's queue is slow.
+
+References: [Apple's notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
+and [GitHub's dependency caching guidance](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows).
+
 The workflow imports the certificate into a temporary keychain.
 It restores the keychain search list and deletes temporary
 signing material even on ordinary failures. GitHub destroys the runner after

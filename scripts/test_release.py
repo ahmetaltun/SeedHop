@@ -6,6 +6,7 @@ import io
 import json
 import pathlib
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -71,9 +72,38 @@ class ReleaseTests(unittest.TestCase):
 
     def test_notarization_acceptance(self):
         with tempfile.TemporaryDirectory() as directory, \
-             patch.object(release, "run", side_effect=[b'{"id":"submission"}', b'{"status":"Accepted","id":"submission"}']):
+             patch.object(release, "run", side_effect=[b'{"id":"submission"}', b'{"status":"Accepted","id":"submission"}', b'{"issues":[]}']):
             root = pathlib.Path(directory)
             self.assertEqual(release.notarize(root / "SeedHop.zip", self.secrets(), root), "submission")
+            self.assertTrue((root / "SeedHop-notary-log.json").exists())
+
+    def test_release_stages_reject_wrong_build_and_modified_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory); app = root / "SeedHop.app"; app.mkdir()
+            binary = app / "binary"; binary.write_bytes(b"signed fixture")
+            path = root / "state.json"
+            release.save_state(path, dict(commit="abc", buildNumber="2"), app, "build")
+            self.assertEqual(release.load_state(path, app, "app", "abc", "2")["phase"], "build")
+            for phase, commit, number in [("dmg", "abc", "2"), ("app", "other", "2"), ("app", "abc", "3")]:
+                with self.subTest(phase=phase, commit=commit, number=number), self.assertRaisesRegex(ValueError, "mismatch"):
+                    release.load_state(path, app, phase, commit, number)
+            binary.write_bytes(b"changed")
+            with self.assertRaisesRegex(ValueError, "changed"):
+                release.load_state(path, app, "app", "abc", "2")
+
+    def test_sensitive_commands_cannot_stream_and_timeouts_redact_credentials(self):
+        with self.assertRaisesRegex(ValueError, "cannot stream"):
+            release.run("security", sensitive=True, stream=True)
+        with patch.object(release.subprocess, "run", side_effect=subprocess.TimeoutExpired(["secret-fixture"], 1)):
+            with self.assertRaisesRegex(RuntimeError, "timed out") as caught:
+                release.run("security", "secret-fixture", sensitive=True, timeout=1)
+        self.assertNotIn("secret-fixture", str(caught.exception))
+
+    def test_command_heartbeat_captures_output_and_enforces_deadline(self):
+        self.assertEqual(release.run(sys.executable, "-c", "print('done')", heartbeat="Fixture"), b"done\n")
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaisesRegex(RuntimeError, "timed out"):
+            release.run(sys.executable, "-c", "import time; time.sleep(10)",
+                        timeout=0.05, heartbeat="Fixture", sensitive=True)
 
     def test_notarization_timeout_preserves_submission_id(self):
         with tempfile.TemporaryDirectory() as directory, \

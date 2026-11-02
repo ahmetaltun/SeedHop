@@ -10,8 +10,11 @@ import pathlib
 import plistlib
 import re
 import shlex
+import signal
 import subprocess
 import tempfile
+import time
+import shutil
 import xml.etree.ElementTree as ET
 
 import build
@@ -24,14 +27,41 @@ SECRETS = ("APPLE_CERTIFICATE", "APPLE_CERTIFICATE_PASSWORD", "APPLE_ID", "APPLE
            "APPLE_SIGNING_IDENTITY", "APPLE_TEAM_ID", "SPARKLE_PRIVATE_KEY")
 
 
-def run(*command, input=None, sensitive=False):
-    result = subprocess.run(list(map(str, command)), cwd=ROOT, input=input,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+def run(*command, input=None, sensitive=False, stream=False, timeout=300, heartbeat=None):
+    if sensitive and stream:
+        raise ValueError("Credential-bearing commands cannot stream raw output")
+    arguments = list(map(str, command))
+    started = time.monotonic()
+    try:
+        if heartbeat:
+            with subprocess.Popen(arguments, cwd=ROOT, stdin=subprocess.PIPE,
+                                  stdout=None if stream else subprocess.PIPE,
+                                  stderr=None if stream else subprocess.PIPE,
+                                  start_new_session=True) as process:
+                pending_input = input
+                while True:
+                    remaining = timeout - (time.monotonic() - started)
+                    if remaining <= 0:
+                        os.killpg(process.pid, signal.SIGKILL); process.communicate()
+                        raise RuntimeError(f"{heartbeat} timed out after {timeout}s; inspect retained submission ID")
+                    try:
+                        stdout, stderr = process.communicate(input=pending_input, timeout=min(30, remaining))
+                        result = subprocess.CompletedProcess(arguments, process.returncode, stdout, stderr)
+                        break
+                    except subprocess.TimeoutExpired:
+                        pending_input = None
+                        print(f"{heartbeat}: still running ({int(time.monotonic() - started)}s)", flush=True)
+        else:
+            result = subprocess.run(arguments, cwd=ROOT, input=input, timeout=timeout,
+                                    stdout=None if stream else subprocess.PIPE,
+                                    stderr=None if stream else subprocess.PIPE)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"{pathlib.Path(arguments[0]).name} timed out after {timeout}s") from None
     if result.returncode:
         # Tool failures can echo credentials supplied as arguments. Never forward those outputs.
-        detail = "" if sensitive else result.stderr.decode(errors="replace")[-4000:]
+        detail = "" if sensitive or stream else result.stderr.decode(errors="replace")[-4000:]
         raise RuntimeError(f"{pathlib.Path(str(command[0])).name} failed ({result.returncode}). {detail}")
-    return result.stdout
+    return result.stdout or b""
 
 
 def validate_tag(tag, version):
@@ -120,17 +150,21 @@ def notarize(path, environ, output):
                    "--team-id", environ["APPLE_TEAM_ID"]]
     print(f"Submitting {path.name} for notarization", flush=True)
     submission = json.loads(run("xcrun", "notarytool", "submit", path, *credentials,
-                               "--output-format", "json", sensitive=True))
+                               "--output-format", "json", sensitive=True, timeout=600,
+                               heartbeat=f"Uploading {path.name} to Apple"))
     # Preserve the ID before waiting: Apple continues processing after a timeout.
     (output / f"{path.stem}-notary.json").write_text(json.dumps(submission, indent=2) + "\n")
     print(f"Notarization submission: {submission['id']}", flush=True)
     response = json.loads(run("xcrun", "notarytool", "wait", submission["id"], *credentials,
-                              "--timeout", "45m", "--output-format", "json", sensitive=True))
+                              "--timeout", "45m", "--output-format", "json", sensitive=True,
+                              timeout=2760, heartbeat=f"Apple notarization {submission['id']}"))
     (output / f"{path.stem}-notary.json").write_text(json.dumps(response, indent=2) + "\n")
+    print(f"Apple notarization result: {response.get('status', 'Unknown')}", flush=True)
+    # Apple's log can include warnings even for an accepted submission.
+    if response.get("id"):
+        log = run("xcrun", "notarytool", "log", response["id"], *credentials, sensitive=True)
+        (output / f"{path.stem}-notary-log.json").write_bytes(log)
     if response.get("status") != "Accepted":
-        if response.get("id"):
-            log = run("xcrun", "notarytool", "log", response["id"], *credentials, sensitive=True)
-            (output / f"{path.stem}-notary-log.json").write_bytes(log)
         raise ValueError(f"Notarization not accepted for {path.name}; inspect retained notary results")
     return response["id"]
 
@@ -201,92 +235,138 @@ def verify_dmg(dmg, app, team):
         for mount in mounts: run("hdiutil", "detach", mount)
 
 
-def package(tag, number, output):
+PHASES = ("build", "app", "dmg", "finalize")
+
+
+def save_state(path, state, app, phase):
+    state.update(phase=phase, manifest=bundle_manifest(app))
+    path.write_text(json.dumps(state, indent=2) + "\n")
+
+
+def load_state(path, app, phase, commit, number):
+    state = json.loads(path.read_text())
+    previous = PHASES[PHASES.index(phase) - 1]
+    if state.get("phase") != previous or state.get("commit") != commit or state.get("buildNumber") != number:
+        raise ValueError("Release phase, commit, or build number mismatch; start a fresh build")
+    if state.get("manifest") != bundle_manifest(app):
+        raise ValueError("App changed between release stages")
+    return state
+
+
+def package(tag, number, output, phase="all"):
+    if phase == "all":
+        for part in PHASES:
+            package(tag, number, output, part)
+        return
+    started = time.monotonic()
+    print(f"Starting release stage: {phase}", flush=True)
     version, commit = preflight(tag, number)
     certificate = validate_secrets(os.environ)
-    if output.exists() and any(output.iterdir()): raise ValueError("Release output directory must be empty")
-    output.mkdir(parents=True, exist_ok=True)
+    app = ROOT / ".build/SeedHop.app"
+    state_path = ROOT / ".build/release-state.json"
+    if phase == "build":
+        if output.exists() and any(output.iterdir()):
+            raise ValueError("Release output directory must be empty")
+        output.mkdir(parents=True, exist_ok=True)
+        state = dict(commit=commit, buildNumber=number)
+    else:
+        state = load_state(state_path, app, phase, commit, number)
     identity = os.environ["APPLE_SIGNING_IDENTITY"]
     with tempfile.TemporaryDirectory(prefix="seedhop-release-") as temporary:
         directory = pathlib.Path(temporary)
         private_key = directory / "sparkle.key"
         private_key.write_text(os.environ["SPARKLE_PRIVATE_KEY"].strip()); private_key.chmod(0o600)
-        with signing_keychain(directory, certificate, os.environ):
-            print("Signing identity imported; building optimized app", flush=True)
-            # Fresh bundle avoids carrying development-only resources into distribution.
-            app = ROOT / ".build/SeedHop.app"
-            if app.exists():
-                import shutil
-                shutil.rmtree(app)
-            run("python3", "scripts/build.py", "--release", "--identity", identity, "--build-number", number)
-            verify_app(app, os.environ["APPLE_TEAM_ID"])
-            print("Nested signatures, entitlements, timestamps, and architecture verified", flush=True)
-            submission = directory / "SeedHop-notarization.zip"
-            run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, submission)
-            app_submission = notarize(submission, os.environ, output)
-            run("xcrun", "stapler", "staple", app)
-            run("xcrun", "stapler", "validate", app)
-            run("spctl", "--assess", "--type", "execute", "--verbose=4", app)
-            print("App notarization, stapling, and Gatekeeper verification passed; creating DMG", flush=True)
-            updates = directory / "updates"; updates.mkdir()
-            archive = updates / f"SeedHop-{version}-arm64.zip"
-            run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, archive)
-            stage = directory / "dmg"; stage.mkdir()
-            run("ditto", app, stage / "SeedHop.app")
-            (stage / "Applications").symlink_to("/Applications")
-            dmg = output / f"SeedHop-{version}-arm64.dmg"
-            run("hdiutil", "create", "-volname", "SeedHop", "-srcfolder", stage, "-format", "UDZO", dmg)
-            run("codesign", "--force", "--timestamp", "--sign", identity, dmg)
-            dmg_submission = notarize(dmg, os.environ, output)
-            run("xcrun", "stapler", "staple", dmg)
-            run("xcrun", "stapler", "validate", dmg)
-            run("codesign", "--verify", "--strict", dmg)
-            run("spctl", "--assess", "--type", "open", "--context", "context:primary-signature", dmg)
-            verify_dmg(dmg, app, os.environ["APPLE_TEAM_ID"])
-            print("DMG mounted and verified; generating signed Sparkle appcast", flush=True)
-            distribution = sparkle.distribution()
-            run(distribution / "bin/generate_appcast", "--ed-key-file", private_key, "--maximum-deltas", "0",
-                "--download-url-prefix", f"https://github.com/{REPOSITORY}/releases/download/{tag}/",
-                "--link", f"https://github.com/{REPOSITORY}/releases/tag/{tag}", updates, sensitive=True)
-            appcast = updates / "appcast.xml"
-            signature = validate_appcast(appcast, archive, tag, number)
-            run(distribution / "bin/sign_update", "--verify", "--ed-key-file", private_key, archive, signature, sensitive=True)
-            corrupted = directory / "corrupted.zip"
-            corrupted.write_bytes(archive.read_bytes() + b"corrupted-update-fixture")
-            rejected = subprocess.run([str(distribution / "bin/sign_update"), "--verify", "--ed-key-file",
-                                       str(private_key), str(corrupted), signature], capture_output=True)
-            if rejected.returncode == 0: raise ValueError("Sparkle accepted a corrupted update archive")
-            # Verify the exact extracted update payload, rather than only the build directory.
-            extracted = directory / "extracted"; extracted.mkdir()
-            run("ditto", "-x", "-k", archive, extracted)
-            verify_app(extracted / "SeedHop.app", os.environ["APPLE_TEAM_ID"])
-            run("xcrun", "stapler", "validate", extracted / "SeedHop.app")
-            run("spctl", "--assess", "--type", "execute", extracted / "SeedHop.app")
-            if bundle_manifest(extracted / "SeedHop.app") != bundle_manifest(app):
-                raise ValueError("ZIP app differs from the verified build")
-            import shutil
-            shutil.copy2(archive, output / archive.name)
-            shutil.copy2(appcast, output / "appcast.xml")
-            metadata = dict(version=version, buildNumber=number, commit=commit, tag=tag,
-                            architecture="arm64", minimumSystemVersion="15.0", sparkleVersion=sparkle.VERSION,
-                            signingIdentity=identity, teamID=os.environ["APPLE_TEAM_ID"],
-                            notarization=dict(app=app_submission, dmg=dmg_submission),
-                            xcode=run("xcodebuild", "-version").decode().strip(),
-                            rust=run("rustc", "--version").decode().strip(),
-                            automatedVerification="passed", corruptUpdateRejected=True, manualAcceptance="pending")
-            (output / "release-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
-            files = sorted(path for path in output.iterdir() if path.is_file())
-            (output / "SHA256SUMS").write_text("".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n" for path in files))
-    print(f"Verified release assets: {output}")
+        signing = signing_keychain(directory, certificate, os.environ) if phase in ("build", "dmg") else contextlib.nullcontext()
+        with signing:
+            if phase == "build":
+                print("Signing identity imported; building optimized app", flush=True)
+                # Fresh bundle avoids carrying development-only resources into distribution.
+                app = ROOT / ".build/SeedHop.app"
+                if app.exists():
+                    shutil.rmtree(app)
+                run("python3", "-u", "scripts/build.py", "--release", "--identity", identity, "--build-number", number,
+                    stream=True, timeout=2400, heartbeat="Optimized native build")
+                verify_app(app, os.environ["APPLE_TEAM_ID"])
+                print("Nested signatures, entitlements, timestamps, and architecture verified", flush=True)
+            elif phase == "app":
+                submission = directory / "SeedHop-notarization.zip"
+                run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, submission)
+                app_submission = notarize(submission, os.environ, output)
+                run("xcrun", "stapler", "staple", app)
+                run("xcrun", "stapler", "validate", app)
+                run("spctl", "--assess", "--type", "execute", "--verbose=4", app)
+                print("App notarization, stapling, and Gatekeeper verification passed; creating DMG", flush=True)
+                state["appSubmission"] = app_submission
+            elif phase == "dmg":
+                stage = directory / "dmg"; stage.mkdir()
+                run("ditto", app, stage / "SeedHop.app")
+                (stage / "Applications").symlink_to("/Applications")
+                dmg = output / f"SeedHop-{version}-arm64.dmg"
+                run("hdiutil", "create", "-volname", "SeedHop", "-srcfolder", stage, "-format", "UDZO", dmg)
+                run("codesign", "--force", "--timestamp", "--sign", identity, dmg)
+                dmg_submission = notarize(dmg, os.environ, output)
+                run("xcrun", "stapler", "staple", dmg)
+                run("xcrun", "stapler", "validate", dmg)
+                run("codesign", "--verify", "--strict", dmg)
+                run("spctl", "--assess", "--type", "open", "--context", "context:primary-signature", dmg)
+                verify_dmg(dmg, app, os.environ["APPLE_TEAM_ID"])
+                print("DMG mounted and verified; generating signed Sparkle appcast", flush=True)
+                state["dmgSubmission"] = dmg_submission
+            else:
+                app_submission, dmg_submission = state["appSubmission"], state["dmgSubmission"]
+                dmg = output / f"SeedHop-{version}-arm64.dmg"
+                expected = state["dmgHash"]
+                if hashlib.sha256(dmg.read_bytes()).hexdigest() != expected:
+                    raise ValueError("DMG changed between release stages")
+                updates = directory / "updates"; updates.mkdir()
+                archive = updates / f"SeedHop-{version}-arm64.zip"
+                run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, archive)
+                distribution = sparkle.distribution()
+                run(distribution / "bin/generate_appcast", "--ed-key-file", private_key, "--maximum-deltas", "0",
+                    "--download-url-prefix", f"https://github.com/{REPOSITORY}/releases/download/{tag}/",
+                    "--link", f"https://github.com/{REPOSITORY}/releases/tag/{tag}", updates, sensitive=True)
+                appcast = updates / "appcast.xml"
+                signature = validate_appcast(appcast, archive, tag, number)
+                run(distribution / "bin/sign_update", "--verify", "--ed-key-file", private_key, archive, signature, sensitive=True)
+                corrupted = directory / "corrupted.zip"
+                corrupted.write_bytes(archive.read_bytes() + b"corrupted-update-fixture")
+                rejected = subprocess.run([str(distribution / "bin/sign_update"), "--verify", "--ed-key-file",
+                                           str(private_key), str(corrupted), signature], capture_output=True, timeout=60)
+                if rejected.returncode == 0: raise ValueError("Sparkle accepted a corrupted update archive")
+                # Verify the exact extracted update payload, rather than only the build directory.
+                extracted = directory / "extracted"; extracted.mkdir()
+                run("ditto", "-x", "-k", archive, extracted)
+                verify_app(extracted / "SeedHop.app", os.environ["APPLE_TEAM_ID"])
+                run("xcrun", "stapler", "validate", extracted / "SeedHop.app")
+                run("spctl", "--assess", "--type", "execute", extracted / "SeedHop.app")
+                if bundle_manifest(extracted / "SeedHop.app") != bundle_manifest(app):
+                    raise ValueError("ZIP app differs from the verified build")
+                shutil.copy2(archive, output / archive.name)
+                shutil.copy2(appcast, output / "appcast.xml")
+                metadata = dict(version=version, buildNumber=number, commit=commit, tag=tag,
+                                architecture="arm64", minimumSystemVersion="15.0", sparkleVersion=sparkle.VERSION,
+                                signingIdentity=identity, teamID=os.environ["APPLE_TEAM_ID"],
+                                notarization=dict(app=app_submission, dmg=dmg_submission),
+                                xcode=run("xcodebuild", "-version").decode().strip(),
+                                rust=run("rustc", "--version").decode().strip(),
+                                automatedVerification="passed", corruptUpdateRejected=True, manualAcceptance="pending")
+                (output / "release-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
+                files = sorted(path for path in output.iterdir() if path.is_file())
+                (output / "SHA256SUMS").write_text("".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n" for path in files))
+    if phase == "dmg":
+        state["dmgHash"] = hashlib.sha256(dmg.read_bytes()).hexdigest()
+    save_state(state_path, state, app, phase)
+    print(f"Completed release stage: {phase} ({int(time.monotonic() - started)}s)", flush=True)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--phase", choices=("all", *PHASES), default="all")
     parser.add_argument("--tag", required=True)
     parser.add_argument("--build-number", required=True, type=build.build_number)
     parser.add_argument("--output", type=pathlib.Path, default=ROOT / ".build/release")
     args = parser.parse_args()
     try:
-        package(args.tag, args.build_number, args.output.resolve())
+        package(args.tag, args.build_number, args.output.resolve(), args.phase)
     except (ValueError, RuntimeError) as error:
         raise SystemExit(str(error))
