@@ -231,6 +231,7 @@ def verify_dmg(dmg, app, team):
             raise ValueError("DMG app differs from the verified build")
         if os.readlink(mounts[0] / "Applications") != "/Applications":
             raise ValueError("DMG lacks the Applications shortcut")
+        run("python3", "scripts/dmg.py", "--verify-mounted", mounts[0], stream=True)
     finally:
         for mount in mounts: run("hdiutil", "detach", mount)
 
@@ -298,11 +299,9 @@ def package(tag, number, output, phase="all"):
                 print("App notarization, stapling, and Gatekeeper verification passed; creating DMG", flush=True)
                 state["appSubmission"] = app_submission
             elif phase == "dmg":
-                stage = directory / "dmg"; stage.mkdir()
-                run("ditto", app, stage / "SeedHop.app")
-                (stage / "Applications").symlink_to("/Applications")
                 dmg = output / f"SeedHop-{version}-arm64.dmg"
-                run("hdiutil", "create", "-volname", "SeedHop", "-srcfolder", stage, "-format", "UDZO", dmg)
+                run("python3", "-u", "scripts/dmg.py", "--app", app, "--output", dmg,
+                    stream=True, timeout=600, heartbeat="Creating branded installer")
                 run("codesign", "--force", "--timestamp", "--sign", identity, dmg)
                 dmg_submission = notarize(dmg, os.environ, output)
                 run("xcrun", "stapler", "staple", dmg)

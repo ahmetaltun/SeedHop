@@ -106,7 +106,9 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-        run: python3 -u scripts/release.py --phase dmg --tag "$RELEASE_TAG" --build-number "$BUILD_NUMBER"
+        run: |
+          python3 -m pip install --require-hashes --only-binary=:all: -r scripts/requirements-dmg.txt
+          python3 -u scripts/release.py --phase dmg --tag "$RELEASE_TAG" --build-number "$BUILD_NUMBER"
       - name: Create signed ZIP, appcast, and checksums
         timeout-minutes: 10
         env:
