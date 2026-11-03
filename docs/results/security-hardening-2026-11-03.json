@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-03",
+  "branch": "dev",
+  "scope": "First security hardening increment; local working tree, not a release or independent audit.",
+  "lockSha256": "5eee67cfedb16fa93fc1ebbb1a3b92098759b7f9eb1a4ae0b4c4280577116d3d",
+  "environment": {
+    "platform": "macOS",
+    "architecture": "arm64"
+  },
+  "checks": {
+    "workspaceTests": {
+      "status": "passed",
+      "passed": 169,
+      "failed": 0,
+      "ignored": 5,
+      "scope": "Full workspace before the final parser depth cap. Impacted suites rerun after that change. This predates the gated sandbox development slice.",
+      "log": ".build/security-regressions-final.log"
+    },
+    "finalImpactedTests": {
+      "status": "passed",
+      "passed": 91,
+      "failed": 0,
+      "ignored": 0,
+      "scope": "v2/hybrid, MSE interoperability, network policy, download safety",
+      "log": ".build/security-parser-followup.log"
+    },
+    "vendorTests": {
+      "status": "passed",
+      "passed": 66,
+      "failed": 0,
+      "ignored": 1,
+      "scope": "bencode, core address checks, tracker DNS checks before final parser additions",
+      "log": ".build/security-vendor-tests.log"
+    },
+    "finalBencodeTests": {
+      "status": "passed",
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0,
+      "scope": "Includes numeric overflow and 64-level depth limit",
+      "log": ".build/security-bencode-final.log"
+    },
+    "clippy": {
+      "status": "passed",
+      "scope": "workspace, all targets, warnings denied",
+      "log": ".build/security-clippy-final.log"
+    },
+    "nativeBuild": {
+      "status": "passed",
+      "architecture": "arm64",
+      "signedValidationBuild": "passed; certificate-backed development signature; deep strict verification"
+    },
+    "signedXpc": {
+      "status": "passed",
+      "scenarios": [
+        "policy save",
+        "bound startup",
+        "live stop",
+        "blocked status",
+        "mutation denial",
+        "missing-interface startup",
+        "offline recovery",
+        "process exit"
+      ],
+      "isolation": "Separate validation identity and library; public discovery disabled",
+      "log": ".build/security-xpc.log"
+    },
+    "ux": {
+      "status": "passed",
+      "checks": 70,
+      "scope": "Controlled transport presentation regressions",
+      "log": ".build/security-ux.log"
+    },
+    "scripts": {
+      "status": "passed",
+      "tests": 26,
+      "log": ".build/security-script-tests.log"
+    },
+    "localization": {
+      "status": "passed",
+      "requiredEntries": 746,
+      "languages": 13,
+      "launches": 16,
+      "assertions": 1472,
+      "humanTranslationReview": "pending",
+      "log": ".build/security-localization.log"
+    },
+    "rendering": {
+      "status": "passed",
+      "scope": "Light/dark fixture rendering; inspected settings presentation",
+      "directory": ".build/security-renders"
+    },
+    "fuzzing": {
+      "status": "passed",
+      "sanitizer": "AddressSanitizer",
+      "targets": [
+        {
+          "target": "torrent_metadata",
+          "runs": 462335,
+          "seconds": 31,
+          "log": ".build/fuzz-torrent-final.log"
+        },
+        {
+          "target": "dns_message",
+          "runs": 980025,
+          "seconds": 31,
+          "log": ".build/fuzz-dns-final.log"
+        }
+      ],
+      "finding": "An earlier run found a 108-byte integer-parsing panic. Checked parsing fixes it; input retained as regression and curated seed. Bounded campaigns do not prove absence of bugs."
+    },
+    "dependencyAudit": {
+      "status": "passed with warning",
+      "knownVulnerabilities": 0,
+      "warnings": [
+        {
+          "package": "basic-toml",
+          "version": "0.1.10",
+          "advisory": "RUSTSEC-2026-0374",
+          "kind": "unmaintained"
+        }
+      ],
+      "log": ".build/security-audit.json"
+    },
+    "formatAndDiff": {
+      "status": "passed",
+      "checks": [
+        "cargo fmt --all -- --check",
+        "git diff --check"
+      ]
+    },
+    "realIkev2": {
+      "status": "Two functional rounds passed; capture limitations remain",
+      "results": "ikev2-validation-2026-11-03.json"
+    },
+    "sandboxDevelopment": {
+      "status": "Implemented; static checks passed; runtime tests deferred",
+      "results": "sandbox-development-2026-11-03.json"
+    },
+    "preferenceMigration": {
+      "status": "Implemented; type-checks passed; runtime tests deferred",
+      "results": "preference-migration-2026-11-03.json"
+    },
+    "folderAccessRecovery": {
+      "status": "Implemented; compiler checks passed; runtime tests deferred",
+      "results": "folder-access-recovery-2026-11-03.json"
+    },
+    "localActivityPrivacy": {
+      "status": "Implemented; Rust build/Clippy and Swift type-checks passed; runtime tests deferred",
+      "results": "local-activity-privacy-2026-11-03.json"
+    },
+    "statisticsRetention": {
+      "status": "Implemented; Rust build/Clippy and Swift compiler checks passed; runtime tests deferred",
+      "results": "statistics-retention-2026-11-03.json"
+    }
+  },
+  "pending": [
+    {
+      "item": "Broader VPN packet-capture acceptance",
+      "reason": "Two IKEv2 rounds now passed with user authorization; process attribution, IPv6, sleep/wake and other failure modes remain open."
+    },
+    {
+      "item": "App Sandbox and reversible folder/background-state migration",
+      "status": "Isolated development implementation added; runtime acceptance and production activation deferred."
+    },
+    {
+      "item": "Full retention controls and private sessions",
+      "status": "unfinished"
+    },
+    {
+      "item": "Formal SBOM, signed provenance and release-key recovery exercises",
+      "status": "unfinished"
+    },
+    {
+      "item": "Strict proxy privacy mode",
+      "status": "not advertised; coverage unproved"
+    },
+    {
+      "item": "Independent security audit",
+      "status": "not commissioned"
+    },
+    {
+      "item": "Native pointer/keyboard and VoiceOver walkthroughs; filesystem and Gatekeeper acceptance",
+      "status": "manual acceptance pending"
+    },
+    {
+      "item": "Hosted CI execution",
+      "status": "pending push; changes remain uncommitted"
+    }
+  ],
+  "limitations": [
+    "Ignored performance/throughput and real ENOSPC fixtures were not converted to passing tests.",
+    "Local build logs are ignored working artifacts, not published attestations.",
+    "No claim of anonymity, universal leak prevention, or completed release acceptance."
+  ]
+}

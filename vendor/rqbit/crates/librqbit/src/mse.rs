@@ -7,8 +7,8 @@ use std::{
 };
 
 use crypto_bigint::{
-    Encoding, U256, U768,
-    modular::runtime_mod::{DynResidue, DynResidueParams},
+    U256, U768,
+    modular::{FixedMontyForm, FixedMontyParams},
 };
 use rand::{TryRng, rngs::SysRng};
 use rc4::{KeyInit, Rc4, StreamCipher, consts::U20};
@@ -22,7 +22,12 @@ const MAX_PAD: usize = 512;
 const PRIME: U768 = U768::from_be_hex(
     "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A63A36210000000000090563",
 );
-const PARAMS: DynResidueParams<{ U768::LIMBS }> = DynResidueParams::new(&PRIME);
+// Only the public modulus uses variable-time parameter construction. Secret
+// exponents continue through fixed-width constant-time exponentiation.
+static PARAMS: std::sync::LazyLock<FixedMontyParams<{ U768::LIMBS }>> =
+    std::sync::LazyLock::new(|| {
+        FixedMontyParams::new_vartime(PRIME.to_odd().expect("MSE modulus is odd"))
+    });
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -103,10 +108,11 @@ impl Exchange {
         })
     }
     fn public(&self) -> [u8; 96] {
-        DynResidue::new(&U768::from(2u8), PARAMS)
+        FixedMontyForm::new(&U768::from(2u8), &PARAMS)
             .pow(&*self.secret)
             .retrieve()
             .to_be_bytes()
+            .into()
     }
     fn shared(&self, key: &[u8; 96]) -> Result<Zeroizing<[u8; 96]>, Error> {
         let public = U768::from_be_slice(key);
@@ -114,11 +120,11 @@ impl Exchange {
             return Err(Error::PublicKey);
         }
         let shared = Zeroizing::new(
-            DynResidue::new(&public, PARAMS)
+            FixedMontyForm::new(&public, &PARAMS)
                 .pow(&*self.secret)
                 .retrieve(),
         );
-        Ok(Zeroizing::new(shared.to_be_bytes()))
+        Ok(Zeroizing::new(shared.to_be_bytes().into()))
     }
 }
 

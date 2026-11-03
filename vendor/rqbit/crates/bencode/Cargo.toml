@@ -14,7 +14,6 @@ serde_derive.workspace = true
 buffers.workspace = true
 clone_to_owned.workspace = true
 bytes.workspace = true
-atoi.workspace = true
 thiserror.workspace = true
 arrayvec.workspace = true
 anyhow.workspace = true

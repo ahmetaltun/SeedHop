@@ -132,7 +132,16 @@ struct ImportView: View {
     private func chooseFolder() {
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
         panel.directoryURL = URL(fileURLWithPath:session.destination)
-        panel.begin { if $0 == .OK, let url = panel.url { session.destination = url.path }; focus = .destination }
+        panel.begin {
+            if $0 == .OK, let url = panel.url {
+                #if SEEDHOP_SANDBOX
+                do { try FolderAccessStore.application.remember(url) }
+                catch { store.error = EngineMessage(code:FolderAccessFailure.noticeCode(for:error)).localizedDescription; return }
+                #endif
+                session.destination = url.path
+            }
+            focus = .destination
+        }
     }
     private func chooseFile() {
         let panel = NSOpenPanel(); panel.allowedContentTypes = [UTType(filenameExtension:"torrent")!]

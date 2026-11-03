@@ -31,6 +31,7 @@ librqbit-dualstack-sockets.workspace = true
 backon.workspace = true
 itertools.workspace = true
 serde_with.workspace = true
+hickory-proto = { version = "=0.26.3", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt", "test-util", "net", "io-util", "sync", "time"] }

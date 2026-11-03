@@ -19,6 +19,7 @@ import xml.etree.ElementTree as ET
 
 import build
 import sparkle
+import security_inventory
 
 ROOT = build.ROOT
 REPOSITORY = "ahmetaltun/SeedHop"
@@ -374,6 +375,7 @@ def package(tag, number, output, phase="all"):
                                 rust=run("rustc", "--version").decode().strip(),
                                 automatedVerification="passed", corruptUpdateRejected=True, manualAcceptance="pending")
                 (output / "release-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
+                (output / "dependencies.json").write_text(json.dumps(security_inventory.inventory(), indent=2) + "\n")
                 files = sorted(path for path in output.iterdir() if path.is_file())
                 (output / "SHA256SUMS").write_text("".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n" for path in files))
     if phase == "dmg":

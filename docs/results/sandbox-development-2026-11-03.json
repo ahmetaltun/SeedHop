@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-03",
+  "scope": "Gated App Sandbox development implementation; no production activation",
+  "implemented": [
+    "Signed isolated sandbox build configuration with team-prefixed shared storage and agent service",
+    "Per-executable persistent folder bookmarks and temporary XPC grant transfer",
+    "Folder approval in default download, import and relocation flows",
+    "Default and restored destination preflight before engine startup",
+    "State copy with original-library barrier, durable receipts, exclusive publication and rollback",
+    "Sandbox-aware Sparkle installer configuration"
+  ],
+  "staticChecks": {
+    "sandboxApplication": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/app-compile.log"
+    },
+    "sandboxHost": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/host-compile.log"
+    },
+    "ordinaryApplication": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/default-app-compile.log"
+    },
+    "ordinaryHost": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/default-host-compile.log"
+    },
+    "pythonBuildFiles": {
+      "status": "passed",
+      "method": "py_compile; no configuration or build execution"
+    },
+    "formatAndDiff": {
+      "status": "passed",
+      "methods": [
+        "cargo fmt --all -- --check",
+        "git diff --check"
+      ]
+    }
+  },
+  "localization": {
+    "newSourceEntries": 12,
+    "languages": 13,
+    "status": "AI draft translations added; human review and runtime layout pending"
+  },
+  "runtimeTests": {
+    "status": "deferred by user",
+    "executed": false
+  },
+  "stateChanges": {
+    "productionLibraryMigrated": false,
+    "userFolderGrantsCreated": false,
+    "backgroundServiceRegistered": false,
+    "vpnChanged": false,
+    "sandboxBuildSignedOrLaunched": false
+  },
+  "pending": [
+    "Signed sandbox enforcement and cross-process bookmark acceptance",
+    "Migration fault injection and mutually exclusive rollback acceptance",
+    "Production preference migration",
+    "Corrupt bookmark archive recovery acceptance",
+    "External-drive, stale/revoked permission and recovery acceptance",
+    "Login/background handoff and Sparkle update acceptance",
+    "Native UI, localization and accessibility walkthroughs",
+    "Production state-location change and sandbox activation"
+  ],
+  "documentation": "../SANDBOX-MIGRATION.md",
+  "changes": "Uncommitted; previous security hardening work retained",
+  "portablePreferences": {
+    "status": "Explicit development transfer implemented; type-checks passed; runtime tests deferred",
+    "results": "preference-migration-2026-11-03.json"
+  },
+  "folderAccessRecovery": {
+    "status": "Implemented; compiler checks passed; runtime acceptance deferred",
+    "results": "folder-access-recovery-2026-11-03.json"
+  }
+}

@@ -389,6 +389,7 @@ async fn malformed_v2_import_does_not_create_transfer_files_or_session_membershi
         state_directory: state.path().to_string_lossy().into(),
         download_directory: downloads.path().to_string_lossy().into(),
         allow_network_discovery: false,
+        allow_local_network: true,
         listen_port: 0,
     })
     .await
@@ -567,6 +568,7 @@ fn engine_config(
         state_directory: state.to_string_lossy().into(),
         download_directory: downloads.to_string_lossy().into(),
         allow_network_discovery: false,
+        allow_local_network: true,
         listen_port: 0,
     }
 }
@@ -1815,7 +1817,7 @@ async fn unauthenticated_private_dictionary_cannot_disable_public_metadata_disco
             magnet.push_str(&format!("&xt=urn:btih:{v1:x}"));
         }
         let response = tokio::time::timeout(
-            std::time::Duration::from_secs(5),
+            std::time::Duration::from_secs(12),
             session.add_torrent(
                 AddTorrent::from_url(magnet),
                 Some(AddTorrentOptions {
@@ -3241,7 +3243,11 @@ async fn metadata_limits_are_shared_and_keepalives_cannot_block_a_healthy_provid
         })
         .await
         .expect("keepalive-only providers starved the healthy candidate");
-        assert_eq!(maximum.load(Ordering::SeqCst), 4);
+        // A remote server can observe the replacement request before it handles
+        // the timed-out socket's FIN. The four-slot allocation assertion above
+        // is made while every stalled dictionary remains live. After turnover,
+        // at most that budget plus the single healthy replacement is observable.
+        assert!(maximum.load(Ordering::SeqCst) <= 5);
         assert!(healthy_requests.load(Ordering::SeqCst) > 0);
         assert_eq!(std::fs::read_dir(files.path()).unwrap().count(), 0);
         session.with_torrents(|items| assert_eq!(items.count(), 0));

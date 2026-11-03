@@ -110,7 +110,7 @@ itertools = "0.15"
 leaky-bucket = "1.1"
 libc = "0.2"
 librqbit-dualstack-sockets = "0.7"
-librqbit-utp = "0.7"
+librqbit-utp = { path = "../librqbit-utp" }
 lru = "0.18"
 mdns-sd = "0.21"
 memchr = "2"

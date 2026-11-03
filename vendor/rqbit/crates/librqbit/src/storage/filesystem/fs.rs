@@ -242,17 +242,124 @@ fn secure_open(root: &Path, relative: &Path, reuse: bool) -> anyhow::Result<std:
     use std::os::fd::{AsRawFd, FromRawFd};
     let (directory, name) = secure_parent(root, relative)?;
     let flags = libc::O_NOFOLLOW
+        | libc::O_NONBLOCK
         | libc::O_CLOEXEC
         | libc::O_RDWR
         | libc::O_CREAT
         | if reuse { 0 } else { libc::O_EXCL };
     // SAFETY: the parent descriptor is live and the leaf is a terminated name.
-    let fd = unsafe { libc::openat(directory.as_raw_fd(), name.as_ptr(), flags, 0o644) };
+    let fd = unsafe { libc::openat(directory.as_raw_fd(), name.as_ptr(), flags, 0o600) };
     if fd < 0 {
         return Err(std::io::Error::last_os_error())
             .context("refused unsafe or unavailable torrent path");
     }
-    Ok(unsafe { std::fs::File::from_raw_fd(fd) })
+    let file = unsafe { std::fs::File::from_raw_fd(fd) };
+    use std::os::unix::fs::MetadataExt;
+    let metadata = file.metadata()?;
+    anyhow::ensure!(
+        metadata.is_file() && metadata.nlink() == 1,
+        "refused non-regular or multiply linked torrent file"
+    );
+    mark_download(&file)?;
+    Ok(file)
+}
+
+/// Set quarantine before payload writes, without resolving another pathname.
+/// Existing quarantine metadata belongs to the OS and is preserved verbatim.
+pub fn mark_download(file: &std::fs::File) -> anyhow::Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::{
+            os::fd::AsRawFd,
+            time::{SystemTime, UNIX_EPOCH},
+        };
+        let name = c"com.apple.quarantine";
+        let size = unsafe {
+            nix::libc::fgetxattr(
+                file.as_raw_fd(),
+                name.as_ptr(),
+                std::ptr::null_mut(),
+                0,
+                0,
+                0,
+            )
+        };
+        if size > 0 {
+            return Ok(());
+        }
+        if size < 0 && std::io::Error::last_os_error().raw_os_error() != Some(nix::libc::ENOATTR) {
+            return Err(std::io::Error::last_os_error())
+                .context("could not read download quarantine");
+        }
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let value = format!("0081;{timestamp:x};SeedHop;");
+        // SAFETY: descriptor is owned; name and value remain live for the call.
+        let result = unsafe {
+            nix::libc::fsetxattr(
+                file.as_raw_fd(),
+                name.as_ptr(),
+                value.as_ptr().cast(),
+                value.len(),
+                0,
+                0,
+            )
+        };
+        if result != 0 {
+            return Err(std::io::Error::last_os_error())
+                .context("destination cannot preserve download quarantine");
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = file;
+    Ok(())
+}
+
+pub fn copy_download_quarantine(
+    source: &std::fs::File,
+    target: &std::fs::File,
+) -> anyhow::Result<()> {
+    mark_download(target)?;
+    #[cfg(target_os = "macos")]
+    {
+        use std::os::fd::AsRawFd;
+        let mut value = vec![0u8; 8192];
+        let length = unsafe {
+            nix::libc::fgetxattr(
+                source.as_raw_fd(),
+                c"com.apple.quarantine".as_ptr(),
+                value.as_mut_ptr().cast(),
+                value.len(),
+                0,
+                0,
+            )
+        };
+        if length < 0 {
+            if std::io::Error::last_os_error().raw_os_error() == Some(nix::libc::ENOATTR) {
+                return Ok(());
+            }
+            return Err(std::io::Error::last_os_error())
+                .context("could not preserve download quarantine");
+        }
+        if length > 0 {
+            let result = unsafe {
+                nix::libc::fsetxattr(
+                    target.as_raw_fd(),
+                    c"com.apple.quarantine".as_ptr(),
+                    value.as_ptr().cast(),
+                    length as usize,
+                    0,
+                    0,
+                )
+            };
+            if result != 0 {
+                return Err(std::io::Error::last_os_error())
+                    .context("could not copy download quarantine");
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = source;
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -284,7 +391,7 @@ fn secure_parent(
             return Ok((directory, name));
         }
         // SAFETY: names are terminated C strings; the parent descriptor is live.
-        let created = unsafe { libc::mkdirat(directory.as_raw_fd(), name.as_ptr(), 0o755) };
+        let created = unsafe { libc::mkdirat(directory.as_raw_fd(), name.as_ptr(), 0o700) };
         if created != 0
             && std::io::Error::last_os_error().kind() != std::io::ErrorKind::AlreadyExists
         {
@@ -302,6 +409,7 @@ fn secure_parent(
             return Err(std::io::Error::last_os_error().into());
         }
         directory = unsafe { std::fs::File::from_raw_fd(fd) };
+        mark_download(&directory)?;
     }
     unreachable!()
 }

@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-03",
+  "scope": "Development-only explicit local activity clearing; no automatic retention or private session claim",
+  "implemented": [
+    "Core operation clears volatile tracker event queues without resetting sequences or saved statistics",
+    "Native host command bypasses lazy startup and works with an existing network-blocked engine",
+    "App clears timeline, graph samples and cached selected details",
+    "Requests app-specific recent-document and delivered/pending notification cleanup",
+    "Rejects late detail replies and errors using an activity generation",
+    "Offline/failed engine clearing reports a partial result and does not create a connection",
+    "Fixture isolation and confirmation before clearing"
+  ],
+  "preserved": [
+    "payload files",
+    "saved library and torrent metadata",
+    "lifetime statistics and timestamps",
+    "counters, pause intent and queue order",
+    "network/encryption policy",
+    "folder grants and migration/undo backups"
+  ],
+  "staticChecks": {
+    "rustLibraries": {
+      "status": "passed",
+      "method": "cargo build --offline --locked --target aarch64-apple-darwin -p seedhop-ffi --features bindgen",
+      "log": ".build/sandbox-development/activity-rust-build.log"
+    },
+    "bindings": {
+      "status": "regenerated",
+      "method": "UniFFI Swift/header generation; no engine startup",
+      "log": ".build/sandbox-development/activity-bindings.log"
+    },
+    "clippy": {
+      "status": "passed",
+      "method": "core and FFI libraries; warnings denied",
+      "log": ".build/sandbox-development/activity-clippy.log"
+    },
+    "nativeHost": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/activity-host-compile.log"
+    },
+    "developmentApp": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/activity-app-compile.log"
+    },
+    "sandboxApp": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/activity-sandbox-compile.log"
+    },
+    "releaseApp": {
+      "status": "passed",
+      "method": "Swift type-check only; control excluded",
+      "log": ".build/sandbox-development/activity-release-compile.log"
+    }
+  },
+  "localization": {
+    "newSourceEntries": 8,
+    "languages": 13,
+    "humanReview": "pending"
+  },
+  "runtimeTests": {
+    "executed": false,
+    "status": "deferred by user"
+  },
+  "stateChanges": {
+    "appOrEngineLaunched": false,
+    "userHistoryCleared": false,
+    "notificationsCleared": false,
+    "recentItemsCleared": false,
+    "productionLibraryChanged": false,
+    "vpnChanged": false,
+    "appBundleRebuilt": false
+  },
+  "limitations": [
+    "Current app process presentation caches and connected-engine event queues are in scope; other app processes and saved library metadata are not erased.",
+    "Native notification and recent-item cleanup requests still require runtime acceptance.",
+    "New activity can appear while transfers run.",
+    "One-second tracker timestamp precision can suppress events in the clearing second.",
+    "Offline or failed RPC clearing does not establish that engine history was removed.",
+    "No secure-erasure guarantee or automatic retention policy."
+  ],
+  "pending": [
+    "Connected/network-blocked and offline no-start acceptance",
+    "Multiple transfer event queues and sequence continuity",
+    "In-flight replies/errors and post-clear activity",
+    "Preserved payloads, statistics, counters, queue and pause state",
+    "Native recent-document/notification behavior",
+    "Fixture and native UI/accessibility acceptance",
+    "Automatic retention, private sessions; persistent-statistics options now have a separate implementation checkpoint"
+  ],
+  "documentation": "../LOCAL-PRIVACY.md",
+  "changes": "Uncommitted; development controls only",
+  "savedStatisticsRetention": {
+    "status": "Separate development controls implemented; runtime acceptance deferred",
+    "results": "statistics-retention-2026-11-03.json"
+  }
+}

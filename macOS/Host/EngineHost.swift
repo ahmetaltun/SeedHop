@@ -5,6 +5,7 @@ struct RunIntent: Codable {
     var session: String
     var running: Bool
     var resumeAtLogin: Bool
+    var downloadDirectory: String? = nil
     static var currentSession: String {
         var session: SecuritySessionId = 0
         guard SessionGetInfo(callerSecuritySession, &session, nil) == errSecSuccess else { return "unknown-\(ProcessInfo.processInfo.processIdentifier)" }
@@ -18,6 +19,7 @@ struct RunIntent: Codable {
 final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
     private let queue = DispatchQueue(label: "app.seedhop.host", qos: .userInitiated, attributes: .concurrent)
     private let lifecycle = NSLock()
+    private let requestSlots = DispatchSemaphore(value:8)
     private var engine: EngineBridge?
     private var stopping = false
     private var connections: [NSXPCConnection] = []
@@ -25,6 +27,9 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
     private var runIntent = RunIntent(session: RunIntent.currentSession, running: false, resumeAtLogin: false)
     private var activity: NSObjectProtocol?
     private var libraryDirectory = SeedHopIdentity.library
+    #if SEEDHOP_SANDBOX
+    private lazy var folderAccess = FolderAccessStore(role: background ? "background" : "foreground")
+    #endif
     private var intentURL: URL { libraryDirectory.appendingPathComponent("run-intent.json") }
 
     init(background: Bool) {
@@ -33,7 +38,7 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         if background, let bytes = try? Data(contentsOf: intentURL), let saved = try? JSONDecoder().decode(RunIntent.self, from: bytes) {
             runIntent = saved
             if saved.running && (saved.session == RunIntent.currentSession || saved.resumeAtLogin) {
-                queue.async { do { _ = try self.start() } catch { NSLog("SeedHop: automatic restore failed: %@", error.localizedDescription) } }
+                queue.async { do { _ = try self.start() } catch { NSLog("SeedHop: automatic restore failed.") } }
             }
         }
     }
@@ -48,24 +53,48 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         lifecycle.lock(); defer { lifecycle.unlock() }
         if stopping { throw HostFailure(code:"host.stopping") }
         if let engine { return engine }
-        #if SEEDHOP_DEVELOPMENT
+        #if SEEDHOP_DEVELOPMENT && !SEEDHOP_SANDBOX
         if let stateDirectory { libraryDirectory = URL(fileURLWithPath:stateDirectory) }
         #endif
-        #if SEEDHOP_VALIDATION
+        #if SEEDHOP_SANDBOX
+        guard let downloads = destination ?? runIntent.downloadDirectory else { throw HostFailure(code:"host.folder_access") }
+        #elseif SEEDHOP_VALIDATION
         let downloads = URL(fileURLWithPath:ValidationConfiguration.root).appendingPathComponent("downloads").path
         #else
         let downloads = destination ?? UserDefaults.standard.string(forKey: "downloadDirectory") ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0].path
         #endif
-        let core = try EngineBridge(stateDirectory: libraryDirectory.path, downloadDirectory: downloads, discovery: true)
+        #if SEEDHOP_VALIDATION
+        let allowLocalNetwork = true
+        let discovery = false
+        #else
+        let allowLocalNetwork = false
+        let discovery = true
+        #endif
+        #if SEEDHOP_SANDBOX
+        do {
+            try folderAccess.requireAccess(to: downloads)
+            let sessionURL = libraryDirectory.appendingPathComponent("session/session.json")
+            if FileManager.default.fileExists(atPath: sessionURL.path) {
+                let session = try JSONSerialization.jsonObject(with: Data(contentsOf: sessionURL)) as? [String: Any]
+                guard let session, let torrents = session["torrents"] as? [String: [String: Any]] else { throw FolderAccessFailure.unavailable }
+                for torrent in torrents.values {
+                    guard let folder = torrent["output_folder"] as? String else { throw FolderAccessFailure.unavailable }
+                    try folderAccess.requireAccess(to: folder)
+                }
+            }
+        } catch { throw HostFailure(code:FolderAccessFailure.noticeCode(for:error)) }
+        #endif
+        let core = try EngineBridge(stateDirectory: libraryDirectory.path, downloadDirectory: downloads, discovery: discovery, allowLocalNetwork:allowLocalNetwork)
         engine = core
         runIntent.session = RunIntent.currentSession; runIntent.running = true
+        runIntent.downloadDirectory = downloads
         try persistIntent()
         activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiatedAllowingIdleSystemSleep], reason: "Maintaining torrent transfers")
         return core
     }
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
         do { connection.setCodeSigningRequirement(try Signing.requirement(at: Signing.containingApp)) }
-        catch { NSLog("SeedHop: rejected connection: %@", error.localizedDescription); return false }
+        catch { NSLog("SeedHop: rejected connection."); return false }
         connection.exportedInterface = NSXPCInterface(with: EngineServiceProtocol.self)
         connection.exportedObject = self
         lifecycle.lock(); connections.append(connection); lifecycle.unlock()
@@ -78,7 +107,15 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         return true
     }
     func send(_ data: Data, withReply reply: @escaping (Data) -> Void) {
+        // Torrent metadata is bounded to 32 MiB; allow its base64 envelope and options.
+        guard data.count <= 48 * 1024 * 1024 else {
+            reply((try? JSONEncoder().encode(EngineReply(errorMessage:EngineMessage(code:"input.invalid")))) ?? Data()); return
+        }
+        guard requestSlots.wait(timeout:.now()) == .success else {
+            reply((try? JSONEncoder().encode(EngineReply(errorMessage:EngineMessage(code:"host.requests_busy")))) ?? Data()); return
+        }
         queue.async {
+            defer { self.requestSlots.signal() }
             let response: EngineReply
             do {
                 let request = try JSONDecoder().decode(EngineRequest.self, from: data)
@@ -92,11 +129,48 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         }
     }
     private func handle(_ r: EngineRequest) throws -> EngineReply {
+        #if SEEDHOP_SANDBOX
+        // Serialized with engine startup, including the background restore path.
+        if let grants = r.folderGrants {
+            lifecycle.lock(); defer { lifecycle.unlock() }
+            do { try folderAccess.receive(grants) }
+            catch { throw HostFailure(code:FolderAccessFailure.noticeCode(for:error)) }
+        }
+        if ["add", "relocate"].contains(r.command) {
+            lifecycle.lock(); defer { lifecycle.unlock() }
+            do {
+                guard let destination = r.destination else { throw FolderAccessFailure.unavailable }
+                try folderAccess.requireAccess(to: destination)
+            } catch { throw HostFailure(code:FolderAccessFailure.noticeCode(for:error)) }
+        }
+        #endif
         #if SEEDHOP_VALIDATION
         // Observe restoration without the usual lazy start on an explicit Connect.
         if r.command == "validationStatus" {
             lifecycle.lock(); defer { lifecycle.unlock() }
             return EngineReply(snapshot:try engine.map { Self.snapshot(try $0.snapshot()) })
+        }
+        #endif
+        #if SEEDHOP_DEVELOPMENT
+        if r.command == "statisticsInfo" || r.command == "statisticsRetention" {
+            lifecycle.lock(); defer { lifecycle.unlock() }
+            guard !stopping else { throw HostFailure(code:"host.stopping") }
+            let json: String
+            if r.command == "statisticsRetention" {
+                guard let remember = r.rememberStatistics else { throw HostFailure(code:"host.unsupported") }
+                if let engine { json = try engine.setStatisticsRetention(remember: remember) }
+                else { json = try saveStatisticsPreferences(stateDirectory: libraryDirectory.path, remember: remember) }
+            } else {
+                json = try engine?.statisticsPreferences() ?? statisticsPreferences(stateDirectory: libraryDirectory.path)
+            }
+            return EngineReply(statisticsRetention: try JSONDecoder().decode(StatisticsRetentionInfo.self, from: Data(json.utf8)))
+        }
+        if r.command == "clearActivity" {
+            lifecycle.lock(); defer { lifecycle.unlock() }
+            guard !stopping else { throw HostFailure(code:"host.stopping") }
+            // Clearing local records must not lazily start a network session.
+            try engine?.clearActivity()
+            return EngineReply()
         }
         #endif
         if r.command == "shutdown" {
@@ -107,11 +181,24 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             try current?.shutdown()
             lifecycle.lock(); defer { lifecycle.unlock() }; engine = nil
             runIntent.running = false
-            try persistIntent()
+            // A preferences-only foreground helper never owned the engine's run
+            // intent. Do not create a library or overwrite a background owner's intent.
+            if current != nil || background { try persistIntent() }
             if let activity { ProcessInfo.processInfo.endActivity(activity); self.activity = nil }
             // Reply first; process exit is the final disk-ownership barrier.
             DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) { exit(0) }
             return EngineReply(stoppedProcessID:ProcessInfo.processInfo.processIdentifier)
+        }
+        if r.command == "networkInfo" || r.command == "networkPolicy" {
+            lifecycle.lock(); defer { lifecycle.unlock() }
+            if r.command == "networkPolicy" {
+                guard let policy = r.networkPolicy else { throw HostFailure(code:"host.unsupported") }
+                let json = String(decoding:try JSONEncoder().encode(policy),as:UTF8.self)
+                if let engine { try engine.setNetworkPolicy(policy:json) }
+                else { try saveNetworkPreferences(stateDirectory:libraryDirectory.path,policy:json) }
+            }
+            let json = try engine?.networkInfo() ?? networkPreferences(stateDirectory:libraryDirectory.path)
+            return EngineReply(networkInfo:try JSONDecoder().decode(NetworkInfo.self,from:Data(json.utf8)))
         }
         let core = try start(destination: r.destination,stateDirectory:r.stateDirectory)
         switch r.command {
@@ -162,9 +249,12 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         return EngineReply()
     }
     private func stopForDisconnect() {
-        lifecycle.lock(); guard !stopping else { lifecycle.unlock(); return }; lifecycle.unlock()
+        lifecycle.lock()
+        guard !stopping, connections.isEmpty, engine != nil else { lifecycle.unlock(); return }
+        stopping = true
+        lifecycle.unlock()
         do { _ = try handle(EngineRequest(command:"shutdown")) }
-        catch { NSLog("SeedHop: shutdown failed: %@", error.localizedDescription) }
+        catch { NSLog("SeedHop: shutdown failed.") }
     }
     static func file(_ f: TransferFile) -> FileItem { FileItem(index:f.index,name:f.name,size:f.size,downloaded:f.downloaded,selected:f.selected,priority:f.priority) }
     static func message(_ notice: UserNotice) -> EngineMessage {
@@ -198,6 +288,8 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         snapshot.alternativeDownloadLimit = s.alternativeDownloadLimit
         snapshot.alternativeUploadLimit = s.alternativeUploadLimit
         snapshot.alternativeLimitsEnabled = s.alternativeLimitsEnabled
+        snapshot.networkBlocked = s.networkBlocked
+        snapshot.networkInterface = s.networkInterface
         snapshot.peerEncryption = PeerEncryptionPolicy(rawValue:s.peerEncryption)
         snapshot.savedPeerEncryption = PeerEncryptionPolicy(rawValue:s.savedPeerEncryption)
         return snapshot

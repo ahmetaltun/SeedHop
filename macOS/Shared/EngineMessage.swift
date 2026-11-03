@@ -35,9 +35,13 @@ struct EngineMessage: Codable, Equatable, LocalizedError {
     }
     var localizedText: String {
         switch code {
+        case "host.folder_access_version": return String(localized:"This version cannot read these folder approvals. Use a compatible SeedHop version. Saved approvals have not been replaced.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "host.folder_access": return String(localized:"Choose your download folders in Settings to allow access. Your library has been preserved.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         case "engine.busy": return String(localized:"Another SeedHop engine is already using this library.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         case "engine.stopping": return String(localized:"The engine is stopping. Try again once it reconnects.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         case "engine.failed": return String(localized:"The engine could not complete this action. Check the details, then try again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "host.requests_busy": return String(localized:"The engine is handling several requests. Try again shortly.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
+        case "network.blocked": return String(localized:"Network protection blocked this operation. Check the selected connection and DNS server in Settings, then restart the engine.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         case "input.invalid": return String(localized:"Check the entered values and try again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         case "torrent.unsupported": return String(localized:"This torrent format is not supported. Use a BitTorrent v1, v2, or hybrid torrent.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
         case "operation.cancelled": return String(localized:"The operation was cancelled.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)

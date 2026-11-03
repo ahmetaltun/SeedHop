@@ -1,7 +1,14 @@
 pub mod adapter;
 mod connection_settings;
+mod network_policy;
+pub use network_policy::{
+    NetworkInterface, NetworkPolicy, network_interfaces, network_preferences,
+    save_network_preferences,
+};
 mod diagnostics;
+mod statistics_retention;
 pub use diagnostics::{PeerDetails, TorrentDetails, TrackerDetails};
+pub use statistics_retention::{save_statistics_preferences, statistics_preferences};
 mod file_operation;
 mod layout_journal;
 mod management;
@@ -27,13 +34,15 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-pub const PROTOCOL_VERSION: u32 = 9;
+pub const PROTOCOL_VERSION: u32 = 10;
 
 /// Owns library state. The FFI host retains this lease until its runtime has stopped.
 pub struct Engine {
     accounting: Mutex<diagnostics::Accounting>,
     statistics_warning: Mutex<Option<String>>,
     session: Arc<Session>,
+    network_policy: NetworkPolicy,
+    network_blocked: AtomicBool,
     active_peer_encryption: librqbit::EncryptionPolicy,
     connection_settings: Mutex<connection_settings::ConnectionSettings>,
     lease: storage::LibraryLease,
@@ -68,12 +77,23 @@ impl Engine {
     ) -> Result<Arc<Self>> {
         let dir = PathBuf::from(&config.state_directory);
         let lease = storage::LibraryLease::acquire(&dir)?;
-        let connection_settings = connection_settings::ConnectionSettings::load(&dir)?;
+        let mut connection_settings = connection_settings::ConnectionSettings::load(&dir)?;
+        // Finish an explicitly requested statistics purge before restoring any
+        // session work, even if the required network is currently unavailable.
+        connection_settings.complete_statistics_clear(&dir)?;
+        if connection_settings.network_policy_pending
+            || (connection_settings.requires_network_policy()
+                && !dir.join("network-policy.json").is_file())
+        {
+            return Err(CoreError::NetworkBlocked);
+        }
+        let network_policy = NetworkPolicy::load(&dir)?;
+        network_policy.check_available()?;
         let peer_encryption = override_policy.unwrap_or(connection_settings.peer_encryption);
         let downloads = PathBuf::from(&config.download_directory);
         storage::validate_destination(&downloads, &[])?;
         let session_dir = dir.join("session");
-        std::fs::create_dir_all(&session_dir).map_err(storage::io_error)?;
+        storage::private_directory(&session_dir)?;
         // Preserve unreadable state in place. Never overwrite it with an empty session.
         let session_path = session_dir.join("session.json");
         // Resolve interrupted layouts while the lease is exclusive and before
@@ -200,6 +220,13 @@ impl Engine {
             limits
         };
         let options = SessionOptions {
+            block_local_network: !(config.allow_local_network
+                || network_policy.allow_local_network),
+            bind_device_name: network_policy.interface.as_ref().map(|i| i.name.clone()),
+            expected_bind_device_index: network_policy.interface.as_ref().map(|i| i.index),
+            bound_dns_server: network_policy
+                .dns_server
+                .map(|ip| std::net::SocketAddr::new(ip, 53)),
             peer_encryption,
             restore_queued: queue.max_active > 0 || schedule.enabled,
             ratelimits: librqbit::limits::LimitsConfig {
@@ -227,13 +254,22 @@ impl Engine {
             client_name_and_version: Some("SeedHop/0.1.0".into()),
             ..Default::default()
         };
+        network_policy.check_available()?;
         let session = Session::new_with_opts(downloads.clone(), options)
             .await
-            .map_err(adapter::engine_error)?;
+            .map_err(|error| {
+                if network_policy.interface.is_some() {
+                    CoreError::NetworkBlocked
+                } else {
+                    adapter::engine_error(error)
+                }
+            })?;
         let engine = Arc::new(Self {
             accounting: Mutex::new(accounting),
             statistics_warning: Mutex::new(None),
             session,
+            network_policy,
+            network_blocked: AtomicBool::new(false),
             active_peer_encryption: peer_encryption,
             connection_settings: Mutex::new(connection_settings),
             lease,
@@ -269,6 +305,13 @@ impl Engine {
                 if engine.stopping.load(Ordering::SeqCst) {
                     break;
                 }
+                if engine.network_policy.check_available().is_err() {
+                    engine.network_blocked.store(true, Ordering::SeqCst);
+                    engine.session.cancellation_token().cancel();
+                }
+                if engine.network_blocked.load(Ordering::SeqCst) {
+                    continue;
+                }
                 // Metadata inspection is read-only and can wait on peers. Share
                 // its lock so calendar transitions still run; file changes and
                 // shutdown retain their exclusive operation boundary.
@@ -289,6 +332,9 @@ impl Engine {
     }
 
     fn ready(&self) -> Result<()> {
+        if self.network_blocked.load(Ordering::SeqCst) {
+            return Err(CoreError::NetworkBlocked);
+        }
         if self.stopping.load(Ordering::SeqCst) {
             Err(CoreError::Stopping)
         } else {
@@ -297,7 +343,9 @@ impl Engine {
     }
 
     pub fn snapshot(&self) -> Result<Snapshot> {
-        self.ready()?;
+        if self.stopping.load(Ordering::SeqCst) {
+            return Err(CoreError::Stopping);
+        }
         self.sample_accounting();
         let mut torrents = self.session.with_torrents(|ts| {
             ts.map(|(_, t)| {
@@ -348,6 +396,12 @@ impl Engine {
             alternative_download_limit: scheduling.alternative.download,
             alternative_upload_limit: scheduling.alternative.upload,
             alternative_limits_enabled: scheduling.alternative.enabled,
+            network_blocked: self.network_blocked.load(Ordering::SeqCst),
+            network_interface: self
+                .network_policy
+                .interface
+                .as_ref()
+                .map(|i| i.name.clone()),
             peer_encryption: connection_settings::name(self.active_peer_encryption).into(),
             saved_peer_encryption: connection_settings::name(
                 self.connection_settings.lock().unwrap().peer_encryption,
@@ -593,13 +647,21 @@ impl Engine {
 
     pub async fn set_paused(&self, id: String, paused: bool) -> Result<()> {
         let _operation = self.operations.write().await;
-        self.ready()?;
+        if !paused || !self.network_blocked.load(Ordering::SeqCst) {
+            self.ready()?;
+        }
+        if self.stopping.load(Ordering::SeqCst) {
+            return Err(CoreError::Stopping);
+        }
         let handle = self.handle(&id)?;
         if !paused {
             self.validate_resume_destination(&handle)?;
         }
         self.save_force_started(&id, false)?;
         self.apply_pause_intent(&handle, paused).await?;
+        if self.network_blocked.load(Ordering::SeqCst) {
+            return Ok(());
+        }
         self.reconcile_queue().await
     }
 
@@ -835,7 +897,7 @@ impl Engine {
         self.accounting
             .lock()
             .unwrap()
-            .checkpoint(&self.state_directory, true)
+            .checkpoint_on_shutdown(&self.state_directory)
     }
 
     pub fn retain_lease(&self) -> &storage::LibraryLease {

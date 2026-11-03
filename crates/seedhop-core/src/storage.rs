@@ -13,7 +13,7 @@ pub struct LibraryLease {
 }
 impl LibraryLease {
     pub fn acquire(directory: &Path) -> Result<Self> {
-        std::fs::create_dir_all(directory).map_err(io_error)?;
+        private_directory(directory)?;
         let file = OpenOptions::new()
             .create(true)
             .truncate(false)
@@ -39,6 +39,25 @@ pub fn io_error(error: std::io::Error) -> CoreError {
     CoreError::Storage(error.to_string())
 }
 
+/// Tighten only application-owned state directories, never payload destinations.
+pub fn private_directory(path: &Path) -> Result<()> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    std::fs::create_dir_all(path).map_err(io_error)?;
+    let directory = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+        .open(path)
+        .map_err(io_error)?;
+    if directory.metadata().map_err(io_error)?.uid() != unsafe { libc::geteuid() } {
+        return Err(CoreError::Storage(
+            "The library directory must belong to the current user.".into(),
+        ));
+    }
+    directory
+        .set_permissions(std::fs::Permissions::from_mode(0o700))
+        .map_err(io_error)
+}
+
 pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     let temp = path.with_extension("pending");
     let mut file = OpenOptions::new()
@@ -48,6 +67,9 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
         .mode(0o600)
         .custom_flags(libc::O_NOFOLLOW)
         .open(&temp)
+        .map_err(io_error)?;
+    use std::os::unix::fs::PermissionsExt;
+    file.set_permissions(std::fs::Permissions::from_mode(0o600))
         .map_err(io_error)?;
     file.write_all(bytes).map_err(io_error)?;
     file.sync_all().map_err(io_error)?;
@@ -154,7 +176,7 @@ pub(crate) fn relative_parent(
         }
         if create {
             // SAFETY: valid owned parent descriptor and terminated component.
-            let result = unsafe { libc::mkdirat(directory.as_raw_fd(), part.as_ptr(), 0o755) };
+            let result = unsafe { libc::mkdirat(directory.as_raw_fd(), part.as_ptr(), 0o700) };
             if result != 0
                 && std::io::Error::last_os_error().kind() != std::io::ErrorKind::AlreadyExists
             {
@@ -173,6 +195,10 @@ pub(crate) fn relative_parent(
             return Err(std::io::Error::last_os_error());
         }
         directory = unsafe { File::from_raw_fd(fd) };
+        if create {
+            librqbit::storage::filesystem::mark_download(&directory)
+                .map_err(std::io::Error::other)?;
+        }
     }
     unreachable!()
 }
@@ -218,7 +244,7 @@ pub(crate) fn copy_exclusive(
                 parent.as_raw_fd(),
                 target.as_ptr(),
                 libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL | libc::O_NOFOLLOW | libc::O_CLOEXEC,
-                0o644,
+                0o600,
             )
         };
         if fd < 0 {
@@ -228,6 +254,8 @@ pub(crate) fn copy_exclusive(
         // Record ownership durably before writing the first byte. The journal
         // owns rollback, including a file interrupted during this callback.
         event(CopyEvent::Created(FileStamp::read(&output)?))?;
+        librqbit::storage::filesystem::copy_download_quarantine(&input, &output)
+            .map_err(|e| CoreError::Storage(e.to_string()))?;
         let result = copy_chunks(&mut input, &mut output, progress).and_then(|digest| {
             output.sync_all().map_err(io_error)?;
             parent.sync_all().map_err(io_error)?;
@@ -521,6 +549,7 @@ mod tests {
             state_directory: state.path().to_string_lossy().into(),
             download_directory: source.path().to_string_lossy().into(),
             allow_network_discovery: false,
+            allow_local_network: true,
             listen_port: 0,
         };
         let content = vec![7; 4096];

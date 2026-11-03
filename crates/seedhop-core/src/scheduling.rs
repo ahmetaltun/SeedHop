@@ -308,6 +308,7 @@ mod tests {
             state_directory: state.path().display().to_string(),
             download_directory: files.path().display().to_string(),
             allow_network_discovery: false,
+            allow_local_network: true,
             listen_port: 0,
         })
         .await
@@ -354,6 +355,7 @@ mod tests {
             state_directory: state.path().display().to_string(),
             download_directory: files.path().display().to_string(),
             allow_network_discovery: false,
+            allow_local_network: true,
             listen_port: 0,
         })
         .await
@@ -402,6 +404,7 @@ mod tests {
             state_directory: state.path().display().to_string(),
             download_directory: files.path().display().to_string(),
             allow_network_discovery: false,
+            allow_local_network: true,
             listen_port: 0,
         })
         .await

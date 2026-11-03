@@ -12,6 +12,7 @@ import platform
 import re
 import tomllib
 import sparkle
+import sandbox
 from localization import LANGUAGES, check as check_localizations, normalize as normalize_localizations, pseudolocalize
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -50,6 +51,8 @@ def main():
     parser.add_argument("--save-identity", action="store_true", help="Save the validated identity locally for subsequent builds")
     parser.add_argument("--validation-root", type=pathlib.Path, help="Build an isolated development lifecycle fixture with a distinct service namespace and library")
     parser.add_argument("--skip-rust",action="store_true")
+    parser.add_argument("--sandbox", action="store_true", help="Enable App Sandbox in a signed, isolated validation build only")
+    parser.add_argument("--sandbox-team-id", help="Ten-character Apple Developer team ID matching the signing certificate")
     parser.add_argument("--update-localizations",action="store_true",help="Extract and sync English source strings into catalogs")
     parser.add_argument("--pseudolocalization",action="store_true",help="Include development-only expanded en-XA text")
     args = parser.parse_args()
@@ -57,6 +60,10 @@ def main():
         parser.error("Pseudolocalization is only available in development builds.")
     if args.release and args.update_localizations:
         parser.error("Update catalogs in a development build before running release validation.")
+    if args.sandbox and (args.release or not args.validation_root or args.identity == '-'):
+        parser.error("Sandbox development requires --validation-root and a certificate-backed identity; production/release activation is gated.")
+    if args.sandbox != bool(args.sandbox_team_id):
+        parser.error("Use --sandbox and --sandbox-team-id together.")
     if platform.system() != "Darwin" or platform.machine() != "arm64":
         parser.error("SeedHop builds require Apple Silicon macOS and native arm64 tools. Run outside Rosetta.")
     if args.identity != '-':
@@ -82,7 +89,13 @@ def main():
         run(target/"uniffi-bindgen","generate","--library",target/"libseedhop_ffi.dylib","--language","swift","--out-dir",generated)
     verify_arm64(target/"libseedhop_ffi.dylib")
     validation_root = args.validation_root.resolve() if args.validation_root else None
-    app_id = 'app.seedhop.validation.' + hashlib.sha256(str(validation_root).encode()).hexdigest()[:12] if validation_root else 'app.seedhop.mac'
+    validation_prefix = 'app.seedhop.sandbox.' if args.sandbox else 'app.seedhop.validation.'
+    app_id = validation_prefix + hashlib.sha256(str(validation_root).encode()).hexdigest()[:12] if validation_root else 'app.seedhop.mac'
+    try:
+        sandbox_config = sandbox.configuration(app_id, args.sandbox_team_id) if args.sandbox else None
+    except ValueError as error:
+        parser.error(str(error))
+    background_id = sandbox_config['group'] + '.agent' if sandbox_config else app_id + '.agent'
     app = (validation_root or ROOT/'.build') / 'SeedHop.app'
     contents = app/"Contents"
     for folder in ["MacOS","Frameworks","Resources","XPCServices/SeedHopEngine.xpc/Contents/MacOS","Library/LaunchAgents"]:
@@ -112,13 +125,17 @@ def main():
     app_plist.update(SUFeedURL=updates["feedURL"], SUPublicEDKey=updates["publicKey"],
                      SUAllowsAutomaticUpdates=False, SUAutomaticallyUpdate=False,
                      SUEnableSystemProfiling=False)
+    if sandbox_config:
+        app_plist['SUEnableInstallerLauncherService'] = True
     write_plist(contents/"Info.plist", app_plist)
     sparkle_distribution = sparkle.distribution()
     sparkle.embed(sparkle_distribution, contents/"Frameworks/Sparkle.framework", args.identity)
     shutil.copy2(sparkle_distribution/"LICENSE", contents/"Resources/Sparkle-LICENSE")
     xpc = contents/"XPCServices/SeedHopEngine.xpc"
     write_plist(xpc/"Contents/Info.plist",dict(base,CFBundleIdentifier=app_id+".engine",CFBundleExecutable="SeedHopEngine",CFBundlePackageType="XPC!",XPCService={"ServiceType":"Application","RunLoopType":"NSRunLoop","JoinExistingSession":True}))
-    write_plist(contents/f"Library/LaunchAgents/{app_id}.agent.plist",{"Label":app_id+".agent","BundleProgram":"Contents/MacOS/SeedHopAgent","ProgramArguments":["SeedHopAgent","--agent"],"MachServices":{app_id+".agent":True},"RunAtLoad":True,"KeepAlive":{"SuccessfulExit":False},"ThrottleInterval":5,"ProcessType":"Background","AssociatedBundleIdentifiers":[app_id]})
+    for stale in (contents/"Library/LaunchAgents").glob("*.plist"):
+        stale.unlink()
+    write_plist(contents/f"Library/LaunchAgents/{background_id}.plist",{"Label":background_id,"BundleProgram":"Contents/MacOS/SeedHopAgent","ProgramArguments":["SeedHopAgent","--agent"],"MachServices":{background_id:True},"RunAtLoad":True,"KeepAlive":{"SuccessfulExit":False},"ThrottleInterval":5,"ProcessType":"Background","AssociatedBundleIdentifiers":[app_id]})
     shutil.copy2(target/"libseedhop_ffi.dylib",contents/"Frameworks/libseedhop_ffi.dylib")
     run("install_name_tool","-id","@rpath/libseedhop_ffi.dylib",contents/"Frameworks/libseedhop_ffi.dylib")
     common = ["swiftc","-target","arm64-apple-macosx15.0","-swift-version","5","-parse-as-library","-module-cache-path",ROOT/".cache/swift"]
@@ -130,6 +147,10 @@ def main():
             'static let app = ' + json.dumps(app_id) + '\n' +
             'static let root = ' + json.dumps(str(validation_root), ensure_ascii=False) + '\n}\n')
         common += ['-D', 'SEEDHOP_VALIDATION', configuration]
+    if sandbox_config:
+        sandbox_source = validation_root / 'SandboxConfiguration.swift'
+        sandbox_source.write_text('enum SandboxConfiguration { static let group = ' + json.dumps(sandbox_config['group']) + ' }\n')
+        common += ['-D', 'SEEDHOP_SANDBOX', sandbox_source]
     shared = sorted((ROOT/"macOS/Shared").glob("*.swift"))
     host = sorted((ROOT/"macOS/Host").glob("*.swift"))
     # Both executable locations find the single bundled, signed Rust dynamic library.
@@ -168,7 +189,15 @@ def main():
         sign=["codesign","--force","--options","runtime","--sign",args.identity,"--identifier",name]
         if args.identity != "-": sign += ["--timestamp"]
         if not args.release and args.identity=="-" and path!=contents/"Frameworks/libseedhop_ffi.dylib": sign += ["--entitlements",debug_entitlements]
+        if sandbox_config and path != contents/"Frameworks/libseedhop_ffi.dylib":
+            entitlement_file = validation_root / (name.rsplit('.', 1)[-1] + '.entitlements')
+            write_plist(entitlement_file, sandbox_config['application'] if path == app else sandbox_config['engine'])
+            sign += ['--entitlements', entitlement_file]
         run(*sign,path)
+    if sandbox_config:
+        signature = subprocess.check_output(['codesign', '-d', '--verbose=4', str(app)], stderr=subprocess.STDOUT, text=True)
+        if 'TeamIdentifier=' + args.sandbox_team_id not in signature.splitlines():
+            raise RuntimeError('Sandbox group team does not match the signing certificate; do not run this build.')
     run("codesign","--verify","--deep","--strict",app)
     print(f"Built {app}\nSigning: {args.identity}. Ad-hoc builds are for local development, not distribution.")
 

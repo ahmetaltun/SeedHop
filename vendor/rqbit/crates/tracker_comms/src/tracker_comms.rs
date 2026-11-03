@@ -38,6 +38,7 @@ pub struct TrackerComms {
     announce_port: u16,
     reqwest_client: reqwest::Client,
     key: u32,
+    block_local_network: bool,
 }
 
 #[derive(Default)]
@@ -181,6 +182,7 @@ enum UdpTrackerResolveResult {
 async fn udp_tracker_to_socket_addrs(
     host: url::Host<&str>,
     port: u16,
+    dns: Option<&crate::BoundDns>,
 ) -> anyhow::Result<UdpTrackerResolveResult> {
     let res = match host {
         url::Host::Domain(name) => {
@@ -188,10 +190,11 @@ async fn udp_tracker_to_socket_addrs(
 
             let mut v4: Option<SocketAddrV4> = None;
             let mut v6: Option<SocketAddrV6> = None;
-            for addr in tokio::net::lookup_host((name, port))
-                .await
-                .with_context(|| format!("error looking up hostname {name}"))?
-            {
+            let addresses = match dns {
+                Some(dns) => dns.lookup(name, port).await?,
+                None => tokio::net::lookup_host((name, port)).await?.collect(),
+            };
+            for addr in addresses {
                 match (v4, v6, addr) {
                     (None, _, SocketAddr::V4(addr)) => v4 = Some(addr),
                     (_, None, SocketAddr::V6(addr)) => v6 = Some(addr),
@@ -257,6 +260,7 @@ impl TrackerComms {
                 announce_port,
                 reqwest_client,
                 key: rand::random(),
+                block_local_network: udp_client.block_local_network,
             });
             let mut futures = FuturesUnordered::new();
             for tracker in trackers {
@@ -386,6 +390,9 @@ impl TrackerComms {
             trackerid: None,
         };
 
+        if self.block_local_network {
+            librqbit_core::network_safety::validate_url(tracker_url)?;
+        }
         let mut url = tracker_url.clone();
 
         let mut queries = request.as_querystring();
@@ -398,7 +405,7 @@ impl TrackerComms {
         if !response.status().is_success() {
             anyhow::bail!("Tracker returned HTTP {}", response.status());
         }
-        let bytes = response.bytes().await?;
+        let bytes = crate::read_limited_response(response, 2 * 1024 * 1024).await?;
         if let Ok((error, _)) =
             bencode::from_bytes_with_rest::<tracker_comms_http::TrackerError>(&bytes)
         {
@@ -477,19 +484,23 @@ impl TrackerComms {
                 .observe(TrackerObservation::new(&url, None, "resolving"));
             // This should retry forever until the addrs are resolved.
             let addrs = (async || {
-                udp_tracker_to_socket_addrs(host.clone(), port)
-                    .instrument(trace_span!("resolve", ?host))
-                    .await
-                    .or_else(|err| {
+                let resolved = udp_tracker_to_socket_addrs(host.clone(), port, client.dns.as_ref())
+                    .instrument(trace_span!("resolve", ?host)).await.or_else(|err| {
                         if let Some(previous) = prev_addrs {
                             let mut observation = TrackerObservation::new(&url, None, "warning");
                             observation.message = Some("Could not refresh tracker address; using previously resolved addresses.".into());
                             self.stats.observe(observation);
                             Ok(previous)
-                        } else {
-                            Err(err)
-                        }
-                    })
+                        } else { Err(err) }
+                    })?;
+                if client.block_local_network {
+                    let permitted = match resolved {
+                        UdpTrackerResolveResult::One(a) => librqbit_core::network_safety::is_public_destination(a.ip()),
+                        UdpTrackerResolveResult::Two(a, b) => librqbit_core::network_safety::is_public_destination((*a.ip()).into()) && librqbit_core::network_safety::is_public_destination((*b.ip()).into()),
+                    };
+                    if !permitted { anyhow::bail!("local tracker destination requires explicit permission"); }
+                }
+                Ok::<_, anyhow::Error>(resolved)
             })
             .retry(
                 ExponentialBuilder::new()

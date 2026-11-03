@@ -3,14 +3,22 @@ import Foundation
 enum SeedHopIdentity {
     #if SEEDHOP_VALIDATION
     static let app = ValidationConfiguration.app
+    #if SEEDHOP_SANDBOX
+    static var library: URL { SandboxStorage.library }
+    #else
     static var library: URL { URL(fileURLWithPath:ValidationConfiguration.root).appendingPathComponent("state", isDirectory:true) }
+    #endif
     #else
     static let app = "app.seedhop.mac"
     static var library: URL { FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("SeedHop", isDirectory: true) }
     #endif
     static let foreground = app + ".engine"
+    #if SEEDHOP_SANDBOX
+    static let background = SandboxConfiguration.group + ".agent"
+    #else
     static let background = app + ".agent"
-    static let protocolVersion = 9
+    #endif
+    static let protocolVersion = 10
     static let agentPlist = background + ".plist"
 }
 
@@ -153,6 +161,8 @@ struct LibrarySnapshot: Codable {
     var storageRecovery: StorageRecoveryItem? = nil
     var peerEncryption: PeerEncryptionPolicy? = nil
     var savedPeerEncryption: PeerEncryptionPolicy? = nil
+    var networkBlocked: Bool? = nil
+    var networkInterface: String? = nil
     var schedule: ScheduleConfig? = nil
     var scheduleActive: Bool? = nil
     var schedulingWarning: String? = nil
@@ -182,6 +192,8 @@ struct EngineRequest: Codable {
     var bytes: Data?
     var destination: String?
     var stateDirectory: String?
+    var folderGrants: [Data]?
+    var rememberStatistics: Bool?
     var selected: [UInt32]?
     var paused: Bool?
     var reuse: Bool?
@@ -199,6 +211,7 @@ struct EngineRequest: Codable {
     var fileIndex: UInt32?
     var fileName: String?
     var peerEncryption: PeerEncryptionPolicy?
+    var networkPolicy: NetworkPolicy?
     var section: String?
     var allPeers: Bool?
     var schedule: ScheduleConfig?
@@ -215,12 +228,20 @@ struct EngineReply: Codable {
     var details: TorrentDetails?
     var stoppedProcessID: Int32?
     var reannounce: ReannounceSummary?
-    init(snapshot: LibrarySnapshot? = nil, preview: ImportPreview? = nil, id: String? = nil, error: String? = nil, errorMessage: EngineMessage? = nil, cancelled: Bool? = nil, cancellationAccepted: Bool? = nil, details: TorrentDetails? = nil, stoppedProcessID: Int32? = nil, reannounce: ReannounceSummary? = nil) {
+    var networkInfo: NetworkInfo?
+    var statisticsRetention: StatisticsRetentionInfo?
+    init(snapshot: LibrarySnapshot? = nil, preview: ImportPreview? = nil, id: String? = nil, error: String? = nil, errorMessage: EngineMessage? = nil, cancelled: Bool? = nil, cancellationAccepted: Bool? = nil, details: TorrentDetails? = nil, stoppedProcessID: Int32? = nil, reannounce: ReannounceSummary? = nil, networkInfo: NetworkInfo? = nil, statisticsRetention: StatisticsRetentionInfo? = nil) {
         self.snapshot = snapshot; self.preview = preview; self.id = id; self.error = error
         self.cancelled = cancelled; self.cancellationAccepted = cancellationAccepted; self.details = details
-        self.errorMessage = errorMessage; self.stoppedProcessID = stoppedProcessID; self.reannounce = reannounce
+        self.errorMessage = errorMessage; self.stoppedProcessID = stoppedProcessID; self.reannounce = reannounce; self.networkInfo = networkInfo
+        self.statisticsRetention = statisticsRetention
     }
 }
+struct StatisticsRetentionInfo: Codable, Equatable {
+    var rememberStatistics: Bool
+    var clearPending: Bool
+}
+
 struct UserFacingError: LocalizedError {
     let message: String
     var errorDescription: String? { message }
@@ -352,4 +373,23 @@ struct PeerRate: Equatable {
 enum WorkspacePreferences {
     static let isFixture = ProcessInfo.processInfo.arguments.contains { $0.hasPrefix("--verify-") || ["--render-designs","--design-preview"].contains($0) }
     static let defaults: UserDefaults = isFixture ? UserDefaults(suiteName:"app.seedhop.workspace-fixtures")! : .standard
+}
+
+struct NetworkInterface: Codable, Equatable, Identifiable {
+    var name: String
+    var index: UInt32
+    var addresses: [String]
+    var id: String { name }
+}
+struct NetworkPolicy: Codable, Equatable {
+    var version = 1
+    var interface: NetworkInterface?
+    var dnsServer: String?
+    var allowLocalNetwork = false
+}
+struct NetworkInfo: Codable, Equatable {
+    var saved: NetworkPolicy?
+    var active: NetworkPolicy?
+    var interfaces: [NetworkInterface]
+    var blocked: Bool
 }

@@ -6,6 +6,10 @@ pub enum CoreError {
     Busy,
     #[error("{0}")]
     InvalidInput(String),
+    #[error(
+        "Network protection blocked this operation. Check the selected connection and DNS server in Settings, then restart the engine."
+    )]
+    NetworkBlocked,
     #[error("{message}")]
     Validation { code: &'static str, message: String },
     #[error("This torrent format is not supported. Use a BitTorrent v1, v2, or hybrid torrent.")]
@@ -29,6 +33,7 @@ impl CoreError {
             Self::Validation { code, .. } => code,
             Self::Busy => "engine.busy",
             Self::InvalidInput(_) => "input.invalid",
+            Self::NetworkBlocked => "network.blocked",
             Self::Unsupported => "torrent.unsupported",
             Self::Cancelled => "operation.cancelled",
             Self::Stopping => "engine.stopping",
@@ -132,6 +137,8 @@ pub struct Snapshot {
     pub alternative_upload_limit: u32,
     pub alternative_limits_enabled: bool,
     pub statistics_warning: Option<String>,
+    pub network_blocked: bool,
+    pub network_interface: Option<String>,
     pub peer_encryption: String,
     pub saved_peer_encryption: String,
     pub protocol_version: u32,
@@ -162,5 +169,6 @@ pub struct EngineConfig {
     pub state_directory: String,
     pub download_directory: String,
     pub allow_network_discovery: bool,
+    pub allow_local_network: bool,
     pub listen_port: u16,
 }

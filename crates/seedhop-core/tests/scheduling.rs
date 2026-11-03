@@ -6,6 +6,7 @@ fn config(state: &std::path::Path, files: &std::path::Path) -> EngineConfig {
         state_directory: state.display().to_string(),
         download_directory: files.display().to_string(),
         allow_network_discovery: false,
+        allow_local_network: true,
         listen_port: 0,
     }
 }

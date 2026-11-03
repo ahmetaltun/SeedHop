@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/seedhop-core", "crates/seedhop-ffi"]
-exclude = ["vendor/rqbit"]
+exclude = ["vendor/rqbit", "vendor/librqbit-utp", "fuzz"]
 
 [workspace.package]
 version = "0.1.2"

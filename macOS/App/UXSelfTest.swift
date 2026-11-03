@@ -12,6 +12,39 @@ import SwiftUI
             try await body(); passed += 1; print("PASS: \(name)")
         }
 
+        try await check("Network protection saves the captured choice before restarting") {
+            let (store, peer) = library()
+            let policy = NetworkPolicy(interface:NetworkInterface(name:"utun8",index:42,addresses:["10.8.0.2"]),dnsServer:"10.8.0.1")
+            store.saveNetworkPolicy(policy)
+            try await eventually { !store.savingNetwork && !store.switching && peer.commands("connect").count == 1 }
+            try expect(peer.commands("networkPolicy").first?.networkPolicy == policy,"Network selection changed before saving")
+            try expect(peer.savedNetworkPolicy == policy && peer.activeNetworkPolicy == policy,"Restart ignored saved protection")
+            try expect(!store.networkBlocked && store.networkInterface == "utun8","Applied protection was not reported")
+            let commands = peer.requests.map(\.command)
+            try expect(commands.firstIndex(of:"networkPolicy")! < commands.firstIndex(of:"shutdown")!,"Restart happened before the policy save")
+        }
+
+        try await check("A failed network save keeps transfers blocked and settings recoverable") {
+            let (store, peer) = library(); peer.hold = ["networkPolicy"]
+            store.saveNetworkPolicy(NetworkPolicy())
+            try await eventually { peer.pending.count == 1 }
+            peer.networkBlocked = true
+            peer.releaseFirst(error:UserFacingError(message:"Controlled persistence failure"))
+            try await eventually { !store.savingNetwork }
+            try expect(store.networkBlocked && !store.canChangeTransfers && store.canRestartForEncryption,"Save failure reopened transfers or blocked recovery")
+            try expect(peer.commands("shutdown").isEmpty && store.error != nil,"Save failure silently restarted")
+        }
+
+        try await check("Blocked startup can save protection before trying to start transfers") {
+            let (store, peer) = library(); store.connected = false
+            let policy = NetworkPolicy(interface:NetworkInterface(name:"utun9",index:43,addresses:["10.9.0.2"]),dnsServer:"10.9.0.1")
+            store.saveNetworkPolicy(policy)
+            try await eventually { !store.savingNetwork && store.connected }
+            let commands = peer.requests.map(\.command)
+            try expect(commands.firstIndex(of:"networkPolicy")! < commands.firstIndex(of:"connect")!,"Offline recovery started transfers before saving")
+            try expect(peer.activeNetworkPolicy == policy,"Offline recovery lost the selected protection")
+        }
+
         try await check("Reannounce skips inactive transfers and preserves captured targets") {
             let (store, peer) = library()
             peer.torrents[0].state = "waiting"; peer.torrents[0].pausedIntent = false; peer.torrents[0].canReannounce = true
@@ -1234,6 +1267,9 @@ import SwiftUI
     var failConnect = false
     var missingDetails = false
     var instanceId = "fixture"
+    var savedNetworkPolicy = NetworkPolicy()
+    var activeNetworkPolicy = NetworkPolicy()
+    var networkBlocked = false
     func connect(background: Bool) throws {
         connections.append(background)
         if failConnect { throw UserFacingError(message:"Engine connection unavailable.") }
@@ -1255,9 +1291,14 @@ import SwiftUI
     }
     private func reply(to request: EngineRequest) -> EngineReply {
         switch request.command {
+        case "networkInfo": return EngineReply(networkInfo:NetworkInfo(saved:savedNetworkPolicy,active:activeNetworkPolicy,interfaces:[],blocked:networkBlocked))
+        case "networkPolicy":
+            savedNetworkPolicy = request.networkPolicy ?? savedNetworkPolicy; networkBlocked = true
+            return EngineReply(networkInfo:NetworkInfo(saved:savedNetworkPolicy,active:activeNetworkPolicy,interfaces:[],blocked:true))
         case "connect", "snapshot":
+            if request.command == "connect" { activeNetworkPolicy = savedNetworkPolicy; networkBlocked = false }
             if request.command == "connect" && stopped { peerEncryption = savedPeerEncryption; stopped = false }
-            return EngineReply(snapshot:LibrarySnapshot(protocolVersion:UInt32(SeedHopIdentity.protocolVersion),engineVersion:"test",instanceId:instanceId,listenPort:0,downloadLimit:alternativeLimitsEnabled ? alternativeDownloadLimit : normalDownloadLimit,uploadLimit:alternativeLimitsEnabled ? alternativeUploadLimit : normalUploadLimit,maxActiveDownloads:maxActiveDownloads,torrents:torrents,fileOperation:fileOperation,storageRecovery:storageRecovery,peerEncryption:peerEncryption,savedPeerEncryption:savedPeerEncryption,schedule:schedule,normalDownloadLimit:normalDownloadLimit,normalUploadLimit:normalUploadLimit,alternativeDownloadLimit:alternativeDownloadLimit,alternativeUploadLimit:alternativeUploadLimit,alternativeLimitsEnabled:alternativeLimitsEnabled))
+            return EngineReply(snapshot:LibrarySnapshot(protocolVersion:UInt32(SeedHopIdentity.protocolVersion),engineVersion:"test",instanceId:instanceId,listenPort:0,downloadLimit:alternativeLimitsEnabled ? alternativeDownloadLimit : normalDownloadLimit,uploadLimit:alternativeLimitsEnabled ? alternativeUploadLimit : normalUploadLimit,maxActiveDownloads:maxActiveDownloads,torrents:torrents,fileOperation:fileOperation,storageRecovery:storageRecovery,peerEncryption:peerEncryption,savedPeerEncryption:savedPeerEncryption,networkBlocked:networkBlocked,networkInterface:activeNetworkPolicy.interface?.name,schedule:schedule,normalDownloadLimit:normalDownloadLimit,normalUploadLimit:normalUploadLimit,alternativeDownloadLimit:alternativeDownloadLimit,alternativeUploadLimit:alternativeUploadLimit,alternativeLimitsEnabled:alternativeLimitsEnabled))
         case "torrentDetails":
             guard !missingDetails, let item = torrents.first(where:{ $0.id == request.id }) else { return EngineReply() }
             var details = PreviewFixtures.diagnostics(item,section:request.section ?? "general")

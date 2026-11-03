@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/ikatson/librqbit-utp",
+  "revision": "c26f57b2debbe35ed0ace1ad419de529f7a5bf95",
+  "version": "0.7.0",
+  "crateChecksum": "4f3bfdc73944bc76cab24d5690a98816770040a654c449edf5ff2b9ba22626aa",
+  "modifiedFiles": [
+    "Cargo.toml",
+    "src/congestion/cubic.rs"
+  ],
+  "change": "Require ringbuf 0.5.2 to address RUSTSEC-2026-0293. Remove an obsolete std::f64 import without changing Cubic behavior."
+}

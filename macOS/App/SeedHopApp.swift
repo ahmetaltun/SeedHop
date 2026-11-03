@@ -4,14 +4,24 @@ import Combine
 @main struct SeedHopApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var store = SeedHopApp.makeStore()
-    @State private var localization = AppLocalization.shared
+    @State private var localization: AppLocalization = {
+        #if SEEDHOP_DEVELOPMENT
+        PreferenceTransfer.prepareAtLaunch()
+        #endif
+        return AppLocalization.shared
+    }()
     @MainActor private static func makeStore() -> LibraryStore {
         #if SEEDHOP_DEVELOPMENT
+        PreferenceTransfer.prepareAtLaunch()
         if ProcessInfo.processInfo.arguments.contains("--verify-desktop-integration") || ProcessInfo.processInfo.arguments.contains("--verify-localization") || ProcessInfo.processInfo.arguments.contains("--verify-live-language") || ProcessInfo.processInfo.arguments.contains("--verify-menus") || ProcessInfo.processInfo.arguments.contains("--render-localizations") { return LibraryStore(designPreview:true) }
         if ProcessInfo.processInfo.arguments.contains("--verify-performance") { return PerformanceSelfTest.fixtureStore() }
         if ProcessInfo.processInfo.arguments.contains("--verify-interface") { return UXSelfTest.nativeFixture() }
         #endif
-        return LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--verify-workspace-layout") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine") || ProcessInfo.processInfo.arguments.contains("--verify-ux") || ProcessInfo.processInfo.arguments.contains("--verify-interface") || ProcessInfo.processInfo.arguments.contains("--verify-lifecycle") || ProcessInfo.processInfo.arguments.contains("--verify-storage-recovery"))
+        let store = LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--verify-workspace-layout") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine") || ProcessInfo.processInfo.arguments.contains("--verify-ux") || ProcessInfo.processInfo.arguments.contains("--verify-interface") || ProcessInfo.processInfo.arguments.contains("--verify-network-security") || ProcessInfo.processInfo.arguments.contains("--verify-lifecycle") || ProcessInfo.processInfo.arguments.contains("--verify-storage-recovery"))
+        #if SEEDHOP_DEVELOPMENT
+        if PreferenceTransfer.startupFailed { store.error = String(localized:"Settings could not be updated. Your saved settings have been preserved.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        #endif
+        return store
     }
     var body: some Scene {
         WindowGroup("SeedHop",id:"library",for:String.self) { _ in
@@ -183,6 +193,10 @@ struct LibraryNavigationCommands: Commands {
         }
         #endif
         #if SEEDHOP_VALIDATION
+        if ProcessInfo.processInfo.arguments.contains("--verify-network-security") {
+            Task { do { try await NetworkSecuritySelfTest.run(); exit(0) } catch { fputs("Network security verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--verify-lifecycle") {
             Task { do { try await LifecycleSelfTest.run(); exit(0) } catch { fputs("Lifecycle verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
             return

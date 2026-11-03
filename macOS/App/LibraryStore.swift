@@ -56,6 +56,11 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     @Published var peerRates: [String:PeerRate] = [:]
     var history: [String:[TrafficSample]] = [:]
     @Published var events: [String:[TransferEvent]] = [:]
+    @Published private(set) var clearingActivity = false
+    @Published private(set) var statisticsRetention: StatisticsRetentionInfo?
+    @Published private(set) var savingStatisticsRetention = false
+    private var activityEpoch: UInt64 = 0
+    private var activityClearedThrough: UInt64?
     @Published private(set) var engineInstance = ""
     private var detailsContext = UUID()
     private var detailsInFlight = false
@@ -104,10 +109,15 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     @Published var peerEncryption: PeerEncryptionPolicy?
     @Published var savedPeerEncryption: PeerEncryptionPolicy?
     @Published private(set) var savingEncryption = false
+    @Published var networkBlocked = false
+    @Published var networkInterface: String?
+    @Published var networkInfo: NetworkInfo?
+    @Published var savingNetwork = false
     @Published var listenPort: UInt16 = 0
     @Published var backgroundEnabled = UserDefaults.standard.bool(forKey:"backgroundEnabled")
     @Published var resumeAtLogin = UserDefaults.standard.bool(forKey:"resumeAtLogin")
     @Published var downloadDirectory = UserDefaults.standard.string(forKey:"downloadDirectory") ?? FileManager.default.urls(for:.downloadsDirectory,in:.userDomainMask)[0].path
+    @Published var notificationDetails = UserDefaults.standard.bool(forKey:"notificationDetails")
     @Published var completionNotifications = UserDefaults.standard.object(forKey:"completionNotifications") as? Bool ?? false
     private(set) var updatePrepared = false
     let designPreview: Bool
@@ -296,12 +306,41 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         return parts.isEmpty ? String(localized:"Waiting for a transfer update.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : parts.joined(separator:" · ")
     }
     var hasFileOperation: Bool { fileOperation != nil || !storageRequests.isEmpty || resolvingStorageRecovery }
-    var canChangeTransfers: Bool { connected && !switching && !designPreview && !hasFileOperation }
+    var canChangeTransfers: Bool { connected && !networkBlocked && !savingNetwork && !switching && !designPreview && !hasFileOperation }
 
-    var encryptionRestartPending: Bool { peerEncryption != nil && savedPeerEncryption != nil && peerEncryption != savedPeerEncryption }
+    var encryptionRestartPending: Bool { networkBlocked || (peerEncryption != nil && savedPeerEncryption != nil && peerEncryption != savedPeerEncryption) }
     var canSaveEncryption: Bool { canChangeTransfers && !savingEncryption && savedPeerEncryption != nil }
-    var canRestartForEncryption: Bool { canChangeTransfers && encryptionRestartPending && !savingEncryption && !savingSchedule && !savingBandwidth && busyTransfers.isEmpty && !savingQueue && !showImport }
+    var canRestartForEncryption: Bool { connected && !switching && !designPreview && !hasFileOperation && encryptionRestartPending && !savingEncryption && !savingSchedule && !savingBandwidth && busyTransfers.isEmpty && !savingQueue && !showImport }
     var connectionPortDescription: String { !connected ? String(localized:"Unavailable while disconnected",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : listenPort == 0 ? String(localized:"No listening port reported",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(listenPort) }
+    func refreshNetworkInfo() async {
+        guard !designPreview, !switching else { return }
+        do {
+            let next = try await client.send(EngineRequest(command:"networkInfo")).networkInfo
+            if networkInfo != next { networkInfo = next }
+            if let info = networkInfo {
+                let blocked = info.blocked && (info.active != nil || info.saved == nil || info.saved?.interface != nil)
+                if networkBlocked != blocked { networkBlocked = blocked }
+            }
+        } catch { self.error = error.localizedDescription }
+    }
+    func saveNetworkPolicy(_ policy: NetworkPolicy) {
+        guard !savingNetwork, !switching, !hasFileOperation, !showImport, !savingEncryption, !savingSchedule, !savingBandwidth, !savingQueue, busyTransfers.isEmpty else { return }
+        savingNetwork = true; error = nil
+        Task {
+            defer { savingNetwork = false }
+            do {
+                var request = EngineRequest(command:"networkPolicy"); request.networkPolicy = policy
+                networkInfo = try await client.send(request).networkInfo
+                networkBlocked = networkInfo?.blocked ?? true
+                if connected { restartForEncryption() }
+                else { await start() }
+            } catch {
+                self.error = error.localizedDescription
+                await refreshNetworkInfo()
+                if let info = networkInfo { networkBlocked = info.blocked }
+            }
+        }
+    }
     func saveEncryption(_ policy: PeerEncryptionPolicy) {
         guard canSaveEncryption else { return }
         savingEncryption = true; error = nil
@@ -343,7 +382,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
 
     func start() async {
-        guard !designPreview, !connected, !connecting, !switching else { return }
+        guard !designPreview, !connected, !connecting, !switching, !clearingActivity, !savingStatisticsRetention else { return }
         connecting = true; defer { connecting = false }
         if UserDefaults.standard.bool(forKey:"updateRestoreBackground") {
             let service = SMAppService.agent(plistName:SeedHopIdentity.agentPlist)
@@ -404,7 +443,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
             var notified = Set(UserDefaults.standard.stringArray(forKey:"completedTorrents") ?? [])
             for item in snapshot.torrents where item.state == "seeding" && !notified.contains(item.id) {
                 if let previous = torrents.first(where:{$0.id == item.id}), previous.downloadedBytes < previous.totalBytes {
-                    let content = UNMutableNotificationContent(); content.title = String(localized:"Your files are ready",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); content.body = item.name; content.sound = .default
+                    let content = UNMutableNotificationContent(); content.title = String(localized:"Your files are ready",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); content.body = notificationDetails ? item.name : String(localized:"Open SeedHop to view the completed transfer.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); content.sound = .default
                     UNUserNotificationCenter.current().add(UNNotificationRequest(identifier:item.id,content:content,trigger:nil))
                     notified.insert(item.id)
                 }
@@ -429,6 +468,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         if normalUploadLimit != normalUp { normalUploadLimit = normalUp }
         if downloadLimit != snapshot.downloadLimit { downloadLimit = snapshot.downloadLimit }
         if uploadLimit != snapshot.uploadLimit { uploadLimit = snapshot.uploadLimit }
+        if networkBlocked != (snapshot.networkBlocked ?? false) { networkBlocked = snapshot.networkBlocked ?? false }
+        if networkInterface != snapshot.networkInterface { networkInterface = snapshot.networkInterface }
         if peerEncryption != snapshot.peerEncryption { peerEncryption = snapshot.peerEncryption }
         if savedPeerEncryption != snapshot.savedPeerEncryption { savedPeerEncryption = snapshot.savedPeerEncryption }
         if listenPort != snapshot.listenPort { listenPort = snapshot.listenPort }
@@ -442,6 +483,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
     func clearFilters() { search = ""; trackerHost = ""; filter = .all }
     private func recordActivity(_ snapshot: LibrarySnapshot) {
+        guard !clearingActivity else { return }
         let date = Date()
         let liveIDs = Set(snapshot.torrents.map(\.id))
         for item in snapshot.torrents {
@@ -466,6 +508,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         if Set(history.keys) != liveIDs { history = history.filter { liveIDs.contains($0.key) }; events = events.filter { liveIDs.contains($0.key) } }
     }
     private func appendEvent(_ id: String, message: String) {
+        guard !clearingActivity else { return }
         var rows = events[id] ?? []; rows.append(TransferEvent(message:message))
         if rows.count > 200 { rows.removeFirst(rows.count - 200) }; events[id] = rows
     }
@@ -476,15 +519,16 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
             if connected && !switching && !detailsInFlight && NSApp.windows.contains(where:{ $0.isVisible && $0.title == "SeedHop" }) {
                 detailsInFlight = true
                 let instance = engineInstance
+                let eventEpoch = activityEpoch
                 do {
                     var request = EngineRequest(command:"torrentDetails"); request.id = id; request.section = section; request.allPeers = allPeers
                     let reply = try await client.send(request)
                     guard let value = reply.details else { throw UserFacingError(message:String(localized:"The engine did not return transfer details. Try again.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
-                    if !Task.isCancelled && detailsContext == token && instance == engineInstance && showInspector && selection == [id], value.torrentId == id && value.instanceId == instance && value.section == section {
+                    if !Task.isCancelled && !clearingActivity && eventEpoch == activityEpoch && detailsContext == token && instance == engineInstance && showInspector && selection == [id], value.torrentId == id && value.instanceId == instance && value.section == section {
                         applyDetails(value); if detailsError != nil { detailsError = nil }
                     }
                 } catch {
-                    if !Task.isCancelled && detailsContext == token && detailsError != error.localizedDescription { detailsError = error.localizedDescription }
+                    if !Task.isCancelled && !clearingActivity && eventEpoch == activityEpoch && detailsContext == token && detailsError != error.localizedDescription { detailsError = error.localizedDescription }
                 }
                 detailsInFlight = false
             }
@@ -492,6 +536,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         }
     }
     private func applyDetails(_ value: TorrentDetails) {
+        var value = value
+        if let cutoff = activityClearedThrough { value.events = value.events?.filter { $0.timestamp > cutoff } }
         let now = ProcessInfo.processInfo.systemUptime
         var rates: [String:PeerRate] = [:], next: [String:(UInt64,UInt64,TimeInterval)] = [:]
         for peer in value.peers {
@@ -510,6 +556,83 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         }
         if details != value { details = value }
     }
+    #if SEEDHOP_DEVELOPMENT
+    private func sendStatisticsRequest(_ request: EngineRequest) async throws -> EngineReply {
+        if connected { return try await client.send(request) }
+        // A temporary foreground helper can edit library policy without invoking
+        // a background agent's automatic network restoration.
+        let offline = EngineClient()
+        try offline.connect(background: false)
+        defer { offline.invalidate() }
+        return try await offline.send(request)
+    }
+
+    func refreshStatisticsRetention() async {
+        guard !designPreview, !WorkspacePreferences.isFixture, !switching, !connecting, !savingStatisticsRetention else { return }
+        do {
+            let value = try await sendStatisticsRequest(EngineRequest(command:"statisticsInfo")).statisticsRetention
+            if statisticsRetention != value { statisticsRetention = value }
+        } catch { statisticsRetention = nil; self.error = error.localizedDescription }
+    }
+
+    func saveStatisticsRetention(_ remember: Bool) async {
+        guard !designPreview, !WorkspacePreferences.isFixture, !switching, !connecting,
+              !savingStatisticsRetention, !clearingActivity, !hasFileOperation,
+              !savingNetwork, !savingEncryption else { return }
+        savingStatisticsRetention = true
+        error = nil
+        defer { savingStatisticsRetention = false }
+        var request = EngineRequest(command:"statisticsRetention"); request.rememberStatistics = remember
+        do {
+            let value = try await sendStatisticsRequest(request).statisticsRetention
+            if statisticsRetention != value { statisticsRetention = value }
+        } catch {
+            self.error = error.localizedDescription
+            // A durable choice can precede a failed purge. Reflect the readable
+            // pending state instead of showing an optimistic success or stale toggle.
+            if let reply = try? await sendStatisticsRequest(EngineRequest(command:"statisticsInfo")) {
+                statisticsRetention = reply.statisticsRetention
+            } else { statisticsRetention = nil }
+        }
+        if connected { await refresh() }
+    }
+
+    var canClearLocalActivity: Bool {
+        !designPreview && !WorkspacePreferences.isFixture && !clearingActivity &&
+            !savingStatisticsRetention && !connecting && !switching && !hasFileOperation && busyTransfers.isEmpty
+    }
+
+    /// Clear volatile activity and app-owned presentation records. A failed engine
+    /// acknowledgement is reported separately from successful local clearing.
+    func clearLocalActivity() async -> Bool? {
+        guard canClearLocalActivity else { return nil }
+        let hasConnectedEngine = connected
+        clearingActivity = true
+        activityEpoch &+= 1
+        activityClearedThrough = UInt64(max(0, Date().timeIntervalSince1970))
+        history = [:]; events = [:]; details = nil; detailsError = nil
+        peerRates = [:]; peerBaselines = [:]
+        reconnect?.cancel(); reconnect = nil
+        NSDocumentController.shared.clearRecentDocuments(nil)
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        defer {
+            activityEpoch &+= 1
+            if !hasConnectedEngine {
+                reconnect?.cancel(); reconnect = nil
+            }
+            clearingActivity = false
+        }
+        // An offline background connection can activate login restoration. Do
+        // not open one for privacy clearing; report the engine state unconfirmed.
+        guard hasConnectedEngine else { return false }
+        do {
+            _ = try await client.send(EngineRequest(command:"clearActivity"))
+            return true
+        } catch { return false }
+    }
+    #endif
+
     func diagnosticReport(_ torrent: TorrentItem) -> String {
         // Export only allowlisted fields. Remote strings, paths, hashes and endpoints stay out.
         let value = details?.torrentId == torrent.id ? details : nil
@@ -785,6 +908,10 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         panel.directoryURL = URL(fileURLWithPath:item.destination)
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
+            #if SEEDHOP_SANDBOX
+            do { try FolderAccessStore.application.remember(url) }
+            catch { self.error = EngineMessage(code:FolderAccessFailure.noticeCode(for:error)).localizedDescription; return }
+            #endif
             var request = EngineRequest(command:"relocate"); request.id = item.id; request.destination = url.path
             self.updateTransfer(request)
         }

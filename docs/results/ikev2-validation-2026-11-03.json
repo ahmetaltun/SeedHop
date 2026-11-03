@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-03",
+  "protocol": "IKEv2",
+  "interface": "ipsec0",
+  "status": "Functional checks passed; bounded capture evidence, not comprehensive leak certification",
+  "authorization": "User authorized real testing and manually disconnected/reconnected the same VPN twice.",
+  "isolation": {
+    "library": "Temporary library under .build/ikev2-test; production library and preferences untouched",
+    "torrent": "Official Debian 13.7.0 arm64 netinst torrent",
+    "downloadLimitBytesPerSecond": 262144,
+    "uploadLimitBytesPerSecond": 32768,
+    "discovery": true,
+    "allowLocalNetwork": false,
+    "dns": "1.1.1.1 via interface-bound TCP; not the system loopback resolver",
+    "execution": "Native Rust engine; real IKEv2 test did not exercise the signed XPC/UI path"
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "downloadedBeforeBlockBytes": 11698176,
+      "disconnectDetected": true,
+      "offlineStartupRejected": true,
+      "explicitRestartResumedPayload": true,
+      "probeSourceSha256": "e28438418b297444d8ecfa410fdf5d66fc2a26d3d29e1714cef4306bf0dd9891",
+      "log": ".build/ikev2-test/probe.log"
+    },
+    {
+      "round": 2,
+      "downloadedBeforeBlockBytes": 9732096,
+      "disconnectDetected": true,
+      "offlineStartupRejected": true,
+      "explicitRestartResumedPayload": true,
+      "probeSourceSha256": "9850e0c762c94a386b93b30c6e27b39f52ef44578ccdd5bf1a204b6e0442e9c1",
+      "log": ".build/ikev2-test/round2/probe.log"
+    }
+  ],
+  "capture": {
+    "round": 2,
+    "method": "64-byte snaplen captures on physical en0 and tunnel ipsec0; engine sockets sampled approximately every 0.5 seconds",
+    "physical": {
+      "parsedTransportPackets": 36064,
+      "ipv6TransportPackets": 0,
+      "matchedEngineTcpPackets": 0,
+      "matchedEngineUdpSourcePortPackets": 0,
+      "packetsWithEngineSourceAddress": 0,
+      "matchedAfterBlock": 0,
+      "tcpDnsPacketsToConfiguredResolver": 0,
+      "udpDnsPacketsToConfiguredResolver": 121,
+      "udpDnsRequestPacketsWhileBlocked": 89,
+      "udpDnsReplyPacketsWhileBlocked": 83
+    },
+    "tunnel": {
+      "parsedTransportPackets": 23392,
+      "ipv6TransportPackets": 0,
+      "matchedEngineTcpPackets": 6124,
+      "matchedEngineUdpSourcePortPackets": 1545,
+      "packetsWithEngineSourceAddress": 9664,
+      "matchedAfterBlock": 0,
+      "tcpDnsPacketsToConfiguredResolver": 14,
+      "udpDnsPacketsToConfiguredResolver": 0
+    },
+    "sampledEngineTcpEndpoints": 344,
+    "sampledEngineUdpPorts": 6,
+    "kernelDroppedPacketsReported": {
+      "physical": 0,
+      "tunnel": 0
+    },
+    "tunnelCaptureEnded": "Interface disappeared at disconnect; no tunnel capture of the reconnect stage",
+    "physicalCaptureSpanned": "Connected download, disconnect, blocked interval, reconnect and resumed download",
+    "interpretation": "No physical packets matched sampled engine TCP endpoints or UDP local ports. Tunnel capture contained matching engine traffic and bound TCP DNS. Other physical UDP DNS traffic was observed and cannot be process-attributed with this capture method.",
+    "rawCaptureLocation": ".build/ikev2-test; retained locally, not committed"
+  },
+  "fix": {
+    "problem": "The Settings picker filtered only utun interfaces and hid the active IKEv2 ipsec0 interface",
+    "change": "Include utun and ipsec interfaces",
+    "nativeBuild": "passed",
+    "nativePresentationRegressions": "70 checks passed"
+  },
+  "limitations": [
+    "Process-filtered pktap capture failed with Operation not permitted. Basic physical/tunnel captures succeeded.",
+    "The first round lacks a valid pre-disconnect capture; do not use it for leak claims.",
+    "Socket sampling can miss short-lived connections, especially before sampling began. Captures are supporting evidence, not exhaustive process attribution.",
+    "Only IPv4 traffic was observed; IPv6 was not validated.",
+    "Kill-switch and split-tunnel policy were not independently established. Physical DNS request/reply traffic continued while the engine was blocked, but this does not prove every direct path was available.",
+    "Sleep/wake, network switching, interface reuse and VPN failures that leave the interface present remain untested.",
+    "Real-network native UI interaction and signed-XPC integration remain separate from these core-engine checks."
+  ],
+  "finalState": {
+    "vpn": "User reconnected; test resumed payload before exiting",
+    "engine": "Both isolated probe runs exited successfully",
+    "captures": "Stopped",
+    "temporaryIntegrationTest": "Archived under .build, outside automatic Cargo test discovery",
+    "changes": "Uncommitted"
+  }
+}

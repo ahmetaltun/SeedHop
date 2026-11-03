@@ -8975,6 +8975,89 @@
         }
       }
     },
+    "Allow local trackers and peers": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokale Tracker und Peers erlauben"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow local trackers and peers"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permitir rastreadores y pares locales"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autoriser les trackers et pairs locaux"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consenti tracker e peer locali"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ローカルトラッカーとピアを許可"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로컬 트래커 및 피어 허용"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zezwalaj na lokalne trackery i peery"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permitir rastreadores e pares locais"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Разрешить локальные трекеры и пиры"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yerel izleyicilere ve eşlere izin ver"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дозволити локальні трекери й піри"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许本地 Tracker 和节点"
+          }
+        }
+      }
+    },
     "Also delete downloaded files": {
       "comment": "SeedHop removal confirmation. Deleting downloaded files is destructive; the checkbox is unchecked for every new removal request.",
       "localizations": {
@@ -10300,6 +10383,255 @@
           "stringUnit": {
             "state": "translated",
             "value": "外观更改会立即生效。"
+          }
+        }
+      }
+    },
+    "Apply and restart engine": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anwenden und Engine neu starten"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply and restart engine"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aplicar y reiniciar el motor"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appliquer et redémarrer le moteur"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applica e riavvia il motore"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "適用してエンジンを再起動"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "적용하고 엔진 재시작"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zastosuj i uruchom silnik ponownie"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aplicar e reiniciar o mecanismo"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Применить и перезапустить движок"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uygula ve motoru yeniden başlat"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Застосувати й перезапустити рушій"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用并重启引擎"
+          }
+        }
+      }
+    },
+    "Applying stops existing connections before saving. If the connection changes or disappears, transfers stay blocked until you review Settings and restart. Updates use a separate connection.": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beim Anwenden werden bestehende Verbindungen vor dem Speichern beendet. Ändert sich die Verbindung oder fällt sie aus, bleiben Übertragungen gesperrt, bis du die Einstellungen prüfst und neu startest. Updates verwenden eine separate Verbindung."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applying stops existing connections before saving. If the connection changes or disappears, transfers stay blocked until you review Settings and restart. Updates use a separate connection."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Al aplicar, se cierran las conexiones existentes antes de guardar. Si la conexión cambia o desaparece, las transferencias permanecen bloqueadas hasta que revises Ajustes y reinicies. Las actualizaciones usan otra conexión."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’application de ce choix ferme les connexions existantes avant l’enregistrement. Si la connexion change ou disparaît, les transferts restent bloqués jusqu’à la vérification des réglages et au redémarrage. Les mises à jour utilisent une connexion distincte."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’applicazione chiude le connessioni esistenti prima del salvataggio. Se la connessione cambia o scompare, i trasferimenti restano bloccati finché non controlli le impostazioni e riavvii. Gli aggiornamenti usano una connessione separata."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "適用すると、保存前に既存の接続が終了します。接続が変更または切断された場合、設定を確認して再起動するまで転送はブロックされます。アップデートには別の接続を使用します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "적용하면 저장 전에 기존 연결이 종료됩니다. 연결이 변경되거나 사라지면 설정을 확인하고 재시작할 때까지 전송이 차단됩니다. 업데이트는 별도 연결을 사용합니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zastosowanie zamyka istniejące połączenia przed zapisaniem. Jeśli połączenie zmieni się lub zniknie, transfery pozostaną zablokowane do sprawdzenia ustawień i ponownego uruchomienia. Aktualizacje używają osobnego połączenia."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ao aplicar, as conexões existentes são encerradas antes de salvar. Se a conexão mudar ou desaparecer, as transferências permanecerão bloqueadas até você revisar os ajustes e reiniciar. As atualizações usam uma conexão separada."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перед сохранением существующие соединения закрываются. Если соединение изменится или исчезнет, передачи останутся заблокированными до проверки настроек и перезапуска. Обновления используют отдельное соединение."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uygulama, kaydetmeden önce mevcut bağlantıları kapatır. Bağlantı değişir veya kaybolursa Ayarlar’ı inceleyip yeniden başlatana kadar aktarımlar engellenir. Güncellemeler ayrı bir bağlantı kullanır."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перед збереженням наявні з’єднання закриваються. Якщо з’єднання зміниться або зникне, передавання залишатимуться заблокованими до перевірки налаштувань і перезапуску. Оновлення використовують окреме з’єднання."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用时会先关闭现有连接，再保存设置。如果连接发生变化或消失，传输将保持阻止状态，直到您检查设置并重启。更新使用单独的连接。"
+          }
+        }
+      }
+    },
+    "Approve the folders SeedHop can use. Import your previous library before choosing download folders.": {
+      "comment": "SeedHop sandbox development UI. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erlaube SeedHop den Zugriff auf die gewünschten Ordner. Importiere deine bisherige Mediathek, bevor du Downloadordner auswählst."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approve the folders SeedHop can use. Import your previous library before choosing download folders."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autoriza las carpetas que SeedHop puede usar. Importa tu biblioteca anterior antes de elegir las carpetas de descarga."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisez les dossiers que SeedHop peut utiliser. Importez votre ancienne bibliothèque avant de choisir les dossiers de téléchargement."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorizza le cartelle che SeedHop può usare. Importa la libreria precedente prima di scegliere le cartelle dei download."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SeedHopが使用できるフォルダを許可してください。ダウンロード先を選ぶ前に、以前のライブラリを読み込んでください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SeedHop이 사용할 폴더를 승인하세요. 다운로드 폴더를 선택하기 전에 이전 라이브러리를 가져오세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zatwierdź foldery, których może używać SeedHop. Zaimportuj poprzednią bibliotekę przed wybraniem folderów pobierania."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorize as pastas que o SeedHop pode usar. Importe sua biblioteca anterior antes de escolher as pastas de download."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Разрешите SeedHop использовать выбранные папки. Импортируйте прежнюю библиотеку перед выбором папок загрузки."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SeedHop’un kullanabileceği klasörlere izin verin. İndirme klasörlerini seçmeden önce önceki arşivinizi içe aktarın."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дозвольте SeedHop використовувати вибрані папки. Імпортуйте попередню бібліотеку перед вибором папок завантаження."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "批准 SeedHop 可以使用的文件夹。请先导入原有资料库，再选择下载文件夹。"
           }
         }
       }
@@ -13058,6 +13390,89 @@
         }
       }
     },
+    "Choose a folder again to repair damaged access records. Recoverable approvals are kept, and damaged data is backed up first.": {
+      "comment": "SeedHop sandbox folder-access recovery. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wähle einen Ordner erneut aus, um beschädigte Zugriffsdaten zu reparieren. Wiederherstellbare Freigaben bleiben erhalten; beschädigte Daten werden zuerst gesichert."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a folder again to repair damaged access records. Recoverable approvals are kept, and damaged data is backed up first."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vuelve a elegir una carpeta para reparar los registros de acceso dañados. Se conservan las autorizaciones recuperables y primero se guarda una copia de los datos dañados."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez à nouveau un dossier pour réparer les données d’accès endommagées. Les autorisations récupérables sont conservées et les données endommagées sont d’abord sauvegardées."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli di nuovo una cartella per riparare i dati di accesso danneggiati. Le autorizzazioni recuperabili vengono conservate e i dati danneggiati vengono prima salvati in una copia di sicurezza."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フォルダを再度選択すると、破損したアクセス記録を修復できます。復旧可能な許可は保持され、破損したデータは先にバックアップされます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더를 다시 선택하여 손상된 접근 기록을 복구하세요. 복구 가능한 승인은 유지되며 손상된 데이터는 먼저 백업됩니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wybierz folder ponownie, aby naprawić uszkodzone dane dostępu. Zachowywane są możliwe do odzyskania uprawnienia, a uszkodzone dane są najpierw kopiowane do kopii zapasowej."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha uma pasta novamente para reparar os registros de acesso danificados. As autorizações recuperáveis são mantidas e os dados danificados são copiados primeiro para um backup."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите папку повторно, чтобы исправить повреждённые записи доступа. Восстановимые разрешения сохраняются, а повреждённые данные сначала копируются в резервную копию."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hasarlı erişim kayıtlarını onarmak için klasörü yeniden seçin. Kurtarılabilir izinler korunur ve hasarlı veriler önce yedeklenir."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Виберіть папку повторно, щоб виправити пошкоджені записи доступу. Відновлювані дозволи зберігаються, а для пошкоджених даних спочатку створюється резервна копія."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新选择文件夹以修复损坏的访问记录。可恢复的授权将被保留，损坏的数据会先备份。"
+          }
+        }
+      }
+    },
     "Choose a folder for %@. Files will be verified after moving.": {
       "comment": "SeedHop macOS UI (LibraryStore.swift). Preserve placeholder types and positions; use positional placeholders when reordering. Text arguments may be verbatim user names, paths, or formatted quantities.",
       "localizations": {
@@ -14137,6 +14552,89 @@
         }
       }
     },
+    "Choose your download folders in Settings to allow access. Your library has been preserved.": {
+      "comment": "SeedHop sandbox development UI. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wähle deine Downloadordner in den Einstellungen aus, um den Zugriff zu erlauben. Deine Mediathek bleibt erhalten."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose your download folders in Settings to allow access. Your library has been preserved."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige tus carpetas de descarga en Ajustes para permitir el acceso. Tu biblioteca se ha conservado."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez vos dossiers de téléchargement dans Réglages pour autoriser l’accès. Votre bibliothèque a été conservée."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli le cartelle dei download in Impostazioni per autorizzare l’accesso. La libreria è stata conservata."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アクセスを許可するには、設定でダウンロード先のフォルダを選んでください。ライブラリは保持されています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "접근을 허용하려면 설정에서 다운로드 폴더를 선택하세요. 라이브러리는 유지되었습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wybierz foldery pobierania w Ustawieniach, aby zezwolić na dostęp. Biblioteka została zachowana."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha suas pastas de download nos Ajustes para permitir o acesso. Sua biblioteca foi preservada."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите папки загрузки в настройках, чтобы разрешить доступ. Ваша библиотека сохранена."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erişime izin vermek için Ayarlar’dan indirme klasörlerinizi seçin. Arşiviniz korundu."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Виберіть папки завантаження в налаштуваннях, щоб дозволити доступ. Вашу бібліотеку збережено."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在设置中选择下载文件夹以允许访问。您的资料库已保留。"
+          }
+        }
+      }
+    },
     "Choose…": {
       "comment": "SeedHop macOS UI (ImportView.swift, SettingsView.swift).",
       "localizations": {
@@ -14386,6 +14884,89 @@
         }
       }
     },
+    "Clear": {
+      "comment": "SeedHop development local-activity privacy controls. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Löschen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borrar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancella"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "消去"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지우기"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wyczyść"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limpar"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Очистить"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Temizle"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Очистити"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除"
+          }
+        }
+      }
+    },
     "Clear Filters": {
       "comment": "SeedHop macOS UI (LibraryView.swift).",
       "localizations": {
@@ -14465,6 +15046,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "清除筛选条件"
+          }
+        }
+      }
+    },
+    "Clear Local Activity…": {
+      "comment": "SeedHop development local-activity privacy controls. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokale Aktivität löschen…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Local Activity…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borrar actividad local…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer l’activité locale…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancella attività locale…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ローカルのアクティビティを消去…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로컬 활동 지우기…"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wyczyść aktywność lokalną…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limpar atividade local…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Очистить локальную активность…"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yerel Etkinliği Temizle…"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Очистити локальну активність…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除本地活动…"
           }
         }
       }
@@ -14631,6 +15295,172 @@
           "stringUnit": {
             "state": "translated",
             "value": "清除文件搜索"
+          }
+        }
+      }
+    },
+    "Clear local activity?": {
+      "comment": "SeedHop development local-activity privacy controls. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokale Aktivität löschen?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear local activity?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Borrar la actividad local?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer l’activité locale ?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancellare l’attività locale?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ローカルのアクティビティを消去しますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로컬 활동을 지울까요?"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wyczyścić aktywność lokalną?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limpar atividade local?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Очистить локальную активность?"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yerel etkinlik temizlensin mi?"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Очистити локальну активність?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除本地活动？"
+          }
+        }
+      }
+    },
+    "Clear recent activity, traffic graphs, SeedHop recent items, and notifications. Downloads and saved library records are kept.": {
+      "comment": "SeedHop development local-activity privacy controls. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lösche letzte Aktivitäten, Verkehrsdiagramme, zuletzt verwendete SeedHop-Objekte und Mitteilungen. Downloads und gespeicherte Mediathekseinträge bleiben erhalten."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear recent activity, traffic graphs, SeedHop recent items, and notifications. Downloads and saved library records are kept."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borra la actividad reciente, los gráficos de tráfico, los ítems recientes de SeedHop y las notificaciones. Se conservan las descargas y los registros guardados de la biblioteca."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacez l’activité récente, les graphiques de trafic, les éléments récents de SeedHop et les notifications. Les téléchargements et les entrées enregistrées de la bibliothèque sont conservés."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancella le attività recenti, i grafici del traffico, gli elementi recenti di SeedHop e le notifiche. I download e le voci salvate nella libreria vengono mantenuti."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近のアクティビティ、通信量グラフ、SeedHopの最近使った項目、通知を消去します。ダウンロードと保存済みのライブラリ記録は保持されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "최근 활동, 트래픽 그래프, SeedHop 최근 항목 및 알림을 지웁니다. 다운로드와 저장된 라이브러리 기록은 유지됩니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wyczyść ostatnią aktywność, wykresy ruchu, ostatnie elementy SeedHop i powiadomienia. Pobrane pliki i zapisane wpisy biblioteki pozostaną."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limpe a atividade recente, os gráficos de tráfego, os itens recentes do SeedHop e as notificações. Os downloads e os registros salvos da biblioteca são mantidos."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Очистите недавнюю активность, графики трафика, недавние объекты SeedHop и уведомления. Загрузки и сохранённые записи библиотеки останутся."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son etkinlikleri, trafik grafiklerini, SeedHop son kullanılan öğelerini ve bildirimleri temizleyin. İndirilen dosyalar ve kayıtlı arşiv girdileri korunur."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Очистьте недавню активність, графіки трафіку, недавні об’єкти SeedHop і сповіщення. Завантаження та збережені записи бібліотеки залишаться."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除近期活动、流量图表、SeedHop 最近使用的项目和通知。下载文件及已保存的资料库记录将被保留。"
           }
         }
       }
@@ -16545,6 +17375,89 @@
         }
       }
     },
+    "Copy this library into SeedHop?": {
+      "comment": "SeedHop sandbox development UI. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Mediathek nach SeedHop kopieren?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy this library into SeedHop?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Copiar esta biblioteca a SeedHop?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copier cette bibliothèque dans SeedHop ?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copiare questa libreria in SeedHop?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このライブラリをSeedHopにコピーしますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 라이브러리를 SeedHop으로 복사할까요?"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skopiować tę bibliotekę do SeedHop?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copiar esta biblioteca para o SeedHop?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скопировать эту библиотеку в SeedHop?"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu arşiv SeedHop’a kopyalansın mı?"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скопіювати цю бібліотеку до SeedHop?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将此资料库复制到 SeedHop？"
+          }
+        }
+      }
+    },
     "Could not change limits": {
       "comment": "SeedHop macOS UI (BandwidthSettingsView.swift).",
       "localizations": {
@@ -17039,6 +17952,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "设计预览 · 示例数据"
+          }
+        }
+      }
+    },
+    "DNS server IP address": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "IP-Adresse des DNS-Servers"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DNS server IP address"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dirección IP del servidor DNS"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adresse IP du serveur DNS"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indirizzo IP del server DNS"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DNSサーバーのIPアドレス"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DNS 서버 IP 주소"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adres IP serwera DNS"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endereço IP do servidor DNS"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "IP-адрес DNS-сервера"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DNS sunucusunun IP adresi"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "IP-адреса DNS-сервера"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DNS 服务器 IP 地址"
           }
         }
       }
@@ -17869,6 +18865,172 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法刷新详细信息。正在显示上次观测结果。%@"
+          }
+        }
+      }
+    },
+    "Direct connection": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direkte Verbindung"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direct connection"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conexión directa"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connexion directe"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connessione diretta"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接接続"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "직접 연결"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Połączenie bezpośrednie"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conexão direta"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прямое соединение"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Doğrudan bağlantı"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пряме з’єднання"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接连接"
+          }
+        }
+      }
+    },
+    "Direct connection. Your network address is visible to peers.": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direkte Verbindung. Deine Netzwerkadresse ist für Peers sichtbar."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direct connection. Your network address is visible to peers."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conexión directa. Los pares pueden ver tu dirección de red."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connexion directe. Votre adresse réseau est visible par les pairs."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connessione diretta. Il tuo indirizzo di rete è visibile ai peer."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接接続です。ネットワークアドレスはピアに公開されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "직접 연결입니다. 피어에게 네트워크 주소가 표시됩니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Połączenie bezpośrednie. Twój adres sieciowy jest widoczny dla peerów."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conexão direta. Seu endereço de rede está visível para os pares."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прямое соединение. Ваш сетевой адрес виден пирам."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Doğrudan bağlantı. Ağ adresiniz eşler tarafından görülebilir."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пряме з’єднання. Вашу мережеву адресу видно пірам."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接连接。其他节点可以看到您的网络地址。"
           }
         }
       }
@@ -20197,6 +21359,89 @@
         }
       }
     },
+    "Earlier builds cannot open the library after this setting is changed.": {
+      "comment": "SeedHop development statistics retention. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ältere Builds können die Mediathek nach dieser Änderung nicht mehr öffnen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier builds cannot open the library after this setting is changed."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las compilaciones anteriores no podrán abrir la biblioteca tras cambiar esta opción."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les anciennes versions ne pourront plus ouvrir la bibliothèque après ce changement."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le build precedenti non potranno aprire la libreria dopo questa modifica."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この設定を変更すると、以前のビルドではライブラリを開けなくなります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 설정을 변경하면 이전 빌드에서는 라이브러리를 열 수 없습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Po zmianie tego ustawienia starsze kompilacje nie będą mogły otworzyć biblioteki."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compilações anteriores não poderão abrir a biblioteca após esta alteração."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "После этого изменения более ранние сборки не смогут открыть библиотеку."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu ayar değiştirildikten sonra önceki derlemeler arşivi açamaz."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Після цієї зміни попередні збірки не зможуть відкрити бібліотеку."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更改此设置后，旧版构建将无法打开此资料库。"
+          }
+        }
+      }
+    },
     "Enable weekly schedule": {
       "comment": "SeedHop macOS UI (SchedulingSettingsView.swift).",
       "localizations": {
@@ -20861,6 +22106,89 @@
         }
       }
     },
+    "Enter a DNS server reachable through your VPN. DNS uses this connection only, with no system fallback. Changing VPN addresses requires selecting the connection again.": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gib einen DNS-Server ein, der über dein VPN erreichbar ist. DNS verwendet nur diese Verbindung, ohne Rückgriff auf das System. Ändern sich die VPN-Adressen, musst du die Verbindung erneut auswählen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a DNS server reachable through your VPN. DNS uses this connection only, with no system fallback. Changing VPN addresses requires selecting the connection again."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Introduce un servidor DNS accesible mediante tu VPN. DNS solo usa esta conexión, sin recurrir al sistema. Si cambian las direcciones de la VPN, debes volver a seleccionar la conexión."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saisissez un serveur DNS accessible via votre VPN. Le DNS utilise uniquement cette connexion, sans recours au système. Si les adresses du VPN changent, vous devez sélectionner à nouveau la connexion."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inserisci un server DNS raggiungibile tramite la VPN. Il DNS usa solo questa connessione, senza ricorrere al sistema. Se cambiano gli indirizzi VPN, devi selezionare nuovamente la connessione."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VPN経由でアクセスできるDNSサーバーを入力してください。DNSはこの接続のみを使用し、システムの名前解決には切り替わりません。VPNのアドレスが変わった場合は、接続を選び直す必要があります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VPN을 통해 접근할 수 있는 DNS 서버를 입력하세요. DNS는 이 연결만 사용하며 시스템 이름 확인으로 전환하지 않습니다. VPN 주소가 변경되면 연결을 다시 선택해야 합니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wpisz serwer DNS dostępny przez VPN. DNS używa tylko tego połączenia, bez przełączania na systemowe rozwiązywanie nazw. Po zmianie adresów VPN trzeba ponownie wybrać połączenie."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Insira um servidor DNS acessível pela VPN. O DNS usa apenas essa conexão, sem recorrer ao sistema. Se os endereços da VPN mudarem, selecione a conexão novamente."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Введите DNS-сервер, доступный через VPN. DNS использует только это соединение, без перехода к системному разрешению имён. При изменении адресов VPN необходимо повторно выбрать соединение."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VPN üzerinden erişilebilen bir DNS sunucusu girin. DNS yalnızca bu bağlantıyı kullanır, sistem çözümleyicisine geçmez. VPN adresleri değişirse bağlantıyı yeniden seçmeniz gerekir."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Введіть DNS-сервер, доступний через VPN. DNS використовує лише це з’єднання, без переходу до системного визначення імен. Якщо адреси VPN зміняться, потрібно повторно вибрати з’єднання."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入可通过 VPN 访问的 DNS 服务器。DNS 仅使用此连接，不会回退到系统解析。VPN 地址发生变化后，需要重新选择连接。"
+          }
+        }
+      }
+    },
     "Enter a file name without slashes or colons.": {
       "comment": "SeedHop macOS UI (LibraryStore.swift).",
       "localizations": {
@@ -21272,6 +22600,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "一切正常"
+          }
+        }
+      }
+    },
+    "Export Settings…": {
+      "comment": "SeedHop development settings migration. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen exportieren…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export Settings…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar ajustes…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporter les réglages…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta impostazioni…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定を書き出す…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 내보내기…"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eksportuj ustawienia…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar ajustes…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Экспортировать настройки…"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarları Dışa Aktar…"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Експортувати налаштування…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出设置…"
           }
         }
       }
@@ -23352,6 +24763,89 @@
         }
       }
     },
+    "Folder access": {
+      "comment": "SeedHop sandbox development UI. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ordnerzugriff"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder access"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acceso a carpetas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accès aux dossiers"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accesso alle cartelle"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フォルダへのアクセス"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더 접근"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dostęp do folderów"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acesso a pastas"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Доступ к папкам"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klasör erişimi"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Доступ до папок"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件夹访问权限"
+          }
+        }
+      }
+    },
     "Follow macOS": {
       "comment": "General settings language picker. Follow macOS removes only the app language override. App interface changes apply immediately; keep the product names SeedHop and macOS unchanged.",
       "localizations": {
@@ -24764,6 +26258,89 @@
         }
       }
     },
+    "Grant Folder Access…": {
+      "comment": "SeedHop sandbox development UI. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ordnerzugriff erlauben…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grant Folder Access…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorizar acceso a carpeta…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autoriser l’accès à un dossier…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorizza accesso alla cartella…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フォルダへのアクセスを許可…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더 접근 허용…"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zezwól na dostęp do folderu…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorizar acesso à pasta…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Разрешить доступ к папке…"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klasör Erişimi Ver…"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Надати доступ до папки…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "授予文件夹访问权限…"
+          }
+        }
+      }
+    },
     "Hide transfer details": {
       "comment": "SeedHop macOS UI (LibraryView.swift).",
       "localizations": {
@@ -24926,6 +26503,338 @@
           "stringUnit": {
             "state": "translated",
             "value": "高"
+          }
+        }
+      }
+    },
+    "Import Existing Library…": {
+      "comment": "SeedHop sandbox development UI. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vorhandene Mediathek importieren…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import Existing Library…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importar biblioteca existente…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importer une bibliothèque existante…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importa libreria esistente…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "既存のライブラリを読み込む…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기존 라이브러리 가져오기…"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importuj istniejącą bibliotekę…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importar biblioteca existente…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Импортировать существующую библиотеку…"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mevcut Arşivi İçe Aktar…"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Імпортувати наявну бібліотеку…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入现有资料库…"
+          }
+        }
+      }
+    },
+    "Import Settings…": {
+      "comment": "SeedHop development settings migration. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen importieren…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import Settings…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importar ajustes…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importer les réglages…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importa impostazioni…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定を読み込む…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 가져오기…"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importuj ustawienia…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importar ajustes…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Импортировать настройки…"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarları İçe Aktar…"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Імпортувати налаштування…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入设置…"
+          }
+        }
+      }
+    },
+    "Import these settings?": {
+      "comment": "SeedHop development settings migration. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Einstellungen importieren?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import these settings?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Importar estos ajustes?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importer ces réglages ?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importare queste impostazioni?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この設定を読み込みますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 설정을 가져올까요?"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zaimportować te ustawienia?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importar estes ajustes?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Импортировать эти настройки?"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu ayarlar içe aktarılsın mı?"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Імпортувати ці налаштування?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入这些设置？"
+          }
+        }
+      }
+    },
+    "Include file names in notifications": {
+      "comment": "SeedHop macOS UI (SettingsView.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dateinamen in Mitteilungen anzeigen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Include file names in notifications"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incluir nombres de archivos en las notificaciones"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inclure les noms de fichiers dans les notifications"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Includi i nomi dei file nelle notifiche"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知にファイル名を表示"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "알림에 파일 이름 포함"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pokazuj nazwy plików w powiadomieniach"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incluir nomes de arquivos nas notificações"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показывать имена файлов в уведомлениях"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bildirimlerde dosya adlarını göster"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показувати назви файлів у сповіщеннях"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在通知中显示文件名"
           }
         }
       }
@@ -25851,6 +27760,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "请至少保留一个文件在下载中。"
+          }
+        }
+      }
+    },
+    "Keep this off for public torrents. Enable only when you trust torrents to contact devices and services on your local network.": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für öffentliche Torrents ausgeschaltet lassen. Nur aktivieren, wenn du den Torrents vertraust, auf Geräte und Dienste in deinem lokalen Netzwerk zuzugreifen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep this off for public torrents. Enable only when you trust torrents to contact devices and services on your local network."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déjalo desactivado para torrents públicos. Actívalo solo si confías en que los torrents contacten con dispositivos y servicios de tu red local."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laissez cette option désactivée pour les torrents publics. Activez-la uniquement si vous autorisez ces torrents à contacter les appareils et services de votre réseau local."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lascia disattivato per i torrent pubblici. Attiva solo se autorizzi i torrent a contattare dispositivi e servizi sulla tua rete locale."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "公開トレントではオフにしてください。トレントがローカルネットワークのデバイスやサービスに接続してもよいと判断した場合のみオンにしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "공개 토렌트에서는 꺼두세요. 토렌트가 로컬 네트워크의 기기 및 서비스에 연결해도 된다고 판단한 경우에만 켜세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pozostaw wyłączone dla publicznych torrentów. Włącz tylko wtedy, gdy ufasz torrentom kontaktującym się z urządzeniami i usługami w sieci lokalnej."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mantenha desativado para torrents públicos. Ative apenas se confiar que os torrents contatem dispositivos e serviços na sua rede local."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Оставьте выключенным для публичных торрентов. Включайте, только если доверяете торрентам обращаться к устройствам и службам вашей локальной сети."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genel torrentlerde kapalı tutun. Yalnızca torrentlerin yerel ağınızdaki cihazlara ve hizmetlere bağlanmasına güveniyorsanız açın."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Залиште вимкненим для публічних торрентів. Увімкніть, лише якщо довіряєте торрентам звертатися до пристроїв і служб вашої локальної мережі."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用公开种子时请保持关闭。仅在您信任种子可以访问本地网络设备和服务时开启。"
           }
         }
       }
@@ -27681,6 +29673,172 @@
         }
       }
     },
+    "Library": {
+      "comment": "SeedHop sandbox development UI. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mediathek"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Library"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Biblioteca"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bibliothèque"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Libreria"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ライブラリ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "라이브러리"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Biblioteka"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Biblioteca"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Библиотека"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arşiv"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Бібліотека"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "资料库"
+          }
+        }
+      }
+    },
+    "Library updated. Choose its download folders before starting transfers.": {
+      "comment": "SeedHop sandbox development UI. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mediathek aktualisiert. Wähle ihre Downloadordner aus, bevor du Übertragungen startest."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Library updated. Choose its download folders before starting transfers."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Biblioteca actualizada. Elige sus carpetas de descarga antes de iniciar las transferencias."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bibliothèque mise à jour. Choisissez ses dossiers de téléchargement avant de lancer les transferts."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Libreria aggiornata. Scegli le sue cartelle dei download prima di avviare i trasferimenti."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ライブラリを更新しました。転送を開始する前にダウンロード先のフォルダを選んでください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "라이브러리가 업데이트되었습니다. 전송을 시작하기 전에 다운로드 폴더를 선택하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Biblioteka zaktualizowana. Wybierz jej foldery pobierania przed rozpoczęciem transferów."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Biblioteca atualizada. Escolha suas pastas de download antes de iniciar as transferências."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Библиотека обновлена. Выберите её папки загрузки перед запуском передач."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arşiv güncellendi. Aktarımları başlatmadan önce indirme klasörlerini seçin."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Бібліотеку оновлено. Виберіть її папки завантаження перед запуском передач."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "资料库已更新。开始传输前，请选择其下载文件夹。"
+          }
+        }
+      }
+    },
     "Lifetime uploaded payload divided by downloaded payload. Unknown history and zero downloads have no ratio.": {
       "comment": "SeedHop macOS UI (NativeTransferGrid.swift).",
       "localizations": {
@@ -28175,6 +30333,172 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在加载 Tracker 信息…"
+          }
+        }
+      }
+    },
+    "Local activity": {
+      "comment": "SeedHop development local-activity privacy controls. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokale Aktivität"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local activity"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actividad local"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activité locale"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attività locale"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ローカルのアクティビティ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로컬 활동"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktywność lokalna"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atividade local"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Локальная активность"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yerel etkinlik"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Локальна активність"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地活动"
+          }
+        }
+      }
+    },
+    "Local activity cleared. Running transfers may create new activity.": {
+      "comment": "SeedHop development local-activity privacy controls. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokale Aktivität gelöscht. Laufende Übertragungen können neue Aktivitäten erzeugen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local activity cleared. Running transfers may create new activity."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actividad local borrada. Las transferencias en curso pueden generar nueva actividad."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activité locale effacée. Les transferts en cours peuvent créer une nouvelle activité."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attività locale cancellata. I trasferimenti in corso possono generare nuove attività."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ローカルのアクティビティを消去しました。実行中の転送により新しいアクティビティが発生する場合があります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로컬 활동을 지웠습니다. 진행 중인 전송은 새 활동을 만들 수 있습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktywność lokalna wyczyszczona. Trwające transfery mogą tworzyć nową aktywność."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atividade local limpa. As transferências em andamento podem gerar novas atividades."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Локальная активность очищена. Работающие передачи могут создавать новую активность."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yerel etkinlik temizlendi. Çalışan aktarımlar yeni etkinlik oluşturabilir."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Локальну активність очищено. Поточні передачі можуть створювати нову активність."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地活动已清除。正在运行的传输可能产生新活动。"
           }
         }
       }
@@ -29671,6 +31995,172 @@
           "stringUnit": {
             "state": "translated",
             "value": "需要处理"
+          }
+        }
+      }
+    },
+    "Network privacy": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Netzwerkdatenschutz"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Network privacy"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacidad de red"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confidentialité réseau"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy di rete"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ネットワークのプライバシー"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "네트워크 개인정보 보호"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prywatność sieci"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacidade da rede"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Конфиденциальность сети"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ağ gizliliği"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Конфіденційність мережі"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网络隐私"
+          }
+        }
+      }
+    },
+    "Network protection blocked this operation. Check the selected connection and DNS server in Settings, then restart the engine.": {
+      "comment": "SeedHop macOS UI (EngineMessage.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Netzwerkschutz hat diesen Vorgang blockiert. Prüfe die ausgewählte Verbindung und den DNS-Server in den Einstellungen und starte die Engine neu."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Network protection blocked this operation. Check the selected connection and DNS server in Settings, then restart the engine."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La protección de red bloqueó esta operación. Comprueba la conexión y el servidor DNS seleccionados en Ajustes y reinicia el motor."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La protection réseau a bloqué cette opération. Vérifiez la connexion et le serveur DNS sélectionnés dans Réglages, puis redémarrez le moteur."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La protezione di rete ha bloccato questa operazione. Controlla la connessione e il server DNS selezionati nelle impostazioni, poi riavvia il motore."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ネットワーク保護により操作がブロックされました。設定で選択した接続とDNSサーバーを確認し、エンジンを再起動してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "네트워크 보호가 이 작업을 차단했습니다. 설정에서 선택한 연결과 DNS 서버를 확인한 다음 엔진을 재시작하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ochrona sieci zablokowała tę operację. Sprawdź wybrane połączenie i serwer DNS w ustawieniach, a następnie uruchom silnik ponownie."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A proteção de rede bloqueou esta operação. Verifique a conexão e o servidor DNS selecionados nos ajustes e reinicie o mecanismo."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Защита сети заблокировала эту операцию. Проверьте выбранное соединение и DNS-сервер в настройках, затем перезапустите движок."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ağ koruması bu işlemi engelledi. Ayarlar’da seçili bağlantıyı ve DNS sunucusunu kontrol edip motoru yeniden başlatın."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Захист мережі заблокував цю операцію. Перевірте вибране з’єднання та DNS-сервер у налаштуваннях, а потім перезапустіть рушій."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网络保护已阻止此操作。请在设置中检查所选连接和 DNS 服务器，然后重启引擎。"
           }
         }
       }
@@ -32329,6 +34819,172 @@
           "stringUnit": {
             "state": "translated",
             "value": "开启"
+          }
+        }
+      }
+    },
+    "Only one library can run. Import blocks the previous library; restoring it blocks the imported copy. Downloads stay in their current folders.": {
+      "comment": "SeedHop sandbox development UI. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nur eine Mediathek kann aktiv sein. Der Import sperrt die bisherige Mediathek; ihre Wiederherstellung sperrt die importierte Kopie. Downloads bleiben in ihren bisherigen Ordnern."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only one library can run. Import blocks the previous library; restoring it blocks the imported copy. Downloads stay in their current folders."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo puede funcionar una biblioteca. La importación bloquea la anterior; restaurarla bloquea la copia importada. Las descargas permanecen en sus carpetas actuales."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une seule bibliothèque peut fonctionner. L’importation bloque l’ancienne bibliothèque ; sa restauration bloque la copie importée. Les téléchargements restent dans leurs dossiers actuels."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Può funzionare una sola libreria. L’importazione blocca quella precedente; il ripristino blocca la copia importata. I download restano nelle cartelle attuali."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同時に使用できるライブラリは1つです。読み込むと以前のライブラリがブロックされ、復元すると読み込んだコピーがブロックされます。ダウンロードしたファイルは現在のフォルダに残ります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "한 번에 하나의 라이브러리만 실행할 수 있습니다. 가져오면 이전 라이브러리가 차단되고, 복원하면 가져온 사본이 차단됩니다. 다운로드 파일은 현재 폴더에 유지됩니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Może działać tylko jedna biblioteka. Import blokuje poprzednią bibliotekę; jej przywrócenie blokuje zaimportowaną kopię. Pobierane pliki pozostają w obecnych folderach."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apenas uma biblioteca pode funcionar. A importação bloqueia a anterior; restaurá-la bloqueia a cópia importada. Os downloads permanecem nas pastas atuais."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Одновременно может работать только одна библиотека. Импорт блокирует прежнюю библиотеку; её восстановление блокирует импортированную копию. Загрузки остаются в текущих папках."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aynı anda yalnızca bir arşiv çalışabilir. İçe aktarma önceki arşivi engeller; geri yükleme ise içe aktarılan kopyayı engeller. İndirmeler mevcut klasörlerinde kalır."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Одночасно може працювати лише одна бібліотека. Імпорт блокує попередню бібліотеку; її відновлення блокує імпортовану копію. Завантаження залишаються в поточних папках."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同一时间只能运行一个资料库。导入会阻止原有资料库运行；恢复原有资料库会阻止导入的副本运行。下载文件将保留在当前文件夹中。"
+          }
+        }
+      }
+    },
+    "Open SeedHop to view the completed transfer.": {
+      "comment": "SeedHop macOS UI (LibraryStore.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Öffne SeedHop, um die abgeschlossene Übertragung anzusehen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open SeedHop to view the completed transfer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre SeedHop para ver la transferencia completada."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrez SeedHop pour voir le transfert terminé."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri SeedHop per vedere il trasferimento completato."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完了した転送を確認するにはSeedHopを開いてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "완료된 전송을 보려면 SeedHop을 여세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otwórz SeedHop, aby zobaczyć ukończony transfer."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abra o SeedHop para ver a transferência concluída."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Откройте SeedHop, чтобы посмотреть завершённую передачу."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamamlanan aktarımı görmek için SeedHop’u açın."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відкрийте SeedHop, щоб переглянути завершене передавання."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 SeedHop 以查看已完成的传输。"
           }
         }
       }
@@ -37397,6 +40053,172 @@
         }
       }
     },
+    "Refresh": {
+      "comment": "SeedHop development statistics retention. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktualisieren"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualiser"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiorna"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새로 고침"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odśwież"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atualizar"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Обновить"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yenile"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Оновити"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新"
+          }
+        }
+      }
+    },
+    "Refresh connections": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbindungen aktualisieren"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh connections"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizar conexiones"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualiser les connexions"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiorna connessioni"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接続を更新"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "연결 새로 고침"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odśwież połączenia"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atualizar conexões"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Обновить соединения"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlantıları yenile"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Оновити з’єднання"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新连接"
+          }
+        }
+      }
+    },
     "Refresh the recovery notice and try again.": {
       "comment": "SeedHop macOS UI (EngineMessage.swift).",
       "localizations": {
@@ -37725,6 +40547,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "所选内容剩余字节数"
+          }
+        }
+      }
+    },
+    "Remember transfer statistics between launches": {
+      "comment": "SeedHop development statistics retention. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Übertragungsstatistiken zwischen Starts speichern"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remember transfer statistics between launches"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recordar estadísticas de transferencia entre inicios"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conserver les statistiques de transfert entre les lancements"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ricorda le statistiche dei trasferimenti tra gli avvii"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "起動をまたいで転送統計を保存する"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "앱을 다시 실행해도 전송 통계 유지"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zapamiętuj statystyki transferów między uruchomieniami"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lembrar estatísticas de transferência entre inicializações"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сохранять статистику передач между запусками"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktarım istatistiklerini uygulama yeniden açıldığında koru"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Зберігати статистику передач між запусками"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在应用重新启动后保留传输统计"
           }
         }
       }
@@ -39421,6 +42326,89 @@
         }
       }
     },
+    "Required connection": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erforderliche Verbindung"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Required connection"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conexión obligatoria"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connexion requise"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connessione richiesta"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "必須の接続"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "필수 연결"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wymagane połączenie"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conexão obrigatória"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Обязательное соединение"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gerekli bağlantı"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Обов’язкове з’єднання"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "必需的连接"
+          }
+        }
+      }
+    },
     "Resolving": {
       "comment": "SeedHop macOS UI (TorrentDiagnosticsView.swift).",
       "localizations": {
@@ -39919,6 +42907,89 @@
         }
       }
     },
+    "Restore Previous Library…": {
+      "comment": "SeedHop sandbox development UI. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bisherige Mediathek wiederherstellen…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore Previous Library…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar biblioteca anterior…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurer l’ancienne bibliothèque…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristina libreria precedente…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以前のライブラリを復元…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 라이브러리 복원…"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Przywróć poprzednią bibliotekę…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar biblioteca anterior…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Восстановить прежнюю библиотеку…"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önceki Arşivi Geri Yükle…"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відновити попередню бібліотеку…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复原有资料库…"
+          }
+        }
+      }
+    },
     "Restore read and write access to the saved folder, then retry. %@": {
       "comment": "SeedHop macOS UI (TransferPresentation.swift). Preserve placeholder types and positions; use positional placeholders when reordering. Text arguments may be verbatim user names, paths, or formatted quantities.",
       "localizations": {
@@ -39998,6 +43069,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "请恢复已保存文件夹的读写权限，然后重试。%@"
+          }
+        }
+      }
+    },
+    "Restore the previous library?": {
+      "comment": "SeedHop sandbox development UI. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bisherige Mediathek wiederherstellen?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore the previous library?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Restaurar la biblioteca anterior?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurer l’ancienne bibliothèque ?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristinare la libreria precedente?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以前のライブラリを復元しますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 라이브러리를 복원할까요?"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Przywrócić poprzednią bibliotekę?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar a biblioteca anterior?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Восстановить прежнюю библиотеку?"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önceki arşiv geri yüklensin mi?"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відновити попередню бібліотеку?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复原有资料库？"
           }
         }
       }
@@ -40994,6 +44148,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "重试清理"
+          }
+        }
+      }
+    },
+    "Retry Clearing Statistics": {
+      "comment": "SeedHop development statistics retention. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Löschen der Statistiken wiederholen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry Clearing Statistics"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reintentar borrado de estadísticas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer d’effacer les statistiques"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprova a cancellare le statistiche"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "統計の消去を再試行"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "통계 지우기 다시 시도"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ponów czyszczenie statystyk"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tentar limpar estatísticas novamente"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Повторить очистку статистики"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İstatistikleri Temizlemeyi Yeniden Dene"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Повторити очищення статистики"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重试清除统计"
           }
         }
       }
@@ -42156,6 +45393,255 @@
           "stringUnit": {
             "state": "translated",
             "value": "已保存，将在下次启动引擎时生效。重启会短暂中断连接并重新校验文件。已暂停的传输保持暂停；运行中的传输遵循队列。"
+          }
+        }
+      }
+    },
+    "Saved network settings could not be read. Transfers remain blocked. Apply a new choice to replace them.": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die gespeicherten Netzwerkeinstellungen konnten nicht gelesen werden. Übertragungen bleiben gesperrt. Wende eine neue Auswahl an, um sie zu ersetzen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved network settings could not be read. Transfers remain blocked. Apply a new choice to replace them."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudieron leer los ajustes de red guardados. Las transferencias siguen bloqueadas. Aplica una nueva selección para reemplazarlos."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les réglages réseau enregistrés sont illisibles. Les transferts restent bloqués. Appliquez un nouveau choix pour les remplacer."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile leggere le impostazioni di rete salvate. I trasferimenti restano bloccati. Applica una nuova scelta per sostituirle."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存されたネットワーク設定を読み込めませんでした。転送はブロックされたままです。新しい選択を適用して設定を置き換えてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장된 네트워크 설정을 읽을 수 없습니다. 전송은 계속 차단됩니다. 새 선택을 적용하여 설정을 교체하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nie można odczytać zapisanych ustawień sieci. Transfery pozostają zablokowane. Zastosuj nowy wybór, aby je zastąpić."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível ler os ajustes de rede salvos. As transferências continuam bloqueadas. Aplique uma nova escolha para substituí-los."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось прочитать сохранённые настройки сети. Передачи остаются заблокированными. Примените новый выбор, чтобы заменить настройки."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kayıtlı ağ ayarları okunamadı. Aktarımlar engellenmeye devam ediyor. Bunları değiştirmek için yeni bir seçim uygulayın."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося прочитати збережені налаштування мережі. Передавання залишаються заблокованими. Застосуйте новий вибір, щоб замінити налаштування."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取已保存的网络设置。传输仍被阻止。请应用新的选择以替换设置。"
+          }
+        }
+      }
+    },
+    "Saved statistics": {
+      "comment": "SeedHop development statistics retention. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gespeicherte Statistiken"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved statistics"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estadísticas guardadas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Statistiques enregistrées"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Statistiche salvate"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存済みの統計"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장된 통계"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zapisane statystyki"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estatísticas salvas"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сохранённая статистика"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kayıtlı istatistikler"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Збережена статистика"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已保存的统计"
+          }
+        }
+      }
+    },
+    "Saved totals and dates in this library will be cleared. Downloads and resume data are kept. Earlier builds will refuse to open this library.": {
+      "comment": "SeedHop development statistics retention. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gespeicherte Summen und Datumsangaben dieser Mediathek werden gelöscht. Downloads und Fortsetzungsdaten bleiben erhalten. Ältere Builds werden diese Mediathek nicht mehr öffnen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved totals and dates in this library will be cleared. Downloads and resume data are kept. Earlier builds will refuse to open this library."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se borrarán los totales y fechas guardados en esta biblioteca. Se conservan los archivos y los datos de reanudación. Las compilaciones anteriores no podrán abrir esta biblioteca."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les totaux et dates enregistrés dans cette bibliothèque seront effacés. Les fichiers et données de reprise sont conservés. Les anciennes versions refuseront d’ouvrir cette bibliothèque."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I totali e le date salvati in questa libreria saranno cancellati. I file e i dati di ripresa vengono mantenuti. Le build precedenti rifiuteranno di aprire questa libreria."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このライブラリの保存済み合計値と日付を消去します。ファイルと再開用データは保持されます。以前のビルドではこのライブラリを開けなくなります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 라이브러리에 저장된 합계와 날짜가 지워집니다. 파일과 재개 데이터는 유지됩니다. 이전 빌드에서는 이 라이브러리를 열 수 없습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zapisane sumy i daty w tej bibliotece zostaną usunięte. Pliki i dane wznawiania zostają zachowane. Starsze kompilacje odmówią otwarcia tej biblioteki."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os totais e as datas salvos nesta biblioteca serão apagados. Os arquivos e os dados de retomada são mantidos. Compilações anteriores se recusarão a abrir esta biblioteca."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сохранённые итоги и даты этой библиотеки будут удалены. Файлы и данные возобновления сохраняются. Более ранние сборки откажутся открывать эту библиотеку."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu arşivdeki kayıtlı toplamlar ve tarihler temizlenir. Dosyalar ve sürdürme verileri korunur. Önceki derlemeler bu arşivi açmayı reddeder."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Збережені підсумки й дати цієї бібліотеки буде видалено. Файли й дані відновлення зберігаються. Попередні збірки відмовляться відкривати цю бібліотеку."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此资料库保存的总计和日期将被清除。文件和续传数据将被保留。旧版构建将拒绝打开此资料库。"
           }
         }
       }
@@ -44745,6 +48231,89 @@
         }
       }
     },
+    "Selected connection unavailable": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausgewählte Verbindung nicht verfügbar"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected connection unavailable"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conexión seleccionada no disponible"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connexion sélectionnée indisponible"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connessione selezionata non disponibile"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択した接続は利用できません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "선택한 연결을 사용할 수 없음"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wybrane połączenie jest niedostępne"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conexão selecionada indisponível"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выбранное соединение недоступно"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçili bağlantı kullanılamıyor"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вибране з’єднання недоступне"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所选连接不可用"
+          }
+        }
+      }
+    },
     "Selected size": {
       "comment": "SeedHop macOS UI (LibraryView.swift, TorrentDiagnosticsView.swift).",
       "localizations": {
@@ -44994,6 +48563,338 @@
         }
       }
     },
+    "Settings could not be updated. Your saved settings have been preserved.": {
+      "comment": "SeedHop development settings migration. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen konnten nicht aktualisiert werden. Deine gespeicherten Einstellungen bleiben erhalten."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings could not be updated. Your saved settings have been preserved."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudieron actualizar los ajustes. Tus ajustes guardados se han conservado."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les réglages n’ont pas pu être mis à jour. Vos réglages enregistrés ont été conservés."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile aggiornare le impostazioni. Le impostazioni salvate sono state conservate."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定を更新できませんでした。保存済みの設定は保持されています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정을 업데이트하지 못했습니다. 저장된 설정은 유지되었습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nie udało się zaktualizować ustawień. Zapisane ustawienia zostały zachowane."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível atualizar os ajustes. Seus ajustes salvos foram preservados."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось обновить настройки. Сохранённые настройки не затронуты."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar güncellenemedi. Kayıtlı ayarlarınız korundu."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося оновити налаштування. Збережені налаштування не змінено."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法更新设置。已保存的设置均已保留。"
+          }
+        }
+      }
+    },
+    "Settings exported.": {
+      "comment": "SeedHop development settings migration. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen exportiert."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings exported."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes exportados."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réglages exportés."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impostazioni esportate."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定を書き出しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정을 내보냈습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ustawienia wyeksportowane."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes exportados."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Настройки экспортированы."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar dışa aktarıldı."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Налаштування експортовано."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置已导出。"
+          }
+        }
+      }
+    },
+    "Settings import canceled.": {
+      "comment": "SeedHop development settings migration. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungsimport abgebrochen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings import canceled."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importación de ajustes cancelada."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importation des réglages annulée."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importazione impostazioni annullata."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定の読み込みをキャンセルしました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 가져오기가 취소되었습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import ustawień anulowany."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importação de ajustes cancelada."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Импорт настроек отменён."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayar içe aktarımı iptal edildi."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Імпорт налаштувань скасовано."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消设置导入。"
+          }
+        }
+      }
+    },
+    "Settings saved. Restart SeedHop to apply the change.": {
+      "comment": "SeedHop development settings migration. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen gespeichert. Starte SeedHop neu, um die Änderung anzuwenden."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings saved. Restart SeedHop to apply the change."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes guardados. Reinicia SeedHop para aplicar el cambio."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réglages enregistrés. Redémarrez SeedHop pour appliquer le changement."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impostazioni salvate. Riavvia SeedHop per applicare la modifica."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定を保存しました。SeedHopを再起動して変更を適用してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정이 저장되었습니다. 변경 사항을 적용하려면 SeedHop을 다시 시작하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ustawienia zapisane. Uruchom ponownie SeedHop, aby zastosować zmianę."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes salvos. Reinicie o SeedHop para aplicar a alteração."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Настройки сохранены. Перезапустите SeedHop, чтобы применить изменения."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar kaydedildi. Değişikliği uygulamak için SeedHop’u yeniden başlatın."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Налаштування збережено. Перезапустіть SeedHop, щоб застосувати зміни."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置已保存。请重新启动 SeedHop 以应用更改。"
+          }
+        }
+      }
+    },
     "Settings section": {
       "comment": "SeedHop macOS UI (SettingsView.swift).",
       "localizations": {
@@ -45073,6 +48974,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "设置分区"
+          }
+        }
+      }
+    },
+    "Settings transfer": {
+      "comment": "SeedHop development settings migration. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen übertragen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings transfer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transferir ajustes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transfert des réglages"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trasferimento impostazioni"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定の移行"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 이전"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Przenoszenie ustawień"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transferência de ajustes"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перенос настроек"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayar aktarımı"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перенесення налаштувань"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置迁移"
           }
         }
       }
@@ -47734,6 +51718,89 @@
         }
       }
     },
+    "Statistics have not finished clearing. Check storage space and folder access, then retry.": {
+      "comment": "SeedHop development statistics retention. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Statistiken wurden noch nicht vollständig gelöscht. Prüfe Speicherplatz und Ordnerzugriff und versuche es erneut."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Statistics have not finished clearing. Check storage space and folder access, then retry."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las estadísticas aún no se han borrado por completo. Comprueba el espacio de almacenamiento y el acceso a las carpetas y vuelve a intentarlo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les statistiques n’ont pas encore été entièrement effacées. Vérifiez l’espace disponible et l’accès aux dossiers, puis réessayez."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La cancellazione delle statistiche non è ancora completata. Controlla lo spazio disponibile e l’accesso alle cartelle, poi riprova."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "統計の消去がまだ完了していません。空き容量とフォルダへのアクセスを確認してから再試行してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "통계 지우기가 아직 완료되지 않았습니다. 저장 공간과 폴더 접근 권한을 확인한 후 다시 시도하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Czyszczenie statystyk nie zostało zakończone. Sprawdź wolne miejsce i dostęp do folderów, a następnie spróbuj ponownie."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As estatísticas ainda não terminaram de ser apagadas. Verifique o espaço de armazenamento e o acesso às pastas e tente novamente."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Очистка статистики ещё не завершена. Проверьте свободное место и доступ к папкам, затем повторите попытку."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İstatistiklerin temizlenmesi tamamlanmadı. Depolama alanını ve klasör erişimini kontrol edip tekrar deneyin."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Очищення статистики ще не завершено. Перевірте вільне місце та доступ до папок, потім повторіть спробу."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "统计尚未清除完毕。请检查存储空间和文件夹访问权限，然后重试。"
+          }
+        }
+      }
+    },
     "Statistics need attention": {
       "comment": "SeedHop macOS UI (LibraryView.swift).",
       "localizations": {
@@ -47896,6 +51963,172 @@
           "stringUnit": {
             "state": "translated",
             "value": "状态"
+          }
+        }
+      }
+    },
+    "Stop Saving and Clear": {
+      "comment": "SeedHop development statistics retention. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speicherung beenden und löschen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop Saving and Clear"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dejar de guardar y borrar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêter l’enregistrement et effacer"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrompi salvataggio e cancella"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存を停止して消去"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장 중지 및 지우기"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Przestań zapisywać i wyczyść"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar de salvar e limpar"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прекратить сохранение и очистить"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaydetmeyi Durdur ve Temizle"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Припинити збереження й очистити"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止保存并清除"
+          }
+        }
+      }
+    },
+    "Stop saving transfer statistics?": {
+      "comment": "SeedHop development statistics retention. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Übertragungsstatistiken nicht mehr speichern?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop saving transfer statistics?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Dejar de guardar estadísticas de transferencia?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne plus enregistrer les statistiques de transfert ?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrompere il salvataggio delle statistiche dei trasferimenti?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "転送統計の保存を停止しますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "전송 통계 저장을 중지할까요?"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Przestać zapisywać statystyki transferów?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar de salvar estatísticas de transferência?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прекратить сохранение статистики передач?"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktarım istatistikleri kaydedilmesin mi?"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Припинити збереження статистики передач?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止保存传输统计？"
           }
         }
       }
@@ -48992,6 +53225,89 @@
         }
       }
     },
+    "The engine is handling several requests. Try again shortly.": {
+      "comment": "SeedHop macOS UI (EngineMessage.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Engine verarbeitet mehrere Anfragen. Versuche es in Kürze erneut."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The engine is handling several requests. Try again shortly."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El motor está procesando varias solicitudes. Inténtalo de nuevo en unos instantes."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le moteur traite plusieurs demandes. Réessayez dans un instant."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il motore sta elaborando più richieste. Riprova tra poco."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エンジンが複数のリクエストを処理中です。しばらくしてから再試行してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "엔진이 여러 요청을 처리하고 있습니다. 잠시 후 다시 시도하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silnik obsługuje kilka żądań. Spróbuj ponownie za chwilę."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O mecanismo está processando várias solicitações. Tente novamente em instantes."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Движок обрабатывает несколько запросов. Повторите попытку чуть позже."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motor birden fazla isteği işliyor. Birazdan yeniden deneyin."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Рушій обробляє кілька запитів. Спробуйте знову трохи пізніше."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "引擎正在处理多个请求。请稍后重试。"
+          }
+        }
+      }
+    },
     "The engine is not connected yet.": {
       "comment": "SeedHop macOS UI (EngineClient.swift).",
       "localizations": {
@@ -49071,6 +53387,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "引擎尚未连接。"
+          }
+        }
+      }
+    },
+    "The engine is stopped. Saved settings apply before transfers start.": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Engine ist gestoppt. Gespeicherte Einstellungen gelten vor dem Start der Übertragungen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The engine is stopped. Saved settings apply before transfers start."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El motor está detenido. Los ajustes guardados se aplican antes de iniciar las transferencias."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le moteur est arrêté. Les réglages enregistrés s’appliquent avant le démarrage des transferts."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il motore è fermo. Le impostazioni salvate si applicano prima dell’avvio dei trasferimenti."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エンジンは停止中です。転送開始前に保存済みの設定が適用されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "엔진이 중지되었습니다. 전송을 시작하기 전에 저장된 설정이 적용됩니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silnik jest zatrzymany. Zapisane ustawienia są stosowane przed rozpoczęciem transferów."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O mecanismo está parado. Os ajustes salvos são aplicados antes de iniciar as transferências."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Движок остановлен. Сохранённые настройки применяются до начала передач."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motor durduruldu. Kayıtlı ayarlar aktarımlar başlamadan önce uygulanır."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Рушій зупинено. Збережені налаштування застосовуються до початку передавань."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "引擎已停止。传输开始前会应用已保存的设置。"
           }
         }
       }
@@ -49486,6 +53885,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法读取文件列表。请尝试其他种子文件或磁力链接。"
+          }
+        }
+      }
+    },
+    "The library could not be updated. Close both engines, finish pending file changes, and retry. Your saved files have been preserved.": {
+      "comment": "SeedHop sandbox development UI. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Mediathek konnte nicht aktualisiert werden. Beende beide Engines, schließe ausstehende Dateiänderungen ab und versuche es erneut. Deine gespeicherten Dateien bleiben erhalten."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The library could not be updated. Close both engines, finish pending file changes, and retry. Your saved files have been preserved."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo actualizar la biblioteca. Cierra ambos motores, termina los cambios pendientes de archivos e inténtalo de nuevo. Tus archivos guardados se han conservado."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La bibliothèque n’a pas pu être mise à jour. Fermez les deux moteurs, terminez les modifications de fichiers en attente et réessayez. Vos fichiers enregistrés ont été conservés."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile aggiornare la libreria. Chiudi entrambi i motori, completa le modifiche ai file in sospeso e riprova. I file salvati sono stati conservati."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ライブラリを更新できませんでした。両方のエンジンを終了し、保留中のファイル変更を完了してから再試行してください。保存済みのファイルは保持されています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "라이브러리를 업데이트하지 못했습니다. 두 엔진을 모두 종료하고 대기 중인 파일 변경을 완료한 후 다시 시도하세요. 저장된 파일은 유지되었습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nie udało się zaktualizować biblioteki. Zamknij oba silniki, zakończ oczekujące zmiany plików i spróbuj ponownie. Zapisane pliki zostały zachowane."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível atualizar a biblioteca. Feche os dois mecanismos, conclua as alterações de arquivos pendentes e tente novamente. Seus arquivos salvos foram preservados."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось обновить библиотеку. Закройте оба движка, завершите ожидающие изменения файлов и повторите попытку. Сохранённые файлы не затронуты."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arşiv güncellenemedi. Her iki motoru kapatın, bekleyen dosya değişikliklerini tamamlayın ve yeniden deneyin. Kayıtlı dosyalarınız korundu."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не вдалося оновити бібліотеку. Закрийте обидва рушії, завершіть очікувані зміни файлів і повторіть спробу. Збережені файли не змінено."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法更新资料库。请关闭两个引擎，完成待处理的文件更改后重试。已保存的文件均已保留。"
           }
         }
       }
@@ -51016,6 +55498,89 @@
         }
       }
     },
+    "This clears the activity timeline, traffic graphs, SeedHop recent items, and notifications. Running transfers can create new activity. This does not erase downloaded files or saved transfer statistics.": {
+      "comment": "SeedHop development local-activity privacy controls. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dies löscht den Aktivitätsverlauf, Verkehrsdiagramme, zuletzt verwendete SeedHop-Objekte und Mitteilungen. Laufende Übertragungen können neue Aktivitäten erzeugen. Heruntergeladene Dateien und gespeicherte Übertragungsstatistiken werden nicht gelöscht."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This clears the activity timeline, traffic graphs, SeedHop recent items, and notifications. Running transfers can create new activity. This does not erase downloaded files or saved transfer statistics."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se borran el historial de actividad, los gráficos de tráfico, los ítems recientes de SeedHop y las notificaciones. Las transferencias en curso pueden generar nueva actividad. No se borran los archivos descargados ni las estadísticas de transferencia guardadas."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette action efface l’historique d’activité, les graphiques de trafic, les éléments récents de SeedHop et les notifications. Les transferts en cours peuvent créer une nouvelle activité. Les fichiers téléchargés et les statistiques de transfert enregistrées ne sont pas effacés."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa azione cancella la cronologia delle attività, i grafici del traffico, gli elementi recenti di SeedHop e le notifiche. I trasferimenti in corso possono generare nuove attività. I file scaricati e le statistiche di trasferimento salvate non vengono eliminati."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アクティビティ履歴、通信量グラフ、SeedHopの最近使った項目、通知を消去します。実行中の転送により新しいアクティビティが発生する場合があります。ダウンロード済みファイルと保存済みの転送統計は削除されません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "활동 기록, 트래픽 그래프, SeedHop 최근 항목 및 알림을 지웁니다. 진행 중인 전송은 새 활동을 만들 수 있습니다. 다운로드한 파일과 저장된 전송 통계는 삭제되지 않습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spowoduje to wyczyszczenie historii aktywności, wykresów ruchu, ostatnich elementów SeedHop i powiadomień. Trwające transfery mogą tworzyć nową aktywność. Pobrane pliki i zapisane statystyki transferów nie zostaną usunięte."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Isso limpa o histórico de atividade, os gráficos de tráfego, os itens recentes do SeedHop e as notificações. As transferências em andamento podem gerar novas atividades. Os arquivos baixados e as estatísticas de transferência salvas não são apagados."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Будут очищены журнал активности, графики трафика, недавние объекты SeedHop и уведомления. Работающие передачи могут создавать новую активность. Скачанные файлы и сохранённая статистика передач не удаляются."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etkinlik geçmişi, trafik grafikleri, SeedHop son kullanılan öğeleri ve bildirimler temizlenir. Çalışan aktarımlar yeni etkinlik oluşturabilir. İndirilen dosyalar ve kayıtlı aktarım istatistikleri silinmez."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Буде очищено журнал активності, графіки трафіку, недавні об’єкти SeedHop і сповіщення. Поточні передачі можуть створювати нову активність. Завантажені файли та збережена статистика передач не видаляються."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这将清除活动历史、流量图表、SeedHop 最近使用的项目和通知。正在运行的传输可能产生新活动。已下载的文件和已保存的传输统计不会被删除。"
+          }
+        }
+      }
+    },
     "This is a design preview with sample data. Launch the app normally for real transfers.": {
       "comment": "SeedHop macOS UI (LibraryStore.swift).",
       "localizations": {
@@ -51846,6 +56411,89 @@
         }
       }
     },
+    "This version cannot read these folder approvals. Use a compatible SeedHop version. Saved approvals have not been replaced.": {
+      "comment": "SeedHop sandbox folder-access format compatibility. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Version kann diese Ordnerfreigaben nicht lesen. Verwende eine kompatible SeedHop-Version. Gespeicherte Freigaben wurden nicht ersetzt."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This version cannot read these folder approvals. Use a compatible SeedHop version. Saved approvals have not been replaced."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta versión no puede leer estas autorizaciones de carpetas. Usa una versión compatible de SeedHop. Las autorizaciones guardadas no se han sustituido."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette version ne peut pas lire ces autorisations de dossiers. Utilisez une version compatible de SeedHop. Les autorisations enregistrées n’ont pas été remplacées."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa versione non può leggere queste autorizzazioni delle cartelle. Usa una versione compatibile di SeedHop. Le autorizzazioni salvate non sono state sostituite."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このバージョンでは、これらのフォルダ許可を読み取れません。互換性のあるSeedHopを使用してください。保存済みの許可は置き換えられていません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 버전에서는 이 폴더 승인 정보를 읽을 수 없습니다. 호환되는 SeedHop 버전을 사용하세요. 저장된 승인은 변경되지 않았습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ta wersja nie może odczytać tych uprawnień folderów. Użyj zgodnej wersji SeedHop. Zapisane uprawnienia nie zostały zastąpione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta versão não consegue ler estas autorizações de pastas. Use uma versão compatível do SeedHop. As autorizações salvas não foram substituídas."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Эта версия не может прочитать разрешения для папок. Используйте совместимую версию SeedHop. Сохранённые разрешения не были заменены."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sürüm bu klasör izinlerini okuyamıyor. Uyumlu bir SeedHop sürümü kullanın. Kayıtlı izinler değiştirilmedi."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ця версія не може прочитати дозволи для папок. Використовуйте сумісну версію SeedHop. Збережені дозволи не було замінено."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此版本无法读取这些文件夹授权。请使用兼容的 SeedHop 版本。已保存的授权未被替换。"
+          }
+        }
+      }
+    },
     "Time": {
       "comment": "SeedHop macOS UI (TorrentDiagnosticsView.swift).",
       "localizations": {
@@ -52506,6 +57154,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "种子格式"
+          }
+        }
+      }
+    },
+    "Torrent traffic uses the selected interface. This does not guarantee anonymity.": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torrent-Datenverkehr verwendet die ausgewählte Schnittstelle. Das garantiert keine Anonymität."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torrent traffic uses the selected interface. This does not guarantee anonymity."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El tráfico de torrents usa la interfaz seleccionada. Esto no garantiza el anonimato."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le trafic torrent utilise l’interface sélectionnée. Cela ne garantit pas l’anonymat."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il traffico torrent usa l’interfaccia selezionata. Questo non garantisce l’anonimato."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "トレント通信は選択したインターフェイスを使用します。匿名性を保証するものではありません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "토렌트 트래픽은 선택한 인터페이스를 사용합니다. 익명성을 보장하지는 않습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruch torrentów używa wybranego interfejsu. Nie gwarantuje to anonimowości."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O tráfego de torrents usa a interface selecionada. Isso não garante anonimato."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Трафик торрентов использует выбранный интерфейс. Это не гарантирует анонимность."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torrent trafiği seçili arayüzü kullanır. Bu, anonimliği garanti etmez."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Трафік торрентів використовує вибраний інтерфейс. Це не гарантує анонімності."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "种子流量使用所选接口。这并不保证匿名性。"
           }
         }
       }
@@ -53340,6 +58071,89 @@
         }
       }
     },
+    "Transfer appearance, language, and workspace layout. Imported settings apply after restarting SeedHop.": {
+      "comment": "SeedHop development settings migration. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Übertrage Darstellung, Sprache und Arbeitsbereichslayout. Importierte Einstellungen gelten nach dem Neustart von SeedHop."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transfer appearance, language, and workspace layout. Imported settings apply after restarting SeedHop."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transfiere la apariencia, el idioma y la disposición del espacio de trabajo. Los ajustes importados se aplican al reiniciar SeedHop."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transférez l’apparence, la langue et la disposition de l’espace de travail. Les réglages importés s’appliquent après le redémarrage de SeedHop."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trasferisci aspetto, lingua e disposizione dell’area di lavoro. Le impostazioni importate si applicano dopo il riavvio di SeedHop."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外観、言語、ワークスペースのレイアウトを移行します。読み込んだ設定はSeedHopの再起動後に適用されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모양, 언어 및 작업 공간 레이아웃을 이전합니다. 가져온 설정은 SeedHop을 다시 시작한 후 적용됩니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Przenieś wygląd, język i układ obszaru roboczego. Importowane ustawienia zostaną zastosowane po ponownym uruchomieniu SeedHop."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transfira aparência, idioma e layout do espaço de trabalho. Os ajustes importados são aplicados após reiniciar o SeedHop."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перенесите оформление, язык и расположение элементов рабочей области. Импортированные настройки вступят в силу после перезапуска SeedHop."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görünümü, dili ve çalışma alanı düzenini aktarın. İçe aktarılan ayarlar SeedHop yeniden başlatıldıktan sonra uygulanır."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перенесіть оформлення, мову та розташування елементів робочої області. Імпортовані налаштування набудуть чинності після перезапуску SeedHop."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "迁移外观、语言和工作区布局。导入的设置将在重新启动 SeedHop 后应用。"
+          }
+        }
+      }
+    },
     "Transfer changes, tracker failures, recovery, and file operations appear here.": {
       "comment": "SeedHop macOS UI (TorrentDiagnosticsView.swift).",
       "localizations": {
@@ -53838,6 +58652,172 @@
         }
       }
     },
+    "Transfers blocked by network protection. Review Transfers in Settings.": {
+      "comment": "SeedHop macOS UI (LibraryView.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Übertragungen durch Netzwerkschutz gesperrt. Prüfe „Übertragungen“ in den Einstellungen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transfers blocked by network protection. Review Transfers in Settings."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transferencias bloqueadas por la protección de red. Revisa Transferencias en Ajustes."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transferts bloqués par la protection réseau. Vérifiez Transferts dans Réglages."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trasferimenti bloccati dalla protezione di rete. Controlla Trasferimenti nelle impostazioni."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ネットワーク保護により転送がブロックされています。設定の「転送」を確認してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "네트워크 보호로 전송이 차단되었습니다. 설정의 전송 항목을 확인하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transfery zablokowane przez ochronę sieci. Sprawdź Transfery w ustawieniach."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transferências bloqueadas pela proteção de rede. Revise Transferências nos ajustes."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Передачи заблокированы защитой сети. Проверьте раздел «Передачи» в настройках."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktarımlar ağ koruması tarafından engellendi. Ayarlar’daki Aktarımlar bölümünü inceleyin."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Передавання заблоковано захистом мережі. Перевірте розділ «Передавання» в налаштуваннях."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网络保护已阻止传输。请检查设置中的“传输”。"
+          }
+        }
+      }
+    },
+    "Transfers blocked. Review your connection and restart the engine.": {
+      "comment": "SeedHop macOS UI (NetworkPrivacySettings.swift). Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Übertragungen gesperrt. Prüfe deine Verbindung und starte die Engine neu."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transfers blocked. Review your connection and restart the engine."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transferencias bloqueadas. Comprueba la conexión y reinicia el motor."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transferts bloqués. Vérifiez votre connexion et redémarrez le moteur."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trasferimenti bloccati. Controlla la connessione e riavvia il motore."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "転送がブロックされています。接続を確認してエンジンを再起動してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "전송이 차단되었습니다. 연결을 확인하고 엔진을 재시작하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transfery zablokowane. Sprawdź połączenie i uruchom silnik ponownie."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transferências bloqueadas. Verifique a conexão e reinicie o mecanismo."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Передачи заблокированы. Проверьте соединение и перезапустите движок."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktarımlar engellendi. Bağlantınızı kontrol edip motoru yeniden başlatın."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Передавання заблоковано. Перевірте з’єднання й перезапустіть рушій."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "传输已被阻止。请检查连接并重启引擎。"
+          }
+        }
+      }
+    },
     "Transport": {
       "comment": "SeedHop macOS UI (TorrentDiagnosticsView.swift).",
       "localizations": {
@@ -54170,6 +59150,89 @@
         }
       }
     },
+    "Turning this off clears this library’s saved totals and dates. Session upload and download counters remain available. Downloads and resume data are kept.": {
+      "comment": "SeedHop development statistics retention. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beim Ausschalten werden die gespeicherten Summen und Datumsangaben dieser Mediathek gelöscht. Upload- und Downloadzähler der Sitzung bleiben verfügbar. Downloads und Fortsetzungsdaten bleiben erhalten."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turning this off clears this library’s saved totals and dates. Session upload and download counters remain available. Downloads and resume data are kept."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Al desactivar esta opción se borran los totales y fechas guardados de esta biblioteca. Los contadores de subida y descarga de la sesión siguen disponibles. Se conservan los archivos y los datos de reanudación."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La désactivation efface les totaux et dates enregistrés de cette bibliothèque. Les compteurs d’envoi et de téléchargement de la session restent disponibles. Les fichiers et données de reprise sont conservés."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disattivando questa opzione si cancellano totali e date salvati in questa libreria. I contatori di caricamento e download della sessione restano disponibili. I file e i dati di ripresa vengono mantenuti."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフにすると、このライブラリの保存済み合計値と日付を消去します。セッション中のアップロードとダウンロードのカウンターは引き続き利用できます。ファイルと再開用データは保持されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 옵션을 끄면 이 라이브러리에 저장된 합계와 날짜가 지워집니다. 세션의 업로드 및 다운로드 카운터는 계속 사용할 수 있습니다. 파일과 재개 데이터는 유지됩니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wyłączenie usuwa zapisane sumy i daty tej biblioteki. Liczniki wysyłania i pobierania bieżącej sesji pozostają dostępne. Pliki i dane wznawiania zostają zachowane."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desativar esta opção limpa os totais e as datas salvos nesta biblioteca. Os contadores de envio e download da sessão continuam disponíveis. Os arquivos e os dados de retomada são mantidos."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отключение удаляет сохранённые итоги и даты этой библиотеки. Счётчики отправки и загрузки текущего сеанса остаются доступны. Файлы и данные возобновления сохраняются."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapatıldığında bu arşivin kayıtlı toplamları ve tarihleri temizlenir. Oturumun yükleme ve indirme sayaçları kullanılabilir kalır. Dosyalar ve sürdürme verileri korunur."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вимкнення видаляє збережені підсумки й дати цієї бібліотеки. Лічильники надсилання та завантаження поточного сеансу залишаються доступними. Файли й дані відновлення зберігаються."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭后将清除此资料库保存的总计和日期。本次会话的上传和下载计数仍可使用。文件和续传数据将被保留。"
+          }
+        }
+      }
+    },
     "Turning this off restores another default app. You can still use Open With SeedHop or add torrents in the app.": {
       "comment": "SeedHop macOS UI (FileAssociationSettings.swift).",
       "localizations": {
@@ -54415,6 +59478,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "断开连接时不可用"
+          }
+        }
+      }
+    },
+    "Undo Settings Import": {
+      "comment": "SeedHop development settings migration. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungsimport rückgängig machen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo Settings Import"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deshacer importación de ajustes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler l’importation des réglages"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla importazione impostazioni"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定の読み込みを取り消す"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 가져오기 실행 취소"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cofnij import ustawień"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desfazer importação de ajustes"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отменить импорт настроек"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayar İçe Aktarımını Geri Al"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скасувати імпорт налаштувань"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "撤销设置导入"
           }
         }
       }
@@ -56329,6 +61475,89 @@
         }
       }
     },
+    "Visible activity and SeedHop notifications were cleared. Engine history could not be cleared; reconnect and try again.": {
+      "comment": "SeedHop development local-activity privacy controls. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sichtbare Aktivitäten und SeedHop-Mitteilungen wurden gelöscht. Der Engine-Verlauf konnte nicht gelöscht werden; verbinde dich erneut und versuche es noch einmal."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visible activity and SeedHop notifications were cleared. Engine history could not be cleared; reconnect and try again."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se borraron la actividad visible y las notificaciones de SeedHop. No se pudo borrar el historial del motor; vuelve a conectarte e inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’activité visible et les notifications de SeedHop ont été effacées. L’historique du moteur n’a pas pu être effacé ; reconnectez-vous et réessayez."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le attività visibili e le notifiche di SeedHop sono state cancellate. Impossibile cancellare la cronologia del motore; riconnettiti e riprova."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "表示中のアクティビティとSeedHopの通知を消去しました。エンジンの履歴は消去できませんでした。再接続してやり直してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "표시된 활동과 SeedHop 알림을 지웠습니다. 엔진 기록은 지우지 못했습니다. 다시 연결한 후 재시도하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Widoczna aktywność i powiadomienia SeedHop zostały wyczyszczone. Nie udało się wyczyścić historii silnika; połącz się ponownie i spróbuj jeszcze raz."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A atividade visível e as notificações do SeedHop foram limpas. Não foi possível limpar o histórico do mecanismo; reconecte e tente novamente."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видимая активность и уведомления SeedHop очищены. Не удалось очистить историю движка; подключитесь повторно и попробуйте ещё раз."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görünen etkinlikler ve SeedHop bildirimleri temizlendi. Motor geçmişi temizlenemedi; yeniden bağlanıp tekrar deneyin."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видиму активність і сповіщення SeedHop очищено. Не вдалося очистити історію рушія; підключіться повторно та спробуйте ще раз."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已清除可见活动和 SeedHop 通知。无法清除引擎历史，请重新连接后重试。"
+          }
+        }
+      }
+    },
     "Wait for the current file change to finish, or cancel it, then add your torrent.": {
       "comment": "SeedHop macOS UI (LibraryStore.swift).",
       "localizations": {
@@ -57819,6 +63048,89 @@
           "stringUnit": {
             "state": "translated",
             "value": "处理中"
+          }
+        }
+      }
+    },
+    "Your current settings will be saved for undo. Download folders, notifications, and background access require separate choices.": {
+      "comment": "SeedHop development settings migration. Translations are AI drafts; human review is pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deine aktuellen Einstellungen werden zum Rückgängigmachen gesichert. Downloadordner, Mitteilungen und Hintergrundzugriff müssen separat gewählt werden."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your current settings will be saved for undo. Download folders, notifications, and background access require separate choices."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tus ajustes actuales se guardarán para poder deshacer el cambio. Las carpetas de descarga, las notificaciones y el acceso en segundo plano se eligen por separado."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vos réglages actuels seront sauvegardés pour pouvoir annuler le changement. Les dossiers de téléchargement, les notifications et l’accès en arrière-plan se choisissent séparément."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le impostazioni attuali saranno salvate per poter annullare la modifica. Cartelle dei download, notifiche e accesso in background vanno scelti separatamente."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "変更を取り消せるように現在の設定を保存します。ダウンロード先、通知、バックグラウンドアクセスは個別に設定してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "변경을 취소할 수 있도록 현재 설정을 저장합니다. 다운로드 폴더, 알림 및 백그라운드 접근은 별도로 선택해야 합니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obecne ustawienia zostaną zapisane, aby umożliwić cofnięcie zmiany. Foldery pobierania, powiadomienia i dostęp w tle wybiera się osobno."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seus ajustes atuais serão salvos para desfazer a alteração. Pastas de download, notificações e acesso em segundo plano são escolhidos separadamente."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Текущие настройки будут сохранены для отмены изменений. Папки загрузки, уведомления и фоновый доступ выбираются отдельно."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişikliği geri alabilmeniz için mevcut ayarlarınız kaydedilir. İndirme klasörleri, bildirimler ve arka plan erişimi ayrı olarak seçilmelidir."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поточні налаштування буде збережено для скасування змін. Папки завантаження, сповіщення та фоновий доступ обираються окремо."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前设置将被保存，以便撤销更改。下载文件夹、通知和后台访问权限需要单独选择。"
           }
         }
       }

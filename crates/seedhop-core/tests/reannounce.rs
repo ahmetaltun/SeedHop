@@ -163,6 +163,7 @@ async fn live_controls_are_scoped_ephemeral_and_credential_safe_for_all_formats(
             state_directory: state.path().display().to_string(),
             download_directory: files.path().display().to_string(),
             allow_network_discovery: false,
+            allow_local_network: true,
             listen_port: 0,
         })
         .await
@@ -292,6 +293,7 @@ async fn private_backups_and_trackerless_torrents_never_gain_controls() {
         state_directory: state.path().display().to_string(),
         download_directory: files.path().display().to_string(),
         allow_network_discovery: false,
+        allow_local_network: true,
         listen_port: 0,
     })
     .await

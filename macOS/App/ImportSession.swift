@@ -68,6 +68,8 @@ import Combine
         do {
             // Reading even a bounded torrent file must not block the UI on a slow drive.
             let bytes = try await Task.detached(priority:.userInitiated) {
+                let scoped = file.startAccessingSecurityScopedResource()
+                defer { if scoped { file.stopAccessingSecurityScopedResource() } }
                 let handle = try FileHandle(forReadingFrom:file)
                 defer { try? handle.close() }
                 let maximum = 32 * 1024 * 1024

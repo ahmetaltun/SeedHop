@@ -139,8 +139,8 @@ async fn encryption_policies_and_invalid_public_keys_fail_closed() {
 
 mod forge {
     use crypto_bigint::{
-        Encoding, U768,
-        modular::runtime_mod::{DynResidue, DynResidueParams},
+        U768,
+        modular::{FixedMontyForm, FixedMontyParams},
     };
     use rc4::{KeyInit, Rc4, StreamCipher, consts::U20};
     use sha1::{Digest, Sha1};
@@ -150,7 +150,10 @@ mod forge {
         "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A63A36210000000000090563",
     );
     pub fn invalid_high_keys() -> [[u8; 96]; 2] {
-        [P.wrapping_sub(&U768::ONE).to_be_bytes(), P.to_be_bytes()]
+        [
+            P.wrapping_sub(&U768::ONE).to_be_bytes().into(),
+            P.to_be_bytes().into(),
+        ]
     }
     pub fn public() -> [u8; 96] {
         let mut result = [0; 96];
@@ -158,10 +161,14 @@ mod forge {
         result
     }
     pub fn shared(remote: &[u8; 96]) -> [u8; 96] {
-        DynResidue::new(&U768::from_be_slice(remote), DynResidueParams::new(&P))
-            .pow(&U768::from(3u8))
-            .retrieve()
-            .to_be_bytes()
+        FixedMontyForm::new(
+            &U768::from_be_slice(remote),
+            &FixedMontyParams::new_vartime(P.to_odd().unwrap()),
+        )
+        .pow(&U768::from(3u8))
+        .retrieve()
+        .to_be_bytes()
+        .into()
     }
     pub fn hash(parts: &[&[u8]]) -> [u8; 20] {
         let mut h = Sha1::new();
@@ -338,6 +345,7 @@ async fn engine_binds_mse_to_the_torrent_and_handles_a_fragmented_initial_handsh
             state_directory: state.path().display().to_string(),
             download_directory: files.path().display().to_string(),
             allow_network_discovery: false,
+            allow_local_network: true,
             listen_port: 0,
         },
         Policy::Require,

@@ -12,6 +12,9 @@ import ServiceManagement
     private var connection: NSXPCConnection?
     private(set) var background = false
     var onInterruption: (() -> Void)?
+    #if SEEDHOP_SANDBOX
+    private var folderGeneration: UInt64?
+    #endif
 
     func connect(background: Bool) throws {
         invalidate()
@@ -27,13 +30,30 @@ import ServiceManagement
         self.background = background
     }
     func invalidate() {
+        #if SEEDHOP_SANDBOX
+        folderGeneration = nil
+        #endif
         connection?.interruptionHandler = nil; connection?.invalidationHandler = nil
         connection?.invalidate(); connection = nil
     }
     func send(_ request: EngineRequest) async throws -> EngineReply {
         guard let connection else { throw UserFacingError(message:String(localized:"The engine is not connected yet.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
+        #if SEEDHOP_SANDBOX
+        var request = request
+        let generation: UInt64?
+        // Losing a folder grant must not prevent stopping the engine or changing
+        // offline network settings. Those operations do not need payload access.
+        if ["shutdown", "cancel", "cancelFileOperation", "networkInfo", "networkPolicy", "clearActivity", "statisticsInfo", "statisticsRetention"].contains(request.command) {
+            generation = nil
+        } else {
+            do {
+                generation = try FolderAccessStore.application.generation()
+                if folderGeneration != generation { request.folderGrants = try FolderAccessStore.application.transferBookmarks() }
+            } catch { throw EngineMessage(code:FolderAccessFailure.noticeCode(for:error)) }
+        }
+        #endif
         let data = try JSONEncoder().encode(request)
-        return try await withCheckedThrowingContinuation { continuation in
+        let result: EngineReply = try await withCheckedThrowingContinuation { continuation in
             let box = ReplyOnce(continuation)
             let timeout: TimeInterval = request.command == "inspect" ? 130 : (request.command == "shutdown" ? 40 : 15)
             // Startup may verify retained copies before the engine can reply.
@@ -54,6 +74,10 @@ import ServiceManagement
                 } catch { box.fail(error) }
             }
         }
+        #if SEEDHOP_SANDBOX
+        if let generation, self.connection === connection { folderGeneration = generation }
+        #endif
+        return result
     }
 }
 

@@ -973,6 +973,7 @@ impl core::fmt::Debug for ResponseOrError {
 }
 
 struct DhtWorker {
+    block_local_network: bool,
     socket: UdpSocket,
     dht: Arc<DhtState>,
 }
@@ -1167,6 +1168,24 @@ impl DhtWorker {
                 addr,
             }) = input_rx.recv().await
             {
+                if self.block_local_network
+                    && !librqbit_core::network_safety::is_public_destination(addr.ip())
+                {
+                    if let Some(tid) = our_tid {
+                        self.on_send_error(
+                            tid,
+                            addr,
+                            Error::lookup(
+                                "blocked destination",
+                                std::io::Error::new(
+                                    std::io::ErrorKind::PermissionDenied,
+                                    "local DHT destination requires explicit permission",
+                                ),
+                            ),
+                        );
+                    }
+                    continue;
+                }
                 if our_tid.is_none() {
                     trace!("{}: sending {:?}", addr, &message);
                 }
@@ -1291,6 +1310,7 @@ pub struct DhtConfig<'a> {
     pub peer_store: Option<PeerStore>,
     pub cancellation_token: Option<CancellationToken>,
     pub bind_device: Option<&'a BindDevice>,
+    pub block_local_network: bool,
 }
 
 impl DhtState {
@@ -1348,7 +1368,11 @@ impl DhtState {
                 {
                     let state = state.clone();
                     async move {
-                        let worker = DhtWorker { socket, dht: state };
+                        let worker = DhtWorker {
+                            socket,
+                            dht: state,
+                            block_local_network: config.block_local_network,
+                        };
                         worker.start(in_rx, &bootstrap_addrs).await
                     }
                 },
