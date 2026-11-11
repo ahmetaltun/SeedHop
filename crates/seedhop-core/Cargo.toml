@@ -23,7 +23,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 anyhow = "1"
-crypto-bigint = { version = "=0.5.5", default-features = false }
+crypto-bigint = { version = "=0.7.10", default-features = false }
 rc4 = "=0.1.0"
 librqbit-peer-protocol = { path = "../../vendor/rqbit/crates/peer_binary_protocol" }
 tempfile = "3"

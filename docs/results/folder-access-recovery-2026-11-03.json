@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-03",
+  "scope": "Reapproval-based folder-access archive recovery in sandbox development builds",
+  "cause": "remember() previously loaded the entire archive before saving a fresh approval, so archive corruption prevented the user from reapproving a folder.",
+  "implemented": [
+    "Validate and activate fresh folder authority before archive changes",
+    "Salvage structurally valid version-1 records while excluding conflicting duplicates",
+    "Preserve exact damaged bytes in an exclusive private backup before replacement",
+    "Bounded no-follow reads and per-role writer leases",
+    "Single atomic publication for each received grant batch",
+    "Refuse recognizable unsupported formats with a distinct compatibility notice",
+    "Renew stale bookmarks without overwriting a newer disk record",
+    "Balance scope lifetimes on failed and successful batches"
+  ],
+  "staticChecks": {
+    "sandboxHost": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/folder-recovery-host-compile.log"
+    },
+    "sandboxApplication": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/folder-recovery-app-compile.log"
+    },
+    "releaseApplication": {
+      "status": "passed",
+      "method": "Swift type-check only; sandbox code excluded",
+      "log": ".build/sandbox-development/folder-recovery-release-compile.log"
+    },
+    "diffWhitespace": {
+      "status": "passed",
+      "method": "git diff --check"
+    }
+  },
+  "limits": {
+    "archiveBytes": 4194304,
+    "records": 64,
+    "bookmarkBytes": 65536,
+    "pathUtf8Bytes": 4096
+  },
+  "localization": {
+    "newSourceEntries": 2,
+    "languages": 13,
+    "humanReview": "pending"
+  },
+  "runtimeTests": {
+    "executed": false,
+    "status": "deferred by user"
+  },
+  "stateChanges": {
+    "appLaunched": false,
+    "liveArchivesReadOrRepaired": false,
+    "userFolderGrantsCreated": false,
+    "productionLibraryChanged": false,
+    "vpnChanged": false
+  },
+  "limitations": [
+    "Unresolvable bookmarks remain stored but do not authorize access while unresolved.",
+    "Unreadable archive structures cannot supply inferred approvals; required folders must be reapproved.",
+    "Oversized, unsafe, inaccessible and recognizable unsupported-format archives are not rewritten.",
+    "Failed backup creation prevents active archive replacement; a later publication-durability failure can occur after atomic replacement.",
+    "Backups are retained privately without automatic pruning or cross-executable restore."
+  ],
+  "pending": [
+    "Exact backup-byte and corruption recovery acceptance",
+    "Malformed, mixed-validity and conflicting-duplicate records",
+    "Unknown formats, empty batches and invalid incoming grants",
+    "Failed backup, rename/sync interruption and disk-space behavior",
+    "Concurrent writers, stale renewals and balanced security-scope lifetimes",
+    "Signed foreground/background recovery",
+    "Native UI/localization/accessibility walkthroughs"
+  ],
+  "documentation": "../SANDBOX-MIGRATION.md",
+  "changes": "Uncommitted; production activation remains disabled"
+}

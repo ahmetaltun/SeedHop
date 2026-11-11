@@ -19,6 +19,7 @@ pub fn config(state: &Path, downloads: &Path) -> EngineConfig {
         state_directory: state.to_string_lossy().into(),
         download_directory: downloads.to_string_lossy().into(),
         allow_network_discovery: false,
+        allow_local_network: true,
         listen_port: 0,
     }
 }

@@ -1,7 +1,16 @@
 pub mod adapter;
 mod connection_settings;
+mod network_policy;
+pub use network_policy::{
+    NetworkInterface, NetworkPolicy, PrivateProtection, network_interfaces, network_preferences,
+    offline_private_protection, save_network_preferences,
+};
 mod diagnostics;
+mod private_payloads;
+mod state_backend;
+mod statistics_retention;
 pub use diagnostics::{PeerDetails, TorrentDetails, TrackerDetails};
+pub use statistics_retention::{save_statistics_preferences, statistics_preferences};
 mod file_operation;
 mod layout_journal;
 mod management;
@@ -27,17 +36,18 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-pub const PROTOCOL_VERSION: u32 = 9;
+pub const PROTOCOL_VERSION: u32 = 11;
 
 /// Owns library state. The FFI host retains this lease until its runtime has stopped.
 pub struct Engine {
     accounting: Mutex<diagnostics::Accounting>,
     statistics_warning: Mutex<Option<String>>,
     session: Arc<Session>,
+    network_policy: NetworkPolicy,
+    network_blocked: AtomicBool,
     active_peer_encryption: librqbit::EncryptionPolicy,
     connection_settings: Mutex<connection_settings::ConnectionSettings>,
-    lease: storage::LibraryLease,
-    state_directory: PathBuf,
+    state: state_backend::StateBackend,
     download_directory: PathBuf,
     instance_id: String,
     operations: RwLock<()>,
@@ -48,6 +58,66 @@ pub struct Engine {
     queue: Mutex<management::QueueConfig>,
     scheduling: Mutex<scheduling::Scheduling>,
     scheduling_warning: Mutex<Option<String>>,
+}
+
+struct EngineBootstrap {
+    state: state_backend::StateBackend,
+    connection_settings: connection_settings::ConnectionSettings,
+    accounting: diagnostics::Accounting,
+    queue: management::QueueConfig,
+    schedule: ScheduleConfig,
+    alternative: scheduling::AlternativeLimits,
+    limits: [u32; 2],
+    storage_recovery: Option<StorageRecovery>,
+}
+
+struct SessionNetworking {
+    discovery: bool,
+    allow_local_network: bool,
+    listen_port: u16,
+}
+
+fn session_options(
+    network_policy: &NetworkPolicy,
+    peer_encryption: librqbit::EncryptionPolicy,
+    networking: SessionNetworking,
+    startup_limits: [u32; 2],
+    restore_queued: bool,
+    persistence: Option<SessionPersistenceConfig>,
+) -> SessionOptions {
+    SessionOptions {
+        block_local_network: !(networking.allow_local_network
+            || network_policy.allow_local_network),
+        bind_device_name: network_policy.interface.as_ref().map(|i| i.name.clone()),
+        expected_bind_device_index: network_policy.interface.as_ref().map(|i| i.index),
+        bound_dns_server: network_policy
+            .dns_server
+            .map(|ip| std::net::SocketAddr::new(ip, 53)),
+        peer_encryption,
+        restore_queued,
+        ratelimits: librqbit::limits::LimitsConfig {
+            download_bps: NonZeroU32::new(startup_limits[0]),
+            upload_bps: NonZeroU32::new(startup_limits[1]),
+        },
+        dht: if networking.discovery {
+            Some(librqbit::DhtSessionConfig {
+                persistence: None,
+                ..Default::default()
+            })
+        } else {
+            None
+        },
+        disable_local_service_discovery: true,
+        fastresume: false, // Always recheck disk data in this preview; never trust stale piece maps.
+        listen: Some(librqbit::ListenerOptions {
+            mode: librqbit::ListenerMode::TcpAndUtp,
+            listen_addr: (std::net::Ipv6Addr::UNSPECIFIED, networking.listen_port).into(),
+            ..Default::default()
+        }),
+        persistence,
+        client_name_and_version: Some("SeedHop/0.1.0".into()),
+        ..Default::default()
+    }
 }
 
 impl Engine {
@@ -68,12 +138,23 @@ impl Engine {
     ) -> Result<Arc<Self>> {
         let dir = PathBuf::from(&config.state_directory);
         let lease = storage::LibraryLease::acquire(&dir)?;
-        let connection_settings = connection_settings::ConnectionSettings::load(&dir)?;
+        let mut connection_settings = connection_settings::ConnectionSettings::load(&dir)?;
+        // Finish an explicitly requested statistics purge before restoring any
+        // session work, even if the required network is currently unavailable.
+        connection_settings.complete_statistics_clear(&dir)?;
+        if connection_settings.network_policy_pending
+            || (connection_settings.requires_network_policy()
+                && !dir.join("network-policy.json").is_file())
+        {
+            return Err(CoreError::NetworkBlocked);
+        }
+        let network_policy = NetworkPolicy::load(&dir)?;
+        network_policy.check_available()?;
         let peer_encryption = override_policy.unwrap_or(connection_settings.peer_encryption);
         let downloads = PathBuf::from(&config.download_directory);
         storage::validate_destination(&downloads, &[])?;
         let session_dir = dir.join("session");
-        std::fs::create_dir_all(&session_dir).map_err(storage::io_error)?;
+        storage::private_directory(&session_dir)?;
         // Preserve unreadable state in place. Never overwrite it with an empty session.
         let session_path = session_dir.join("session.json");
         // Resolve interrupted layouts while the lease is exclusive and before
@@ -199,46 +280,121 @@ impl Engine {
         } else {
             limits
         };
-        let options = SessionOptions {
+        let options = session_options(
+            &network_policy,
             peer_encryption,
-            restore_queued: queue.max_active > 0 || schedule.enabled,
-            ratelimits: librqbit::limits::LimitsConfig {
-                download_bps: NonZeroU32::new(startup_limits[0]),
-                upload_bps: NonZeroU32::new(startup_limits[1]),
+            SessionNetworking {
+                discovery: config.allow_network_discovery,
+                allow_local_network: config.allow_local_network,
+                listen_port: config.listen_port,
             },
-            dht: if config.allow_network_discovery {
-                Some(librqbit::DhtSessionConfig {
-                    persistence: None,
-                    ..Default::default()
-                })
-            } else {
-                None
-            },
-            disable_local_service_discovery: true,
-            fastresume: false, // Always recheck disk data in this preview; never trust stale piece maps.
-            listen: Some(librqbit::ListenerOptions {
-                mode: librqbit::ListenerMode::TcpAndUtp,
-                listen_addr: (std::net::Ipv6Addr::UNSPECIFIED, config.listen_port).into(),
-                ..Default::default()
-            }),
-            persistence: Some(SessionPersistenceConfig::Json {
+            startup_limits,
+            queue.max_active > 0 || schedule.enabled,
+            Some(SessionPersistenceConfig::Json {
                 folder: Some(session_dir),
             }),
-            client_name_and_version: Some("SeedHop/0.1.0".into()),
-            ..Default::default()
-        };
+        );
+        Self::start_session(
+            downloads,
+            network_policy,
+            peer_encryption,
+            options,
+            EngineBootstrap {
+                state: state_backend::StateBackend::Library {
+                    directory: dir,
+                    lease,
+                },
+                connection_settings,
+                accounting,
+                queue,
+                schedule,
+                alternative,
+                limits,
+                storage_recovery,
+            },
+        )
+        .await
+    }
+
+    /// Core-only private backend. No state directory is accepted or created.
+    /// The caller must hold authority for the download parent throughout the
+    /// engine lifetime; native transient folder integration remains separate.
+    pub async fn open_private(config: PrivateEngineConfig) -> Result<Arc<Self>> {
+        config.network_policy.check_available()?;
+        let downloads = PathBuf::from(config.download_directory);
+        storage::validate_destination(&downloads, &[])?;
+        let payloads = private_payloads::PrivatePayloads::new(&downloads)?;
+        let mut connection_settings = connection_settings::ConnectionSettings::default();
+        connection_settings.peer_encryption = config.peer_encryption;
+        let options = session_options(
+            &config.network_policy,
+            config.peer_encryption,
+            SessionNetworking {
+                discovery: config.allow_network_discovery,
+                allow_local_network: false,
+                listen_port: 0,
+            },
+            [0, 0],
+            false,
+            None,
+        );
+        Self::start_session(
+            downloads,
+            config.network_policy,
+            config.peer_encryption,
+            options,
+            EngineBootstrap {
+                state: state_backend::StateBackend::Memory { payloads },
+                connection_settings,
+                accounting: diagnostics::Accounting::memory_only(),
+                queue: management::QueueConfig::default(),
+                schedule: ScheduleConfig::default(),
+                alternative: scheduling::AlternativeLimits::default(),
+                limits: [0, 0],
+                storage_recovery: None,
+            },
+        )
+        .await
+    }
+
+    async fn start_session(
+        downloads: PathBuf,
+        network_policy: NetworkPolicy,
+        peer_encryption: librqbit::EncryptionPolicy,
+        options: SessionOptions,
+        bootstrap: EngineBootstrap,
+    ) -> Result<Arc<Self>> {
+        let EngineBootstrap {
+            state,
+            connection_settings,
+            accounting,
+            queue,
+            schedule,
+            alternative,
+            limits,
+            storage_recovery,
+        } = bootstrap;
+        let downloads = downloads.canonicalize().map_err(storage::io_error)?;
+        network_policy.check_available()?;
         let session = Session::new_with_opts(downloads.clone(), options)
             .await
-            .map_err(adapter::engine_error)?;
+            .map_err(|error| {
+                if network_policy.interface.is_some() {
+                    CoreError::NetworkBlocked
+                } else {
+                    adapter::engine_error(error)
+                }
+            })?;
         let engine = Arc::new(Self {
             accounting: Mutex::new(accounting),
             statistics_warning: Mutex::new(None),
             session,
+            network_policy,
+            network_blocked: AtomicBool::new(false),
             active_peer_encryption: peer_encryption,
             connection_settings: Mutex::new(connection_settings),
-            lease,
-            state_directory: dir,
-            download_directory: downloads.canonicalize().map_err(storage::io_error)?,
+            state,
+            download_directory: downloads,
             instance_id: uuid::Uuid::new_v4().to_string(),
             operations: RwLock::new(()),
             file_operation: Mutex::new(None),
@@ -263,11 +419,26 @@ impl Engine {
         }
         let weak = Arc::downgrade(&engine);
         tokio::spawn(async move {
+            let mut next_activity_expiry = tokio::time::Instant::now();
             loop {
                 tokio::time::sleep(Duration::from_millis(250)).await;
                 let Some(engine) = weak.upgrade() else { break };
                 if engine.stopping.load(Ordering::SeqCst) {
                     break;
+                }
+                // Local history must expire even after protected networking
+                // blocks the engine. This does not alter transfer lifecycle.
+                let current = tokio::time::Instant::now();
+                if current >= next_activity_expiry {
+                    engine.expire_activity();
+                    next_activity_expiry = current + Duration::from_secs(30);
+                }
+                if engine.network_policy.check_available().is_err() {
+                    engine.network_blocked.store(true, Ordering::SeqCst);
+                    engine.session.cancellation_token().cancel();
+                }
+                if engine.network_blocked.load(Ordering::SeqCst) {
+                    continue;
                 }
                 // Metadata inspection is read-only and can wait on peers. Share
                 // its lock so calendar transitions still run; file changes and
@@ -277,11 +448,7 @@ impl Engine {
                 // report their own persistence errors directly to the caller.
                 let _ = engine.apply_scheduling().await;
                 engine.sample_accounting();
-                let saved = engine
-                    .accounting
-                    .lock()
-                    .unwrap()
-                    .checkpoint(&engine.state_directory, false);
+                let saved = engine.checkpoint_accounting(false);
                 *engine.statistics_warning.lock().unwrap() = saved.err().map(|_| "Transfer statistics could not be saved. Check space and access to the library folder. Totals remain in memory until saving succeeds.".into());
             }
         });
@@ -289,6 +456,9 @@ impl Engine {
     }
 
     fn ready(&self) -> Result<()> {
+        if self.network_blocked.load(Ordering::SeqCst) {
+            return Err(CoreError::NetworkBlocked);
+        }
         if self.stopping.load(Ordering::SeqCst) {
             Err(CoreError::Stopping)
         } else {
@@ -297,7 +467,9 @@ impl Engine {
     }
 
     pub fn snapshot(&self) -> Result<Snapshot> {
-        self.ready()?;
+        if self.stopping.load(Ordering::SeqCst) {
+            return Err(CoreError::Stopping);
+        }
         self.sample_accounting();
         let mut torrents = self.session.with_torrents(|ts| {
             ts.map(|(_, t)| {
@@ -348,6 +520,12 @@ impl Engine {
             alternative_download_limit: scheduling.alternative.download,
             alternative_upload_limit: scheduling.alternative.upload,
             alternative_limits_enabled: scheduling.alternative.enabled,
+            network_blocked: self.network_blocked.load(Ordering::SeqCst),
+            network_interface: self
+                .network_policy
+                .interface
+                .as_ref()
+                .map(|i| i.name.clone()),
             peer_encryption: connection_settings::name(self.active_peer_encryption).into(),
             saved_peer_encryption: connection_settings::name(
                 self.connection_settings.lock().unwrap().peer_encryption,
@@ -472,6 +650,11 @@ impl Engine {
         selected: Vec<u32>,
         options: TorrentAddOptions,
     ) -> Result<String> {
+        if self.is_private() {
+            return self
+                .add_with_options(bytes, destination, selected, options)
+                .await;
+        }
         let metadata = adapter::preview(bytes.clone())?;
         let parent = PathBuf::from(destination)
             .canonicalize()
@@ -500,6 +683,11 @@ impl Engine {
             sequential,
             first_last_pieces,
         } = options;
+        if self.is_private() && reuse {
+            return Err(CoreError::InvalidInput(
+                "Private transfers cannot adopt existing files.".into(),
+            ));
+        }
         let metadata = adapter::preview(bytes.clone())?;
         if self
             .snapshot()?
@@ -518,9 +706,17 @@ impl Engine {
                 message: "Select at least one file to download.".into(),
             });
         }
-        let root = PathBuf::from(destination)
-            .canonicalize()
-            .map_err(storage::io_error)?;
+        let (root, storage_factory) = if let Some(payloads) = self.state.payloads() {
+            let (root, factory) = payloads.prepare(Path::new(&destination), &metadata.id)?;
+            (root, Some(factory))
+        } else {
+            (
+                PathBuf::from(destination)
+                    .canonicalize()
+                    .map_err(storage::io_error)?,
+                None,
+            )
+        };
         // Force one explicit root so preflight validation matches the engine's actual paths.
         storage::validate_destination(
             &root,
@@ -545,10 +741,7 @@ impl Engine {
             .lock()
             .unwrap()
             .new_transfer(metadata.id.clone());
-        self.accounting
-            .lock()
-            .unwrap()
-            .checkpoint(&self.state_directory, true)?;
+        self.checkpoint_accounting(true)?;
         // Save admission order before membership: a failed queue write must never
         // report an unsuccessful Add after the torrent has already been added.
         self.save_force_started(&metadata.id, false)?;
@@ -566,6 +759,7 @@ impl Engine {
                     sequential,
                     first_last_pieces,
                     overwrite: reuse,
+                    storage_factory,
                     ..Default::default()
                 }),
             )
@@ -593,13 +787,21 @@ impl Engine {
 
     pub async fn set_paused(&self, id: String, paused: bool) -> Result<()> {
         let _operation = self.operations.write().await;
-        self.ready()?;
+        if !paused || !self.network_blocked.load(Ordering::SeqCst) {
+            self.ready()?;
+        }
+        if self.stopping.load(Ordering::SeqCst) {
+            return Err(CoreError::Stopping);
+        }
         let handle = self.handle(&id)?;
         if !paused {
             self.validate_resume_destination(&handle)?;
         }
         self.save_force_started(&id, false)?;
         self.apply_pause_intent(&handle, paused).await?;
+        if self.network_blocked.load(Ordering::SeqCst) {
+            return Ok(());
+        }
         self.reconcile_queue().await
     }
 
@@ -619,6 +821,9 @@ impl Engine {
         }
         let record = adapter::record(handle);
         let root = Path::new(&record.destination);
+        if let Some(payloads) = self.state.payloads() {
+            payloads.validate(&record.id, root)?;
+        }
         if !root.is_dir() {
             return Err(CoreError::Storage(format!(
                 "The saved destination is unavailable: {}. Reconnect the drive and retry.",
@@ -669,6 +874,7 @@ impl Engine {
     }
 
     pub async fn select_files(&self, id: String, indices: Vec<u32>) -> Result<()> {
+        self.state.require_library()?;
         let _operation = self.operations.write().await;
         self.ready()?;
         let handle = self.handle(&id)?;
@@ -733,6 +939,9 @@ impl Engine {
     fn validate_recheck_destination(&self, handle: &Arc<librqbit::ManagedTorrent>) -> Result<()> {
         let record = adapter::record(handle);
         let root = Path::new(&record.destination);
+        if let Some(payloads) = self.state.payloads() {
+            payloads.validate(&record.id, root)?;
+        }
         if !root.is_dir() {
             return Err(CoreError::Storage(format!(
                 "The saved destination is unavailable: {}. Reconnect the drive and retry.",
@@ -751,6 +960,9 @@ impl Engine {
     }
 
     pub async fn remove(&self, id: String, delete_files: bool) -> Result<()> {
+        if delete_files {
+            self.state.require_library()?;
+        }
         let _operation = self.operations.write().await;
         self.ready()?;
         if self
@@ -782,12 +994,11 @@ impl Engine {
             .await
             .map_err(adapter::engine_error)?;
         self.accounting.lock().unwrap().entries.remove(&id);
+        if let Some(payloads) = self.state.payloads() {
+            payloads.forget(&id);
+        }
         self.reconcile_queue().await?;
-        let saved = self
-            .accounting
-            .lock()
-            .unwrap()
-            .checkpoint(&self.state_directory, true);
+        let saved = self.checkpoint_accounting(true);
         *self.statistics_warning.lock().unwrap() = saved.err().map(|_| "Transfer statistics could not be saved. Check space and access to the library folder. Totals remain in memory until saving succeeds.".into());
         if delete_files {
             let root = Path::new(&record.destination);
@@ -815,7 +1026,9 @@ impl Engine {
         let _operation = self.operations.write().await;
         self.ready()?;
         let value = serde_json::to_vec(&[down, up]).map_err(adapter::engine_error)?;
-        storage::atomic_write(&self.state_directory.join("limits.json"), &value)?;
+        if let Some(root) = self.state.root() {
+            storage::atomic_write(&root.join("limits.json"), &value)?;
+        }
         self.scheduling.lock().unwrap().normal_limits = [down, up];
         self.reconcile_schedule();
         Ok(())
@@ -832,13 +1045,27 @@ impl Engine {
             .await
             .map_err(adapter::engine_error)?;
         self.sample_accounting();
-        self.accounting
-            .lock()
-            .unwrap()
-            .checkpoint(&self.state_directory, true)
+        if let Some(root) = self.state.root() {
+            self.accounting.lock().unwrap().checkpoint_on_shutdown(root)
+        } else {
+            Ok(())
+        }
     }
 
-    pub fn retain_lease(&self) -> &storage::LibraryLease {
-        &self.lease
+    /// A memory-only engine owns no persistent library lease.
+    pub fn retain_lease(&self) -> Option<&storage::LibraryLease> {
+        self.state.lease()
+    }
+
+    pub fn is_private(&self) -> bool {
+        self.state.root().is_none()
+    }
+
+    fn checkpoint_accounting(&self, force: bool) -> Result<()> {
+        if let Some(root) = self.state.root() {
+            self.accounting.lock().unwrap().checkpoint(root, force)
+        } else {
+            Ok(())
+        }
     }
 }

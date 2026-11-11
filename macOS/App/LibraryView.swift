@@ -29,6 +29,16 @@ struct LibraryView: View {
 
     var body: some View {
         presentedWorkspace
+            .safeAreaInset(edge:.top,spacing:0) {
+                if store.networkBlocked {
+                    HStack {
+                        Image(systemName:"network.badge.shield.half.filled")
+                        Text(String(localized:"Transfers blocked by network protection. Review Transfers in Settings.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                            .font(.system(size:11)).fixedSize(horizontal:false,vertical:true)
+                        Spacer()
+                    }.padding(10).background(Design.card)
+                }
+            }
             // Notice ownership stays outside resizable hosting panes, so layout
             // changes cannot remount announcement gates or repeat speech.
             .announceAccessibility(store.statisticsWarning)

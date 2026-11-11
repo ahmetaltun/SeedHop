@@ -36,6 +36,7 @@ async fn layout_lab(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
         state_directory: state,
         download_directory: files.clone(),
         allow_network_discovery: false,
+        allow_local_network: true,
         listen_port: 0,
     })
     .await?;
@@ -280,6 +281,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 state_directory: state,
                 download_directory: downloads.clone(),
                 allow_network_discovery: false,
+                allow_local_network: true,
                 listen_port: 0,
             })
             .await?;
@@ -314,6 +316,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 state_directory: state,
                 download_directory: downloads.clone(),
                 allow_network_discovery: false,
+                allow_local_network: true,
                 listen_port: 0,
             })
             .await?;
@@ -352,6 +355,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 state_directory: state,
                 download_directory: downloads.clone(),
                 allow_network_discovery: command == "benchmark-magnet",
+                allow_local_network: true,
                 listen_port: 0,
             })
             .await?;

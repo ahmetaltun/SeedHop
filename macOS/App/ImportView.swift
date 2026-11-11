@@ -10,8 +10,8 @@ struct ImportView: View {
     @FocusState private var filesFocused: Bool
     @State private var focusedFiles = Set<UInt32>()
 
-    init(preview: ImportPreview? = nil) {
-        _session = StateObject(wrappedValue:ImportSession(preview:preview))
+    init(preview: ImportPreview? = nil, privateSession: Bool = false) {
+        _session = StateObject(wrappedValue:ImportSession(preview:preview,privateSession:privateSession))
     }
 
     var body: some View {
@@ -57,7 +57,9 @@ struct ImportView: View {
                             Image(systemName:"folder").foregroundStyle(Design.green)
                             Text(session.downloadPath.replacingOccurrences(of:NSHomeDirectory(),with:"~")).font(.system(size:11)).lineLimit(1).truncationMode(.middle).help(session.downloadPath)
                             Spacer()
-                            Button(String(localized:"Choose…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),action:chooseFolder).controlSize(.small).focused($focus,equals:.destination).accessibilityLabel(String(localized:"Choose download folder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                            if !store.isPrivate {
+                                Button(String(localized:"Choose…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),action:chooseFolder).controlSize(.small).focused($focus,equals:.destination).accessibilityLabel(String(localized:"Choose download folder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                            }
                         }.padding(12).background(Design.card,in:RoundedRectangle(cornerRadius:8)).overlay(RoundedRectangle(cornerRadius:8).stroke(Design.line))
                     }
                     HStack(alignment:.top,spacing:24) {
@@ -71,7 +73,9 @@ struct ImportView: View {
                         }.frame(maxWidth:.infinity,alignment:.leading)
                         VStack(alignment:.leading,spacing:9) {
                             Toggle(isOn:$session.paused) { Text(String(localized:"Add paused",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).fixedSize(horizontal:false,vertical:true) }
-                            Toggle(isOn:$session.reuse) { Text(String(localized:"Verify and reuse existing files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).fixedSize(horizontal:false,vertical:true) }
+                            if !store.isPrivate {
+                                Toggle(isOn:$session.reuse) { Text(String(localized:"Verify and reuse existing files",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).fixedSize(horizontal:false,vertical:true) }
+                            }
                         }.frame(maxWidth:.infinity,alignment:.leading)
                     }.toggleStyle(.checkbox).font(.system(size:11))
                 } else {
@@ -132,7 +136,16 @@ struct ImportView: View {
     private func chooseFolder() {
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
         panel.directoryURL = URL(fileURLWithPath:session.destination)
-        panel.begin { if $0 == .OK, let url = panel.url { session.destination = url.path }; focus = .destination }
+        panel.begin {
+            if $0 == .OK, let url = panel.url {
+                #if SEEDHOP_SANDBOX
+                do { try FolderAccessStore.application.remember(url) }
+                catch { store.error = EngineMessage(code:FolderAccessFailure.noticeCode(for:error)).localizedDescription; return }
+                #endif
+                session.destination = url.path
+            }
+            focus = .destination
+        }
     }
     private func chooseFile() {
         let panel = NSOpenPanel(); panel.allowedContentTypes = [UTType(filenameExtension:"torrent")!]

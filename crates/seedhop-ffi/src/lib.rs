@@ -1,4 +1,5 @@
-use seedhop_core::{Engine, EngineConfig};
+use seedhop_core::{Engine, EngineConfig, PrivateEngineConfig, PrivateProtection};
+use std::future::Future;
 use std::sync::{Arc, Mutex};
 uniffi::setup_scaffolding!();
 
@@ -260,6 +261,8 @@ pub struct EngineSnapshot {
     pub alternative_download_limit: u32,
     pub alternative_upload_limit: u32,
     pub alternative_limits_enabled: bool,
+    pub network_blocked: bool,
+    pub network_interface: Option<String>,
     pub peer_encryption: String,
     pub saved_peer_encryption: String,
     pub protocol_version: u32,
@@ -289,6 +292,27 @@ pub struct EngineBridge {
 }
 
 impl EngineBridge {
+    fn launch(
+        start: impl Future<Output = seedhop_core::Result<Arc<Engine>>> + Send + 'static,
+    ) -> Result<Arc<Self>, BridgeError> {
+        let runtime = Arc::new(
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .worker_threads(2)
+                .build()
+                .map_err(error)?,
+        );
+        // Start on a Tokio worker, away from the smaller macOS dispatch stack.
+        let core = runtime
+            .block_on(runtime.spawn(start))
+            .map_err(error)?
+            .map_err(error)?;
+        Ok(Arc::new(Self {
+            core: Mutex::new(Some(core)),
+            runtime: Mutex::new(Some(runtime)),
+        }))
+    }
+
     fn handles(&self) -> Result<(Arc<Engine>, Arc<tokio::runtime::Runtime>), BridgeError> {
         let core = self
             .core
@@ -315,32 +339,46 @@ impl EngineBridge {
         state_directory: String,
         download_directory: String,
         discovery: bool,
+        allow_local_network: bool,
     ) -> Result<Arc<Self>, BridgeError> {
-        let runtime = Arc::new(
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .worker_threads(2)
-                .build()
-                .map_err(error)?,
-        );
         let config = EngineConfig {
             state_directory,
             download_directory,
             allow_network_discovery: discovery,
+            allow_local_network,
             listen_port: 0,
         };
-        // Runtime::block_on polls its root future on the calling thread.
-        // macOS dispatch queues have a small stack; constructing the uTP
-        // dispatcher there overflows it even when Session::new is boxed.
-        // Construct and poll the engine on an owned Tokio worker instead.
-        let core = runtime
-            .block_on(runtime.spawn(async move { Engine::open(config).await }))
-            .map_err(error)?
-            .map_err(error)?;
-        Ok(Arc::new(Self {
-            core: Mutex::new(Some(core)),
-            runtime: Mutex::new(Some(runtime)),
+        Self::launch(Engine::open(config))
+    }
+
+    #[uniffi::constructor]
+    pub fn new_private(
+        download_directory: String,
+        protection: String,
+        discovery: bool,
+    ) -> Result<Arc<Self>, BridgeError> {
+        let settings: PrivateProtection = serde_json::from_str(&protection).map_err(error)?;
+        Self::launch(Engine::open_private(PrivateEngineConfig {
+            download_directory,
+            network_policy: settings.network_policy,
+            peer_encryption: settings.peer_encryption,
+            allow_network_discovery: discovery,
         }))
+    }
+
+    pub fn private_protection(&self) -> Result<String, BridgeError> {
+        let (core, runtime) = self.handles()?;
+        let settings = runtime.block_on(core.private_protection()).map_err(error)?;
+        serde_json::to_string(&settings).map_err(error)
+    }
+    pub fn network_info(&self) -> Result<String, BridgeError> {
+        self.handles()?.0.network_info().map_err(error)
+    }
+    pub fn set_network_policy(&self, policy: String) -> Result<(), BridgeError> {
+        let (core, runtime) = self.handles()?;
+        runtime
+            .block_on(core.set_network_policy(policy))
+            .map_err(error)
     }
     pub fn set_peer_encryption(&self, policy: String) -> Result<(), BridgeError> {
         let (core, runtime) = self.handles()?;
@@ -419,6 +457,8 @@ impl EngineBridge {
             alternative_download_limit: s.alternative_download_limit,
             alternative_upload_limit: s.alternative_upload_limit,
             alternative_limits_enabled: s.alternative_limits_enabled,
+            network_blocked: s.network_blocked,
+            network_interface: s.network_interface,
             peer_encryption: s.peer_encryption,
             saved_peer_encryption: s.saved_peer_encryption,
             protocol_version: s.protocol_version,
@@ -517,6 +557,18 @@ impl EngineBridge {
     pub fn force_recheck(&self, id: String) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;
         rt.block_on(core.force_recheck(id)).map_err(error)
+    }
+    pub fn clear_activity(&self) -> Result<(), BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.clear_activity()).map_err(error)
+    }
+    pub fn statistics_preferences(&self) -> Result<String, BridgeError> {
+        self.handles()?.0.statistics_preferences().map_err(error)
+    }
+    pub fn set_statistics_retention(&self, remember: bool) -> Result<String, BridgeError> {
+        let (core, rt) = self.handles()?;
+        rt.block_on(core.set_statistics_retention(remember))
+            .map_err(error)
     }
     pub fn retry_transfer(&self, id: String) -> Result<(), BridgeError> {
         let (core, rt) = self.handles()?;
@@ -623,6 +675,13 @@ impl EngineBridge {
 }
 
 #[uniffi::export]
+pub fn offline_private_protection(state_directory: String) -> Result<String, BridgeError> {
+    let settings = seedhop_core::offline_private_protection(std::path::Path::new(&state_directory))
+        .map_err(error)?;
+    serde_json::to_string(&settings).map_err(error)
+}
+
+#[uniffi::export]
 pub fn protocol_version() -> u32 {
     seedhop_core::PROTOCOL_VERSION
 }
@@ -702,6 +761,7 @@ mod tests {
             state.path().display().to_string(),
             downloads.path().display().to_string(),
             false,
+            true,
         )
         .unwrap();
         let id = bridge
@@ -745,7 +805,7 @@ mod tests {
             serde_json::from_str(&bridge.snapshot_json().unwrap()).unwrap();
         assert_eq!(json["torrents"][0]["forceStarted"], true);
         assert_eq!(json["torrents"][0]["canReannounce"], false);
-        assert_eq!(json["protocolVersion"], 9);
+        assert_eq!(json["protocolVersion"], seedhop_core::PROTOCOL_VERSION);
         bridge.set_paused(id, false).unwrap();
         assert!(!bridge.snapshot().unwrap().torrents[0].force_started);
         bridge.shutdown().unwrap();
@@ -763,6 +823,7 @@ mod tests {
                     state.path().to_string_lossy().into_owned(),
                     downloads.path().to_string_lossy().into_owned(),
                     false,
+                    true,
                 )
                 .unwrap();
                 let snapshot = bridge.snapshot().unwrap();
@@ -780,4 +841,29 @@ mod tests {
             .join()
             .unwrap();
     }
+}
+
+#[uniffi::export]
+pub fn network_preferences(state_directory: String) -> Result<String, BridgeError> {
+    seedhop_core::network_preferences(std::path::Path::new(&state_directory)).map_err(error)
+}
+#[uniffi::export]
+pub fn statistics_preferences(state_directory: String) -> Result<String, BridgeError> {
+    seedhop_core::statistics_preferences(std::path::Path::new(&state_directory)).map_err(error)
+}
+#[uniffi::export]
+pub fn save_statistics_preferences(
+    state_directory: String,
+    remember: bool,
+) -> Result<String, BridgeError> {
+    seedhop_core::save_statistics_preferences(std::path::Path::new(&state_directory), remember)
+        .map_err(error)
+}
+#[uniffi::export]
+pub fn save_network_preferences(
+    state_directory: String,
+    policy: String,
+) -> Result<(), BridgeError> {
+    seedhop_core::save_network_preferences(std::path::Path::new(&state_directory), &policy)
+        .map_err(error)
 }

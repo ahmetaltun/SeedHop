@@ -1,0 +1,1420 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index fe69a89..ded6d88 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -110,7 +110,7 @@ itertools = "0.15"
+ leaky-bucket = "1.1"
+ libc = "0.2"
+ librqbit-dualstack-sockets = "0.7"
+-librqbit-utp = "0.7"
++librqbit-utp = { path = "../librqbit-utp" }
+ lru = "0.18"
+ mdns-sd = "0.21"
+ memchr = "2"
+diff --git a/crates/bencode/Cargo.toml b/crates/bencode/Cargo.toml
+index 7228294..5308fea 100644
+--- a/crates/bencode/Cargo.toml
++++ b/crates/bencode/Cargo.toml
+@@ -14,7 +14,6 @@ serde_derive.workspace = true
+ buffers.workspace = true
+ clone_to_owned.workspace = true
+ bytes.workspace = true
+-atoi.workspace = true
+ thiserror.workspace = true
+ arrayvec.workspace = true
+ anyhow.workspace = true
+diff --git a/crates/bencode/src/deserialize.rs b/crates/bencode/src/deserialize.rs
+index 78ee11e..4daec2b 100644
+--- a/crates/bencode/src/deserialize.rs
++++ b/crates/bencode/src/deserialize.rs
+@@ -1,7 +1,6 @@
+ use std::marker::PhantomData;
+ 
+ use arrayvec::ArrayVec;
+-use atoi::{FromRadix10, FromRadix10Signed};
+ use buffers::ByteBuf;
+ use clone_to_owned::CloneToOwned;
+ use serde::{Deserialize, Serialize, forward_to_deserialize_any};
+@@ -13,6 +12,7 @@ pub struct BencodeDeserializer<'de> {
+     field_context: ErrorContext<'de>,
+     field_context_did_not_fit: u8,
+     parsing_key: bool,
++    depth: u8,
+ }
+ 
+ impl<'de> BencodeDeserializer<'de> {
+@@ -22,6 +22,7 @@ impl<'de> BencodeDeserializer<'de> {
+             field_context: Default::default(),
+             field_context_did_not_fit: 0,
+             parsing_key: false,
++            depth: 0,
+         }
+     }
+ 
+@@ -41,27 +42,48 @@ impl<'de> BencodeDeserializer<'de> {
+         }
+     }
+ 
+-    fn parse_integer<I>(&mut self, atoi: impl Fn(&'de [u8]) -> (I, usize)) -> Result<I, Error> {
++    fn parse_integer<I: std::str::FromStr>(&mut self) -> Result<I, Error> {
+         self.parse_first_byte(b'i', Error::InvalidValue)?;
+-        match atoi(self.buf) {
+-            (v, len) if len > 0 && self.buf.get(len) == Some(&b'e') => {
+-                self.buf = &self.buf[len + 1..];
+-                Ok(v)
+-            }
+-            _ => Err(Error::InvalidValue),
++        // Every supported integer fits within 20 digits plus a sign. Parse with
++        // checked arithmetic: unchecked atoi can panic or wrap on hostile input.
++        let end = self
++            .buf
++            .iter()
++            .take(22)
++            .position(|&c| c == b'e')
++            .ok_or(Error::InvalidValue)?;
++        let bytes = &self.buf[..end];
++        let digits = bytes.strip_prefix(b"-").unwrap_or(bytes);
++        if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) {
++            return Err(Error::InvalidValue);
+         }
++        let value = std::str::from_utf8(bytes)
++            .map_err(|_| Error::InvalidValue)?
++            .parse::<I>()
++            .map_err(|_| Error::InvalidValue)?;
++        self.buf = &self.buf[end + 1..];
++        Ok(value)
+     }
+ 
+     fn parse_bytes(&mut self) -> Result<&'de [u8], Error> {
+-        let b = match usize::from_radix_10(self.buf) {
+-            (v, len) if len > 0 && self.buf.get(len) == Some(&b':') => {
+-                self.buf = unsafe { self.buf.get_unchecked(len + 1..) };
+-                let (bytes, rest) = self.buf.split_at_checked(v).ok_or(Error::Eof)?;
+-                self.buf = rest;
+-                bytes
+-            }
+-            _ => return Err(Error::InvalidValue),
+-        };
++        let end = self
++            .buf
++            .iter()
++            .take(21)
++            .position(|&c| c == b':')
++            .ok_or(Error::InvalidValue)?;
++        let digits = &self.buf[..end];
++        if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) {
++            return Err(Error::InvalidValue);
++        }
++        let length = std::str::from_utf8(digits)
++            .map_err(|_| Error::InvalidValue)?
++            .parse::<usize>()
++            .map_err(|_| Error::InvalidValue)?;
++        let (b, rest) = self.buf[end + 1..]
++            .split_at_checked(length)
++            .ok_or(Error::Eof)?;
++        self.buf = rest;
+         if self.parsing_key && self.field_context.try_push(ByteBuf(b)).is_err() {
+             self.field_context_did_not_fit = self.field_context_did_not_fit.saturating_add(1);
+         }
+@@ -197,7 +219,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut BencodeDeserializer<'de> {
+     where
+         V: serde::de::Visitor<'de>,
+     {
+-        let value = self.parse_integer::<u8>(u8::from_radix_10)?;
++        let value = self.parse_integer::<u8>()?;
+         if value > 1 {
+             return Err(Error::InvalidBool(value));
+         }
+@@ -208,56 +230,56 @@ impl<'de> serde::de::Deserializer<'de> for &mut BencodeDeserializer<'de> {
+     where
+         V: serde::de::Visitor<'de>,
+     {
+-        visitor.visit_i8(self.parse_integer(i8::from_radix_10_signed)?)
++        visitor.visit_i8(self.parse_integer::<i8>()?)
+     }
+ 
+     fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+     where
+         V: serde::de::Visitor<'de>,
+     {
+-        visitor.visit_i16(self.parse_integer(i16::from_radix_10_signed)?)
++        visitor.visit_i16(self.parse_integer::<i16>()?)
+     }
+ 
+     fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+     where
+         V: serde::de::Visitor<'de>,
+     {
+-        visitor.visit_i32(self.parse_integer(i32::from_radix_10_signed)?)
++        visitor.visit_i32(self.parse_integer::<i32>()?)
+     }
+ 
+     fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+     where
+         V: serde::de::Visitor<'de>,
+     {
+-        visitor.visit_i64(self.parse_integer(i64::from_radix_10_signed)?)
++        visitor.visit_i64(self.parse_integer::<i64>()?)
+     }
+ 
+     fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+     where
+         V: serde::de::Visitor<'de>,
+     {
+-        visitor.visit_u8(self.parse_integer(u8::from_radix_10)?)
++        visitor.visit_u8(self.parse_integer::<u8>()?)
+     }
+ 
+     fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+     where
+         V: serde::de::Visitor<'de>,
+     {
+-        visitor.visit_u16(self.parse_integer(u16::from_radix_10)?)
++        visitor.visit_u16(self.parse_integer::<u16>()?)
+     }
+ 
+     fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+     where
+         V: serde::de::Visitor<'de>,
+     {
+-        visitor.visit_u32(self.parse_integer(u32::from_radix_10)?)
++        visitor.visit_u32(self.parse_integer::<u32>()?)
+     }
+ 
+     fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+     where
+         V: serde::de::Visitor<'de>,
+     {
+-        visitor.visit_u64(self.parse_integer(u64::from_radix_10)?)
++        visitor.visit_u64(self.parse_integer::<u64>()?)
+     }
+ 
+     fn deserialize_f32<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+@@ -359,7 +381,13 @@ impl<'de> serde::de::Deserializer<'de> for &mut BencodeDeserializer<'de> {
+         V: serde::de::Visitor<'de>,
+     {
+         self.parse_first_byte(b'l', Error::InvalidValue)?;
+-        visitor.visit_seq(SeqAccess { de: self })
++        if self.depth >= 64 {
++            return Err(Error::InvalidValue);
++        }
++        self.depth += 1;
++        let result = visitor.visit_seq(SeqAccess { de: self });
++        self.depth -= 1;
++        result
+     }
+ 
+     fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
+@@ -386,7 +414,13 @@ impl<'de> serde::de::Deserializer<'de> for &mut BencodeDeserializer<'de> {
+         V: serde::de::Visitor<'de>,
+     {
+         self.parse_first_byte(b'd', Error::InvalidValue)?;
+-        visitor.visit_map(MapAccess { de: self })
++        if self.depth >= 64 {
++            return Err(Error::InvalidValue);
++        }
++        self.depth += 1;
++        let result = visitor.visit_map(MapAccess { de: self });
++        self.depth -= 1;
++        result
+     }
+ 
+     fn deserialize_struct<V>(
+@@ -770,4 +804,39 @@ mod tests {
+             }
+         );
+     }
++    #[test]
++    fn integer_overflow_is_rejected_without_panicking_or_wrapping() {
++        assert!(from_bytes::<u32>(b"i4294967296e").is_err());
++        assert!(from_bytes::<u64>(b"i18446744073709551616e").is_err());
++        assert!(from_bytes::<i64>(b"i9223372036854775808e").is_err());
++        assert!(from_bytes::<i64>(b"i-9223372036854775809e").is_err());
++        assert_eq!(
++            from_bytes::<u64>(b"i18446744073709551615e").unwrap(),
++            u64::MAX
++        );
++        assert_eq!(
++            from_bytes::<i64>(b"i-9223372036854775808e").unwrap(),
++            i64::MIN
++        );
++    }
++    #[test]
++    fn byte_string_length_overflow_is_rejected_before_slicing() {
++        assert!(from_bytes::<ByteBuf>(b"18446744073709551616:x").is_err());
++        assert!(from_bytes::<ByteBuf>(b"9999999999999999999999999999999999999:x").is_err());
++    }
++    #[test]
++    fn nested_containers_have_a_checked_depth_limit() {
++        for depth in [1, 64, 65, 1024] {
++            let input = [vec![b'l'; depth], b"0:".to_vec(), vec![b'e'; depth]].concat();
++            assert_eq!(
++                from_bytes::<serde::de::IgnoredAny>(&input).is_ok(),
++                depth <= 64
++            );
++            let input = [b"d1:x".repeat(depth), b"0:".to_vec(), vec![b'e'; depth]].concat();
++            assert_eq!(
++                from_bytes::<serde::de::IgnoredAny>(&input).is_ok(),
++                depth <= 64
++            );
++        }
++    }
+ }
+diff --git a/crates/dht/src/dht.rs b/crates/dht/src/dht.rs
+index 2c79925..bf000bc 100644
+--- a/crates/dht/src/dht.rs
++++ b/crates/dht/src/dht.rs
+@@ -973,6 +973,7 @@ impl core::fmt::Debug for ResponseOrError {
+ }
+ 
+ struct DhtWorker {
++    block_local_network: bool,
+     socket: UdpSocket,
+     dht: Arc<DhtState>,
+ }
+@@ -1167,6 +1168,24 @@ impl DhtWorker {
+                 addr,
+             }) = input_rx.recv().await
+             {
++                if self.block_local_network
++                    && !librqbit_core::network_safety::is_public_destination(addr.ip())
++                {
++                    if let Some(tid) = our_tid {
++                        self.on_send_error(
++                            tid,
++                            addr,
++                            Error::lookup(
++                                "blocked destination",
++                                std::io::Error::new(
++                                    std::io::ErrorKind::PermissionDenied,
++                                    "local DHT destination requires explicit permission",
++                                ),
++                            ),
++                        );
++                    }
++                    continue;
++                }
+                 if our_tid.is_none() {
+                     trace!("{}: sending {:?}", addr, &message);
+                 }
+@@ -1291,6 +1310,7 @@ pub struct DhtConfig<'a> {
+     pub peer_store: Option<PeerStore>,
+     pub cancellation_token: Option<CancellationToken>,
+     pub bind_device: Option<&'a BindDevice>,
++    pub block_local_network: bool,
+ }
+ 
+ impl DhtState {
+@@ -1348,7 +1368,11 @@ impl DhtState {
+                 {
+                     let state = state.clone();
+                     async move {
+-                        let worker = DhtWorker { socket, dht: state };
++                        let worker = DhtWorker {
++                            socket,
++                            dht: state,
++                            block_local_network: config.block_local_network,
++                        };
+                         worker.start(in_rx, &bootstrap_addrs).await
+                     }
+                 },
+diff --git a/crates/librqbit/Cargo.toml b/crates/librqbit/Cargo.toml
+index 5f25a44..0878f24 100644
+--- a/crates/librqbit/Cargo.toml
++++ b/crates/librqbit/Cargo.toml
+@@ -110,7 +110,7 @@ librqbit-dualstack-sockets = { workspace = true, features = ["axum"] }
+ socket2.workspace = true
+ nix = { workspace = true, features = ["uio"] }
+ thiserror.workspace = true
+-crypto-bigint = { version = "=0.5.5", default-features = false, features = ["zeroize"] }
++crypto-bigint = { version = "=0.7.10", default-features = false, features = ["zeroize"] }
+ rc4 = { version = "=0.1.0", features = ["zeroize"] }
+ zeroize = "1"
+ 
+diff --git a/crates/librqbit/src/mse.rs b/crates/librqbit/src/mse.rs
+index 7827eb0..d84bbf1 100644
+--- a/crates/librqbit/src/mse.rs
++++ b/crates/librqbit/src/mse.rs
+@@ -7,8 +7,8 @@ use std::{
+ };
+ 
+ use crypto_bigint::{
+-    Encoding, U256, U768,
+-    modular::runtime_mod::{DynResidue, DynResidueParams},
++    U256, U768,
++    modular::{FixedMontyForm, FixedMontyParams},
+ };
+ use rand::{TryRng, rngs::SysRng};
+ use rc4::{KeyInit, Rc4, StreamCipher, consts::U20};
+@@ -22,7 +22,12 @@ const MAX_PAD: usize = 512;
+ const PRIME: U768 = U768::from_be_hex(
+     "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A63A36210000000000090563",
+ );
+-const PARAMS: DynResidueParams<{ U768::LIMBS }> = DynResidueParams::new(&PRIME);
++// Only the public modulus uses variable-time parameter construction. Secret
++// exponents continue through fixed-width constant-time exponentiation.
++static PARAMS: std::sync::LazyLock<FixedMontyParams<{ U768::LIMBS }>> =
++    std::sync::LazyLock::new(|| {
++        FixedMontyParams::new_vartime(PRIME.to_odd().expect("MSE modulus is odd"))
++    });
+ 
+ #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+ #[serde(rename_all = "snake_case")]
+@@ -103,10 +108,11 @@ impl Exchange {
+         })
+     }
+     fn public(&self) -> [u8; 96] {
+-        DynResidue::new(&U768::from(2u8), PARAMS)
++        FixedMontyForm::new(&U768::from(2u8), &PARAMS)
+             .pow(&*self.secret)
+             .retrieve()
+             .to_be_bytes()
++            .into()
+     }
+     fn shared(&self, key: &[u8; 96]) -> Result<Zeroizing<[u8; 96]>, Error> {
+         let public = U768::from_be_slice(key);
+@@ -114,11 +120,11 @@ impl Exchange {
+             return Err(Error::PublicKey);
+         }
+         let shared = Zeroizing::new(
+-            DynResidue::new(&public, PARAMS)
++            FixedMontyForm::new(&public, &PARAMS)
+                 .pow(&*self.secret)
+                 .retrieve(),
+         );
+-        Ok(Zeroizing::new(shared.to_be_bytes()))
++        Ok(Zeroizing::new(shared.to_be_bytes().into()))
+     }
+ }
+ 
+diff --git a/crates/librqbit/src/peer_info_reader/mod.rs b/crates/librqbit/src/peer_info_reader/mod.rs
+index 28e844e..3118f9c 100644
+--- a/crates/librqbit/src/peer_info_reader/mod.rs
++++ b/crates/librqbit/src/peer_info_reader/mod.rs
+@@ -343,7 +343,6 @@ pub type TorrentAndInfoBytes = (TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned);
+ struct Handler {
+     progress: tokio::sync::watch::Sender<Option<(tokio::time::Instant, std::time::Duration)>>,
+     metadata_slots: Arc<tokio::sync::Semaphore>,
+-    metadata_permit: Mutex<Option<tokio::sync::OwnedSemaphorePermit>>,
+     privacy: Arc<MetadataPrivacy>,
+     addr: SocketAddr,
+     identity: MetadataIdentity,
+@@ -359,6 +358,9 @@ struct Handler {
+     >,
+     locked: RwLock<Option<HandlerLocked>>,
+     client_name_and_version: String,
++    // Rust drops fields in declaration order. Free dictionaries and pending
++    // proof buffers before returning their shared allocation permit.
++    metadata_permit: Mutex<Option<tokio::sync::OwnedSemaphorePermit>>,
+ }
+ 
+ impl Handler {
+diff --git a/crates/librqbit/src/session.rs b/crates/librqbit/src/session.rs
+index 26917d7..62b5d89 100644
+--- a/crates/librqbit/src/session.rs
++++ b/crates/librqbit/src/session.rs
+@@ -121,6 +121,7 @@ pub struct Session {
+     dht: Option<Dht>,
+     pub(crate) connector: Arc<StreamConnector>,
+     reqwest_client: reqwest::Client,
++    block_local_network: bool,
+     udp_tracker_client: UdpTrackerClient,
+     disable_trackers: bool,
+     tracker_controls:
+@@ -165,7 +166,11 @@ pub struct Session {
+ async fn torrent_from_url(
+     reqwest_client: &reqwest::Client,
+     url: &str,
++    block_local_network: bool,
+ ) -> anyhow::Result<ParsedTorrentFile> {
++    if block_local_network {
++        librqbit_core::network_safety::validate_url(&url::Url::parse(url)?)?;
++    }
+     let response = reqwest_client
+         .get(url)
+         .send()
+@@ -174,11 +179,10 @@ async fn torrent_from_url(
+     if !response.status().is_success() {
+         bail!("GET {} returned {}", url, response.status())
+     }
+-    let b = response
+-        .bytes()
++    let b = tracker_comms::read_limited_response(response, 32 * 1024 * 1024)
+         .await
+-        .with_context(|| format!("error reading response body from {url}"))?;
+-    torrent_from_bytes(b).context("error decoding torrent")
++        .context("error reading torrent metadata response")?;
++    torrent_from_bytes(b.into()).context("error decoding torrent")
+ }
+ 
+ fn compute_only_files_regex<ByteBuf: AsRef<[u8]>>(
+@@ -444,6 +448,12 @@ pub struct SessionOptions {
+     /// What network device to bind to for DHT, BT-UDP, BT-TCP, trackers and LSD.
+     /// On OSX will use IP(V6)_BOUND_IF, on Linux will use SO_BINDTODEVICE.
+     pub bind_device_name: Option<String>,
++    pub block_local_network: bool,
++
++    /// Resolve all torrent DNS through this numeric server on the bound interface.
++    pub bound_dns_server: Option<SocketAddr>,
++    /// Reject a reused interface name before creating any network resources.
++    pub expected_bind_device_index: Option<u32>,
+ 
+     /// Disable tracker communication
+     pub disable_trackers: bool,
+@@ -509,6 +519,9 @@ impl Default for SessionOptions {
+             restore_queued: false,
+             dht: Some(DhtSessionConfig::default()),
+             bind_device_name: None,
++            block_local_network: false,
++            bound_dns_server: None,
++            expected_bind_device_index: None,
+             disable_trackers: false,
+             fastresume: false,
+             persistence: None,
+@@ -613,6 +626,11 @@ impl Session {
+         mut opts: SessionOptions,
+     ) -> BoxFuture<'static, anyhow::Result<Arc<Self>>> {
+         async move {
++            if (opts.bound_dns_server.is_some() || opts.block_local_network)
++                && opts.connect.as_ref().is_some_and(|c| c.proxy_url.is_some())
++            {
++                bail!("proxy coverage is not verified with protected network policy");
++            }
+             let restore_queued = opts.restore_queued;
+             let peer_id = opts
+                 .peer_id
+@@ -632,6 +650,46 @@ impl Session {
+                 None => None,
+             };
+ 
++            if let Some(expected) = opts.expected_bind_device_index {
++                if bind_device.as_ref().map(|d| d.index().get()) != Some(expected) {
++                    bail!("selected network interface changed");
++                }
++            }
++            let bound_dns = match opts.bound_dns_server {
++                Some(server) => Some(tracker_comms::BoundDns::new(
++                    bind_device
++                        .clone()
++                        .context("protected DNS requires an interface")?,
++                    server,
++                )),
++                None => None,
++            };
++            if let (Some(dns), Some(dht)) = (bound_dns.as_ref(), opts.dht.as_mut()) {
++                let hosts = dht
++                    .bootstrap_addrs
++                    .take()
++                    .unwrap_or_else(|| dht::DHT_BOOTSTRAP.iter().map(|s| s.to_string()).collect());
++                let mut addresses = Vec::new();
++                for host in hosts {
++                    if let Ok(address) = host.parse::<SocketAddr>() {
++                        addresses.push(address.to_string());
++                        continue;
++                    }
++                    let (name, port) = host.rsplit_once(':').context("invalid DHT bootstrap")?;
++                    if let Ok(resolved) = dns.lookup(name, port.parse()?).await {
++                        addresses.extend(resolved.into_iter().map(|a| a.to_string()));
++                    }
++                }
++                if addresses.is_empty() {
++                    bail!("protected DNS could not resolve DHT bootstrap nodes");
++                }
++                dht.bootstrap_addrs = Some(addresses);
++            }
++            if opts.block_local_network
++                && opts.dht.as_ref().is_some_and(|d| d.persistence.is_some())
++            {
++                bail!("restricted network mode requires non-persistent DHT");
++            }
+             let listen_result = if let Some(listen_opts) = opts.listen.take() {
+                 Some(
+                     listen_opts
+@@ -662,6 +720,7 @@ impl Session {
+                 } else {
+                     let listen_addr = dht_listen_addr(dht_config.port, None, opts.ipv4_only);
+                     DhtBuilder::with_config(DhtConfig {
++                        block_local_network: opts.block_local_network,
+                         bootstrap_addrs: dht_config.bootstrap_addrs,
+                         cancellation_token: Some(token.child_token()),
+                         bind_device: bind_device.as_ref(),
+@@ -754,7 +813,7 @@ impl Session {
+                     reqwest::Client::builder().proxy(proxy)
+                 } else {
+                     #[allow(unused_mut)]
+-                    let mut b = reqwest::Client::builder();
++                    let mut b = reqwest::Client::builder().no_proxy();
+                     #[cfg(not(windows))]
+                     if let Some(bd) = opts.bind_device_name.as_ref() {
+                         b = b.interface(bd);
+@@ -762,6 +821,14 @@ impl Session {
+                     b
+                 };
+ 
++                let builder = if opts.block_local_network {
++                    tracker_comms::restrict_http(builder, bound_dns.clone())
++                } else if let Some(dns) = bound_dns.as_ref() {
++                    // Environment/system proxies may resolve or connect outside the interface.
++                    builder.no_proxy().dns_resolver(Arc::new(dns.clone()))
++                } else {
++                    builder
++                };
+                 builder
+                     .user_agent(&client_name_and_version)
+                     .build()
+@@ -772,6 +839,7 @@ impl Session {
+                 StreamConnector::new(StreamConnectorArgs {
+                     encryption_policy: opts.peer_encryption,
+                     enable_tcp: opts.connect.as_ref().map(|c| c.enable_tcp).unwrap_or(true),
++                    block_local_network: opts.block_local_network,
+                     socks_proxy_config: proxy_config,
+                     utp_socket: listen_result.as_ref().and_then(|l| l.utp_socket.clone()),
+                     bind_device: bind_device.clone(),
+@@ -805,7 +873,9 @@ impl Session {
+ 
+             let udp_tracker_client = UdpTrackerClient::new(token.clone(), bind_device.as_ref())
+                 .await
+-                .context("error creating UDP tracker client")?;
++                .context("error creating UDP tracker client")?
++                .with_dns(bound_dns)
++                .with_destination_policy(opts.block_local_network);
+ 
+             let lsd = {
+                 if opts.disable_local_service_discovery {
+@@ -839,6 +909,7 @@ impl Session {
+                 announce_port: listen_result.as_ref().and_then(|l| l.announce_port),
+                 listen_addr: listen_result.as_ref().map(|l| l.addr),
+                 default_storage_factory: opts.default_storage_factory,
++                block_local_network: opts.block_local_network,
+                 reqwest_client,
+                 connector: stream_connector,
+                 root_span: opts.root_span,
+@@ -1104,6 +1175,7 @@ impl Session {
+                         Ok((addr, (read, write))) => {
+                             trace!("accepted connection from {addr}");
+                             let session = session.upgrade().context("session is dead")?;
++                            if session.block_local_network && !librqbit_core::network_safety::is_public_destination(addr.ip()) { continue; }
+                             let span = debug_span!(parent: session.rs(), "incoming", addr=%addr);
+                             futs.push(
+                                 session.check_incoming_connection(addr, A::KIND, Box::new(read), Box::new(write))
+@@ -1292,7 +1364,8 @@ impl Session {
+                         AddTorrent::Url(url)
+                             if url.starts_with("http://") || url.starts_with("https://") =>
+                         {
+-                            torrent_from_url(&self.reqwest_client, &url).await?
++                            torrent_from_url(&self.reqwest_client, &url, self.block_local_network)
++                                .await?
+                         }
+                         AddTorrent::Url(url) => {
+                             bail!(
+diff --git a/crates/librqbit/src/session_persistence/json.rs b/crates/librqbit/src/session_persistence/json.rs
+index 8a6a827..8332a8c 100644
+--- a/crates/librqbit/src/session_persistence/json.rs
++++ b/crates/librqbit/src/session_persistence/json.rs
+@@ -88,7 +88,10 @@ impl JsonSessionPersistenceStore {
+         // we don't need the write lock technically, but we need to stop concurrent modifications
+         let db_content = self.db_content.write().await;
+         let tmp_filename = format!("{}.tmp", self.db_filename.to_str().unwrap());
+-        let mut tmp = tokio::fs::OpenOptions::new()
++        let mut options = tokio::fs::OpenOptions::new();
++        #[cfg(unix)]
++        options.mode(0o600).custom_flags(nix::libc::O_NOFOLLOW);
++        let mut tmp = options
+             .create(true)
+             .truncate(true)
+             .write(true)
+diff --git a/crates/librqbit/src/storage/filesystem/fs.rs b/crates/librqbit/src/storage/filesystem/fs.rs
+index b8105b5..128cf16 100644
+--- a/crates/librqbit/src/storage/filesystem/fs.rs
++++ b/crates/librqbit/src/storage/filesystem/fs.rs
+@@ -242,17 +242,124 @@ fn secure_open(root: &Path, relative: &Path, reuse: bool) -> anyhow::Result<std:
+     use std::os::fd::{AsRawFd, FromRawFd};
+     let (directory, name) = secure_parent(root, relative)?;
+     let flags = libc::O_NOFOLLOW
++        | libc::O_NONBLOCK
+         | libc::O_CLOEXEC
+         | libc::O_RDWR
+         | libc::O_CREAT
+         | if reuse { 0 } else { libc::O_EXCL };
+     // SAFETY: the parent descriptor is live and the leaf is a terminated name.
+-    let fd = unsafe { libc::openat(directory.as_raw_fd(), name.as_ptr(), flags, 0o644) };
++    let fd = unsafe { libc::openat(directory.as_raw_fd(), name.as_ptr(), flags, 0o600) };
+     if fd < 0 {
+         return Err(std::io::Error::last_os_error())
+             .context("refused unsafe or unavailable torrent path");
+     }
+-    Ok(unsafe { std::fs::File::from_raw_fd(fd) })
++    let file = unsafe { std::fs::File::from_raw_fd(fd) };
++    use std::os::unix::fs::MetadataExt;
++    let metadata = file.metadata()?;
++    anyhow::ensure!(
++        metadata.is_file() && metadata.nlink() == 1,
++        "refused non-regular or multiply linked torrent file"
++    );
++    mark_download(&file)?;
++    Ok(file)
++}
++
++/// Set quarantine before payload writes, without resolving another pathname.
++/// Existing quarantine metadata belongs to the OS and is preserved verbatim.
++pub fn mark_download(file: &std::fs::File) -> anyhow::Result<()> {
++    #[cfg(target_os = "macos")]
++    {
++        use std::{
++            os::fd::AsRawFd,
++            time::{SystemTime, UNIX_EPOCH},
++        };
++        let name = c"com.apple.quarantine";
++        let size = unsafe {
++            nix::libc::fgetxattr(
++                file.as_raw_fd(),
++                name.as_ptr(),
++                std::ptr::null_mut(),
++                0,
++                0,
++                0,
++            )
++        };
++        if size > 0 {
++            return Ok(());
++        }
++        if size < 0 && std::io::Error::last_os_error().raw_os_error() != Some(nix::libc::ENOATTR) {
++            return Err(std::io::Error::last_os_error())
++                .context("could not read download quarantine");
++        }
++        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
++        let value = format!("0081;{timestamp:x};SeedHop;");
++        // SAFETY: descriptor is owned; name and value remain live for the call.
++        let result = unsafe {
++            nix::libc::fsetxattr(
++                file.as_raw_fd(),
++                name.as_ptr(),
++                value.as_ptr().cast(),
++                value.len(),
++                0,
++                0,
++            )
++        };
++        if result != 0 {
++            return Err(std::io::Error::last_os_error())
++                .context("destination cannot preserve download quarantine");
++        }
++    }
++    #[cfg(not(target_os = "macos"))]
++    let _ = file;
++    Ok(())
++}
++
++pub fn copy_download_quarantine(
++    source: &std::fs::File,
++    target: &std::fs::File,
++) -> anyhow::Result<()> {
++    mark_download(target)?;
++    #[cfg(target_os = "macos")]
++    {
++        use std::os::fd::AsRawFd;
++        let mut value = vec![0u8; 8192];
++        let length = unsafe {
++            nix::libc::fgetxattr(
++                source.as_raw_fd(),
++                c"com.apple.quarantine".as_ptr(),
++                value.as_mut_ptr().cast(),
++                value.len(),
++                0,
++                0,
++            )
++        };
++        if length < 0 {
++            if std::io::Error::last_os_error().raw_os_error() == Some(nix::libc::ENOATTR) {
++                return Ok(());
++            }
++            return Err(std::io::Error::last_os_error())
++                .context("could not preserve download quarantine");
++        }
++        if length > 0 {
++            let result = unsafe {
++                nix::libc::fsetxattr(
++                    target.as_raw_fd(),
++                    c"com.apple.quarantine".as_ptr(),
++                    value.as_ptr().cast(),
++                    length as usize,
++                    0,
++                    0,
++                )
++            };
++            if result != 0 {
++                return Err(std::io::Error::last_os_error())
++                    .context("could not copy download quarantine");
++            }
++        }
++    }
++    #[cfg(not(target_os = "macos"))]
++    let _ = source;
++    Ok(())
+ }
+ 
+ #[cfg(unix)]
+@@ -284,7 +391,7 @@ fn secure_parent(
+             return Ok((directory, name));
+         }
+         // SAFETY: names are terminated C strings; the parent descriptor is live.
+-        let created = unsafe { libc::mkdirat(directory.as_raw_fd(), name.as_ptr(), 0o755) };
++        let created = unsafe { libc::mkdirat(directory.as_raw_fd(), name.as_ptr(), 0o700) };
+         if created != 0
+             && std::io::Error::last_os_error().kind() != std::io::ErrorKind::AlreadyExists
+         {
+@@ -302,6 +409,7 @@ fn secure_parent(
+             return Err(std::io::Error::last_os_error().into());
+         }
+         directory = unsafe { std::fs::File::from_raw_fd(fd) };
++        mark_download(&directory)?;
+     }
+     unreachable!()
+ }
+diff --git a/crates/librqbit/src/storage/filesystem/mod.rs b/crates/librqbit/src/storage/filesystem/mod.rs
+index 1e4b46f..f94f813 100644
+--- a/crates/librqbit/src/storage/filesystem/mod.rs
++++ b/crates/librqbit/src/storage/filesystem/mod.rs
+@@ -2,5 +2,7 @@ mod fs;
+ mod opened_file;
+ mod sparse;
+ 
+-pub use fs::{FilesystemStorage, FilesystemStorageFactory};
++pub use fs::{
++    FilesystemStorage, FilesystemStorageFactory, copy_download_quarantine, mark_download,
++};
+ pub use opened_file::OurFileExt;
+diff --git a/crates/librqbit/src/stream_connect.rs b/crates/librqbit/src/stream_connect.rs
+index 2c014cf..3f0bfc8 100644
+--- a/crates/librqbit/src/stream_connect.rs
++++ b/crates/librqbit/src/stream_connect.rs
+@@ -66,6 +66,7 @@ pub(crate) struct StreamConnectorArgs {
+     pub utp_socket: Option<Arc<UtpSocketUdp>>,
+     pub bind_device: Option<BindDevice>,
+     pub ipv4_only: bool,
++    pub block_local_network: bool,
+ }
+ 
+ impl SocksProxyConfig {
+@@ -142,9 +143,21 @@ pub(crate) struct StreamConnector {
+     utp_socket: Option<Arc<librqbit_utp::UtpSocketUdp>>,
+     stats: ConnectStatsAtomic,
+     ipv4_only: bool,
++    block_local_network: bool,
+ }
+ 
+ impl StreamConnector {
++    fn check_destination(&self, addr: SocketAddr) -> Result<()> {
++        if self.block_local_network
++            && !librqbit_core::network_safety::is_public_destination(addr.ip())
++        {
++            return Err(Error::Anyhow(anyhow::anyhow!(
++                "local peer destination requires explicit permission"
++            )));
++        }
++        Ok(())
++    }
++
+     pub async fn new(config: StreamConnectorArgs) -> anyhow::Result<Self> {
+         #[allow(clippy::single_match)]
+         match (
+@@ -172,6 +185,7 @@ impl StreamConnector {
+             bind_device: config.bind_device,
+             stats: Default::default(),
+             ipv4_only: config.ipv4_only,
++            block_local_network: config.block_local_network,
+         })
+     }
+ 
+@@ -245,6 +259,7 @@ impl StreamConnector {
+         &self,
+         addr: SocketAddr,
+     ) -> Result<(ConnectionKind, BoxAsyncReadVectored, BoxAsyncWrite)> {
++        self.check_destination(addr)?;
+         if !self.can_connect_utp() {
+             return Err(Error::Anyhow(anyhow::anyhow!("direct uTP is unavailable")));
+         }
+@@ -262,6 +277,7 @@ impl StreamConnector {
+         &self,
+         addr: SocketAddr,
+     ) -> Result<(ConnectionKind, BoxAsyncReadVectored, BoxAsyncWrite)> {
++        self.check_destination(addr)?;
+         if addr.port() == 0 {
+             return Err(Error::Anyhow(anyhow::anyhow!(
+                 "invalid peer address (port 0): {}",
+diff --git a/crates/librqbit_core/src/lib.rs b/crates/librqbit_core/src/lib.rs
+index a44684e..ba2a231 100644
+--- a/crates/librqbit_core/src/lib.rs
++++ b/crates/librqbit_core/src/lib.rs
+@@ -14,4 +14,5 @@ pub use hash_id::{Id20, Id32};
+ pub use error::Error;
+ pub type Result<T> = std::result::Result<T, Error>;
+ 
++pub mod network_safety;
+ pub mod v2;
+diff --git a/crates/tracker_comms/Cargo.toml b/crates/tracker_comms/Cargo.toml
+index df2cfc5..1e17b3e 100644
+--- a/crates/tracker_comms/Cargo.toml
++++ b/crates/tracker_comms/Cargo.toml
+@@ -31,6 +31,7 @@ librqbit-dualstack-sockets.workspace = true
+ backon.workspace = true
+ itertools.workspace = true
+ serde_with.workspace = true
++hickory-proto = { version = "=0.26.3", default-features = false, features = ["std"] }
+ 
+ [dev-dependencies]
+ tokio = { workspace = true, features = ["macros", "rt", "test-util", "net", "io-util", "sync", "time"] }
+diff --git a/crates/tracker_comms/src/lib.rs b/crates/tracker_comms/src/lib.rs
+index 6563ea7..952b9f7 100644
+--- a/crates/tracker_comms/src/lib.rs
++++ b/crates/tracker_comms/src/lib.rs
+@@ -1,4 +1,28 @@
++mod bound_dns;
+ mod reannounce;
++pub use bound_dns::BoundDns;
++mod safe_dns;
++pub use safe_dns::restrict_http;
++
++/// Bound remote response bodies before buffering or parsing them.
++pub async fn read_limited_response(
++    mut response: reqwest::Response,
++    limit: usize,
++) -> anyhow::Result<Vec<u8>> {
++    anyhow::ensure!(
++        response.content_length().is_none_or(|n| n <= limit as u64),
++        "response exceeds size limit"
++    );
++    let mut bytes = Vec::new();
++    while let Some(chunk) = response.chunk().await? {
++        anyhow::ensure!(
++            chunk.len() <= limit.saturating_sub(bytes.len()),
++            "response exceeds size limit"
++        );
++        bytes.extend_from_slice(&chunk);
++    }
++    Ok(bytes)
++}
+ pub use reannounce::{ReannounceDisposition, ReannounceSnapshot, TrackerControl};
+ mod tracker_comms;
+ mod tracker_comms_http;
+diff --git a/crates/tracker_comms/src/tracker_comms.rs b/crates/tracker_comms/src/tracker_comms.rs
+index 35fe404..fd8a560 100644
+--- a/crates/tracker_comms/src/tracker_comms.rs
++++ b/crates/tracker_comms/src/tracker_comms.rs
+@@ -38,6 +38,7 @@ pub struct TrackerComms {
+     announce_port: u16,
+     reqwest_client: reqwest::Client,
+     key: u32,
++    block_local_network: bool,
+ }
+ 
+ #[derive(Default)]
+@@ -181,6 +182,7 @@ enum UdpTrackerResolveResult {
+ async fn udp_tracker_to_socket_addrs(
+     host: url::Host<&str>,
+     port: u16,
++    dns: Option<&crate::BoundDns>,
+ ) -> anyhow::Result<UdpTrackerResolveResult> {
+     let res = match host {
+         url::Host::Domain(name) => {
+@@ -188,10 +190,11 @@ async fn udp_tracker_to_socket_addrs(
+ 
+             let mut v4: Option<SocketAddrV4> = None;
+             let mut v6: Option<SocketAddrV6> = None;
+-            for addr in tokio::net::lookup_host((name, port))
+-                .await
+-                .with_context(|| format!("error looking up hostname {name}"))?
+-            {
++            let addresses = match dns {
++                Some(dns) => dns.lookup(name, port).await?,
++                None => tokio::net::lookup_host((name, port)).await?.collect(),
++            };
++            for addr in addresses {
+                 match (v4, v6, addr) {
+                     (None, _, SocketAddr::V4(addr)) => v4 = Some(addr),
+                     (_, None, SocketAddr::V6(addr)) => v6 = Some(addr),
+@@ -257,6 +260,7 @@ impl TrackerComms {
+                 announce_port,
+                 reqwest_client,
+                 key: rand::random(),
++                block_local_network: udp_client.block_local_network,
+             });
+             let mut futures = FuturesUnordered::new();
+             for tracker in trackers {
+@@ -386,6 +390,9 @@ impl TrackerComms {
+             trackerid: None,
+         };
+ 
++        if self.block_local_network {
++            librqbit_core::network_safety::validate_url(tracker_url)?;
++        }
+         let mut url = tracker_url.clone();
+ 
+         let mut queries = request.as_querystring();
+@@ -398,7 +405,7 @@ impl TrackerComms {
+         if !response.status().is_success() {
+             anyhow::bail!("Tracker returned HTTP {}", response.status());
+         }
+-        let bytes = response.bytes().await?;
++        let bytes = crate::read_limited_response(response, 2 * 1024 * 1024).await?;
+         if let Ok((error, _)) =
+             bencode::from_bytes_with_rest::<tracker_comms_http::TrackerError>(&bytes)
+         {
+@@ -477,19 +484,23 @@ impl TrackerComms {
+                 .observe(TrackerObservation::new(&url, None, "resolving"));
+             // This should retry forever until the addrs are resolved.
+             let addrs = (async || {
+-                udp_tracker_to_socket_addrs(host.clone(), port)
+-                    .instrument(trace_span!("resolve", ?host))
+-                    .await
+-                    .or_else(|err| {
++                let resolved = udp_tracker_to_socket_addrs(host.clone(), port, client.dns.as_ref())
++                    .instrument(trace_span!("resolve", ?host)).await.or_else(|err| {
+                         if let Some(previous) = prev_addrs {
+                             let mut observation = TrackerObservation::new(&url, None, "warning");
+                             observation.message = Some("Could not refresh tracker address; using previously resolved addresses.".into());
+                             self.stats.observe(observation);
+                             Ok(previous)
+-                        } else {
+-                            Err(err)
+-                        }
+-                    })
++                        } else { Err(err) }
++                    })?;
++                if client.block_local_network {
++                    let permitted = match resolved {
++                        UdpTrackerResolveResult::One(a) => librqbit_core::network_safety::is_public_destination(a.ip()),
++                        UdpTrackerResolveResult::Two(a, b) => librqbit_core::network_safety::is_public_destination((*a.ip()).into()) && librqbit_core::network_safety::is_public_destination((*b.ip()).into()),
++                    };
++                    if !permitted { anyhow::bail!("local tracker destination requires explicit permission"); }
++                }
++                Ok::<_, anyhow::Error>(resolved)
+             })
+             .retry(
+                 ExponentialBuilder::new()
+diff --git a/crates/tracker_comms/src/tracker_comms_udp.rs b/crates/tracker_comms/src/tracker_comms_udp.rs
+index 517e423..6ce5c06 100644
+--- a/crates/tracker_comms/src/tracker_comms_udp.rs
++++ b/crates/tracker_comms/src/tracker_comms_udp.rs
+@@ -250,6 +250,8 @@ struct ClientShared {
+ #[derive(Clone)]
+ pub struct UdpTrackerClient {
+     state: Arc<ClientShared>,
++    pub(crate) dns: Option<crate::BoundDns>,
++    pub(crate) block_local_network: bool,
+ }
+ 
+ struct TransactionIdGuard<'a> {
+@@ -265,6 +267,15 @@ impl Drop for TransactionIdGuard<'_> {
+ }
+ 
+ impl UdpTrackerClient {
++    pub fn with_destination_policy(mut self, block: bool) -> Self {
++        self.block_local_network = block;
++        self
++    }
++    pub fn with_dns(mut self, dns: Option<crate::BoundDns>) -> Self {
++        self.dns = dns;
++        self
++    }
++
+     pub async fn new(
+         cancel_token: CancellationToken,
+         bind_device: Option<&BindDevice>,
+@@ -280,6 +291,8 @@ impl UdpTrackerClient {
+         .with_context(|| format!("error creating UDP socket at {addr}"))?;
+ 
+         let client = Self {
++            dns: None,
++            block_local_network: false,
+             state: Arc::new(ClientShared {
+                 sock,
+                 locked: RwLock::new(Default::default()),
+diff --git a/crates/librqbit_core/src/network_safety.rs b/crates/librqbit_core/src/network_safety.rs
+new file mode 100644
+index 0000000..e724ff6
+--- /dev/null
++++ b/crates/librqbit_core/src/network_safety.rs
+@@ -0,0 +1,87 @@
++//! Conservative destination restrictions for untrusted public torrent endpoints.
++use std::net::IpAddr;
++
++pub fn is_public_destination(ip: IpAddr) -> bool {
++    match ip {
++        IpAddr::V4(ip) => {
++            let [a, b, _, _] = ip.octets();
++            !ip.is_private()
++                && !ip.is_loopback()
++                && !ip.is_link_local()
++                && !ip.is_broadcast()
++                && !ip.is_documentation()
++                && !ip.is_multicast()
++                && a != 0
++                && a < 240
++                && !(a == 100 && (64..=127).contains(&b))
++                && !(a == 198 && (b == 18 || b == 19))
++                && !(a == 192 && b == 0)
++        }
++        IpAddr::V6(ip) => {
++            if let Some(ip) = ip.to_ipv4_mapped() {
++                return is_public_destination(IpAddr::V4(ip));
++            }
++            let s = ip.segments();
++            // Exclude local, transition, documentation and non-global scopes.
++            (s[0] & 0xe000) == 0x2000
++                && s[0] != 0x2002
++                && !(s[0] == 0x2001 && (s[1] < 0x200 || s[1] == 0xdb8))
++        }
++    }
++}
++
++pub fn validate_url(url: &url::Url) -> anyhow::Result<()> {
++    anyhow::ensure!(
++        matches!(url.scheme(), "http" | "https"),
++        "unsupported network URL scheme"
++    );
++    if let Some(host) = url.host() {
++        let ip = match host {
++            url::Host::Ipv4(ip) => Some(IpAddr::V4(ip)),
++            url::Host::Ipv6(ip) => Some(IpAddr::V6(ip)),
++            _ => None,
++        };
++        anyhow::ensure!(
++            ip.is_none_or(is_public_destination),
++            "local network destination requires explicit permission"
++        );
++    }
++    Ok(())
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn rejects_local_and_encoded_local_destinations() {
++        for ip in [
++            "127.0.0.1",
++            "0.0.0.1",
++            "10.0.0.1",
++            "172.16.0.1",
++            "192.168.1.1",
++            "169.254.169.254",
++            "100.64.0.1",
++            "198.18.0.1",
++            "224.0.0.1",
++            "::1",
++            "::ffff:127.0.0.1",
++            "fc00::1",
++            "fe80::1",
++            "2002:7f00:1::",
++            "64:ff9b::7f00:1",
++        ] {
++            assert!(!is_public_destination(ip.parse().unwrap()), "{ip}");
++        }
++        for ip in ["1.1.1.1", "8.8.8.8", "2606:4700:4700::1111"] {
++            assert!(is_public_destination(ip.parse().unwrap()));
++        }
++        for url in [
++            "http://127.1/announce",
++            "http://2130706433/announce",
++            "http://[::ffff:127.0.0.1]/announce",
++        ] {
++            assert!(validate_url(&url::Url::parse(url).unwrap()).is_err());
++        }
++    }
++}
+diff --git a/crates/tracker_comms/src/bound_dns.rs b/crates/tracker_comms/src/bound_dns.rs
+new file mode 100644
+index 0000000..e8d11e3
+--- /dev/null
++++ b/crates/tracker_comms/src/bound_dns.rs
+@@ -0,0 +1,221 @@
++//! DNS over TCP on an explicitly selected interface. Never uses the OS resolver.
++use anyhow::{Context, bail};
++use hickory_proto::{
++    op::{Message, MessageType, OpCode, Query, ResponseCode},
++    rr::{Name, RData, RecordType},
++};
++use librqbit_dualstack_sockets::{BindDevice, ConnectOpts, tcp_connect};
++use std::{
++    net::{IpAddr, SocketAddr},
++    sync::Arc,
++    time::Duration,
++};
++use tokio::{
++    io::{AsyncReadExt, AsyncWriteExt},
++    sync::Semaphore,
++};
++
++#[derive(Clone)]
++pub struct BoundDns {
++    device: BindDevice,
++    server: SocketAddr,
++    permits: Arc<Semaphore>,
++}
++
++impl BoundDns {
++    pub fn new(device: BindDevice, server: SocketAddr) -> Self {
++        Self {
++            device,
++            server,
++            permits: Arc::new(Semaphore::new(8)),
++        }
++    }
++
++    pub async fn lookup(&self, host: &str, port: u16) -> anyhow::Result<Vec<SocketAddr>> {
++        if let Ok(ip) = host.parse::<IpAddr>() {
++            return Ok(vec![SocketAddr::new(ip, port)]);
++        }
++        let mut name = Name::from_ascii(host).context("invalid DNS name")?;
++        name.set_fqdn(true);
++        let lookup = async {
++            let _permit = self.permits.acquire().await?;
++            // An interface name must still designate the originally selected index.
++            let current = BindDevice::new_from_name(self.device.name())?;
++            if current.index() != self.device.index() {
++                bail!("selected interface changed");
++            }
++            let (a, aaaa) = tokio::join!(
++                self.query(&name, RecordType::A),
++                self.query(&name, RecordType::AAAA)
++            );
++            let mut result = Vec::new();
++            for ips in [a, aaaa].into_iter().flatten() {
++                result.extend(ips.into_iter().map(|ip| SocketAddr::new(ip, port)));
++            }
++            if result.is_empty() {
++                bail!("selected DNS server returned no usable addresses");
++            }
++            Ok(result)
++        };
++        tokio::time::timeout(Duration::from_secs(8), lookup)
++            .await
++            .context("protected DNS lookup timed out")?
++    }
++
++    async fn query(&self, name: &Name, kind: RecordType) -> anyhow::Result<Vec<IpAddr>> {
++        let mut request = Message::query();
++        request.metadata.recursion_desired = true;
++        request.add_query(Query::query(name.clone(), kind));
++        let bytes = request.to_vec()?;
++        let mut stream = tcp_connect(
++            self.server,
++            ConnectOpts {
++                bind_device: Some(&self.device),
++                ..Default::default()
++            },
++        )
++        .await?;
++        stream.write_u16(bytes.len().try_into()?).await?;
++        stream.write_all(&bytes).await?;
++        let len = usize::from(stream.read_u16().await?);
++        // Bound allocation and parser work before accepting an untrusted response.
++        if !(12..=16384).contains(&len) {
++            bail!("invalid DNS response size");
++        }
++        let mut bytes = vec![0; len];
++        stream.read_exact(&mut bytes).await?;
++        parse_response(&bytes, &request)
++    }
++}
++
++fn parse_response(bytes: &[u8], request: &Message) -> anyhow::Result<Vec<IpAddr>> {
++    let response = Message::from_vec(bytes)?;
++    let meta = &response.metadata;
++    if meta.id != request.metadata.id
++        || meta.message_type != MessageType::Response
++        || meta.op_code != OpCode::Query
++        || meta.truncation
++        || meta.response_code != ResponseCode::NoError
++        || response.queries != request.queries
++    {
++        bail!("invalid DNS response");
++    }
++    let mut owner = request.queries[0].name().clone();
++    for _ in 0..8 {
++        let mut addresses = Vec::new();
++        let mut alias = None;
++        for record in &response.answers {
++            if record.name != owner {
++                continue;
++            }
++            match &record.data {
++                RData::A(ip) if request.queries[0].query_type() == RecordType::A => {
++                    addresses.push(IpAddr::V4(ip.0))
++                }
++                RData::AAAA(ip) if request.queries[0].query_type() == RecordType::AAAA => {
++                    addresses.push(IpAddr::V6(ip.0))
++                }
++                RData::CNAME(name) => alias = Some(name.0.clone()),
++                _ => (),
++            }
++        }
++        if !addresses.is_empty() {
++            return Ok(addresses);
++        }
++        match alias {
++            Some(name) => owner = name,
++            None => return Ok(Vec::new()),
++        }
++    }
++    bail!("DNS alias chain is too long")
++}
++
++impl reqwest::dns::Resolve for BoundDns {
++    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
++        let this = self.clone();
++        Box::pin(async move {
++            let addresses = this.lookup(name.as_str(), 0).await?;
++            Ok(Box::new(addresses.into_iter()) as reqwest::dns::Addrs)
++        })
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use hickory_proto::rr::{Record, rdata::A};
++
++    fn request() -> Message {
++        let mut message = Message::query();
++        message.add_query(Query::query(
++            Name::from_ascii("seedhop.example.").unwrap(),
++            RecordType::A,
++        ));
++        message
++    }
++    fn response(request: &Message) -> Message {
++        let mut response = Message::response(request.metadata.id, OpCode::Query);
++        response.queries = request.queries.clone();
++        response.add_answer(Record::from_rdata(
++            request.queries[0].name().clone(),
++            60,
++            RData::A(A("203.0.113.7".parse().unwrap())),
++        ));
++        response
++    }
++    #[test]
++    fn validates_transaction_question_and_answer_owner() {
++        let request = request();
++        let mut answer = response(&request);
++        assert_eq!(
++            parse_response(&answer.to_vec().unwrap(), &request).unwrap(),
++            vec!["203.0.113.7".parse::<IpAddr>().unwrap()]
++        );
++        answer.metadata.id ^= 1;
++        assert!(parse_response(&answer.to_vec().unwrap(), &request).is_err());
++        answer = response(&request);
++        answer.queries[0] =
++            Query::query(Name::from_ascii("other.example.").unwrap(), RecordType::A);
++        assert!(parse_response(&answer.to_vec().unwrap(), &request).is_err());
++        answer = response(&request);
++        answer.answers[0].name = Name::from_ascii("other.example.").unwrap();
++        assert!(
++            parse_response(&answer.to_vec().unwrap(), &request)
++                .unwrap()
++                .is_empty()
++        );
++        for bytes in [&[][..], &[0u8; 12][..], &[255u8; 512][..]] {
++            assert!(parse_response(bytes, &request).is_err());
++        }
++    }
++
++    #[tokio::test]
++    async fn resolves_only_through_explicit_bound_server() {
++        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
++        let server = listener.local_addr().unwrap();
++        let task = tokio::spawn(async move {
++            for _ in 0..2 {
++                let (mut stream, _) = listener.accept().await.unwrap();
++                let len = stream.read_u16().await.unwrap();
++                let mut bytes = vec![0; usize::from(len)];
++                stream.read_exact(&mut bytes).await.unwrap();
++                let request = Message::from_vec(&bytes).unwrap();
++                assert_eq!(request.queries[0].name().to_ascii(), "seedhop.example.");
++                let response = response(&request).to_vec().unwrap();
++                stream.write_u16(response.len() as u16).await.unwrap();
++                stream.write_all(&response).await.unwrap();
++            }
++        });
++        #[cfg(target_os = "macos")]
++        let name = "lo0";
++        #[cfg(not(target_os = "macos"))]
++        let name = "lo";
++        let dns = BoundDns::new(BindDevice::new_from_name(name).unwrap(), server);
++        let addresses = dns.lookup("seedhop.example", 6881).await.unwrap();
++        assert_eq!(addresses, vec!["203.0.113.7:6881".parse().unwrap()]);
++        task.await.unwrap();
++        // The fake name is not resolvable by public DNS. Closing its explicit server
++        // must fail, never retry through the system's DNS service.
++        assert!(dns.lookup("seedhop.example", 6881).await.is_err());
++    }
++}
+diff --git a/crates/tracker_comms/src/safe_dns.rs b/crates/tracker_comms/src/safe_dns.rs
+new file mode 100644
+index 0000000..f7689bd
+--- /dev/null
++++ b/crates/tracker_comms/src/safe_dns.rs
+@@ -0,0 +1,62 @@
++use std::{net::SocketAddr, sync::Arc};
++
++/// Filters the actual addresses handed to the connector, avoiding validation/
++/// connection re-resolution races. Numeric URLs are checked at request entry.
++pub struct SafeDns(pub Option<crate::BoundDns>);
++impl reqwest::dns::Resolve for SafeDns {
++    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
++        let bound = self.0.clone();
++        Box::pin(async move {
++            let addresses: Vec<SocketAddr> = match bound {
++                Some(dns) => dns.lookup(name.as_str(), 0).await?,
++                None => tokio::net::lookup_host((name.as_str(), 0)).await?.collect(),
++            };
++            let addresses: Vec<_> = addresses
++                .into_iter()
++                .filter(|a| librqbit_core::network_safety::is_public_destination(a.ip()))
++                .collect();
++            if addresses.is_empty() {
++                return Err("local network destination requires explicit permission".into());
++            }
++            Ok(Box::new(addresses.into_iter()) as reqwest::dns::Addrs)
++        })
++    }
++}
++
++pub fn restrict_http(
++    builder: reqwest::ClientBuilder,
++    bound: Option<crate::BoundDns>,
++) -> reqwest::ClientBuilder {
++    builder
++        .no_proxy()
++        .dns_resolver(Arc::new(SafeDns(bound)))
++        .redirect(reqwest::redirect::Policy::custom(|attempt| {
++            if attempt.previous().len() >= 10 {
++                return attempt.error("too many redirects");
++            }
++            if librqbit_core::network_safety::validate_url(attempt.url()).is_err() {
++                return attempt.error("local network redirect requires explicit permission");
++            }
++            if attempt
++                .previous()
++                .last()
++                .is_some_and(|previous| previous.scheme() == "https")
++                && attempt.url().scheme() != "https"
++            {
++                return attempt.error("HTTPS downgrade rejected");
++            }
++            attempt.follow()
++        }))
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use reqwest::dns::Resolve;
++
++    #[tokio::test]
++    async fn system_resolution_cannot_return_loopback_to_the_connector() {
++        let result = SafeDns(None).resolve("localhost".parse().unwrap()).await;
++        assert!(result.is_err());
++    }
++}

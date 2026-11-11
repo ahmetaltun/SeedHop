@@ -1,23 +1,29 @@
 import AppKit
 import Foundation
 
-// Render every required macOS icon size from the checked-in artwork.
+// Render the standard macOS icon sizes and store their PNG data in an ICNS file.
 guard CommandLine.arguments.count == 3 else {
-    fatalError("Usage: swift scripts/Icon.swift <output.iconset> <source.png>")
+    fatalError("Usage: swift scripts/Icon.swift <output.icns> <source.png>")
 }
-let root = URL(fileURLWithPath: CommandLine.arguments[1])
+let output = URL(fileURLWithPath: CommandLine.arguments[1])
 let source = URL(fileURLWithPath: CommandLine.arguments[2])
 guard let image = NSImage(contentsOf: source) else {
     fatalError("Cannot load app icon: \(source.path)")
 }
-try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+func appendChunk(_ type: String, payload: Data, to data: inout Data) {
+    data.append(contentsOf: type.utf8)
+    var length = UInt32(payload.count + 8).bigEndian
+    withUnsafeBytes(of: &length) { data.append(contentsOf: $0) }
+    data.append(payload)
+}
 
-for (label, size) in [
-    ("16x16", 16), ("16x16@2x", 32),
-    ("32x32", 32), ("32x32@2x", 64),
-    ("128x128", 128), ("128x128@2x", 256),
-    ("256x256", 256), ("256x256@2x", 512),
-    ("512x512", 512), ("512x512@2x", 1024),
+var representations = Data()
+for (type, size) in [
+    ("icp4", 16), ("ic11", 32),
+    ("icp5", 32), ("ic12", 64),
+    ("ic07", 128), ("ic13", 256),
+    ("ic08", 256), ("ic14", 512),
+    ("ic09", 512), ("ic10", 1024),
 ] {
     let bitmap = NSBitmapImageRep(
         bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
@@ -30,6 +36,12 @@ for (label, size) in [
     NSGraphicsContext.current!.imageInterpolation = .high
     image.draw(in: NSRect(x: 0, y: 0, width: size, height: size))
     NSGraphicsContext.restoreGraphicsState()
-    try bitmap.representation(using: .png, properties: [:])!
-        .write(to: root.appendingPathComponent("icon_\(label).png"))
+    guard let png = bitmap.representation(using: .png, properties: [:]) else {
+        fatalError("Cannot encode the \(size)-pixel app icon")
+    }
+    appendChunk(type, payload: png, to: &representations)
 }
+
+var icon = Data()
+appendChunk("icns", payload: representations, to: &icon)
+try icon.write(to: output, options: .atomic)

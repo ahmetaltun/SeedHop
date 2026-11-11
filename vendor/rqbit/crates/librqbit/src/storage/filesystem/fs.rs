@@ -31,6 +31,8 @@ impl StorageFactory for FilesystemStorageFactory {
             output_folder: shared.options.output_folder.read().clone(),
             opened_files: Default::default(),
             targets: Default::default(),
+            #[cfg(unix)]
+            pinned_root: None,
         })
     }
 
@@ -43,6 +45,51 @@ pub struct FilesystemStorage {
     pub(crate) output_folder: PathBuf,
     pub(crate) opened_files: Vec<OpenedFile>,
     targets: Vec<PathBuf>,
+    #[cfg(unix)]
+    pinned_root: Option<std::sync::Arc<super::pinned::PinnedRoot>>,
+}
+
+/// SeedHop: a fresh private transfer owns one pinned directory capability.
+#[cfg(unix)]
+#[derive(Clone)]
+pub struct PinnedFilesystemStorageFactory {
+    root: std::sync::Arc<super::pinned::PinnedRoot>,
+}
+
+#[cfg(unix)]
+impl PinnedFilesystemStorageFactory {
+    pub fn new(path: PathBuf, directory: std::fs::File) -> anyhow::Result<Self> {
+        Ok(Self {
+            root: std::sync::Arc::new(super::pinned::PinnedRoot::new(path, directory)?),
+        })
+    }
+}
+
+#[cfg(unix)]
+impl StorageFactory for PinnedFilesystemStorageFactory {
+    type Storage = FilesystemStorage;
+
+    fn create(
+        &self,
+        shared: &ManagedTorrentShared,
+        _metadata: &TorrentMetadata,
+    ) -> anyhow::Result<Self::Storage> {
+        self.root.check_path()?;
+        anyhow::ensure!(
+            shared.options.output_folder.read().as_path() == self.root.path(),
+            "private payload destination changed"
+        );
+        Ok(FilesystemStorage {
+            output_folder: self.root.path().to_owned(),
+            opened_files: Vec::new(),
+            targets: Vec::new(),
+            pinned_root: Some(self.root.clone()),
+        })
+    }
+
+    fn clone_box(&self) -> crate::storage::BoxStorageFactory {
+        self.clone().boxed()
+    }
 }
 
 impl FilesystemStorage {
@@ -56,6 +103,8 @@ impl FilesystemStorage {
                 .collect::<anyhow::Result<Vec<_>>>()?,
             output_folder: self.output_folder.clone(),
             targets: self.targets.clone(),
+            #[cfg(unix)]
+            pinned_root: self.pinned_root.clone(),
         })
     }
 }
@@ -64,6 +113,15 @@ impl TorrentStorage for FilesystemStorage {
     fn prepare_selection(&self, indices: &std::collections::HashSet<usize>) -> anyhow::Result<()> {
         for &index in indices {
             let target = self.targets.get(index).context("no such file")?;
+            #[cfg(unix)]
+            if self.pinned_root.is_some() {
+                let path = self.opened_files[index].path();
+                anyhow::ensure!(
+                    path.as_os_str().is_empty() || path == self.output_folder.join(target),
+                    "changing private file membership is not supported"
+                );
+                continue;
+            }
             self.opened_files[index].materialize(self.output_folder.join(target), |source| {
                 let source = source.strip_prefix(&self.output_folder)?;
                 #[cfg(unix)]
@@ -111,6 +169,11 @@ impl TorrentStorage for FilesystemStorage {
     }
 
     fn remove_file(&self, file_id: usize, _filename: &Path) -> anyhow::Result<()> {
+        #[cfg(unix)]
+        anyhow::ensure!(
+            self.pinned_root.is_none(),
+            "private payload deletion is not supported"
+        );
         let path = self
             .opened_files
             .get(file_id)
@@ -142,10 +205,17 @@ impl TorrentStorage for FilesystemStorage {
                 .collect::<anyhow::Result<Vec<_>>>()?,
             output_folder: self.output_folder.clone(),
             targets: self.targets.clone(),
+            #[cfg(unix)]
+            pinned_root: self.pinned_root.clone(),
         }))
     }
 
     fn remove_directory_if_empty(&self, path: &Path) -> anyhow::Result<()> {
+        #[cfg(unix)]
+        anyhow::ensure!(
+            self.pinned_root.is_none(),
+            "private payload deletion is not supported"
+        );
         let path = self.output_folder.join(path);
         if !path.is_dir() {
             anyhow::bail!("cannot remove dir: {path:?} is not a directory")
@@ -178,6 +248,14 @@ impl TorrentStorage for FilesystemStorage {
                 ".seedhop-parts/{}/{index}",
                 shared.info_hash.as_string()
             ));
+            // A private transfer already has a unique root; do not put its
+            // info hash into retained boundary-piece filenames.
+            #[cfg(unix)]
+            let part = if self.pinned_root.is_some() {
+                PathBuf::from(format!(".seedhop-parts/{index}"))
+            } else {
+                part
+            };
             let relative_path = if wanted { target } else { &part };
             full_path.push(relative_path);
 
@@ -186,15 +264,19 @@ impl TorrentStorage for FilesystemStorage {
                 continue;
             };
             #[cfg(unix)]
-            let f = secure_open(
-                &self.output_folder,
-                relative_path,
-                !wanted
-                    || shared
-                        .options
-                        .allow_overwrite
-                        .load(std::sync::atomic::Ordering::Relaxed),
-            )?;
+            let f = if let Some(root) = &self.pinned_root {
+                root.open(relative_path)?
+            } else {
+                secure_open(
+                    &self.output_folder,
+                    relative_path,
+                    !wanted
+                        || shared
+                            .options
+                            .allow_overwrite
+                            .load(std::sync::atomic::Ordering::Relaxed),
+                )?
+            };
             #[cfg(not(unix))]
             std::fs::create_dir_all(full_path.parent().context("bug: no parent")?)?;
             #[cfg(not(unix))]
@@ -242,17 +324,124 @@ fn secure_open(root: &Path, relative: &Path, reuse: bool) -> anyhow::Result<std:
     use std::os::fd::{AsRawFd, FromRawFd};
     let (directory, name) = secure_parent(root, relative)?;
     let flags = libc::O_NOFOLLOW
+        | libc::O_NONBLOCK
         | libc::O_CLOEXEC
         | libc::O_RDWR
         | libc::O_CREAT
         | if reuse { 0 } else { libc::O_EXCL };
     // SAFETY: the parent descriptor is live and the leaf is a terminated name.
-    let fd = unsafe { libc::openat(directory.as_raw_fd(), name.as_ptr(), flags, 0o644) };
+    let fd = unsafe { libc::openat(directory.as_raw_fd(), name.as_ptr(), flags, 0o600) };
     if fd < 0 {
         return Err(std::io::Error::last_os_error())
             .context("refused unsafe or unavailable torrent path");
     }
-    Ok(unsafe { std::fs::File::from_raw_fd(fd) })
+    let file = unsafe { std::fs::File::from_raw_fd(fd) };
+    use std::os::unix::fs::MetadataExt;
+    let metadata = file.metadata()?;
+    anyhow::ensure!(
+        metadata.is_file() && metadata.nlink() == 1,
+        "refused non-regular or multiply linked torrent file"
+    );
+    mark_download(&file)?;
+    Ok(file)
+}
+
+/// Set quarantine before payload writes, without resolving another pathname.
+/// Existing quarantine metadata belongs to the OS and is preserved verbatim.
+pub fn mark_download(file: &std::fs::File) -> anyhow::Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::{
+            os::fd::AsRawFd,
+            time::{SystemTime, UNIX_EPOCH},
+        };
+        let name = c"com.apple.quarantine";
+        let size = unsafe {
+            nix::libc::fgetxattr(
+                file.as_raw_fd(),
+                name.as_ptr(),
+                std::ptr::null_mut(),
+                0,
+                0,
+                0,
+            )
+        };
+        if size > 0 {
+            return Ok(());
+        }
+        if size < 0 && std::io::Error::last_os_error().raw_os_error() != Some(nix::libc::ENOATTR) {
+            return Err(std::io::Error::last_os_error())
+                .context("could not read download quarantine");
+        }
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let value = format!("0081;{timestamp:x};SeedHop;");
+        // SAFETY: descriptor is owned; name and value remain live for the call.
+        let result = unsafe {
+            nix::libc::fsetxattr(
+                file.as_raw_fd(),
+                name.as_ptr(),
+                value.as_ptr().cast(),
+                value.len(),
+                0,
+                0,
+            )
+        };
+        if result != 0 {
+            return Err(std::io::Error::last_os_error())
+                .context("destination cannot preserve download quarantine");
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = file;
+    Ok(())
+}
+
+pub fn copy_download_quarantine(
+    source: &std::fs::File,
+    target: &std::fs::File,
+) -> anyhow::Result<()> {
+    mark_download(target)?;
+    #[cfg(target_os = "macos")]
+    {
+        use std::os::fd::AsRawFd;
+        let mut value = vec![0u8; 8192];
+        let length = unsafe {
+            nix::libc::fgetxattr(
+                source.as_raw_fd(),
+                c"com.apple.quarantine".as_ptr(),
+                value.as_mut_ptr().cast(),
+                value.len(),
+                0,
+                0,
+            )
+        };
+        if length < 0 {
+            if std::io::Error::last_os_error().raw_os_error() == Some(nix::libc::ENOATTR) {
+                return Ok(());
+            }
+            return Err(std::io::Error::last_os_error())
+                .context("could not preserve download quarantine");
+        }
+        if length > 0 {
+            let result = unsafe {
+                nix::libc::fsetxattr(
+                    target.as_raw_fd(),
+                    c"com.apple.quarantine".as_ptr(),
+                    value.as_ptr().cast(),
+                    length as usize,
+                    0,
+                    0,
+                )
+            };
+            if result != 0 {
+                return Err(std::io::Error::last_os_error())
+                    .context("could not copy download quarantine");
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = source;
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -284,7 +473,7 @@ fn secure_parent(
             return Ok((directory, name));
         }
         // SAFETY: names are terminated C strings; the parent descriptor is live.
-        let created = unsafe { libc::mkdirat(directory.as_raw_fd(), name.as_ptr(), 0o755) };
+        let created = unsafe { libc::mkdirat(directory.as_raw_fd(), name.as_ptr(), 0o700) };
         if created != 0
             && std::io::Error::last_os_error().kind() != std::io::ErrorKind::AlreadyExists
         {
@@ -302,6 +491,7 @@ fn secure_parent(
             return Err(std::io::Error::last_os_error().into());
         }
         directory = unsafe { std::fs::File::from_raw_fd(fd) };
+        mark_download(&directory)?;
     }
     unreachable!()
 }

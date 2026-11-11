@@ -62,7 +62,7 @@ impl Engine {
     }
 
     async fn refresh_storage_recovery(&self) -> Result<()> {
-        let state = self.state_directory.clone();
+        let state = self.state.require_library()?.to_path_buf();
         let recovery = tokio::task::spawn_blocking(move || crate::layout_journal::recover(&state))
             .await
             .map_err(adapter::engine_error)?;
@@ -71,6 +71,7 @@ impl Engine {
     }
 
     pub async fn resolve_storage_recovery(&self, id: String, keep_copies: bool) -> Result<()> {
+        self.state.require_library()?;
         let _operation = self.operations.write().await;
         self.ready()?;
         let notice = self
@@ -92,7 +93,7 @@ impl Engine {
         if let Some(handle) = &handle {
             handle.quiesce().map_err(adapter::engine_error)?;
         }
-        let state = self.state_directory.clone();
+        let state = self.state.require_library()?.to_path_buf();
         let result = tokio::task::spawn_blocking(move || {
             crate::layout_journal::retry(&state, &id, keep_copies)
         })
@@ -165,6 +166,7 @@ impl Engine {
     }
 
     pub async fn set_file_priorities(&self, id: String, priorities: Vec<u8>) -> Result<()> {
+        self.state.require_library()?;
         let _operation = self.operations.write().await;
         self.ready()?;
         let handle = self.handle(&id)?;
@@ -243,10 +245,12 @@ impl Engine {
     }
 
     fn save_queue(&self, config: QueueConfig) -> Result<()> {
-        storage::atomic_write(
-            &self.state_directory.join("queue.json"),
-            &serde_json::to_vec(&config).map_err(adapter::engine_error)?,
-        )?;
+        if let Some(root) = self.state.root() {
+            storage::atomic_write(
+                &root.join("queue.json"),
+                &serde_json::to_vec(&config).map_err(adapter::engine_error)?,
+            )?;
+        }
         *self.queue.lock().unwrap() = config;
         Ok(())
     }
@@ -328,6 +332,7 @@ impl Engine {
     }
 
     pub async fn relocate(&self, id: String, destination: String) -> Result<()> {
+        self.state.require_library()?;
         let _operation = self.operations.write().await;
         self.ready()?;
         let handle = self.handle(&id)?;
@@ -338,6 +343,7 @@ impl Engine {
     }
 
     pub async fn rename_file(&self, id: String, index: u32, name: String) -> Result<()> {
+        self.state.require_library()?;
         let _operation = self.operations.write().await;
         self.ready()?;
         let handle = self.handle(&id)?;
@@ -463,7 +469,7 @@ impl Engine {
                 .map(|(f, t)| (f.name.clone(), (*t).clone(), f.size))
                 .collect();
             let operation = operation.clone();
-            let state = self.state_directory.clone();
+            let state = self.state.require_library()?.to_path_buf();
             let original = crate::layout_journal::Layout { root: old_root.clone(), names: old_names.clone() };
             let destination = crate::layout_journal::Layout { root: root.clone(), names: names.clone() };
             let torrent_id = record.id.clone();
@@ -526,7 +532,7 @@ impl Engine {
             .map_err(adapter::engine_error)?;
         if let Err(error) = self.session.try_update_persistence_metadata(&handle).await {
             operation.phase("restoring");
-            if matches!(copied.authority(&self.state_directory), Ok(false)) {
+            if matches!(copied.authority(self.state.require_library()?), Ok(false)) {
                 handle
                     .replace_storage_layout(old_root.clone(), old_names)
                     .map_err(adapter::engine_error)?;
@@ -551,7 +557,7 @@ impl Engine {
         // The durable new layout is the commit point. Interrupted cleanup may
         // leave extra originals, but can never leave the library without bytes.
         operation.phase("cleaning");
-        let state = self.state_directory.clone();
+        let state = self.state.require_library()?.to_path_buf();
         let cleanup = tokio::task::spawn_blocking(move || copied.complete(&state, true))
             .await
             .map_err(adapter::engine_error)?;

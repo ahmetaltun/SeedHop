@@ -86,6 +86,16 @@ struct SettingsView: View {
                                 settingText(String(localized:"Show transfer speeds in Dock",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),String(localized:"Show download and upload speeds while SeedHop is running. Hidden when idle.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).frame(maxWidth:.infinity,alignment:.leading)
                             }.toggleStyle(.switch).controlSize(.small)
                         }
+                        #if SEEDHOP_SANDBOX
+                        SandboxAccessSettings().environmentObject(store)
+                        #endif
+                        #if SEEDHOP_DEVELOPMENT || SEEDHOP_SANDBOX
+                        PreferenceTransferSettings().environmentObject(store)
+                        #endif
+                        #if SEEDHOP_DEVELOPMENT
+                        ActivityPrivacySettings().environmentObject(store)
+                        StatisticsRetentionSettings().environmentObject(store)
+                        #endif
                         group(String(localized:"Download location",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
                             HStack(spacing:12) { Image(systemName:"folder").foregroundStyle(Design.green); VStack(alignment:.leading,spacing:4) { Text(URL(fileURLWithPath:store.downloadDirectory).lastPathComponent).font(.system(size:12,weight:.medium)); Text(store.downloadDirectory.replacingOccurrences(of:NSHomeDirectory(),with:"~")).font(.system(size:10)).foregroundStyle(.secondary) }; Spacer(); Button(String(localized:"Choose…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),action:chooseFolder).focused($focusedField,equals:.folder).accessibilityLabel(String(localized:"Choose default download folder",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
                         }
@@ -100,12 +110,19 @@ struct SettingsView: View {
                             SoftwareUpdateSettings()
                         }
                         group(String(localized:"Notifications",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
+                            VStack(alignment:.leading,spacing:14) {
                             Toggle(isOn:Binding(get:{store.completionNotifications},set:{ enabled in
                                 if enabled { UNUserNotificationCenter.current().requestAuthorization(options:[.alert,.sound]) { granted,_ in Task { @MainActor in store.completionNotifications = granted; UserDefaults.standard.set(granted,forKey:"completionNotifications") } } }
                                 else { store.completionNotifications = false; UserDefaults.standard.set(false,forKey:"completionNotifications") }
                             })) { settingText(String(localized:"Let me know when a download finishes",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale), String(localized:"A quiet notification when your files are ready.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }.toggleStyle(.switch).controlSize(.small)
+                            Divider()
+                            Toggle(isOn:Binding(get:{store.notificationDetails},set:{store.notificationDetails = $0; UserDefaults.standard.set($0,forKey:"notificationDetails")})) {
+                                Text(String(localized:"Include file names in notifications",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)).frame(maxWidth:.infinity,alignment:.leading)
+                            }.toggleStyle(.switch).controlSize(.small).disabled(!store.completionNotifications)
+                            }
                         }
                     } else if tab == 1 {
+                        NetworkPrivacySettings()
                         group(String(localized:"Peer encryption",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
                             VStack(alignment:.leading,spacing:12) {
                                 DropdownRow(String(localized:"Connection policy",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
@@ -159,5 +176,20 @@ struct SettingsView: View {
     }
     private func settingText(_ title:String,_ detail:String) -> some View { VStack(alignment:.leading,spacing:5) { Text(title).font(.system(size:12,weight:.medium)); Text(detail).font(.system(size:10)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true) } }
     private func info(_ title:String,_ value:String) -> some View { HStack { Text(title).foregroundStyle(.secondary); Spacer(); Text(value) }.font(.system(size:11)) }
-    private func chooseFolder() { let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.directoryURL = URL(fileURLWithPath:store.downloadDirectory); panel.begin { focusedField = .folder; if $0 == .OK, let url = panel.url { store.downloadDirectory = url.path; UserDefaults.standard.set(url.path,forKey:"downloadDirectory") } } }
+    private func chooseFolder() {
+        let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
+        panel.directoryURL = URL(fileURLWithPath:store.downloadDirectory)
+        panel.begin {
+            focusedField = .folder
+            guard $0 == .OK, let url = panel.url else { return }
+            #if SEEDHOP_SANDBOX
+            do { try FolderAccessStore.application.remember(url) }
+            catch { store.error = EngineMessage(code:FolderAccessFailure.noticeCode(for:error)).localizedDescription; return }
+            #endif
+            store.downloadDirectory = url.path; UserDefaults.standard.set(url.path,forKey:"downloadDirectory")
+            #if SEEDHOP_SANDBOX
+            Task { await store.start() }
+            #endif
+        }
+    }
 }

@@ -250,6 +250,8 @@ struct ClientShared {
 #[derive(Clone)]
 pub struct UdpTrackerClient {
     state: Arc<ClientShared>,
+    pub(crate) dns: Option<crate::BoundDns>,
+    pub(crate) block_local_network: bool,
 }
 
 struct TransactionIdGuard<'a> {
@@ -265,6 +267,15 @@ impl Drop for TransactionIdGuard<'_> {
 }
 
 impl UdpTrackerClient {
+    pub fn with_destination_policy(mut self, block: bool) -> Self {
+        self.block_local_network = block;
+        self
+    }
+    pub fn with_dns(mut self, dns: Option<crate::BoundDns>) -> Self {
+        self.dns = dns;
+        self
+    }
+
     pub async fn new(
         cancel_token: CancellationToken,
         bind_device: Option<&BindDevice>,
@@ -280,6 +291,8 @@ impl UdpTrackerClient {
         .with_context(|| format!("error creating UDP socket at {addr}"))?;
 
         let client = Self {
+            dns: None,
+            block_local_network: false,
             state: Arc::new(ClientShared {
                 sock,
                 locked: RwLock::new(Default::default()),

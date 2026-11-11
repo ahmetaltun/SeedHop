@@ -50,7 +50,7 @@ imports or creates signing material.
 Release builds omit development flags and the validation exception:
 
 ```sh
-python3 scripts/build.py --release --identity 'Developer ID Application: Your Name (TEAMID)'
+python3 scripts/build.py --release --sandbox --sandbox-team-id TEAMID --identity 'Developer ID Application: Your Name (TEAMID)'
 ```
 
 Notarization and distribution require your own Developer ID and Apple account.

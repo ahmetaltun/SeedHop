@@ -9,6 +9,7 @@ async fn diagnostics_preserve_unknown_history_and_reused_files_are_not_network_t
         state_directory: state.path().to_string_lossy().into(),
         download_directory: files.path().to_string_lossy().into(),
         allow_network_discovery: false,
+        allow_local_network: true,
         listen_port: 0,
     };
     let bytes = adapter::create_fixture("existing.bin", b"already on disk");

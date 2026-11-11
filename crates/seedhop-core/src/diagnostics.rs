@@ -16,6 +16,12 @@ pub fn now() -> u64 {
         .as_secs()
 }
 
+const ACTIVITY_RETENTION_SECONDS: u64 = 15 * 60;
+
+fn retains_activity(timestamp: u64, current: u64) -> bool {
+    timestamp > current.saturating_sub(ACTIVITY_RETENTION_SECONDS) && timestamp <= current
+}
+
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Totals {
@@ -37,15 +43,37 @@ pub(crate) struct Totals {
     #[serde(skip)]
     seeding_fraction: f64,
 }
-#[derive(Default)]
 pub(crate) struct Accounting {
     pub entries: HashMap<String, Totals>,
     last_checkpoint: Option<Instant>,
+    remember_statistics: bool,
+}
+impl Default for Accounting {
+    fn default() -> Self {
+        Self {
+            entries: HashMap::new(),
+            last_checkpoint: None,
+            remember_statistics: true,
+        }
+    }
 }
 impl Accounting {
+    pub(crate) fn memory_only() -> Self {
+        Self {
+            remember_statistics: false,
+            ..Self::default()
+        }
+    }
+
     pub fn load(dir: &Path) -> Result<Self> {
+        let remember =
+            crate::connection_settings::ConnectionSettings::load(dir)?.remembers_statistics();
         let path = dir.join("statistics.json");
-        let entries = if path.exists() {
+        let entries = if !remember {
+            // Do not deserialize historical records when their retention is off.
+            storage::atomic_write(&path, b"{}")?;
+            HashMap::new()
+        } else if path.exists() {
             serde_json::from_slice(&std::fs::read(path).map_err(storage::io_error)?)
                 .map_err(|e| crate::CoreError::CorruptState(format!("Statistics: {e}")))?
         } else {
@@ -54,9 +82,14 @@ impl Accounting {
         Ok(Self {
             entries,
             last_checkpoint: None,
+            remember_statistics: remember,
         })
     }
     pub fn new_transfer(&mut self, id: String) {
+        if !self.remember_statistics {
+            self.entries.insert(id, Totals::default());
+            return;
+        }
         self.entries.insert(
             id,
             Totals {
@@ -76,14 +109,48 @@ impl Accounting {
         {
             return Ok(());
         }
-        let result = storage::atomic_write(
-            &dir.join("statistics.json"),
-            &serde_json::to_vec(&self.entries).map_err(adapter::engine_error)?,
-        );
+        let result = if self.remember_statistics {
+            storage::atomic_write(
+                &dir.join("statistics.json"),
+                &serde_json::to_vec(&self.entries).map_err(adapter::engine_error)?,
+            )
+        } else {
+            // Retry an unfinished explicit purge without serializing session
+            // counters. A failed purge must not become a successful skipped save.
+            crate::connection_settings::ConnectionSettings::load(dir)
+                .and_then(|mut saved| saved.complete_statistics_clear(dir))
+        };
         // A failed forced save also invalidates the normal checkpoint timer.
         // Maintenance must retry instead of clearing the warning on a skipped save.
         self.last_checkpoint = result.as_ref().ok().map(|_| Instant::now());
         result
+    }
+    pub(crate) fn set_retention(&mut self, remember: bool) {
+        self.last_checkpoint = None;
+        if self.remember_statistics == remember {
+            return;
+        }
+        self.remember_statistics = remember;
+        for totals in self.entries.values_mut() {
+            // Preserve session counters and their monotonic baseline. Do not
+            // revive private-period totals when persistence is enabled again.
+            totals.downloaded = remember.then_some(0);
+            totals.uploaded = remember.then_some(0);
+            totals.added = None;
+            totals.completed = None;
+            totals.seeding_seconds = remember.then_some(0);
+            totals.seeding_fraction = 0.0;
+            totals.last = Some(Instant::now());
+        }
+    }
+    pub(crate) fn checkpoint_on_shutdown(&mut self, dir: &Path) -> Result<()> {
+        // An unfinished privacy purge is durably marked and retried before the
+        // next session restores. Never keep a drained engine alive just to retry
+        // deleting ancillary statistics, or serialize private session counters.
+        if !self.remember_statistics {
+            return Ok(());
+        }
+        self.checkpoint(dir, true)
     }
     pub fn sample(&mut self, id: String, down: u64, up: u64, seeding: bool, complete: bool) {
         let t = self.entries.entry(id).or_default();
@@ -188,6 +255,37 @@ pub struct TorrentDetails {
 }
 
 impl Engine {
+    /// Bound volatile tracker history even when no inspector requests it.
+    pub(crate) fn expire_activity(&self) {
+        let current = now();
+        self.session.with_torrents(|torrents| {
+            for (_, torrent) in torrents {
+                torrent
+                    .shared()
+                    .tracker_events
+                    .lock()
+                    .retain(|(_, timestamp, _, _)| retains_activity(*timestamp, current));
+            }
+        });
+    }
+
+    /// Clear volatile tracker activity without changing payloads, accounting,
+    /// queue intent, discovery settings, or the monotonic event sequence.
+    pub async fn clear_activity(&self) -> Result<()> {
+        let _operation = self.operations.write().await;
+        // Local privacy controls remain available while network policy blocks
+        // transfers. Do not call ready(), which would reject that state.
+        if self.stopping.load(Ordering::SeqCst) {
+            return Err(crate::CoreError::Stopping);
+        }
+        self.session.with_torrents(|torrents| {
+            for (_, torrent) in torrents {
+                torrent.shared().tracker_events.lock().clear();
+            }
+        });
+        Ok(())
+    }
+
     pub(crate) fn sample_accounting(&self) {
         // Serialize collection and application so concurrent readers cannot
         // commit an older counter sample after a newer one.
@@ -374,12 +472,14 @@ impl Engine {
                 code: "input.this_torrent_is_no_longer_in_the_library",
                 message: "This torrent is no longer in the library.".into(),
             })?;
+        let current = now();
         let events = if section == "activity" {
             torrent
                 .shared()
                 .tracker_events
                 .lock()
                 .iter()
+                .filter(|(_, timestamp, _, _)| retains_activity(*timestamp, current))
                 .map(|(sequence, timestamp, url, state)| DiagnosticEvent {
                     sequence: *sequence,
                     timestamp: *timestamp,
@@ -474,6 +574,17 @@ fn sanitize_message(message: &str, raw: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn activity_retention_excludes_expired_and_future_timestamps() {
+        assert!(!retains_activity(100, 1000));
+        assert!(!retains_activity(99, 1000));
+        assert!(retains_activity(101, 1000));
+        assert!(retains_activity(1000, 1000));
+        assert!(!retains_activity(1001, 1000));
+        assert!(!retains_activity(0, 10));
+        assert!(retains_activity(1, 10));
+    }
+
     #[test]
     fn payload_counts_are_not_content_progress_and_do_not_double_count() {
         let mut a = Accounting::default();

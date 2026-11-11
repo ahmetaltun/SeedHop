@@ -11,7 +11,7 @@ import build
 
 class ArchitectureTests(unittest.TestCase):
     def test_debug_and_release_pin_rust_target_and_output(self):
-        for flags in ([], ["--release"]):
+        for flags in ([], ["--release", "--sandbox", "--sandbox-team-id", "ABCDEFGHIJ"]):
             with self.subTest(flags=flags), tempfile.TemporaryDirectory() as directory:
                 root = pathlib.Path(directory)
                 with patch("sys.argv", ["build.py", "--identity", "Developer ID Application: Test (ABCDEFGHIJ)" if flags else "-", *flags]), \

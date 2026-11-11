@@ -64,6 +64,12 @@ not greater than all published stable release metadata. Reruns may refresh draft
 assets; a published release cannot be overwritten. Do not publish an older draft
 after a newer stable version, or manually mark an older release as latest.
 
+For v0.1.3, use a disposable existing library to verify import and folder
+approval on the signed build. Confirm normal transfers reconnect, then add a
+paused fixture in a private session and end the session. Check that the normal
+library stays separate and private payload files remain. Check rollback with
+the same disposable library.
+
 The workflow validates the tag and version, then builds the release app once.
 It caches Rust dependencies, build outputs, and the checksum-verified Sparkle
 distribution between runs. It does not run the local test suite or native UI

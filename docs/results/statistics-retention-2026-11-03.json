@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-03",
+  "scope": "Development controls for optional saved transfer-statistics retention",
+  "default": "Existing libraries continue remembering statistics until explicitly changed.",
+  "implemented": [
+    "Format-4 retention choice with explicit network-required marker and old-reader refusal",
+    "Pending-purge transaction before clearing the active statistics file",
+    "Startup purge replay before network/session restoration and maintenance retries",
+    "Session-only accounting while persistence is off",
+    "Fresh retained totals on re-enable; no persistence of off-period counters",
+    "Accounting pruning to registered transfers at the policy boundary",
+    "Offline foreground policy controls with the existing exclusive library lease",
+    "Preferences-only helpers preserve background run intent",
+    "Sandbox migration accepts format 4 and rejects pending statistics purges"
+  ],
+  "preserved": [
+    "payload files and verification bitfields",
+    "session upload/download counters",
+    "saved library, trackers and file selection",
+    "pause intent and queue order",
+    "network/encryption requirements",
+    "other library copies, backups and notification deduplication identifiers"
+  ],
+  "staticChecks": {
+    "initialWorkspaceCheck": {
+      "status": "passed",
+      "method": "cargo check --workspace --all-targets; compiled tests, did not run them",
+      "log": ".build/sandbox-development/statistics-check.log"
+    },
+    "rustBuild": {
+      "status": "passed",
+      "method": "cargo build --offline --locked --target aarch64-apple-darwin -p seedhop-ffi --features bindgen",
+      "log": ".build/sandbox-development/statistics-rust-build.log"
+    },
+    "clippy": {
+      "status": "passed",
+      "method": "workspace/all-targets, warnings denied; no test execution",
+      "log": ".build/sandbox-development/statistics-clippy.log"
+    },
+    "bindings": {
+      "status": "regenerated",
+      "log": ".build/sandbox-development/statistics-bindings.log"
+    },
+    "host": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/statistics-host-compile.log"
+    },
+    "developmentApp": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/statistics-app-compile.log"
+    },
+    "sandboxApp": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/statistics-sandbox-compile.log"
+    },
+    "releaseApp": {
+      "status": "passed",
+      "method": "Swift type-check only; controls excluded",
+      "log": ".build/sandbox-development/statistics-release-compile.log"
+    },
+    "formatAndDiff": {
+      "status": "passed",
+      "methods": [
+        "cargo fmt --all -- --check",
+        "git diff --check"
+      ]
+    }
+  },
+  "compatibility": {
+    "acceptedActiveSettingsVersions": [
+      1,
+      2,
+      4
+    ],
+    "inactiveMigrationVersion": 3,
+    "nativeProtocolVersion": 10,
+    "format4RequiredFields": [
+      "remember_statistics",
+      "network_policy_required"
+    ],
+    "pendingClearMarker": "statistics_clear_pending",
+    "olderReaders": "Readers limited to formats 1/2 refuse format 4. Do not manually downgrade or delete the guard."
+  },
+  "localization": {
+    "newSourceEntries": 10,
+    "languages": 13,
+    "humanReview": "pending"
+  },
+  "runtimeTests": {
+    "executed": false,
+    "status": "deferred by user"
+  },
+  "stateChanges": {
+    "appOrEngineLaunched": false,
+    "actualStatisticsPurged": false,
+    "userLibraryOrPreferencesChanged": false,
+    "vpnChanged": false,
+    "serviceRegisteredOrRestarted": false,
+    "appBundleRebuilt": false
+  },
+  "limitations": [
+    "Only the active library statistics file is purged. Other copies, migration originals and backups remain.",
+    "A failed write or flush can leave the previous or newly readable choice; errors remain reported.",
+    "An unfinished purge can remain on disk at quit and is retried before the next session restores.",
+    "No private-session, secure-erasure or automatic-expiry claim.",
+    "Live UI and native helper behavior have compiler evidence only."
+  ],
+  "pending": [
+    "Disable/re-enable and current-session counter boundaries",
+    "Failed writes, purge retries and directory-flush interruption",
+    "Startup/shutdown with pending clear and network-blocked policy",
+    "Format downgrade/missing-field refusal and network/encryption preservation",
+    "Foreground/background ownership and offline no-start acceptance",
+    "Sandbox migration and rollback with format 4",
+    "Native layout, localization and accessibility acceptance"
+  ],
+  "documentation": "../LOCAL-PRIVACY.md",
+  "changes": "Uncommitted; controls remain development-only"
+}

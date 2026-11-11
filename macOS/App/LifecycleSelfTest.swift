@@ -48,7 +48,7 @@ import ServiceManagement
                 print("PASS: certificate-backed host handoff cycle \(cycle); running and paused intent retained")
             }
             try await shutdown(client)
-            let intentURL = SeedHopIdentity.library.appendingPathComponent("run-intent.json")
+            let intentURL = try SeedHopIdentity.library.appendingPathComponent("run-intent.json")
             let original = try JSONSerialization.jsonObject(with:Data(contentsOf:intentURL)) as! [String:Any]
             for (resume, sameSession, shouldRestore) in [(false,false,false),(true,false,true),(false,true,true)] {
                 var saved = original

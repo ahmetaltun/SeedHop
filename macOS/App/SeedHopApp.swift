@@ -4,19 +4,48 @@ import Combine
 @main struct SeedHopApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var store = SeedHopApp.makeStore()
-    @State private var localization = AppLocalization.shared
+    @StateObject private var privateSession = PrivateSessionController()
+    @State private var localization: AppLocalization = {
+        #if SEEDHOP_DEVELOPMENT || SEEDHOP_SANDBOX
+        PreferenceTransfer.prepareAtLaunch()
+        #endif
+        return AppLocalization.shared
+    }()
     @MainActor private static func makeStore() -> LibraryStore {
+        #if SEEDHOP_DEVELOPMENT || SEEDHOP_SANDBOX
+        PreferenceTransfer.prepareAtLaunch()
+        #endif
         #if SEEDHOP_DEVELOPMENT
         if ProcessInfo.processInfo.arguments.contains("--verify-desktop-integration") || ProcessInfo.processInfo.arguments.contains("--verify-localization") || ProcessInfo.processInfo.arguments.contains("--verify-live-language") || ProcessInfo.processInfo.arguments.contains("--verify-menus") || ProcessInfo.processInfo.arguments.contains("--render-localizations") { return LibraryStore(designPreview:true) }
         if ProcessInfo.processInfo.arguments.contains("--verify-performance") { return PerformanceSelfTest.fixtureStore() }
         if ProcessInfo.processInfo.arguments.contains("--verify-interface") { return UXSelfTest.nativeFixture() }
         #endif
-        return LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--verify-workspace-layout") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine") || ProcessInfo.processInfo.arguments.contains("--verify-ux") || ProcessInfo.processInfo.arguments.contains("--verify-interface") || ProcessInfo.processInfo.arguments.contains("--verify-lifecycle") || ProcessInfo.processInfo.arguments.contains("--verify-storage-recovery"))
+        let store = LibraryStore(designPreview:ProcessInfo.processInfo.arguments.contains("--verify-workspace-layout") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--design-preview") || ProcessInfo.processInfo.arguments.contains("--render-designs") || ProcessInfo.processInfo.arguments.contains("--verify-engine") || ProcessInfo.processInfo.arguments.contains("--verify-ux") || ProcessInfo.processInfo.arguments.contains("--verify-interface") || ProcessInfo.processInfo.arguments.contains("--verify-network-security") || ProcessInfo.processInfo.arguments.contains("--verify-lifecycle") || ProcessInfo.processInfo.arguments.contains("--verify-storage-recovery"))
+        #if SEEDHOP_DEVELOPMENT || SEEDHOP_SANDBOX
+        if PreferenceTransfer.startupFailed { store.error = String(localized:"Settings could not be updated. Your saved settings have been preserved.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
+        #endif
+        return store
     }
     var body: some Scene {
         WindowGroup("SeedHop",id:"library",for:String.self) { _ in
             LibraryView().environmentObject(store)
-                .modifier(ExternalOpenBridge(coordinator:delegate.externalOpens,store:store,attached:{ delegate.store = store }))
+                .modifier(ExternalOpenBridge(coordinator:delegate.externalOpens,store:store,attached:{
+                    delegate.store = store
+                    delegate.privateSession = privateSession
+                }))
+                .sheet(item:Binding(get:{ privateSession.store.map { IdentifiedWorkspace(store:$0) } },set:{ _ in })) { workspace in
+                    PrivateSessionView(controller:privateSession,store:workspace.store)
+                }
+                .alert(String(localized:"Private Session",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),isPresented:Binding(
+                    get:{ privateSession.error != nil },set:{ if !$0 { privateSession.error = nil } }
+                )) {
+                    Button(String(localized:"OK",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { privateSession.error = nil }
+                } message: {
+                    Text(privateSession.error ?? "")
+                }
+                #if SEEDHOP_SANDBOX && !SEEDHOP_VALIDATION
+                .modifier(SandboxFirstRun(store:store))
+                #endif
                 .task { await store.start() }
         } defaultValue: { "library" }
         .defaultSize(width:1200,height:760)
@@ -27,6 +56,8 @@ import Combine
                 Button(String(localized:"Add Torrent…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.beginImport() }.keyboardShortcut("n").disabled(store.hasFileOperation)
                 Button(String(localized:"Open Torrent File…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.openFiles() }.keyboardShortcut("o").disabled(store.hasFileOperation)
                 Button(String(localized:"Paste Magnet Link…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.pasteMagnet() }.keyboardShortcut("v",modifiers:[.command,.shift]).disabled(store.hasFileOperation)
+                Button(String(localized:"New Private Session…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { privateSession.begin(from:store) }
+                    .disabled(store.designPreview || store.showImport || privateSession.busy || privateSession.store != nil)
             }
             SoftwareUpdateCommands()
             LibraryNavigationCommands(store:store)
@@ -53,6 +84,11 @@ import Combine
         }.windowResizability(.contentSize).environment(\.locale,localization.locale)
         Settings { SettingsView().environmentObject(store) }.environment(\.locale,localization.locale)
     }
+}
+
+private struct IdentifiedWorkspace: Identifiable {
+    let store: LibraryStore
+    var id: ObjectIdentifier { ObjectIdentifier(store) }
 }
 
 struct LibraryNavigationCommands: Commands {
@@ -86,6 +122,7 @@ struct LibraryNavigationCommands: Commands {
     weak var store: LibraryStore? {
         didSet { if oldValue !== store { observeDock() } }
     }
+    weak var privateSession: PrivateSessionController?
     private func observeDock() {
         dockObservations.removeAll()
         guard let store, !store.designPreview, !WorkspacePreferences.isFixture else { return }
@@ -128,9 +165,11 @@ struct LibraryNavigationCommands: Commands {
         guard !quitting else { return .terminateCancel }
         quitting = true
         Task {
-            let ready = SoftwareUpdate.shared.installing
-                ? await store.prepareForUpdate()
-                : await store.prepareToQuit(stopEverything:stopEverything)
+            let privateEnded = await privateSession?.end() ?? true
+            let ready: Bool
+            if !privateEnded { ready = false }
+            else if SoftwareUpdate.shared.installing { ready = await store.prepareForUpdate() }
+            else { ready = await store.prepareToQuit(stopEverything:stopEverything) }
             quitting = false; stopEverything = false
             if ready { dockSpeeds.reset() }
             sender.reply(toApplicationShouldTerminate:ready)
@@ -183,6 +222,10 @@ struct LibraryNavigationCommands: Commands {
         }
         #endif
         #if SEEDHOP_VALIDATION
+        if ProcessInfo.processInfo.arguments.contains("--verify-network-security") {
+            Task { do { try await NetworkSecuritySelfTest.run(); exit(0) } catch { fputs("Network security verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--verify-lifecycle") {
             Task { do { try await LifecycleSelfTest.run(); exit(0) } catch { fputs("Lifecycle verification failed: \(error.localizedDescription)\n",stderr); exit(1) } }
             return

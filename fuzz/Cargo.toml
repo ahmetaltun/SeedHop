@@ -1,0 +1,30 @@
+[package]
+name = "seedhop-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "=0.4.13"
+seedhop-core = { path = "../crates/seedhop-core" }
+hickory-proto = { version = "=0.26.3", default-features = false, features = ["std"] }
+
+[[bin]]
+name = "torrent_metadata"
+path = "fuzz_targets/torrent_metadata.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "dns_message"
+path = "fuzz_targets/dns_message.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]

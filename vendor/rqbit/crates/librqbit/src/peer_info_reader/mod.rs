@@ -343,7 +343,6 @@ pub type TorrentAndInfoBytes = (TorrentMetaV1Info<ByteBufOwned>, ByteBufOwned);
 struct Handler {
     progress: tokio::sync::watch::Sender<Option<(tokio::time::Instant, std::time::Duration)>>,
     metadata_slots: Arc<tokio::sync::Semaphore>,
-    metadata_permit: Mutex<Option<tokio::sync::OwnedSemaphorePermit>>,
     privacy: Arc<MetadataPrivacy>,
     addr: SocketAddr,
     identity: MetadataIdentity,
@@ -359,6 +358,9 @@ struct Handler {
     >,
     locked: RwLock<Option<HandlerLocked>>,
     client_name_and_version: String,
+    // Rust drops fields in declaration order. Free dictionaries and pending
+    // proof buffers before returning their shared allocation permit.
+    metadata_permit: Mutex<Option<tokio::sync::OwnedSemaphorePermit>>,
 }
 
 impl Handler {

@@ -1,0 +1,71 @@
+name: Security checks
+
+on:
+  pull_request:
+  push:
+    branches: [master, dev]
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned vulnerability scanner
+        run: cargo +stable install cargo-audit --version 0.22.2 --locked
+      - name: Audit the native app lockfile
+        run: cargo +stable audit --file Cargo.lock
+      - name: Export dependency inventory
+        run: python3 scripts/security_inventory.py --output .build/security/dependencies.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dependency-inventory
+          path: .build/security/dependencies.json
+          if-no-files-found: error
+
+  native-safety:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test network, file, and settings boundaries
+        run: cargo test --locked -p seedhop-core --test network_policy --test download_safety --test settings
+      - name: Check Rust boundaries
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+  parser-fuzzing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install fuzzing tools
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo +stable install cargo-fuzz --version 0.13.2 --locked
+      - name: Seed parser corpora
+        run: |
+          mkdir -p fuzz/corpus/torrent_metadata fuzz/corpus/dns_message
+          cp fuzz/seeds/torrent_metadata/* fuzz/corpus/torrent_metadata/
+          cp fuzz/seeds/dns_message/* fuzz/corpus/dns_message/
+      - name: Exercise untrusted torrent metadata
+        run: cargo +nightly fuzz run torrent_metadata -- -max_total_time=60 -max_len=1048576 -rss_limit_mb=2048
+      - name: Exercise DNS message parsing
+        run: cargo +nightly fuzz run dns_message -- -max_total_time=60 -max_len=16384 -rss_limit_mb=1024
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: parser-fuzz-failures
+          path: fuzz/artifacts/
+          if-no-files-found: ignore

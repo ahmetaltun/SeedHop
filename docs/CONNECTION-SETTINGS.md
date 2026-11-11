@@ -1,5 +1,18 @@
 # Connection settings and engine restart
 
+Network routing, protected DNS, LAN destination restrictions and the protocol-10
+compatibility barrier are documented in [SECURITY-HARDENING.md](SECURITY-HARDENING.md).
+Explicit network-policy saves stop connections immediately and use a version-2
+connection-settings guard, or preserve an existing version-4 retention guard;
+the peer-encryption-only next-start behavior below
+otherwise remains unchanged.
+
+The development-only statistics-retention choice is documented in
+[LOCAL-PRIVACY.md](LOCAL-PRIVACY.md). Version 4 requires explicit statistics and
+network-policy-required flags. Network and encryption edits preserve those flags;
+they never downgrade the guard. Version 3 remains an inactive sandbox-migration
+barrier and is never accepted as an active format.
+
 Roadmap step 5, completed on 2026-10-27, exposes the existing engine's peer-encryption policies and makes
 connection information match the configured listener. It does not add another
 protocol implementation, advanced transport switches, or a reachability probe.

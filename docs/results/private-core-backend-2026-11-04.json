@@ -1,0 +1,63 @@
+{
+  "checkpoint": "Core-only memory backend for private-session inspection",
+  "date": "2026-11-04",
+  "status": "implemented; native private sessions and transfer admission remain unavailable",
+  "behavior": [
+    "Explicit library backend owns its path and exclusive lease; memory backend owns neither.",
+    "PrivateEngineConfig accepts no state-directory field and requires explicit network/encryption policy.",
+    "Private startup bypasses library settings, resume restoration, statistics purge and layout recovery.",
+    "Shared session construction preserves binding, bound DNS, encryption and destination policy.",
+    "Private session and DHT persistence are disabled; rqbit selects nonpersistent bitfields.",
+    "Memory accounting starts empty; maintenance and shutdown do not call library checkpoints.",
+    "Queue bookkeeping and basic bandwidth limits can stay in memory.",
+    "Persistent settings, layout/recovery operations and payload deletion require a library backend.",
+    "Private add/import requests fail before destination creation or transfer admission, pending exclusive payload ownership."
+  ],
+  "compatibility": {
+    "nativeProtocolVersion": 10,
+    "libraryFormatsChanged": false,
+    "ffiApiChanged": false,
+    "nativeEntryAdded": false,
+    "rustApi": "Engine::retain_lease now returns Option<&LibraryLease>; all workspace targets compile",
+    "normalStartup": "Existing loading/recovery/persistence path remains selected by Engine::open"
+  },
+  "verification": {
+    "workspaceCheck": {"status": "passed", "method": "cargo check --offline --locked --workspace --all-targets; initial implementation", "log": ".build/sandbox-development/private-core-check.log"},
+    "finalClippy": {"status": "passed", "method": "cargo clippy --offline --locked --workspace --all-targets -- -D warnings", "log": ".build/sandbox-development/private-core-clippy.log"},
+    "nativeBuild": {"status": "passed", "method": "cargo build --offline --locked --target aarch64-apple-darwin -p seedhop-ffi --features bindgen", "log": ".build/sandbox-development/private-core-build.log"},
+    "architecture": {"status": "passed", "artifact": "target/aarch64-apple-darwin/debug/libseedhop_ffi.dylib", "architectures": ["arm64"]},
+    "formatAndDiff": "passed",
+    "swiftAndBindings": "Not rerun or regenerated; this checkpoint changes no exported FFI or Swift API"
+  },
+  "runtimeTests": {
+    "executed": false,
+    "status": "deferred by user",
+    "newRegressions": [
+      "Memory backend cannot supply a library path or lease",
+      "Private metadata inspection ignores decoy disk state and rejects persistent mutations without changing those files",
+      "Malformed or unavailable network protection cannot fall back to a direct session"
+    ],
+    "regressionStatus": "compiled only, not executed"
+  },
+  "stateChanges": {
+    "appOrEngineLaunched": false,
+    "userPreferencesOrLibraryChanged": false,
+    "vpnChanged": false,
+    "serviceRegisteredOrRestarted": false,
+    "appBundleRebuilt": false
+  },
+  "pending": [
+    "Exclusive private payload ownership and transfer admission",
+    "Read-only protection snapshot from the normal library owner",
+    "Private FFI/protocol, authenticated foreground helper and native workspace",
+    "Transient sandbox folder grants and end-session ownership barriers",
+    "Runtime filesystem/network/shutdown evidence and normal-library regression acceptance"
+  ],
+  "limitations": [
+    "This is an inspection-only Rust backend, not a usable private torrent-client mode.",
+    "No runtime evidence establishes filesystem write absence, network leak prevention or crash behavior.",
+    "No production activation, anonymity or secure-erasure claim."
+  ],
+  "documentation": "../PRIVATE-SESSIONS.md",
+  "changes": "Uncommitted"
+}

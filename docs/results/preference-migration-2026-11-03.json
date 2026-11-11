@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-03",
+  "scope": "Explicit portable UI preference transfer for development and sandbox development builds",
+  "implemented": [
+    "Allowlisted JSON export/import with confirmation and restart application",
+    "Private per-app transaction and exclusive lease",
+    "Durable undo snapshot before applying preferences",
+    "Pending cancellation and restart-based undo",
+    "Replay of interrupted application and restoration",
+    "Startup language refresh and fixture isolation"
+  ],
+  "portableFields": [
+    "appearance",
+    "language override",
+    "Dock speed display",
+    "transfer-details visibility",
+    "sidebar visibility",
+    "row density",
+    "native column order",
+    "recognized column widths",
+    "sort order"
+  ],
+  "excluded": [
+    "torrent history and filenames",
+    "folder paths and access grants",
+    "notification choices",
+    "login and background access",
+    "update preferences",
+    "engine security policy",
+    "window positions and opaque column-customization state"
+  ],
+  "staticChecks": {
+    "ordinaryDevelopmentApp": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/preferences-default-compile.log"
+    },
+    "sandboxDevelopmentApp": {
+      "status": "passed",
+      "method": "Swift type-check only",
+      "log": ".build/sandbox-development/preferences-sandbox-compile.log"
+    },
+    "releaseApp": {
+      "status": "passed",
+      "method": "Swift type-check only; development controls excluded",
+      "log": ".build/sandbox-development/preferences-release-compile.log"
+    }
+  },
+  "localization": {
+    "newSourceEntries": 11,
+    "languages": 13,
+    "humanReview": "pending"
+  },
+  "runtimeTests": {
+    "executed": false,
+    "status": "deferred by user"
+  },
+  "stateChanges": {
+    "appLaunched": false,
+    "settingsExportedImportedOrRestored": false,
+    "productionLibraryChanged": false,
+    "vpnChanged": false
+  },
+  "limits": {
+    "archiveBytes": 65536,
+    "undoSnapshotBytes": 65536,
+    "transactionBytes": 262144,
+    "undoHistory": "Latest staged import only"
+  },
+  "pending": [
+    "Runtime preference round trips and exact undo",
+    "Interruption and malformed-input acceptance",
+    "Startup language/appearance and live-view lifecycle acceptance",
+    "Concurrent-instance acceptance",
+    "Native UI/localization/accessibility review",
+    "Automatic production preference migration and sandbox production activation"
+  ],
+  "documentation": "../SANDBOX-MIGRATION.md",
+  "changes": "Uncommitted"
+}

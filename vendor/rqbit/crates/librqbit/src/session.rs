@@ -121,6 +121,7 @@ pub struct Session {
     dht: Option<Dht>,
     pub(crate) connector: Arc<StreamConnector>,
     reqwest_client: reqwest::Client,
+    block_local_network: bool,
     udp_tracker_client: UdpTrackerClient,
     disable_trackers: bool,
     tracker_controls:
@@ -165,7 +166,11 @@ pub struct Session {
 async fn torrent_from_url(
     reqwest_client: &reqwest::Client,
     url: &str,
+    block_local_network: bool,
 ) -> anyhow::Result<ParsedTorrentFile> {
+    if block_local_network {
+        librqbit_core::network_safety::validate_url(&url::Url::parse(url)?)?;
+    }
     let response = reqwest_client
         .get(url)
         .send()
@@ -174,11 +179,10 @@ async fn torrent_from_url(
     if !response.status().is_success() {
         bail!("GET {} returned {}", url, response.status())
     }
-    let b = response
-        .bytes()
+    let b = tracker_comms::read_limited_response(response, 32 * 1024 * 1024)
         .await
-        .with_context(|| format!("error reading response body from {url}"))?;
-    torrent_from_bytes(b).context("error decoding torrent")
+        .context("error reading torrent metadata response")?;
+    torrent_from_bytes(b.into()).context("error decoding torrent")
 }
 
 fn compute_only_files_regex<ByteBuf: AsRef<[u8]>>(
@@ -444,6 +448,12 @@ pub struct SessionOptions {
     /// What network device to bind to for DHT, BT-UDP, BT-TCP, trackers and LSD.
     /// On OSX will use IP(V6)_BOUND_IF, on Linux will use SO_BINDTODEVICE.
     pub bind_device_name: Option<String>,
+    pub block_local_network: bool,
+
+    /// Resolve all torrent DNS through this numeric server on the bound interface.
+    pub bound_dns_server: Option<SocketAddr>,
+    /// Reject a reused interface name before creating any network resources.
+    pub expected_bind_device_index: Option<u32>,
 
     /// Disable tracker communication
     pub disable_trackers: bool,
@@ -509,6 +519,9 @@ impl Default for SessionOptions {
             restore_queued: false,
             dht: Some(DhtSessionConfig::default()),
             bind_device_name: None,
+            block_local_network: false,
+            bound_dns_server: None,
+            expected_bind_device_index: None,
             disable_trackers: false,
             fastresume: false,
             persistence: None,
@@ -613,6 +626,11 @@ impl Session {
         mut opts: SessionOptions,
     ) -> BoxFuture<'static, anyhow::Result<Arc<Self>>> {
         async move {
+            if (opts.bound_dns_server.is_some() || opts.block_local_network)
+                && opts.connect.as_ref().is_some_and(|c| c.proxy_url.is_some())
+            {
+                bail!("proxy coverage is not verified with protected network policy");
+            }
             let restore_queued = opts.restore_queued;
             let peer_id = opts
                 .peer_id
@@ -632,6 +650,46 @@ impl Session {
                 None => None,
             };
 
+            if let Some(expected) = opts.expected_bind_device_index {
+                if bind_device.as_ref().map(|d| d.index().get()) != Some(expected) {
+                    bail!("selected network interface changed");
+                }
+            }
+            let bound_dns = match opts.bound_dns_server {
+                Some(server) => Some(tracker_comms::BoundDns::new(
+                    bind_device
+                        .clone()
+                        .context("protected DNS requires an interface")?,
+                    server,
+                )),
+                None => None,
+            };
+            if let (Some(dns), Some(dht)) = (bound_dns.as_ref(), opts.dht.as_mut()) {
+                let hosts = dht
+                    .bootstrap_addrs
+                    .take()
+                    .unwrap_or_else(|| dht::DHT_BOOTSTRAP.iter().map(|s| s.to_string()).collect());
+                let mut addresses = Vec::new();
+                for host in hosts {
+                    if let Ok(address) = host.parse::<SocketAddr>() {
+                        addresses.push(address.to_string());
+                        continue;
+                    }
+                    let (name, port) = host.rsplit_once(':').context("invalid DHT bootstrap")?;
+                    if let Ok(resolved) = dns.lookup(name, port.parse()?).await {
+                        addresses.extend(resolved.into_iter().map(|a| a.to_string()));
+                    }
+                }
+                if addresses.is_empty() {
+                    bail!("protected DNS could not resolve DHT bootstrap nodes");
+                }
+                dht.bootstrap_addrs = Some(addresses);
+            }
+            if opts.block_local_network
+                && opts.dht.as_ref().is_some_and(|d| d.persistence.is_some())
+            {
+                bail!("restricted network mode requires non-persistent DHT");
+            }
             let listen_result = if let Some(listen_opts) = opts.listen.take() {
                 Some(
                     listen_opts
@@ -662,6 +720,7 @@ impl Session {
                 } else {
                     let listen_addr = dht_listen_addr(dht_config.port, None, opts.ipv4_only);
                     DhtBuilder::with_config(DhtConfig {
+                        block_local_network: opts.block_local_network,
                         bootstrap_addrs: dht_config.bootstrap_addrs,
                         cancellation_token: Some(token.child_token()),
                         bind_device: bind_device.as_ref(),
@@ -754,7 +813,7 @@ impl Session {
                     reqwest::Client::builder().proxy(proxy)
                 } else {
                     #[allow(unused_mut)]
-                    let mut b = reqwest::Client::builder();
+                    let mut b = reqwest::Client::builder().no_proxy();
                     #[cfg(not(windows))]
                     if let Some(bd) = opts.bind_device_name.as_ref() {
                         b = b.interface(bd);
@@ -762,6 +821,14 @@ impl Session {
                     b
                 };
 
+                let builder = if opts.block_local_network {
+                    tracker_comms::restrict_http(builder, bound_dns.clone())
+                } else if let Some(dns) = bound_dns.as_ref() {
+                    // Environment/system proxies may resolve or connect outside the interface.
+                    builder.no_proxy().dns_resolver(Arc::new(dns.clone()))
+                } else {
+                    builder
+                };
                 builder
                     .user_agent(&client_name_and_version)
                     .build()
@@ -772,6 +839,7 @@ impl Session {
                 StreamConnector::new(StreamConnectorArgs {
                     encryption_policy: opts.peer_encryption,
                     enable_tcp: opts.connect.as_ref().map(|c| c.enable_tcp).unwrap_or(true),
+                    block_local_network: opts.block_local_network,
                     socks_proxy_config: proxy_config,
                     utp_socket: listen_result.as_ref().and_then(|l| l.utp_socket.clone()),
                     bind_device: bind_device.clone(),
@@ -805,7 +873,9 @@ impl Session {
 
             let udp_tracker_client = UdpTrackerClient::new(token.clone(), bind_device.as_ref())
                 .await
-                .context("error creating UDP tracker client")?;
+                .context("error creating UDP tracker client")?
+                .with_dns(bound_dns)
+                .with_destination_policy(opts.block_local_network);
 
             let lsd = {
                 if opts.disable_local_service_discovery {
@@ -839,6 +909,7 @@ impl Session {
                 announce_port: listen_result.as_ref().and_then(|l| l.announce_port),
                 listen_addr: listen_result.as_ref().map(|l| l.addr),
                 default_storage_factory: opts.default_storage_factory,
+                block_local_network: opts.block_local_network,
                 reqwest_client,
                 connector: stream_connector,
                 root_span: opts.root_span,
@@ -1104,6 +1175,7 @@ impl Session {
                         Ok((addr, (read, write))) => {
                             trace!("accepted connection from {addr}");
                             let session = session.upgrade().context("session is dead")?;
+                            if session.block_local_network && !librqbit_core::network_safety::is_public_destination(addr.ip()) { continue; }
                             let span = debug_span!(parent: session.rs(), "incoming", addr=%addr);
                             futs.push(
                                 session.check_incoming_connection(addr, A::KIND, Box::new(read), Box::new(write))
@@ -1292,7 +1364,8 @@ impl Session {
                         AddTorrent::Url(url)
                             if url.starts_with("http://") || url.starts_with("https://") =>
                         {
-                            torrent_from_url(&self.reqwest_client, &url).await?
+                            torrent_from_url(&self.reqwest_client, &url, self.block_local_network)
+                                .await?
                         }
                         AddTorrent::Url(url) => {
                             bail!(

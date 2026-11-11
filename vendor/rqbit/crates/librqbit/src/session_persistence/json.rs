@@ -88,7 +88,10 @@ impl JsonSessionPersistenceStore {
         // we don't need the write lock technically, but we need to stop concurrent modifications
         let db_content = self.db_content.write().await;
         let tmp_filename = format!("{}.tmp", self.db_filename.to_str().unwrap());
-        let mut tmp = tokio::fs::OpenOptions::new()
+        let mut options = tokio::fs::OpenOptions::new();
+        #[cfg(unix)]
+        options.mode(0o600).custom_flags(nix::libc::O_NOFOLLOW);
+        let mut tmp = options
             .create(true)
             .truncate(true)
             .write(true)

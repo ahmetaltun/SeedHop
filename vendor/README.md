@@ -53,3 +53,14 @@ Tracker lifecycle events are committed after successful requests, with payload
 baselines covering fast completion after metadata discovery. A hash-indexed weak
 registry and monitor-drop cleanup avoid retaining retired streams or scanning the
 whole session for each torrent snapshot. Manual transports share four slots.
+
+Patch `0036-seedhop-private-payload-capabilities.patch` adds an opt-in pinned
+filesystem factory for private payloads. It creates unknown files exclusively,
+reopens only recorded file identities, and retains directory descriptors instead
+of resolving a replacement path for new opens. Quarantine, owner-only modes,
+non-blocking opens and single-link checks remain required. Initial partial-file
+selection uses index-only boundary storage inside each exclusive transfer root;
+it does not write the torrent hash into those filenames. Later membership changes
+and payload deletion are rejected. Ordinary filesystem storage keeps its existing
+behavior. Runtime acceptance is deferred; this patch is not a filesystem-race or
+private-session certification.

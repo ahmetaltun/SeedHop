@@ -10,14 +10,22 @@ import ServiceManagement
 
 @MainActor final class EngineClient: EngineTransport {
     private var connection: NSXPCConnection?
+    private let privateSession: Bool
     private(set) var background = false
     var onInterruption: (() -> Void)?
+    #if SEEDHOP_SANDBOX
+    private var folderGeneration: UInt64?
+    #endif
+
+    init(privateSession: Bool = false) { self.privateSession = privateSession }
 
     func connect(background: Bool) throws {
         invalidate()
-        let connection = background ? NSXPCConnection(machServiceName:SeedHopIdentity.background) : NSXPCConnection(serviceName:SeedHopIdentity.foreground)
+        guard !privateSession || !background else { throw EngineMessage(code:"host.unsupported") }
+        let service = privateSession ? SeedHopIdentity.privateEngine : SeedHopIdentity.foreground
+        let connection = background ? NSXPCConnection(machServiceName:SeedHopIdentity.background) : NSXPCConnection(serviceName:service)
         let root = Bundle.main.bundleURL.appendingPathComponent("Contents")
-        let helper = background ? root.appendingPathComponent("MacOS/SeedHopAgent") : root.appendingPathComponent("XPCServices/SeedHopEngine.xpc")
+        let helper = background ? root.appendingPathComponent("MacOS/SeedHopAgent") : root.appendingPathComponent(privateSession ? "XPCServices/SeedHopPrivateEngine.xpc" : "XPCServices/SeedHopEngine.xpc")
         connection.setCodeSigningRequirement(try Signing.requirement(at:helper))
         connection.remoteObjectInterface = NSXPCInterface(with:EngineServiceProtocol.self)
         connection.interruptionHandler = { [weak self] in Task { @MainActor in self?.onInterruption?() } }
@@ -27,13 +35,30 @@ import ServiceManagement
         self.background = background
     }
     func invalidate() {
+        #if SEEDHOP_SANDBOX
+        folderGeneration = nil
+        #endif
         connection?.interruptionHandler = nil; connection?.invalidationHandler = nil
         connection?.invalidate(); connection = nil
     }
     func send(_ request: EngineRequest) async throws -> EngineReply {
         guard let connection else { throw UserFacingError(message:String(localized:"The engine is not connected yet.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
+        #if SEEDHOP_SANDBOX
+        var request = request
+        let generation: UInt64?
+        // Losing a folder grant must not prevent stopping the engine or changing
+        // offline network settings. Those operations do not need payload access.
+        if privateSession || ["shutdown", "cancel", "cancelFileOperation", "networkInfo", "networkPolicy", "clearActivity", "statisticsInfo", "statisticsRetention", "privateProtection"].contains(request.command) {
+            generation = nil
+        } else {
+            do {
+                generation = try FolderAccessStore.application.generation()
+                if folderGeneration != generation { request.folderGrants = try FolderAccessStore.application.transferBookmarks() }
+            } catch { throw EngineMessage(code:FolderAccessFailure.noticeCode(for:error)) }
+        }
+        #endif
         let data = try JSONEncoder().encode(request)
-        return try await withCheckedThrowingContinuation { continuation in
+        let result: EngineReply = try await withCheckedThrowingContinuation { continuation in
             let box = ReplyOnce(continuation)
             let timeout: TimeInterval = request.command == "inspect" ? 130 : (request.command == "shutdown" ? 40 : 15)
             // Startup may verify retained copies before the engine can reply.
@@ -54,6 +79,10 @@ import ServiceManagement
                 } catch { box.fail(error) }
             }
         }
+        #if SEEDHOP_SANDBOX
+        if let generation, self.connection === connection { folderGeneration = generation }
+        #endif
+        return result
     }
 }
 

@@ -1,0 +1,29 @@
+{
+  "exclude": [
+    "expo-animation",
+    "expo-app-clip",
+    "expo-brownfield",
+    "expo-data-fetching",
+    "expo-design-system",
+    "expo-dev-client",
+    "expo-dom",
+    "expo-examples",
+    "expo-migrate-module",
+    "expo-module",
+    "expo-native-ui",
+    "expo-overview",
+    "expo-project-structure",
+    "expo-router",
+    "expo-skill-eval",
+    "expo-ui",
+    "expo-upgrade",
+    "expo-web-to-native",
+    "reverse-engineer-anything",
+    "vercel-react-best-practices",
+    "vercel-react-native-skills",
+    "vercel-react-view-transitions",
+    "web-design-guidelines",
+    "modern-web-guidance",
+    "chrome-extensions"
+  ]
+}

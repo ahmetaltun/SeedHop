@@ -66,6 +66,7 @@ pub(crate) struct StreamConnectorArgs {
     pub utp_socket: Option<Arc<UtpSocketUdp>>,
     pub bind_device: Option<BindDevice>,
     pub ipv4_only: bool,
+    pub block_local_network: bool,
 }
 
 impl SocksProxyConfig {
@@ -142,9 +143,21 @@ pub(crate) struct StreamConnector {
     utp_socket: Option<Arc<librqbit_utp::UtpSocketUdp>>,
     stats: ConnectStatsAtomic,
     ipv4_only: bool,
+    block_local_network: bool,
 }
 
 impl StreamConnector {
+    fn check_destination(&self, addr: SocketAddr) -> Result<()> {
+        if self.block_local_network
+            && !librqbit_core::network_safety::is_public_destination(addr.ip())
+        {
+            return Err(Error::Anyhow(anyhow::anyhow!(
+                "local peer destination requires explicit permission"
+            )));
+        }
+        Ok(())
+    }
+
     pub async fn new(config: StreamConnectorArgs) -> anyhow::Result<Self> {
         #[allow(clippy::single_match)]
         match (
@@ -172,6 +185,7 @@ impl StreamConnector {
             bind_device: config.bind_device,
             stats: Default::default(),
             ipv4_only: config.ipv4_only,
+            block_local_network: config.block_local_network,
         })
     }
 
@@ -245,6 +259,7 @@ impl StreamConnector {
         &self,
         addr: SocketAddr,
     ) -> Result<(ConnectionKind, BoxAsyncReadVectored, BoxAsyncWrite)> {
+        self.check_destination(addr)?;
         if !self.can_connect_utp() {
             return Err(Error::Anyhow(anyhow::anyhow!("direct uTP is unavailable")));
         }
@@ -262,6 +277,7 @@ impl StreamConnector {
         &self,
         addr: SocketAddr,
     ) -> Result<(ConnectionKind, BoxAsyncReadVectored, BoxAsyncWrite)> {
+        self.check_destination(addr)?;
         if addr.port() == 0 {
             return Err(Error::Anyhow(anyhow::anyhow!(
                 "invalid peer address (port 0): {}",

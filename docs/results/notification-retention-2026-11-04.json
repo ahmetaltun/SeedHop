@@ -1,0 +1,44 @@
+{
+  "checkpoint": "Notification identifier retention",
+  "date": "2026-11-04",
+  "scope": "Native app notification bookkeeping; release and development builds",
+  "behavior": [
+    "Completion deduplication identifiers stay in memory, bounded by current snapshot transfer IDs.",
+    "Engine instance changes reset bookkeeping and establish a completion baseline without notification submission.",
+    "Normal snapshots remove the legacy completedTorrents preferences key without loading its identifiers.",
+    "Development activity clearing removes the legacy key even while offline and clears in-memory bookkeeping.",
+    "Preview and fixture snapshots do not mutate notification preferences or submit notifications.",
+    "Activity clearing suppresses notification submission while in progress."
+  ],
+  "compilerChecks": {
+    "developmentApp": {"status": "passed", "log": ".build/sandbox-development/notification-development-compile.log"},
+    "sandboxDevelopmentApp": {"status": "passed", "log": ".build/sandbox-development/notification-sandbox-compile.log"},
+    "releaseApp": {"status": "passed", "log": ".build/sandbox-development/notification-release-compile.log"},
+    "method": "Swift type-check, arm64 macOS 15; no app execution"
+  },
+  "diffCheck": "passed",
+  "runtimeTests": {"executed": false, "status": "deferred by user"},
+  "stateChanges": {
+    "appOrEngineLaunched": false,
+    "userPreferencesChanged": false,
+    "notificationsRemoved": false,
+    "libraryOrPayloadChanged": false,
+    "vpnChanged": false
+  },
+  "limitations": [
+    "An offline launch without a snapshot or explicit clear leaves the legacy key untouched.",
+    "Notification Center records, backups and older application versions have separate retention.",
+    "No private-session, automatic-expiry or secure-erasure claim."
+  ],
+  "pending": [
+    "Completion transitions and repeated snapshots",
+    "Disabled notifications and later enablement",
+    "Restart, reconnect and replacement-engine baselines",
+    "Transfer removal/re-addition and bounded identifier lifetime",
+    "Offline clearing and completion during clearing",
+    "Legacy preferences cleanup in the correct app domain",
+    "Preview and fixture isolation"
+  ],
+  "documentation": "../LOCAL-PRIVACY.md",
+  "changes": "Uncommitted"
+}
