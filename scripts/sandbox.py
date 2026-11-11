@@ -18,4 +18,7 @@ def configuration(app_id, team_id):
     application["com.apple.security.temporary-exception.mach-lookup.global-name"] = [
         app_id + "-spks", app_id + "-spki"]
     engine = dict(common, **{"com.apple.security.network.server": True})
-    return {"group": group, "application": application, "engine": engine}
+    private_engine = dict(engine)
+    del private_engine["com.apple.security.application-groups"]
+    del private_engine["com.apple.security.files.bookmarks.app-scope"]
+    return {"group": group, "application": application, "engine": engine, "private_engine": private_engine}

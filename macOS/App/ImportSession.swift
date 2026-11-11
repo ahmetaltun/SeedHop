@@ -19,15 +19,17 @@ import Combine
     @Published private(set) var error: String?
     @Published private(set) var sourceFile: URL?
     private var lookupID: String?
+    private let privateSession: Bool
 
-    init(preview: ImportPreview? = nil) {
+    init(preview: ImportPreview? = nil, privateSession: Bool = false) {
+        self.privateSession = privateSession
         self.preview = preview
         selected = Set(preview?.files.map(\.index) ?? [])
         destination = UserDefaults.standard.string(forKey:"downloadDirectory") ?? FileManager.default.urls(for:.downloadsDirectory,in:.userDomainMask)[0].path
     }
 
     var downloadPath: String {
-        guard let preview else { return destination }
+        guard !privateSession, let preview else { return destination }
         let title = String(preview.name.unicodeScalars.map { scalar -> Character in
             scalar == "/" || scalar == ":" || CharacterSet.controlCharacters.contains(scalar) ? "_" : Character(scalar)
         }).trimmingCharacters(in:.whitespacesAndNewlines)

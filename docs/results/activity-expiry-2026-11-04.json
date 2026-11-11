@@ -1,0 +1,55 @@
+{
+  "checkpoint": "Automatic volatile activity expiry",
+  "date": "2026-11-04",
+  "scope": "Development and release builds; no library format or protocol change",
+  "retention": {
+    "windowSeconds": 900,
+    "engineCleanupIntervalSeconds": 30,
+    "appCleanup": "Existing one-second polling task and snapshot/detail application",
+    "countLimits": "Existing 200 timeline rows and 900 traffic samples per transfer remain",
+    "clock": "Wall-clock event timestamps; expired and future timestamps are excluded",
+    "deadline": "Cleanup can be delayed by scheduling, suspension, long operations or update/quit barriers"
+  },
+  "behavior": [
+    "Engine tracker queues expire without inspector requests, including when network policy blocks transfers.",
+    "Detail replies omit expired tracker events without resetting event sequence numbers.",
+    "App cleanup expires timeline rows, graph samples and cached detail events while its polling task runs.",
+    "Delayed detail replies cannot repopulate expired events.",
+    "Snapshot removal prunes timeline and graph records independently.",
+    "The activity inspector labels its 15-minute window."
+  ],
+  "verification": {
+    "clippy": {"status": "passed", "method": "cargo clippy --offline --locked --workspace --all-targets -- -D warnings", "log": ".build/sandbox-development/activity-expiry-clippy.log"},
+    "developmentApp": {"status": "passed", "method": "Swift type-check", "log": ".build/sandbox-development/activity-expiry-development-compile.log"},
+    "sandboxApp": {"status": "passed", "method": "Swift type-check", "log": ".build/sandbox-development/activity-expiry-sandbox-compile.log"},
+    "releaseApp": {"status": "passed", "method": "Swift type-check", "log": ".build/sandbox-development/activity-expiry-release-compile.log"},
+    "localization": {"status": "passed", "entries": 790, "languages": 13, "newEntries": 1, "humanReview": "pending", "log": ".build/sandbox-development/activity-expiry-localization.log"},
+    "formatAndDiff": "passed"
+  },
+  "runtimeTests": {
+    "executed": false,
+    "status": "deferred by user",
+    "newRegression": "Timestamp cutoff, expired/current/future timestamps and saturating subtraction; compiled only"
+  },
+  "stateChanges": {
+    "appOrEngineLaunched": false,
+    "liveActivityCleared": false,
+    "userPreferencesOrLibraryChanged": false,
+    "vpnChanged": false,
+    "appBundleRebuilt": false
+  },
+  "limitations": [
+    "Saved statistics, resume records, tracker status/error fields, peer caches, notifications and recent documents have separate retention.",
+    "No exact erasure deadline, zeroization, secure-erasure or private-session claim.",
+    "Backward clock changes can discard future-dated events early."
+  ],
+  "pending": [
+    "Expiry without new events, hidden/offline windows and network-blocked engines",
+    "Delayed replies, removed transfers and event sequence continuity",
+    "Clock changes, sleep/wake, long operations and update barriers",
+    "Count limits and transfer continuity",
+    "Native layout, localization and accessibility"
+  ],
+  "documentation": "../LOCAL-PRIVACY.md",
+  "changes": "Uncommitted"
+}

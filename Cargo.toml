@@ -4,7 +4,7 @@ members = ["crates/seedhop-core", "crates/seedhop-ffi"]
 exclude = ["vendor/rqbit", "vendor/librqbit-utp", "fuzz"]
 
 [workspace.package]
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 license = "Apache-2.0"
 

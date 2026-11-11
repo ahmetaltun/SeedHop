@@ -172,3 +172,13 @@ pub struct EngineConfig {
     pub allow_local_network: bool,
     pub listen_port: u16,
 }
+
+/// Core-only private engine configuration. Protection must be supplied explicitly.
+/// Payload admission creates exclusive children beneath this approved parent.
+/// The caller retains folder authority for the engine lifetime.
+pub struct PrivateEngineConfig {
+    pub download_directory: String,
+    pub network_policy: crate::NetworkPolicy,
+    pub peer_encryption: librqbit::EncryptionPolicy,
+    pub allow_network_discovery: bool,
+}

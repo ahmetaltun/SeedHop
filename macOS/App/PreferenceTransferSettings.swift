@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-#if SEEDHOP_DEVELOPMENT
+#if SEEDHOP_DEVELOPMENT || SEEDHOP_SANDBOX
 struct PreferenceTransferSettings: View {
     @EnvironmentObject var store: LibraryStore
     @State private var message: String?
@@ -42,6 +42,9 @@ struct PreferenceTransferSettings: View {
 
     private func importSettings() {
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.json]; panel.allowsMultipleSelection = false
+        #if SEEDHOP_SANDBOX
+        panel.allowedContentTypes.append(.propertyList)
+        #endif
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             do {

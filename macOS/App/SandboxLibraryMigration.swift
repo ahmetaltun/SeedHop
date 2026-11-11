@@ -7,12 +7,33 @@ import Darwin
 /// session and payloads remain in place for an explicit, mutually exclusive rollback.
 enum SandboxLibraryMigration {
     private static let receiptName = "sandbox-migration.json"
+    private static let setupKey = "sandboxLibrarySetUp"
+    static var isSetUp: Bool { UserDefaults.standard.bool(forKey:setupKey) }
+    static func completeSetup() { UserDefaults.standard.set(true,forKey:setupKey) }
+    static func resetSetup() { UserDefaults.standard.removeObject(forKey:setupKey) }
+    static var legacyLibrary: URL? {
+        guard let home = getpwuid(getuid())?.pointee.pw_dir else { return nil }
+        return URL(fileURLWithPath:String(cString:home)).appendingPathComponent("Library/Application Support/SeedHop",isDirectory:true)
+    }
+    static var migratedDownloadDirectory: String? {
+        guard let location = try? SandboxStorage.library.appendingPathComponent(receiptName),
+              let data = try? Data(contentsOf:location) else { return nil }
+        return (try? JSONDecoder().decode(Receipt.self,from:data))?.downloadDirectory
+    }
+    static func requiredFolders() -> [String] {
+        guard let session = try? SandboxStorage.library.appendingPathComponent("session/session.json"),
+              let bytes = try? Data(contentsOf:session),
+              let root = (try? JSONSerialization.jsonObject(with:bytes)) as? [String:Any],
+              let torrents = root["torrents"] as? [String:[String:Any]] else { return [] }
+        return Set(torrents.values.compactMap { $0["output_folder"] as? String }).sorted()
+    }
     private struct Receipt: Codable {
         var version = 1
         var id: String
         var source: String
         var stage: String
         var connectionSettings: Data?
+        var downloadDirectory: String?
     }
     private enum Failure: Error { case invalidLibrary, busy, io }
 
@@ -57,7 +78,7 @@ enum SandboxLibraryMigration {
         let temporary = ".sandbox-\(UUID().uuidString)"
         let fd = openat(directory, temporary, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
         guard fd >= 0 else { throw Failure.io }
-        defer { close(fd) }
+        defer { close(fd); _ = unlinkat(directory, temporary, 0) }
         try data.withUnsafeBytes { bytes in
             var offset = 0
             while offset < bytes.count {
@@ -79,7 +100,7 @@ enum SandboxLibraryMigration {
         let scoped = source.startAccessingSecurityScopedResource()
         guard scoped else { throw FolderAccessFailure.unavailable }
         defer { source.stopAccessingSecurityScopedResource() }
-        let target = SandboxStorage.library
+        let target = try SandboxStorage.library
         guard source.standardizedFileURL != target.standardizedFileURL,
               !FileManager.default.fileExists(atPath: target.path) else { throw Failure.invalidLibrary }
         let original = try directory(source); defer { close(original) }
@@ -96,9 +117,17 @@ enum SandboxLibraryMigration {
             }
         }
         let id = UUID().uuidString
-        let receipt = Receipt(id: id, source: source.standardizedFileURL.path, stage: ".migration-\(id)", connectionSettings: settings)
-        let stage = SandboxStorage.container.appendingPathComponent(receipt.stage, isDirectory: true)
+        let previousIntent = try readFile(original,"run-intent.json")
+        let intent = previousIntent.flatMap { try? JSONSerialization.jsonObject(with:$0) as? [String:Any] }
+        let previousDefault = (intent?["downloadDirectory"] as? String).flatMap { path in
+            path.hasPrefix("/") && path.utf8.count <= 4096 && !path.utf8.contains(0) ? path : nil
+        }
+        let receipt = Receipt(id:id,source:source.standardizedFileURL.path,stage:".migration-\(id)",
+                              connectionSettings:settings,downloadDirectory:previousDefault)
+        let stage = try SandboxStorage.container.appendingPathComponent(receipt.stage,isDirectory:true)
         try FileManager.default.createDirectory(at: stage, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        var recoveryRecorded = false
+        defer { if !recoveryRecorded { try? FileManager.default.removeItem(at:stage) } }
         let output = try directory(stage); defer { close(output) }
         let allowed = Set(["connection-settings.json", "network-policy.json", "limits.json", "queue.json", "statistics.json", "schedule.json", "alternative-limits.json"])
         var total = 0
@@ -128,6 +157,7 @@ enum SandboxLibraryMigration {
         let receiptBytes = try JSONEncoder().encode(receipt)
         try writeFile(output, receiptName, receiptBytes)
         // Persist recovery instructions before disabling the previous reader.
+        recoveryRecorded = true
         try writeFile(original, receiptName, receiptBytes)
         try writeFile(original, "connection-settings.json", barrier(id))
         // Exclusive publication cannot overwrite a concurrently created library.
@@ -147,7 +177,7 @@ enum SandboxLibraryMigration {
               UUID(uuidString: receipt.id) != nil, receipt.stage == ".migration-\(receipt.id)" else { throw Failure.invalidLibrary }
         let current = try readFile(original, "connection-settings.json")
         guard current == (try barrier(receipt.id)) || current == receipt.connectionSettings else { throw Failure.invalidLibrary }
-        let target = SandboxStorage.library
+        let target = try SandboxStorage.library
         if FileManager.default.fileExists(atPath: target.path) {
             let migrated = try directory(target); defer { close(migrated) }
             let migratedLease = try lease(migrated, create: true); defer { close(migratedLease) }
@@ -157,6 +187,10 @@ enum SandboxLibraryMigration {
             }
             // Disable the migrated reader before re-enabling the original reader.
             try writeFile(migrated, "connection-settings.json", barrier(receipt.id))
+            let archived = try SandboxStorage.container.appendingPathComponent("Library-rollback-\(receipt.id)")
+            guard renamex_np(target.path, archived.path, UInt32(RENAME_EXCL)) == 0 else { throw Failure.io }
+            let parent = try directory(SandboxStorage.container); defer { close(parent) }
+            guard fsync(parent) == 0 else { throw Failure.io }
         }
         if let settings = receipt.connectionSettings { try writeFile(original, "connection-settings.json", settings) }
         else { guard unlinkat(original, "connection-settings.json", 0) == 0 || errno == ENOENT else { throw Failure.io } }

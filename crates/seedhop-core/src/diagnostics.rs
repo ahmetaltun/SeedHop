@@ -16,6 +16,12 @@ pub fn now() -> u64 {
         .as_secs()
 }
 
+const ACTIVITY_RETENTION_SECONDS: u64 = 15 * 60;
+
+fn retains_activity(timestamp: u64, current: u64) -> bool {
+    timestamp > current.saturating_sub(ACTIVITY_RETENTION_SECONDS) && timestamp <= current
+}
+
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Totals {
@@ -52,6 +58,13 @@ impl Default for Accounting {
     }
 }
 impl Accounting {
+    pub(crate) fn memory_only() -> Self {
+        Self {
+            remember_statistics: false,
+            ..Self::default()
+        }
+    }
+
     pub fn load(dir: &Path) -> Result<Self> {
         let remember =
             crate::connection_settings::ConnectionSettings::load(dir)?.remembers_statistics();
@@ -242,6 +255,20 @@ pub struct TorrentDetails {
 }
 
 impl Engine {
+    /// Bound volatile tracker history even when no inspector requests it.
+    pub(crate) fn expire_activity(&self) {
+        let current = now();
+        self.session.with_torrents(|torrents| {
+            for (_, torrent) in torrents {
+                torrent
+                    .shared()
+                    .tracker_events
+                    .lock()
+                    .retain(|(_, timestamp, _, _)| retains_activity(*timestamp, current));
+            }
+        });
+    }
+
     /// Clear volatile tracker activity without changing payloads, accounting,
     /// queue intent, discovery settings, or the monotonic event sequence.
     pub async fn clear_activity(&self) -> Result<()> {
@@ -445,12 +472,14 @@ impl Engine {
                 code: "input.this_torrent_is_no_longer_in_the_library",
                 message: "This torrent is no longer in the library.".into(),
             })?;
+        let current = now();
         let events = if section == "activity" {
             torrent
                 .shared()
                 .tracker_events
                 .lock()
                 .iter()
+                .filter(|(_, timestamp, _, _)| retains_activity(*timestamp, current))
                 .map(|(sequence, timestamp, url, state)| DiagnosticEvent {
                     sequence: *sequence,
                     timestamp: *timestamp,
@@ -545,6 +574,17 @@ fn sanitize_message(message: &str, raw: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn activity_retention_excludes_expired_and_future_timestamps() {
+        assert!(!retains_activity(100, 1000));
+        assert!(!retains_activity(99, 1000));
+        assert!(retains_activity(101, 1000));
+        assert!(retains_activity(1000, 1000));
+        assert!(!retains_activity(1001, 1000));
+        assert!(!retains_activity(0, 10));
+        assert!(retains_activity(1, 10));
+    }
+
     #[test]
     fn payload_counts_are_not_content_progress_and_do_not_double_count() {
         let mut a = Accounting::default();

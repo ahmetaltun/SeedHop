@@ -1,9 +1,22 @@
-# App Sandbox development slice — 2026-11-03
+# App Sandbox and library migration
 
-Implementation is gated to an isolated, certificate-signed development build.
-Production and release builds cannot enable it. Runtime tests are deferred at the
-user's request. Compiler checks do not establish sandbox enforcement, successful
-bookmark transfer, or safe migration under interruption.
+**v0.1.3.** The signed release workflow enables App Sandbox. On first launch,
+choose **Import Existing Library…** before approving download folders. The
+previous library is normally in `~/Library/Application Support/SeedHop`. Pick
+the existing SeedHop folder, then approve the listed download folders. For a
+fresh library, approve a download folder directly.
+
+Use **Settings → General → Folder access → Restore Previous Library…** for
+rollback. SeedHop stops the current engine and archives the sandbox copy before
+re-enabling the old library. Downloaded files stay in place. To bring across
+appearance, language, or layout preferences, use **Import Settings…** and
+select an exported settings JSON file or the old
+`~/Library/Preferences/app.seedhop.mac.plist`. The preference change applies
+after restart and can be undone. Background and notification permissions use
+the new app's settings and permissions.
+
+The development notes below describe the original isolated implementation.
+The signed release still needs a focused migration and folder-access check.
 
 ## Ownership and access
 

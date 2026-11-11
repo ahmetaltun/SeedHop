@@ -4,21 +4,26 @@ enum SeedHopIdentity {
     #if SEEDHOP_VALIDATION
     static let app = ValidationConfiguration.app
     #if SEEDHOP_SANDBOX
-    static var library: URL { SandboxStorage.library }
+    static var library: URL { get throws { try SandboxStorage.library } }
     #else
-    static var library: URL { URL(fileURLWithPath:ValidationConfiguration.root).appendingPathComponent("state", isDirectory:true) }
+    static var library: URL { get throws { URL(fileURLWithPath:ValidationConfiguration.root).appendingPathComponent("state",isDirectory:true) } }
     #endif
     #else
     static let app = "app.seedhop.mac"
-    static var library: URL { FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("SeedHop", isDirectory: true) }
+    #if SEEDHOP_SANDBOX
+    static var library: URL { get throws { try SandboxStorage.library } }
+    #else
+    static var library: URL { get throws { FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("SeedHop",isDirectory:true) } }
+    #endif
     #endif
     static let foreground = app + ".engine"
+    static let privateEngine = app + ".private-engine"
     #if SEEDHOP_SANDBOX
     static let background = SandboxConfiguration.group + ".agent"
     #else
     static let background = app + ".agent"
     #endif
-    static let protocolVersion = 10
+    static let protocolVersion = 11
     static let agentPlist = background + ".plist"
 }
 
@@ -193,6 +198,8 @@ struct EngineRequest: Codable {
     var destination: String?
     var stateDirectory: String?
     var folderGrants: [Data]?
+    var privateFolder: Data?
+    var privateProtection: String?
     var rememberStatistics: Bool?
     var selected: [UInt32]?
     var paused: Bool?
@@ -230,6 +237,8 @@ struct EngineReply: Codable {
     var reannounce: ReannounceSummary?
     var networkInfo: NetworkInfo?
     var statisticsRetention: StatisticsRetentionInfo?
+    var privateProtection: String?
+    var privateProcessID: Int32?
     init(snapshot: LibrarySnapshot? = nil, preview: ImportPreview? = nil, id: String? = nil, error: String? = nil, errorMessage: EngineMessage? = nil, cancelled: Bool? = nil, cancellationAccepted: Bool? = nil, details: TorrentDetails? = nil, stoppedProcessID: Int32? = nil, reannounce: ReannounceSummary? = nil, networkInfo: NetworkInfo? = nil, statisticsRetention: StatisticsRetentionInfo? = nil) {
         self.snapshot = snapshot; self.preview = preview; self.id = id; self.error = error
         self.cancelled = cancelled; self.cancellationAccepted = cancellationAccepted; self.details = details

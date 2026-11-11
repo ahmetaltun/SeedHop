@@ -63,6 +63,7 @@
       "Active filters: %@": "dca5dbae4ce99b82b842cf1bc7b8c163fe74709de593cb85192983a4ea65bb6f",
       "Active policy": "b46b20d94be67b3a12b1c0ced657976c14b26ba534e53df6be602fb63ca484e2",
       "Activity": "fdf01c353d6ea1d7e273e9855fc1f3a9160d9079bcd3517b89775b2958ca539c",
+      "Activity · last 15 minutes": "cdff70d60258a694412a00e48dd3cb0132404a33837548e825b6c7a1c0a9ebf8",
       "Add Torrent…": "c99ae40aeb8ac94df05c738c42f0108794479199e368d11ac817092870bcd5ec",
       "Add a magnet link or open a torrent file.": "cde5e041ea579fbe6b50df7a3849cd2e5643764b1ca8dccc3b711f950fd865fa",
       "Add a torrent (⌘N)": "99926fe5d0de07e7573f0749dae0493dce71ec25f114eec5bc5a685690d82f8f",
@@ -133,6 +134,7 @@
       "Choose Low, Normal, or High for every file.": "e8854f711423badf092792243d7bab8ea6dacc685e5b11e32591a3ad1d40e67c",
       "Choose a .torrent file from your Mac": "3efe1357572db79cab50040a4feaac92168a66ad567567a3580ef54bfbf789c4",
       "Choose a .torrent file or a magnet link to add a transfer.": "8fcdd9b0af6480b429ccb159b4a8b952afb7f03f2224cd8ca6df1aa026faf7cc",
+      "Choose a download folder. Ending the session stops its transfers and discards its library records. Downloaded and partial files stay on disk.": "896a132c7575f4512a660de58ac0e2f775c9e7ee8340ea5c4bbe2e305d02b3a1",
       "Choose a folder again to repair damaged access records. Recoverable approvals are kept, and damaged data is backed up first.": "40293efb139688f6b230d94716d874bf6b38816be94aa8dbffc35d13e1bbdec4",
       "Choose a folder for %@. Files will be verified after moving.": "7828630d608d612a1fff6415b4dd6d41f68a268d299621e8459903e815f537db",
       "Choose a folder outside SeedHop's library state.": "66967a6449eec8f0d37a5d27fd08f1f20161e3678ba19d442034f6fb55474ccb",
@@ -233,6 +235,7 @@
       "Enable weekly schedule": "25cccfea1f238d9b1e71e213360f9c3aa5711f2368b8bb65f2e1931bc154f049",
       "Encrypted": "35abe614d724d1f31929c903d359b02e8be694b8a9aac76333599fff3cf9fa53",
       "Encryption": "3b9c5cd73e55930fde3fd2ad27d481c799e9a7c2d86d24b03cee76a7a2562323",
+      "End Private Session": "c28f3a7ffc1a1ace4e2ea433a0ef10d97f2d91fda5cb123ee185444a9176d7e7",
       "Endpoint": "e06c2eede53f3f7e021015dccd49e64bf9a911d13e12aef5c32a928364bbbef4",
       "Engine": "a51285b4c34ae52b46d1b7914ab90c757bc3d1adcd6d7aee213a6b5600da9b7e",
       "Engine connected": "b982257e11e29dc83ff5f07bb2037fba7e88bbc8a0cd3960ad9e310f260d9502",
@@ -357,8 +360,10 @@
       "Name": "311a0ef94839da080bb5507632b7efd5036f2cbb34d99aa0d7ec74028b7c3901",
       "Name: %@": "79a90d883b4e42fdfbd3616f5240131bdcd8020832a69b6e672eb75eee4c6b97",
       "Needs attention": "a85c81488b52df2b6f1a938fc3b0fac7c5dc5422b87b18471e024d6b71ddbb99",
+      "Network blocked": "062f87a30a1c806cfed1f1e18ef5b1907c91ad28621107a27762a61fa39e79d7",
       "Network privacy": "128ec831be20507598d37a17e67bb06aca2d989b8ba900869b80e0dd36d7edf5",
       "Network protection blocked this operation. Check the selected connection and DNS server in Settings, then restart the engine.": "fe48832fba20e60c4cb16830d97ec248a15a6649b8170f02cd40fa27d5df6019",
+      "New Private Session…": "117974b4d19d917bd52e3c63608fc77916cb3b92b88ce1d118644d3fefd27fe5",
       "New file name": "b39671ee826ef4e4b52bc384960d78daea83c2c1f4f80705082c5001431e500d",
       "Next announce": "6287439f99a5ff00eef6e6552bf30199a89051dab6bf8bc105572cf6f3d05211",
       "No alternative limits saved": "3c00d0c576469b171a5e4fae1cda3198b15f0080a03cd79240dbed64f30e8761",
@@ -389,6 +394,7 @@
       "Not reported": "702cdcfe0279b34342973bc46a626d89a9c88db535a13dbefeedb303d58dbff5",
       "Not set": "37a1a9295fa8f955e3dec83f08cd23a4c29abc6c624a403301b6edddd50ee8a6",
       "Notifications": "3a52c5fbd5cfe574b456d444bc1092a6a8bc6bcdf85e06b3603a1ba8abc18254",
+      "OK": "ffcde6abba98d5d4e85e4e0085d252473b172eb013f2f069cdae43821ce77c45",
       "Off": "bff70211493438ff6723ad2c78a45ed52e056aa6d26902d03aa5ffd63ef6872e",
       "On": "65c576e862d5a2e73def1d05b08da8cc4bb4ffa94e3413e0d2b147b8f6e8a3d6",
       "Only one library can run. Import blocks the previous library; restoring it blocks the imported copy. Downloads stay in their current folders.": "cac7b5465145add1fb333d4df782c05a42a232144f9259b6e9c42289074f8e02",
@@ -435,6 +441,7 @@
       "Priority": "c5ad2305017866a779d901c9c768601f1f0469f3235a97c1e78ae6a9bbb87f89",
       "Priority for %@": "72b218fcd0023699d3f5c27d1d278eac501b24cfdbb1ac6f2976e8456934e8c6",
       "Priority: %@": "6fd70376bf7a94cb5502e09ee2e74348ae7c87a80eb044218e92c67f22f50af3",
+      "Private Session": "21a297cb508a76f9639797c7a05d70ca857df0957964f2a5422014cfd1e8cb8b",
       "Progress": "1ecc2ff2770e6c7150eb2b2036a29de8a9c9759057241c4be9dfee909ea930f2",
       "Progress for %@ is unavailable": "ebca7613c5d0f94ce99d0e8f725c15c91bb7bab5c0b9b978a6b97ba5e680ef8e",
       "Progress for %@: %@": "c8aabf9766fbbf65192bd1bf0b1eeb2b0229c6c078206f76594e3eaac2738b48",
@@ -846,6 +853,6 @@
       "origin": "AI draft"
     }
   },
-  "sourceDigest": "470a83d8cc67cb54bbc03768619819298ad86ab01dbf44270e3f11ce262358dc",
+  "sourceDigest": "8dc869788eca0ed31c289e2f359e32ce2c7a5ef38a8e520d719f89e888b4a255",
   "sourceLanguage": "en"
 }

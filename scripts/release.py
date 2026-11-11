@@ -194,12 +194,13 @@ def notarize(path, environ, output):
 def verify_app(app, team):
     run("codesign", "--verify", "--deep", "--strict", "--verbose=2", app)
     contents = app / "Contents"
-    paths = [contents / "MacOS/SeedHop", contents / "MacOS/SeedHopAgent",
-             contents / "XPCServices/SeedHopEngine.xpc", contents / "Frameworks/libseedhop_ffi.dylib"]
+    private_engine = contents / "XPCServices/SeedHopPrivateEngine.xpc"
+    shared = [app, contents / "MacOS/SeedHop", contents / "MacOS/SeedHopAgent", contents / "XPCServices/SeedHopEngine.xpc"]
+    paths = [*shared, private_engine, contents / "Frameworks/libseedhop_ffi.dylib"]
     framework = contents / "Frameworks/Sparkle.framework"
     paths += [framework, framework / "Versions/B/Autoupdate", framework / "Versions/B/Updater.app",
               framework / "Versions/B/XPCServices/Downloader.xpc", framework / "Versions/B/XPCServices/Installer.xpc"]
-    for path in [app, *paths]:
+    for path in paths:
         info = subprocess.run(["codesign", "-d", "--verbose=4", str(path)], capture_output=True, check=True).stderr.decode()
         if f"TeamIdentifier={team}" not in info or "Timestamp=" not in info or "runtime" not in info:
             raise ValueError(f"Missing team, timestamp or Hardened Runtime: {path}")
@@ -207,8 +208,14 @@ def verify_app(app, team):
         values = plistlib.loads(entitlements) if entitlements.strip() else {}
         if values.get("com.apple.security.cs.disable-library-validation") or values.get("com.apple.security.get-task-allow"):
             raise ValueError(f"Development entitlement in release: {path}")
+        groups = values.get("com.apple.security.application-groups", [])
+        if path in shared and (not values.get("com.apple.security.app-sandbox") or f"{team}.app.seedhop.mac.shared" not in groups):
+            raise ValueError(f"Missing SeedHop sandbox entitlements: {path}")
+        if path == private_engine and (not values.get("com.apple.security.app-sandbox") or groups or values.get("com.apple.security.files.bookmarks.app-scope")):
+            raise ValueError(f"Invalid private engine entitlements: {path}")
     for path in [contents / "MacOS/SeedHop", contents / "MacOS/SeedHopAgent",
                  contents / "XPCServices/SeedHopEngine.xpc/Contents/MacOS/SeedHopEngine",
+                 contents / "XPCServices/SeedHopPrivateEngine.xpc/Contents/MacOS/SeedHopEngine",
                  contents / "Frameworks/libseedhop_ffi.dylib"]:
         build.verify_arm64(path)
 
@@ -308,7 +315,7 @@ def package(tag, number, output, phase="all"):
                 app = ROOT / ".build/SeedHop.app"
                 if app.exists():
                     shutil.rmtree(app)
-                run("python3", "-u", "scripts/build.py", "--release", "--identity", identity, "--build-number", number,
+                run("python3", "-u", "scripts/build.py", "--release", "--sandbox", "--sandbox-team-id", os.environ["APPLE_TEAM_ID"], "--identity", identity, "--build-number", number,
                     stream=True, timeout=2400, heartbeat="Optimized native build")
                 verify_app(app, os.environ["APPLE_TEAM_ID"])
                 print("Nested signatures, entitlements, timestamps, and architecture verified", flush=True)

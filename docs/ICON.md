@@ -3,8 +3,8 @@
 Source artwork: [`macOS/Resources/AppIcon.png`](../macOS/Resources/AppIcon.png).
 Generated with the built-in image generation tool on 2026-10-24, with a transparent background.
 
-`make build` renders the ten standard macOS PNG representations with
-`scripts/Icon.swift`, then packages them with `iconutil` into
+`make build` uses `scripts/Icon.swift` to render and package the ten standard
+macOS PNG representations into
 `.build/SeedHop.app/Contents/Resources/AppIcon.icns`. No image generation service
 is needed to build the app.
 

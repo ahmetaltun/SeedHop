@@ -1,0 +1,77 @@
+{
+  "checkpoint": "Exclusive private payload ownership and core transfer admission",
+  "date": "2026-11-04",
+  "status": "implemented in Rust only; native private-session entry remains unavailable",
+  "behavior": [
+    "Inspection pins the chosen parent without creating payload folders.",
+    "Private adds/imports reject existing-file reuse and destinations other than the configured parent.",
+    "The first preparation creates a fresh owner-only session directory; every transfer receives a fresh exclusive child.",
+    "Private storage retains root/nested directory descriptors and original file-inode pins in memory.",
+    "Unknown paths require exclusive creation; reopened files must match retained identity, ownership, mode and single-link checks.",
+    "Quarantine is required before payload writes; no library metadata or resume records are written by this backend.",
+    "Initial partial-file selection uses index-only boundary storage instead of info-hash paths.",
+    "Later private file membership/priority changes, relocation, rename, recovery, durable settings and payload deletion remain blocked.",
+    "End, failed admission and removal without deletion retain created folders, selected payloads and hidden boundary bytes.",
+    "Resume/recheck reject replaced owned directory paths; existing file descriptors continue to refer to their original inodes."
+  ],
+  "compatibility": {
+    "nativeProtocolVersion": 10,
+    "libraryFormatsChanged": false,
+    "exportedFfiApiChanged": false,
+    "nativeEntryAdded": false,
+    "ordinaryStorage": "Existing FilesystemStorageFactory selects the original path; pinned storage is opt-in for private admission"
+  },
+  "verification": {
+    "initialWorkspaceCheck": {"status": "passed", "log": ".build/sandbox-development/private-payload-check.log"},
+    "finalWorkspaceClippy": {"status": "passed", "method": "cargo clippy --offline --locked --workspace --all-targets -- -D warnings", "log": ".build/sandbox-development/private-payload-clippy.log"},
+    "finalNativeBuild": {"status": "passed", "method": "cargo build --offline --locked --target aarch64-apple-darwin -p seedhop-ffi --features bindgen", "log": ".build/sandbox-development/private-payload-build.log"},
+    "architecture": {"status": "passed", "artifact": "target/aarch64-apple-darwin/debug/libseedhop_ffi.dylib", "architectures": ["arm64"]},
+    "formatAndDiff": "passed",
+    "vendorPatch": {"status": "reverse application check passed", "path": "vendor/patches/0036-seedhop-private-payload-capabilities.patch", "provenance": "vendor/SOURCE.json"},
+    "standaloneVendorUnitTestCompilation": {
+      "status": "failed; not a passed gate",
+      "method": "cargo check --offline --locked -p librqbit --lib --tests from the outer workspace",
+      "reason": "The dependency unit-test target did not receive its dev dependencies: tempfile, tracing_subscriber and pollster.",
+      "log": ".build/sandbox-development/private-payload-vendor-check.log",
+      "scope": "New direct storage regressions compile in seedhop-core integration targets instead; standalone vendor unit-test compilation remains unverified."
+    },
+    "swiftAndBindings": "Not rerun or regenerated; exported FFI and Swift API are unchanged"
+  },
+  "runtimeTests": {
+    "executed": false,
+    "status": "deferred by user",
+    "regressionStatus": "compiled only",
+    "newCoverage": [
+      "Fresh payload roots, retained bytes and no restoration in a new private engine",
+      "Existing-file reuse and unapproved-parent rejection",
+      "Replacement-directory rejection on resume/recheck",
+      "Initial partial selection and index-only boundary filenames",
+      "Reopening owned inodes and refusing replacement files",
+      "Refusing replacement nested directories"
+    ]
+  },
+  "stateChanges": {
+    "appOrEngineLaunched": false,
+    "actualPrivateTransfersRun": false,
+    "userPreferencesOrLibraryChanged": false,
+    "vpnChanged": false,
+    "appBundleRebuilt": false
+  },
+  "limitations": [
+    "This is a core API, not a user-facing private torrent-client mode.",
+    "Transient folder authority and the authenticated private helper remain to be implemented.",
+    "Directory creation/open races and same-user interference are not certified safe by compiler checks.",
+    "In-flight I/O on existing descriptors can continue on original moved inodes; no instantaneous pathname-change stop claim.",
+    "Each materialized file requires an additional retained descriptor; large-torrent and descriptor-exhaustion acceptance remains.",
+    "Opaque retained folders may require manual organization and verification for later ordinary-library reuse.",
+    "No anonymity, secure-erasure, crash-recovery or universal leak-prevention claim."
+  ],
+  "next": [
+    "Read-only protection snapshot from the ordinary library owner",
+    "Authenticated private FFI/protocol/helper lifecycle",
+    "Transient sandbox folder authority and separate native workspace",
+    "Deferred runtime transfer, filesystem, quarantine, lifecycle and ordinary-library acceptance"
+  ],
+  "documentation": "../PRIVATE-SESSIONS.md",
+  "changes": "Uncommitted"
+}

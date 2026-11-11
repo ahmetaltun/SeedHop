@@ -1,11 +1,12 @@
 import SwiftUI
 
 #if SEEDHOP_SANDBOX
-/// Development migration controls; production builds cannot enable this slice yet.
 struct SandboxAccessSettings: View {
     @EnvironmentObject var store: LibraryStore
+    var onReady: (() -> Void)? = nil
     @State private var busy = false
     @State private var message: String?
+    @State private var folders: [String] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -19,32 +20,53 @@ struct SandboxAccessSettings: View {
                 Button(String(localized:"Grant Folder Access…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { chooseFolder() }
                 Spacer()
                 Menu(String(localized:"Library",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) {
-                    Button(String(localized:"Import Existing Library…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { chooseLibrary(rollback: false) }
+                    Button(String(localized:"Import Existing Library…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { chooseLibrary(rollback: false) }.disabled(store.connected)
                     Button(String(localized:"Restore Previous Library…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { chooseLibrary(rollback: true) }
-                }.disabled(store.connected || store.connecting || store.switching)
+                }.disabled(store.connecting || store.switching)
             }.disabled(busy)
+            ForEach(folders,id:\.self) { folder in
+                Button(folder) { chooseFolder(at:URL(fileURLWithPath:folder)) }
+                    .lineLimit(1).truncationMode(.middle).disabled(busy)
+            }
             if busy { ProgressView().controlSize(.small) }
             if let message { Text(message).font(.system(size: 11)).fixedSize(horizontal: false, vertical: true) }
         }
+        .onAppear(perform:refreshFolders)
     }
 
-    private func chooseFolder() {
+    private func refreshFolders() {
+        folders = SandboxLibraryMigration.requiredFolders().filter {
+            (try? FolderAccessStore.application.requireAccess(to:$0)) == nil
+        }
+    }
+
+    private func chooseFolder(at directory: URL? = nil) {
         let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
+        panel.directoryURL = directory ?? SandboxLibraryMigration.migratedDownloadDirectory.map { URL(fileURLWithPath:$0) }
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             do {
                 try FolderAccessStore.application.remember(url)
                 // A first approved root also supplies the stopped engine's default.
-                if !store.connected {
+                if !SandboxLibraryMigration.isSetUp, let previous = SandboxLibraryMigration.migratedDownloadDirectory,
+                   (try? FolderAccessStore.application.requireAccess(to:previous)) != nil {
+                    store.downloadDirectory = previous; UserDefaults.standard.set(previous,forKey:"downloadDirectory")
+                } else if (try? FolderAccessStore.application.requireAccess(to:store.downloadDirectory)) == nil {
                     store.downloadDirectory = url.path; UserDefaults.standard.set(url.path,forKey:"downloadDirectory")
                 }
-                Task { await store.start() }
+                refreshFolders()
+                if folders.isEmpty {
+                    SandboxLibraryMigration.completeSetup()
+                    onReady?()
+                    Task { await store.start() }
+                }
             } catch { message = EngineMessage(code:FolderAccessFailure.noticeCode(for:error)).localizedDescription }
         }
     }
 
     private func chooseLibrary(rollback: Bool) {
         let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
+        panel.directoryURL = SandboxLibraryMigration.legacyLibrary?.deletingLastPathComponent()
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             // Show the source selection before requesting the final migration choice.
@@ -60,10 +82,13 @@ struct SandboxAccessSettings: View {
             Task {
                 defer { busy = false }
                 do {
+                    if rollback { try await store.stopForLibraryMigration() }
                     try await Task.detached(priority: .userInitiated) {
                         if rollback { try SandboxLibraryMigration.restorePreviousLibrary(at: url) }
                         else { try SandboxLibraryMigration.copyLibrary(from: url) }
                     }.value
+                    if rollback { SandboxLibraryMigration.resetSetup() }
+                    refreshFolders()
                     message = String(localized:"Library updated. Choose its download folders before starting transfers.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
                 } catch {
                     message = String(localized:"The library could not be updated. Close both engines, finish pending file changes, and retry. Your saved files have been preserved.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
@@ -72,5 +97,21 @@ struct SandboxAccessSettings: View {
         }
     }
 
+}
+
+struct SandboxFirstRun: ViewModifier {
+    @ObservedObject var store: LibraryStore
+    @State private var showSetup = false
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { showSetup = !store.designPreview && !SandboxLibraryMigration.isSetUp }
+            .sheet(isPresented:$showSetup) {
+                ScrollView {
+                    SandboxAccessSettings(onReady:{ showSetup = false }).environmentObject(store)
+                        .padding(24)
+                }.frame(width:510,height:350).interactiveDismissDisabled()
+            }
+    }
 }
 #endif

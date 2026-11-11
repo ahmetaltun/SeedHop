@@ -31,6 +31,8 @@ impl StorageFactory for FilesystemStorageFactory {
             output_folder: shared.options.output_folder.read().clone(),
             opened_files: Default::default(),
             targets: Default::default(),
+            #[cfg(unix)]
+            pinned_root: None,
         })
     }
 
@@ -43,6 +45,51 @@ pub struct FilesystemStorage {
     pub(crate) output_folder: PathBuf,
     pub(crate) opened_files: Vec<OpenedFile>,
     targets: Vec<PathBuf>,
+    #[cfg(unix)]
+    pinned_root: Option<std::sync::Arc<super::pinned::PinnedRoot>>,
+}
+
+/// SeedHop: a fresh private transfer owns one pinned directory capability.
+#[cfg(unix)]
+#[derive(Clone)]
+pub struct PinnedFilesystemStorageFactory {
+    root: std::sync::Arc<super::pinned::PinnedRoot>,
+}
+
+#[cfg(unix)]
+impl PinnedFilesystemStorageFactory {
+    pub fn new(path: PathBuf, directory: std::fs::File) -> anyhow::Result<Self> {
+        Ok(Self {
+            root: std::sync::Arc::new(super::pinned::PinnedRoot::new(path, directory)?),
+        })
+    }
+}
+
+#[cfg(unix)]
+impl StorageFactory for PinnedFilesystemStorageFactory {
+    type Storage = FilesystemStorage;
+
+    fn create(
+        &self,
+        shared: &ManagedTorrentShared,
+        _metadata: &TorrentMetadata,
+    ) -> anyhow::Result<Self::Storage> {
+        self.root.check_path()?;
+        anyhow::ensure!(
+            shared.options.output_folder.read().as_path() == self.root.path(),
+            "private payload destination changed"
+        );
+        Ok(FilesystemStorage {
+            output_folder: self.root.path().to_owned(),
+            opened_files: Vec::new(),
+            targets: Vec::new(),
+            pinned_root: Some(self.root.clone()),
+        })
+    }
+
+    fn clone_box(&self) -> crate::storage::BoxStorageFactory {
+        self.clone().boxed()
+    }
 }
 
 impl FilesystemStorage {
@@ -56,6 +103,8 @@ impl FilesystemStorage {
                 .collect::<anyhow::Result<Vec<_>>>()?,
             output_folder: self.output_folder.clone(),
             targets: self.targets.clone(),
+            #[cfg(unix)]
+            pinned_root: self.pinned_root.clone(),
         })
     }
 }
@@ -64,6 +113,15 @@ impl TorrentStorage for FilesystemStorage {
     fn prepare_selection(&self, indices: &std::collections::HashSet<usize>) -> anyhow::Result<()> {
         for &index in indices {
             let target = self.targets.get(index).context("no such file")?;
+            #[cfg(unix)]
+            if self.pinned_root.is_some() {
+                let path = self.opened_files[index].path();
+                anyhow::ensure!(
+                    path.as_os_str().is_empty() || path == self.output_folder.join(target),
+                    "changing private file membership is not supported"
+                );
+                continue;
+            }
             self.opened_files[index].materialize(self.output_folder.join(target), |source| {
                 let source = source.strip_prefix(&self.output_folder)?;
                 #[cfg(unix)]
@@ -111,6 +169,11 @@ impl TorrentStorage for FilesystemStorage {
     }
 
     fn remove_file(&self, file_id: usize, _filename: &Path) -> anyhow::Result<()> {
+        #[cfg(unix)]
+        anyhow::ensure!(
+            self.pinned_root.is_none(),
+            "private payload deletion is not supported"
+        );
         let path = self
             .opened_files
             .get(file_id)
@@ -142,10 +205,17 @@ impl TorrentStorage for FilesystemStorage {
                 .collect::<anyhow::Result<Vec<_>>>()?,
             output_folder: self.output_folder.clone(),
             targets: self.targets.clone(),
+            #[cfg(unix)]
+            pinned_root: self.pinned_root.clone(),
         }))
     }
 
     fn remove_directory_if_empty(&self, path: &Path) -> anyhow::Result<()> {
+        #[cfg(unix)]
+        anyhow::ensure!(
+            self.pinned_root.is_none(),
+            "private payload deletion is not supported"
+        );
         let path = self.output_folder.join(path);
         if !path.is_dir() {
             anyhow::bail!("cannot remove dir: {path:?} is not a directory")
@@ -178,6 +248,14 @@ impl TorrentStorage for FilesystemStorage {
                 ".seedhop-parts/{}/{index}",
                 shared.info_hash.as_string()
             ));
+            // A private transfer already has a unique root; do not put its
+            // info hash into retained boundary-piece filenames.
+            #[cfg(unix)]
+            let part = if self.pinned_root.is_some() {
+                PathBuf::from(format!(".seedhop-parts/{index}"))
+            } else {
+                part
+            };
             let relative_path = if wanted { target } else { &part };
             full_path.push(relative_path);
 
@@ -186,15 +264,19 @@ impl TorrentStorage for FilesystemStorage {
                 continue;
             };
             #[cfg(unix)]
-            let f = secure_open(
-                &self.output_folder,
-                relative_path,
-                !wanted
-                    || shared
-                        .options
-                        .allow_overwrite
-                        .load(std::sync::atomic::Ordering::Relaxed),
-            )?;
+            let f = if let Some(root) = &self.pinned_root {
+                root.open(relative_path)?
+            } else {
+                secure_open(
+                    &self.output_folder,
+                    relative_path,
+                    !wanted
+                        || shared
+                            .options
+                            .allow_overwrite
+                            .load(std::sync::atomic::Ordering::Relaxed),
+                )?
+            };
             #[cfg(not(unix))]
             std::fs::create_dir_all(full_path.parent().context("bug: no parent")?)?;
             #[cfg(not(unix))]

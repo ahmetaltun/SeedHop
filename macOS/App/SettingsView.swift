@@ -89,8 +89,10 @@ struct SettingsView: View {
                         #if SEEDHOP_SANDBOX
                         SandboxAccessSettings().environmentObject(store)
                         #endif
-                        #if SEEDHOP_DEVELOPMENT
+                        #if SEEDHOP_DEVELOPMENT || SEEDHOP_SANDBOX
                         PreferenceTransferSettings().environmentObject(store)
+                        #endif
+                        #if SEEDHOP_DEVELOPMENT
                         ActivityPrivacySettings().environmentObject(store)
                         StatisticsRetentionSettings().environmentObject(store)
                         #endif

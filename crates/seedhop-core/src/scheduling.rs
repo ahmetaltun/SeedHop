@@ -167,6 +167,7 @@ fn local_week_minute() -> (usize, u16) {
 
 impl Engine {
     pub async fn set_alternative_limits(&self, down: u32, up: u32, enabled: bool) -> Result<()> {
+        let root = self.state.require_library()?;
         if enabled && down == 0 && up == 0 {
             return Err(CoreError::Validation { code: "input.set_an_alternative_download_or_upload_limit_before", message: "Set an alternative download or upload limit before enabling alternative limits.".into() });
         }
@@ -178,11 +179,8 @@ impl Engine {
             enabled,
         };
         let bytes = serde_json::to_vec_pretty(&value).map_err(adapter::engine_error)?;
-        if let Err(error) = storage::atomic_write(
-            &self.state_directory.join("alternative-limits.json"),
-            &bytes,
-        ) {
-            if let Ok(saved) = AlternativeLimits::load(&self.state_directory) {
+        if let Err(error) = storage::atomic_write(&root.join("alternative-limits.json"), &bytes) {
+            if let Ok(saved) = AlternativeLimits::load(root) {
                 self.scheduling.lock().unwrap().alternative = saved;
                 self.reconcile_schedule();
             }
@@ -194,6 +192,7 @@ impl Engine {
     }
 
     pub async fn set_schedule(&self, config: ScheduleConfig) -> Result<()> {
+        let root = self.state.require_library()?;
         config.validate()?;
         let _operation = self.operations.write().await;
         self.ready()?;
@@ -202,12 +201,10 @@ impl Engine {
             config: config.clone(),
         })
         .map_err(adapter::engine_error)?;
-        if let Err(error) =
-            storage::atomic_write(&self.state_directory.join("schedule.json"), &bytes)
-        {
+        if let Err(error) = storage::atomic_write(&root.join("schedule.json"), &bytes) {
             // A directory flush can fail after rename. Reflect readable disk state
             // while reporting the failed durability guarantee to the caller.
-            if let Ok(saved) = ScheduleConfig::load(&self.state_directory) {
+            if let Ok(saved) = ScheduleConfig::load(root) {
                 self.replace_schedule_config(saved);
                 self.reconcile_schedule();
             }

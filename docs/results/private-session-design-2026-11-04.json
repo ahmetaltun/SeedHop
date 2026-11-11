@@ -1,0 +1,46 @@
+{
+  "checkpoint": "Private-session architecture and regression plan",
+  "date": "2026-11-04",
+  "status": "design complete; private sessions not implemented",
+  "documentation": "../PRIVATE-SESSIONS.md",
+  "verifiedSourceBoundaries": [
+    "Ordinary core startup acquires a lease and performs policy, recovery and resume-state work before creating JSON persistence.",
+    "Vendored rqbit already supports no session persistence with nonpersistent bitfields.",
+    "Statistics retention off still has library-settings access and is not a private accounting backend.",
+    "Queue, scheduling, accounting and layout operations have independent durable write paths.",
+    "Foreground and background native hosts have run-intent persistence paths.",
+    "Native library windows currently share one store and the client selects ordinary foreground/background endpoints."
+  ],
+  "designDecisions": [
+    "Explicit library/private state ownership; no temporary-folder-and-delete substitute.",
+    "Read-only validated policy snapshot, fail-closed networking and no ordinary session startup as fallback.",
+    "Separate authenticated foreground helper role; no login restoration or request replay after failure.",
+    "Fresh exclusive payload subtree; keep payloads after end/crash and reject initially unsupported file operations.",
+    "Separate development workspace/store/import routing and transient sandbox folder authority.",
+    "Drain engine-owned work before confirmed session end; preserve normal background transfers."
+  ],
+  "implementationOrder": [
+    "Core backend and private constructor",
+    "FFI/protocol and authenticated private helper",
+    "Development workspace and native lifecycle",
+    "Compiler, localization and packaging checks",
+    "Deferred runtime acceptance before production activation"
+  ],
+  "verification": {
+    "method": "Scoped source inspection and documentation diff check",
+    "diffCheck": "passed",
+    "runtimeTests": "not executed; deferred by user",
+    "compilerChecks": "not rerun; this checkpoint changes documentation only"
+  },
+  "stateChanges": {
+    "applicationCodeChanged": false,
+    "appOrEngineLaunched": false,
+    "userPreferencesOrLibraryChanged": false,
+    "vpnChanged": false
+  },
+  "limitations": [
+    "This design provides no implemented private-session feature or runtime privacy evidence.",
+    "No anonymity, secure-erasure, signing, sandbox or independent-audit certification claim."
+  ],
+  "changes": "Uncommitted documentation; earlier uncommitted implementation remains untouched"
+}

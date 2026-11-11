@@ -4,13 +4,14 @@ import Foundation
 import Darwin
 enum SandboxStorage {
     static var container: URL {
-        guard let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SandboxConfiguration.group) else {
-            // A missing shared container must never select another library or route.
-            fatalError("The signed SeedHop shared container is unavailable.")
+        get throws {
+            guard let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier:SandboxConfiguration.group) else {
+                throw FolderAccessFailure.unavailable
+            }
+            return url
         }
-        return url
     }
-    static var library: URL { container.appendingPathComponent("Library", isDirectory: true) }
+    static var library: URL { get throws { try container.appendingPathComponent("Library",isDirectory:true) } }
 }
 
 enum FolderAccessFailure: Error {
@@ -37,7 +38,7 @@ final class FolderAccessStore {
     private var records: [String: Record] = [:]
     private var renewals: [String: Record] = [:]
     private var active: [String: URL] = [:]
-    private var location: URL { SandboxStorage.container.appendingPathComponent("\(role)-folder-access.json") }
+    private var archiveName: String { "\(role)-folder-access.json" }
 
     init(role: String) { self.role = role }
     deinit { for url in active.values { url.stopAccessingSecurityScopedResource() } }
@@ -51,7 +52,7 @@ final class FolderAccessStore {
     }
 
     private func openDirectory() throws -> Int32 {
-        let container = SandboxStorage.container
+        let container = try SandboxStorage.container
         try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         let fd = open(container.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
         guard fd >= 0 else { throw FolderAccessFailure.unavailable }
@@ -61,7 +62,7 @@ final class FolderAccessStore {
     }
 
     private func inspect(_ directory: Int32) throws -> Inspection {
-        let fd = openat(directory, location.lastPathComponent, O_RDONLY | O_NONBLOCK | O_NOFOLLOW)
+        let fd = openat(directory, archiveName, O_RDONLY | O_NONBLOCK | O_NOFOLLOW)
         if fd < 0, errno == ENOENT { return Inspection(original: nil, records: [:], damaged: false) }
         guard fd >= 0 else { throw FolderAccessFailure.unavailable }; defer { close(fd) }
         var info = stat()
@@ -182,7 +183,7 @@ final class FolderAccessStore {
         if inspection.damaged, let original = inspection.original {
             try write(original, name: "\(role)-folder-access-damaged-\(UUID().uuidString).json", directory: directory, publish: false)
         }
-        try write(bytes, name: location.lastPathComponent, directory: directory, publish: true)
+        try write(bytes, name: archiveName, directory: directory, publish: true)
         install(updated, approved: approved)
         revision &+= 1; committed = true
     }

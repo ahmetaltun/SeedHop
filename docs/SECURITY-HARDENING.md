@@ -138,7 +138,17 @@ The next unfinished boundaries are:
    timelines and native recent-item/notification cleanup. Separate development
    controls now offer optional saved-statistics retention with a version-4 guard
    and pending-purge recovery; resume metadata remains. Runtime acceptance is
-   deferred. Formal SBOM,
+   deferred. Notification deduplication identifiers now stay in memory, with
+   legacy preferences cleanup on normal snapshots or explicit activity clearing;
+   compiler checks passed, but runtime acceptance remains deferred. Volatile
+   activity now expires through a 15-minute window, including engine cleanup
+   while VPN protection is blocked. Private sessions and runtime expiry
+   acceptance remain unfinished. A repository-grounded
+   [private-session design](PRIVATE-SESSIONS.md) now defines memory-only state,
+   foreground lifecycle, payload isolation and the required regression gates;
+   its core-only memory backend now admits transfers into fresh exclusive payload
+   folders with pinned storage ownership. Native integration and runtime
+   acceptance remain; later private file-membership changes are blocked. Formal SBOM,
    independently verifiable build provenance and release-key recovery exercises
    also remain.
 4. Strict proxy mode only after DNS/UDP/incoming coverage is proved; unsupported

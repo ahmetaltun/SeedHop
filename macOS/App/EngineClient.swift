@@ -10,17 +10,22 @@ import ServiceManagement
 
 @MainActor final class EngineClient: EngineTransport {
     private var connection: NSXPCConnection?
+    private let privateSession: Bool
     private(set) var background = false
     var onInterruption: (() -> Void)?
     #if SEEDHOP_SANDBOX
     private var folderGeneration: UInt64?
     #endif
 
+    init(privateSession: Bool = false) { self.privateSession = privateSession }
+
     func connect(background: Bool) throws {
         invalidate()
-        let connection = background ? NSXPCConnection(machServiceName:SeedHopIdentity.background) : NSXPCConnection(serviceName:SeedHopIdentity.foreground)
+        guard !privateSession || !background else { throw EngineMessage(code:"host.unsupported") }
+        let service = privateSession ? SeedHopIdentity.privateEngine : SeedHopIdentity.foreground
+        let connection = background ? NSXPCConnection(machServiceName:SeedHopIdentity.background) : NSXPCConnection(serviceName:service)
         let root = Bundle.main.bundleURL.appendingPathComponent("Contents")
-        let helper = background ? root.appendingPathComponent("MacOS/SeedHopAgent") : root.appendingPathComponent("XPCServices/SeedHopEngine.xpc")
+        let helper = background ? root.appendingPathComponent("MacOS/SeedHopAgent") : root.appendingPathComponent(privateSession ? "XPCServices/SeedHopPrivateEngine.xpc" : "XPCServices/SeedHopEngine.xpc")
         connection.setCodeSigningRequirement(try Signing.requirement(at:helper))
         connection.remoteObjectInterface = NSXPCInterface(with:EngineServiceProtocol.self)
         connection.interruptionHandler = { [weak self] in Task { @MainActor in self?.onInterruption?() } }
@@ -43,7 +48,7 @@ import ServiceManagement
         let generation: UInt64?
         // Losing a folder grant must not prevent stopping the engine or changing
         // offline network settings. Those operations do not need payload access.
-        if ["shutdown", "cancel", "cancelFileOperation", "networkInfo", "networkPolicy", "clearActivity", "statisticsInfo", "statisticsRetention"].contains(request.command) {
+        if privateSession || ["shutdown", "cancel", "cancelFileOperation", "networkInfo", "networkPolicy", "clearActivity", "statisticsInfo", "statisticsRetention", "privateProtection"].contains(request.command) {
             generation = nil
         } else {
             do {

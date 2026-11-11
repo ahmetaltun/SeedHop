@@ -26,6 +26,7 @@
     "crates/librqbit/src/session_persistence/postgres.rs",
     "crates/librqbit/src/storage/filesystem/fs.rs",
     "crates/librqbit/src/storage/filesystem/mod.rs",
+    "crates/librqbit/src/storage/filesystem/pinned.rs",
     "crates/librqbit/src/stream_connect.rs",
     "crates/librqbit/src/torrent_state/initializing.rs",
     "crates/librqbit/src/torrent_state/live/mod.rs",

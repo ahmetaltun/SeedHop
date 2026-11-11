@@ -9,12 +9,13 @@ request; compilation is not functional acceptance.
 
 | Data | Existing location/lifetime | This action |
 | --- | --- | --- |
-| Activity timeline | App memory; at most 200 rows per transfer | Clear this app process's rows |
+| Activity timeline | App memory; at most 200 rows per transfer, recent 15-minute window | Clear this app process's rows |
 | Traffic graphs | App memory; at most 900 samples/15 minutes per transfer | Clear samples |
-| Tracker activity events | Running engine memory | Clear queues in the connected engine |
+| Tracker activity events | Running engine memory; recent 15-minute window | Clear queues in the connected engine |
 | Selected details and peer rate baselines | App memory | Clear cached details; fresh observations may return |
 | SeedHop recent-document list | Native app-specific recent items | Request clearing through NSDocumentController |
 | SeedHop notifications | App-specific Notification Center records | Request removal of delivered and pending notifications |
+| Completion notification bookkeeping | App memory, bounded by current library | Clear identifiers and remove the legacy preferences key |
 | Saved library, torrent metadata and bitfields | Library/session files | Preserve |
 | Lifetime statistics and timestamps | Library statistics.json | Preserve |
 | Network policy, encryption, queue and file intent | Existing library settings | Preserve |
@@ -72,9 +73,10 @@ old detail replies/errors, new post-clear events, pending/delivered notification
 app-specific recent items, fixtures and native accessibility. Confirm that payload
 bytes, statistics, counters, pause state, queue order and policy remain intact.
 
-Automatic expiry and private sessions remain future work. Optional statistics
-retention is implemented in the following development increment. Existing explicit
-library removal remains separate from these controls.
+Automatic expiry for volatile activity is implemented in the later checkpoint
+below. Private sessions remain future work. Optional statistics retention is
+implemented in the following development increment. Existing explicit library
+removal remains separate from these controls.
 
 ## Optional saved-statistics retention
 
@@ -142,8 +144,8 @@ before saving policies into a new sandbox development library.
 ### Scope and remaining acceptance
 
 This setting affects the active library's accounting file. It does not remove
-older library copies, migration originals, backups, exports, notification
-deduplication identifiers in app preferences, or necessary torrent metadata.
+older library copies, migration originals, backups, exports, or necessary torrent
+metadata. Notification bookkeeping now has a separate lifetime described below.
 Restoring another library snapshot can restore that snapshot's older policy and
 statistics. This is neither secure erasure nor a private session.
 
@@ -158,3 +160,85 @@ failed guard writes, purge failure and retry, directory-flush failures, missing 
 malformed format-4 flags, older readers, preservation of VPN/encryption settings,
 sandbox migration/rollback, and foreground/background ownership. Confirm payload
 and resume continuity and that off-period counters never reappear in saved totals.
+
+## Notification bookkeeping — 2026-11-04
+
+Completion notification identifiers now stay in app memory. Every snapshot drops
+identifiers for removed transfers, and a changed engine instance resets the set.
+No new completion identifiers are written to preferences. Unlike the development
+privacy controls, this behavior is included in release builds.
+
+The first successful snapshot in a normal app removes the legacy
+`completedTorrents` preferences key, even with notifications disabled. Development
+Clear Local Activity also removes it while offline and resets the in-memory set.
+Preview and fixture snapshots neither change that key nor submit notifications.
+An offline launch without a snapshot or explicit clear leaves the old key until
+one of those actions occurs. No actual preferences were changed during development.
+
+The first snapshot from an engine establishes a baseline without notifying about
+already completed transfers. Later snapshots retain the existing completion
+transition check and suppress duplicates for that engine's current library.
+Clearing activity suppresses notification submission while the clear is in
+progress. Transfers may generate new notifications afterward. Notification Center
+still retains delivered records until the system or user removes them, or the
+development clear action requests removal. Backups and older app versions can
+retain or recreate the legacy preferences key; this is not secure erasure.
+
+Compiler checks cover development, sandbox development and release app variants.
+Runtime tests remain deferred. Acceptance must cover ordinary completion,
+duplicate snapshots, disabled notifications, restart/reconnect baselines, engine
+replacement, transfer removal/re-addition, offline clearing, completion during
+clearing, previews/fixtures, and legacy-key removal in the correct app domain.
+
+## Automatic activity expiry — 2026-11-04
+
+Activity rows and tracker-event history now use the same 15-minute window as
+traffic graphs. The activity inspector labels that window. Existing row/sample
+count limits still apply. This policy is included in development and release
+builds; it adds no preference or library-format change.
+
+The running engine prunes tracker-event queues every 30 seconds, including after
+VPN protection blocks networking. Activity detail replies also filter expired
+events immediately. Pruning keeps event sequence numbers intact and changes no
+tracker state, announce timing, transfer counters, pause intent or payload data.
+
+The app expires timeline rows, traffic samples and cached detail events on its
+existing one-second polling task, before deciding whether to fetch a snapshot.
+This continues with a hidden window or disconnected engine while that task runs.
+Applying snapshots or details also expires old cached activity. Detail replies
+are filtered before entering caches, so delayed replies cannot restore expired
+events. Snapshots independently remove timeline rows and samples for transfers
+that leave the library.
+
+Expiration uses event wall-clock timestamps. Events at or before the cutoff, or
+with future timestamps after a backward clock adjustment, are discarded. Clock
+changes may therefore shorten history. Timer scheduling, process suspension,
+long operations and update/quit barriers can delay physical removal from memory;
+there is no exact erasure deadline. Engine queues can retain an expired event
+until their next cleanup pass, even though new detail replies omit it. No memory
+zeroization or secure-erasure claim is made.
+
+Saved statistics, resume metadata, tracker status/error fields, peer caches,
+notifications, recent documents, exports and backups have separate lifetimes.
+This expiry is neither a private session nor an automatic deletion policy for
+downloaded files or saved library records. Explicit clearing remains available
+in development builds for its broader documented scope.
+
+Workspace/all-target Clippy and Swift compiler checks cover the code and compile
+the new timestamp-boundary regression test. Runtime tests remain deferred; the
+regression test has not been executed. Deferred acceptance must cover expiry
+without new events, hidden/offline windows, network-blocked engines, delayed
+detail replies, removed transfers, clock changes, sleep/wake and update barriers,
+count limits, event sequence continuity, native layout/accessibility, and transfer
+continuity. New translations are AI drafts pending human review.
+
+## Private-session design
+
+[Private sessions](PRIVATE-SESSIONS.md) now have a repository-grounded design and
+regression plan. The core-only memory backend now admits transfers into exclusive
+session-owned payload folders. User-facing private sessions and native integration
+remain unavailable. The design requires a separate
+memory-only engine, foreground-only lifetime, explicit payload ownership, no
+ordinary-library fallback, and the same validated network protection as normal
+transfers. Automatic activity expiry and statistics controls do not establish
+those boundaries by themselves.

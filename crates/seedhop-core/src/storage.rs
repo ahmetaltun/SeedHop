@@ -23,6 +23,22 @@ impl LibraryLease {
             .custom_flags(libc::O_NOFOLLOW)
             .open(directory.join("engine.lock"))
             .map_err(io_error)?;
+        Self::lock(file)
+    }
+
+    pub(crate) fn acquire_existing(directory: &Path) -> Result<Self> {
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+            .open(directory.join("engine.lock"))
+            .map_err(io_error)?;
+        if !file.metadata().map_err(io_error)?.is_file() {
+            return Err(CoreError::CorruptState("Invalid library lock".into()));
+        }
+        Self::lock(file)
+    }
+
+    fn lock(file: File) -> Result<Self> {
         // SAFETY: this is a live owned descriptor; flock does not retain pointers.
         if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
             let error = std::io::Error::last_os_error();

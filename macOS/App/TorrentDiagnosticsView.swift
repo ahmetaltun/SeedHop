@@ -204,6 +204,9 @@ struct TorrentDiagnosticsView: View {
                 .accessibilityLabel(String(localized:"Download and upload traffic history for \(torrent.name)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
             }
             Divider()
+            Text(String(localized:"Activity · last 15 minutes",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
+                .foregroundStyle(.secondary).frame(maxWidth:.infinity,alignment:.leading)
+                .padding(.horizontal,12).padding(.vertical,7)
             if events.isEmpty { empty(String(localized:"No recorded events",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),detail:String(localized:"Transfer changes, tracker failures, recovery, and file operations appear here.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) }
             else {
                 List(events.reversed()) { event in

@@ -142,20 +142,18 @@ fn parse(value: &str) -> Result<EncryptionPolicy> {
 impl Engine {
     /// Save for the next engine start. Existing connections retain the active policy.
     pub async fn set_peer_encryption(&self, policy: String) -> Result<()> {
+        let root = self.state.require_library()?;
         let policy = parse(&policy)?;
         let _operation = self.operations.write().await;
         self.ready()?;
-        let mut settings = ConnectionSettings::load(&self.state_directory)?;
+        let mut settings = ConnectionSettings::load(root)?;
         settings.peer_encryption = policy;
         let bytes =
             serde_json::to_vec_pretty(&settings).map_err(|e| CoreError::Engine(e.to_string()))?;
-        if let Err(error) = storage::atomic_write(
-            &self.state_directory.join("connection-settings.json"),
-            &bytes,
-        ) {
+        if let Err(error) = storage::atomic_write(&root.join("connection-settings.json"), &bytes) {
             // A failed directory flush may follow a successful rename. Reflect
             // the readable saved choice, but keep reporting that durability failed.
-            if let Ok(saved) = ConnectionSettings::load(&self.state_directory) {
+            if let Ok(saved) = ConnectionSettings::load(root) {
                 *self.connection_settings.lock().unwrap() = saved;
             }
             return Err(error);

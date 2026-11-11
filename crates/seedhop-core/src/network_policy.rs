@@ -180,14 +180,49 @@ pub fn save_network_preferences(root: &Path, json: &str) -> Result<()> {
     policy.save(root)
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PrivateProtection {
+    pub network_policy: NetworkPolicy,
+    pub peer_encryption: librqbit::EncryptionPolicy,
+}
+
+pub fn offline_private_protection(root: &Path) -> Result<PrivateProtection> {
+    let _lease = storage::LibraryLease::acquire_existing(root)?;
+    private_protection(root)
+}
+
+fn private_protection(root: &Path) -> Result<PrivateProtection> {
+    let settings = crate::connection_settings::ConnectionSettings::load(root)?;
+    let network_policy = saved_policy(root).ok_or(CoreError::NetworkBlocked)?;
+    network_policy.check_available()?;
+    Ok(PrivateProtection {
+        network_policy,
+        peer_encryption: settings.peer_encryption,
+    })
+}
+
 impl Engine {
+    pub async fn private_protection(&self) -> Result<PrivateProtection> {
+        let _operation = self.operations.read().await;
+        self.ready()?;
+        let protection = private_protection(self.state.require_library()?)?;
+        if protection.network_policy != self.network_policy
+            || protection.peer_encryption != self.active_peer_encryption
+        {
+            return Err(CoreError::NetworkBlocked);
+        }
+        Ok(protection)
+    }
+
     pub fn network_info(&self) -> Result<String> {
-        let saved = saved_policy(&self.state_directory);
+        let saved = self.state.root().and_then(saved_policy);
         serde_json::to_string(&serde_json::json!({ "saved": saved, "active": self.network_policy,
             "interfaces": network_interfaces()?, "blocked": self.network_blocked.load(Ordering::SeqCst) }))
             .map_err(crate::adapter::engine_error)
     }
     pub async fn set_network_policy(&self, json: String) -> Result<()> {
+        let root = self.state.require_library()?;
         let _operation = self.operations.write().await;
         if self.stopping.load(Ordering::SeqCst) {
             return Err(CoreError::Stopping);
@@ -202,6 +237,6 @@ impl Engine {
             .stop_and_wait()
             .await
             .map_err(crate::adapter::engine_error)?;
-        policy.save(&self.state_directory)
+        policy.save(root)
     }
 }

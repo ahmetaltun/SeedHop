@@ -1,6 +1,6 @@
 import Foundation
 
-#if SEEDHOP_DEVELOPMENT
+#if SEEDHOP_DEVELOPMENT || SEEDHOP_SANDBOX
 import Darwin
 
 /// Portable UI settings only. Engine policy, paths, permissions and private
@@ -57,6 +57,14 @@ import Darwin
     static func exportData() throws -> Data {
         guard !WorkspacePreferences.isFixture else { throw Failure.invalidArchive }
         let saved = UserDefaults.standard.persistentDomain(forName: domain) ?? [:]
+        let archive = try portableSettings(from:saved)
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let bytes = try encoder.encode(archive)
+        guard bytes.count <= 65536 else { throw Failure.invalidArchive }
+        return bytes
+    }
+
+    private static func portableSettings(from saved: [String:Any]) throws -> Archive {
         let columns = TransferColumns.all.map(\.id)
         let order = (saved[TransferColumns.orderKey] as? [String]) ?? columns
         let rawWidths = saved["workspaceColumnWidths"] as? [String: Double] ?? [:]
@@ -78,10 +86,7 @@ import Darwin
             columnOrder: order, columnWidths: widths,
             sortOrder: (sort?.isEmpty == false ? sort : nil) ?? [SortRule(field: saved["workspaceSort"] as? String ?? "queue", reverse: saved["workspaceSortReverse"] as? Bool ?? false)]))
         try validate(archive)
-        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let bytes = try encoder.encode(archive)
-        guard bytes.count <= 65536 else { throw Failure.invalidArchive }
-        return bytes
+        return archive
     }
 
     private static func openDirectory() throws -> (directory: Int32, lock: Int32) {
@@ -122,7 +127,16 @@ import Darwin
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         let fd = open(url.path, O_RDONLY | O_NONBLOCK | O_NOFOLLOW)
         guard fd >= 0 else { throw Failure.io }; defer { close(fd) }
-        let archive = try JSONDecoder().decode(Archive.self, from: read(fd, limit: 65536))
+        let bytes = try read(fd, limit: 65536)
+        #if SEEDHOP_SANDBOX
+        if url.lastPathComponent == "app.seedhop.mac.plist" {
+            guard let saved = try PropertyListSerialization.propertyList(from:bytes,options:[],format:nil) as? [String:Any] else {
+                throw Failure.invalidArchive
+            }
+            return try portableSettings(from:saved)
+        }
+        #endif
+        let archive = try JSONDecoder().decode(Archive.self, from:bytes)
         try validate(archive)
         return archive
     }

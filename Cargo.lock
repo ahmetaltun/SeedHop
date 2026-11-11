@@ -2848,7 +2848,7 @@ dependencies = [
 
 [[package]]
 name = "seedhop-core"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "crypto-bigint",
@@ -2871,7 +2871,7 @@ dependencies = [
 
 [[package]]
 name = "seedhop-ffi"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "seedhop-core",
  "serde",

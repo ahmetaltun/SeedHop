@@ -1,4 +1,5 @@
-use seedhop_core::{Engine, EngineConfig};
+use seedhop_core::{Engine, EngineConfig, PrivateEngineConfig, PrivateProtection};
+use std::future::Future;
 use std::sync::{Arc, Mutex};
 uniffi::setup_scaffolding!();
 
@@ -291,6 +292,27 @@ pub struct EngineBridge {
 }
 
 impl EngineBridge {
+    fn launch(
+        start: impl Future<Output = seedhop_core::Result<Arc<Engine>>> + Send + 'static,
+    ) -> Result<Arc<Self>, BridgeError> {
+        let runtime = Arc::new(
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .worker_threads(2)
+                .build()
+                .map_err(error)?,
+        );
+        // Start on a Tokio worker, away from the smaller macOS dispatch stack.
+        let core = runtime
+            .block_on(runtime.spawn(start))
+            .map_err(error)?
+            .map_err(error)?;
+        Ok(Arc::new(Self {
+            core: Mutex::new(Some(core)),
+            runtime: Mutex::new(Some(runtime)),
+        }))
+    }
+
     fn handles(&self) -> Result<(Arc<Engine>, Arc<tokio::runtime::Runtime>), BridgeError> {
         let core = self
             .core
@@ -319,13 +341,6 @@ impl EngineBridge {
         discovery: bool,
         allow_local_network: bool,
     ) -> Result<Arc<Self>, BridgeError> {
-        let runtime = Arc::new(
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .worker_threads(2)
-                .build()
-                .map_err(error)?,
-        );
         let config = EngineConfig {
             state_directory,
             download_directory,
@@ -333,18 +348,28 @@ impl EngineBridge {
             allow_local_network,
             listen_port: 0,
         };
-        // Runtime::block_on polls its root future on the calling thread.
-        // macOS dispatch queues have a small stack; constructing the uTP
-        // dispatcher there overflows it even when Session::new is boxed.
-        // Construct and poll the engine on an owned Tokio worker instead.
-        let core = runtime
-            .block_on(runtime.spawn(async move { Engine::open(config).await }))
-            .map_err(error)?
-            .map_err(error)?;
-        Ok(Arc::new(Self {
-            core: Mutex::new(Some(core)),
-            runtime: Mutex::new(Some(runtime)),
+        Self::launch(Engine::open(config))
+    }
+
+    #[uniffi::constructor]
+    pub fn new_private(
+        download_directory: String,
+        protection: String,
+        discovery: bool,
+    ) -> Result<Arc<Self>, BridgeError> {
+        let settings: PrivateProtection = serde_json::from_str(&protection).map_err(error)?;
+        Self::launch(Engine::open_private(PrivateEngineConfig {
+            download_directory,
+            network_policy: settings.network_policy,
+            peer_encryption: settings.peer_encryption,
+            allow_network_discovery: discovery,
         }))
+    }
+
+    pub fn private_protection(&self) -> Result<String, BridgeError> {
+        let (core, runtime) = self.handles()?;
+        let settings = runtime.block_on(core.private_protection()).map_err(error)?;
+        serde_json::to_string(&settings).map_err(error)
     }
     pub fn network_info(&self) -> Result<String, BridgeError> {
         self.handles()?.0.network_info().map_err(error)
@@ -650,6 +675,13 @@ impl EngineBridge {
 }
 
 #[uniffi::export]
+pub fn offline_private_protection(state_directory: String) -> Result<String, BridgeError> {
+    let settings = seedhop_core::offline_private_protection(std::path::Path::new(&state_directory))
+        .map_err(error)?;
+    serde_json::to_string(&settings).map_err(error)
+}
+
+#[uniffi::export]
 pub fn protocol_version() -> u32 {
     seedhop_core::PROTOCOL_VERSION
 }
@@ -773,7 +805,7 @@ mod tests {
             serde_json::from_str(&bridge.snapshot_json().unwrap()).unwrap();
         assert_eq!(json["torrents"][0]["forceStarted"], true);
         assert_eq!(json["torrents"][0]["canReannounce"], false);
-        assert_eq!(json["protocolVersion"], 10);
+        assert_eq!(json["protocolVersion"], seedhop_core::PROTOCOL_VERSION);
         bridge.set_paused(id, false).unwrap();
         assert!(!bridge.snapshot().unwrap().torrents[0].force_started);
         bridge.shutdown().unwrap();
