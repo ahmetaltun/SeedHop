@@ -127,6 +127,14 @@ pub struct Transfer {
     pub queue_position: u32,
     pub paused_intent: bool,
     pub force_started: bool,
+    pub sequential: bool,
+    pub first_last_pieces: bool,
+    pub network_downloaded_bytes: Option<u64>,
+    pub network_uploaded_bytes: Option<u64>,
+    pub added_at: Option<u64>,
+    pub completed_at: Option<u64>,
+    pub eta_seconds: Option<u64>,
+    pub selected_bytes: u64,
 }
 impl From<seedhop_core::TorrentRecord> for Transfer {
     fn from(t: seedhop_core::TorrentRecord) -> Self {
@@ -150,6 +158,14 @@ impl From<seedhop_core::TorrentRecord> for Transfer {
             queue_position: t.queue_position,
             paused_intent: t.paused_intent,
             force_started: t.force_started,
+            sequential: t.sequential,
+            first_last_pieces: t.first_last_pieces,
+            network_downloaded_bytes: t.network_downloaded_bytes,
+            network_uploaded_bytes: t.network_uploaded_bytes,
+            added_at: t.added_at,
+            completed_at: t.completed_at,
+            eta_seconds: t.eta_seconds,
+            selected_bytes: t.selected_bytes,
         }
     }
 }
@@ -251,6 +267,7 @@ impl From<ScheduleWindow> for seedhop_core::ScheduleRule {
 #[derive(uniffi::Record)]
 pub struct EngineSnapshot {
     pub statistics_message: Option<UserNotice>,
+    pub statistics_warning: Option<String>,
     pub scheduling_message: Option<UserNotice>,
     pub schedule_enabled: bool,
     pub schedule_rules: Vec<ScheduleWindow>,
@@ -444,6 +461,7 @@ impl EngineBridge {
                 .statistics_warning
                 .as_ref()
                 .map(|detail| UserNotice::new("statistics.save_failed", Some(detail.clone()))),
+            statistics_warning: s.statistics_warning,
             scheduling_message: s
                 .scheduling_warning
                 .as_ref()

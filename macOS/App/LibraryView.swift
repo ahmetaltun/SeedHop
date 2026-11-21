@@ -44,7 +44,7 @@ struct LibraryView: View {
             .announceAccessibility(store.statisticsWarning)
             .announceAccessibility(store.schedulingWarning)
             .announceAccessibility(store.reannounceNotice)
-            .announceAccessibility(store.error.map { String(localized:"Something needs attention. \($0)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) })
+            .announceAccessibility((store.error ?? store.snapshotError).map { String(localized:"Something needs attention. \($0)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) })
             .announceAccessibility(store.fileOperation.map { store.connected ? String(localized:"File change. \($0.title)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Last known file change. \($0.title)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) },priority:.medium)
             .announceAccessibility(store.storageRecovery.map { String(localized:"File cleanup needs attention. \($0.localizedMessage)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) })
             .focusedSceneValue(\.librarySearch,LibrarySearchAction(focus:{ searchFocused = true },focusTransfers:focusTransfers,toggleSidebar:{ showSidebar.toggle() }))
@@ -275,18 +275,19 @@ struct LibraryView: View {
     private var activeFilterDescription: String {
         [store.filter == .all ? nil : store.filter.title,store.search.isEmpty ? nil : String(localized:"Name: \(store.search)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),store.trackerHost.isEmpty ? nil : String(localized:"Tracker: \(store.trackerHost)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)].compactMap { $0 }.joined(separator:" · ")
     }
-    private var hasNotice: Bool { store.switching || store.storageRecovery != nil || store.fileOperation != nil || !store.storageRequests.isEmpty || store.error != nil || store.statisticsWarning != nil || store.schedulingWarning != nil }
+    private var hasNotice: Bool { store.switching || store.storageRecovery != nil || store.fileOperation != nil || !store.storageRequests.isEmpty || store.error != nil || store.snapshotError != nil || store.statisticsWarning != nil || store.schedulingWarning != nil }
     private var noticeTitle: String {
         if store.storageRecovery != nil { return String(localized:"File cleanup needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
         if let operation = store.fileOperation { return store.connected ? String(localized:"\(operation.title) · \(operation.detail)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Last known: \(operation.title) · \(operation.detail)",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) }
         if let error = store.error { return error }
+        if let error = store.snapshotError { return error }
         if let warning = store.schedulingWarning { return warning }
         if let warning = store.statisticsWarning { return warning }
         return store.switching ? String(localized:"Switching transfer engine…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale) : String(localized:"Preparing file change…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)
     }
     private var noticeStrip: some View {
         HStack(spacing:8) {
-            Image(systemName:store.error != nil || store.storageRecovery != nil ? "exclamationmark.circle" : "arrow.triangle.2.circlepath")
+            Image(systemName:store.error != nil || store.snapshotError != nil || store.storageRecovery != nil ? "exclamationmark.circle" : "arrow.triangle.2.circlepath")
             Text(noticeTitle).lineLimit(1).truncationMode(.tail).help(noticeTitle)
             Spacer(minLength:4)
             if let operation = store.fileOperation, operation.canCancel {
@@ -305,7 +306,10 @@ struct LibraryView: View {
             if let warning = store.schedulingWarning { InlineNotice(title:String(localized:"Scheduling needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),message:warning) }
             if let warning = store.statisticsWarning { InlineNotice(title:String(localized:"Statistics need attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),message:warning) }
             if let error = store.error {
-                InlineNotice(title:String(localized:"Something needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),message:error,retry:store.connected ? nil : { Task { store.error = nil; await store.start() } },dismiss:{ store.error = nil; showNotice = false })
+                InlineNotice(title:String(localized:"Something needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),message:error,retry:store.connected || store.snapshotError != nil ? nil : { Task { store.error = nil; await store.start() } },dismiss:{ store.error = nil; showNotice = false })
+            }
+            if let error = store.snapshotError {
+                InlineNotice(title:String(localized:"Something needs attention",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale),message:error,retry:{ Task { await store.refresh() } })
             }
         }.environment(\.accessibilityAnnouncementsEnabled,false)
     }

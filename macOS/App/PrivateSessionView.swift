@@ -61,7 +61,7 @@ struct PrivateSessionView: View {
                      : store.networkInterface ?? String(localized:"Direct connection",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
                     .font(.subheadline).foregroundStyle(.secondary)
             }
-            if let error = store.error { Text(error).foregroundStyle(.secondary).textSelection(.enabled) }
+            if let error = store.error ?? store.snapshotError { Text(error).foregroundStyle(.secondary).textSelection(.enabled) }
             HStack {
                 Button(String(localized:"Add Torrent…",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.beginImport() }
                 Button(String(localized:"Resume Selected",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale)) { store.toggleSelected(paused:false) }.disabled(!store.canResumeSelection)

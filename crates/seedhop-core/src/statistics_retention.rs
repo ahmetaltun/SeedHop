@@ -70,7 +70,8 @@ impl Engine {
             }
             Err(_) => accounting.set_retention(false),
         }
-        let result = saved.and_then(|_| accounting.checkpoint(root, true));
+        drop(accounting);
+        let result = saved.and_then(|_| self.checkpoint_accounting(true));
         *self.statistics_warning.lock().unwrap() = result.as_ref().err().map(|_| {
             "Statistics retention could not be fully saved or cleared. Review the saved choice and retry.".into()
         });

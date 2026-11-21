@@ -1,6 +1,6 @@
 use crate::{CoreError, Engine, Result, adapter, storage};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -42,7 +42,7 @@ impl Engine {
         let handle = self.handle(&id)?;
         if enabled {
             if matches!(
-                handle.stats().state,
+                handle.stats_summary().state,
                 librqbit::TorrentStatsState::Initializing { .. }
                     | librqbit::TorrentStatsState::Error
             ) {
@@ -236,7 +236,7 @@ impl Engine {
                     adapter::torrent_id(t) == *item
                         && !t.is_paused()
                         && !t.is_queued()
-                        && !t.stats().finished
+                        && !t.stats_summary().finished
                 })
             })
             .map_or(0, |p| p + 1);
@@ -261,36 +261,42 @@ impl Engine {
             .with_torrents(|items| items.map(|(_, t)| t.clone()).collect::<Vec<_>>());
         // Engine IDs are monotonic and define stable FIFO for newly added items.
         handles.sort_by_key(|t| t.id());
+        let mut handles: Vec<_> = handles
+            .into_iter()
+            .map(|handle| (adapter::torrent_id(&handle), handle))
+            .collect();
+        let live_ids: HashSet<_> = handles.iter().map(|(id, _)| id.as_str()).collect();
         let mut config = self.queue.lock().unwrap().clone();
-        let old = config.order.clone();
-        let old_forced = config.force_started.clone();
+        let old_counts = (config.order.len(), config.force_started.len());
         config
             .force_started
-            .retain(|id| handles.iter().any(|t| adapter::torrent_id(t) == *id));
-        config
-            .order
-            .retain(|id| handles.iter().any(|t| adapter::torrent_id(t) == *id));
-        for handle in &handles {
-            let id = adapter::torrent_id(handle);
-            if !config.order.contains(&id) {
-                config.order.push(id);
-            }
-        }
-        if old != config.order || old_forced != config.force_started {
+            .retain(|id| live_ids.contains(id.as_str()));
+        config.order.retain(|id| live_ids.contains(id.as_str()));
+        let removed = old_counts != (config.order.len(), config.force_started.len());
+        let known: HashSet<_> = config.order.iter().map(String::as_str).collect();
+        let new_ids: Vec<_> = handles
+            .iter()
+            .map(|(id, _)| id)
+            .filter(|id| !known.contains(id.as_str()))
+            .cloned()
+            .collect();
+        if removed || !new_ids.is_empty() {
+            config.order.extend(new_ids);
             self.save_queue(config.clone())?;
         }
-        handles.sort_by_key(|t| {
-            config
-                .order
-                .iter()
-                .position(|id| *id == adapter::torrent_id(t))
-                .unwrap_or(usize::MAX)
-        });
+        let positions: HashMap<_, _> = config
+            .order
+            .iter()
+            .enumerate()
+            .rev()
+            .map(|(i, id)| (id.as_str(), i))
+            .collect();
+        handles.sort_by_key(|(id, _)| positions[id.as_str()]);
         let suspended = self.schedule_suspended();
         let mut slots = 0;
         let mut changes = Vec::new();
-        for handle in handles {
-            let stats = handle.stats();
+        for (id, handle) in handles {
+            let stats = handle.stats_summary();
             if matches!(
                 stats.state,
                 librqbit::TorrentStatsState::Initializing { .. }
@@ -309,7 +315,7 @@ impl Engine {
             } else if handle.is_paused()
                 || stats.finished
                 || config.max_active == 0
-                || config.force_started.contains(&adapter::torrent_id(&handle))
+                || config.force_started.contains(&id)
             {
                 false
             } else {

@@ -51,6 +51,7 @@ pub struct Engine {
     download_directory: PathBuf,
     instance_id: String,
     operations: RwLock<()>,
+    inspections: RwLock<()>,
     file_operation: Mutex<Option<Arc<file_operation::Control>>>,
     storage_recovery: Mutex<Option<StorageRecovery>>,
     resolving: Mutex<HashMap<String, tokio::sync::watch::Sender<bool>>>,
@@ -397,6 +398,7 @@ impl Engine {
             download_directory: downloads,
             instance_id: uuid::Uuid::new_v4().to_string(),
             operations: RwLock::new(()),
+            inspections: RwLock::new(()),
             file_operation: Mutex::new(None),
             storage_recovery: Mutex::new(storage_recovery),
             resolving: Mutex::new(HashMap::new()),
@@ -440,10 +442,12 @@ impl Engine {
                 if engine.network_blocked.load(Ordering::SeqCst) {
                     continue;
                 }
-                // Metadata inspection is read-only and can wait on peers. Share
-                // its lock so calendar transitions still run; file changes and
-                // shutdown retain their exclusive operation boundary.
+                // File changes and shutdown retain their exclusive operation
+                // boundary. Metadata lookups have a separate drain barrier.
                 let _operation = engine.operations.read().await;
+                if engine.ready().is_err() {
+                    continue;
+                }
                 // Retry failed persistence on the next tick. Commands still
                 // report their own persistence errors directly to the caller.
                 let _ = engine.apply_scheduling().await;
@@ -482,9 +486,16 @@ impl Engine {
             })
             .collect::<Vec<_>>()
         });
-        torrents.sort_by_key(|a| a.name.to_lowercase());
+        torrents.sort_by_cached_key(|a| a.name.to_lowercase());
         let accounting = self.accounting.lock().unwrap();
         let queue = self.queue.lock().unwrap();
+        let positions: HashMap<_, _> = queue
+            .order
+            .iter()
+            .enumerate()
+            .rev()
+            .map(|(i, id)| (id.as_str(), i as u32 + 1))
+            .collect();
         for torrent in &mut torrents {
             torrent.force_started = queue.force_started.contains(&torrent.id);
             if let Some(totals) = accounting.entries.get(&torrent.id) {
@@ -493,13 +504,9 @@ impl Engine {
                 torrent.added_at = totals.added;
                 torrent.completed_at = totals.completed;
             }
-            torrent.queue_position = queue
-                .order
-                .iter()
-                .position(|id| id == &torrent.id)
-                .map(|i| i as u32 + 1)
-                .unwrap_or(0);
+            torrent.queue_position = positions.get(torrent.id.as_str()).copied().unwrap_or(0);
         }
+        drop(accounting);
         let scheduling = self.scheduling.lock().unwrap();
         if scheduling
             .active
@@ -566,7 +573,7 @@ impl Engine {
         magnet: Option<String>,
         bytes: Vec<u8>,
     ) -> Result<TorrentPreview> {
-        let _operation = self.operations.read().await;
+        let _inspection = self.inspections.read().await;
         self.ready()?;
         if magnet.is_none() {
             return adapter::preview(bytes);
@@ -588,15 +595,21 @@ impl Engine {
             return Err(CoreError::Unsupported);
         }
         let (cancel, mut receiver) = tokio::sync::watch::channel(false);
-        match self.resolving.lock().unwrap().entry(request_id.clone()) {
-            std::collections::hash_map::Entry::Vacant(entry) => {
-                entry.insert(cancel);
-            }
-            std::collections::hash_map::Entry::Occupied(_) => {
-                return Err(CoreError::Validation {
-                    code: "input.this_request_is_already_resolving",
-                    message: "This request is already resolving.".into(),
-                });
+        {
+            let mut resolving = self.resolving.lock().unwrap();
+            // Recheck under the registration lock so a lookup cannot miss a
+            // concurrent shutdown or network protection change.
+            self.ready()?;
+            match resolving.entry(request_id.clone()) {
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(cancel);
+                }
+                std::collections::hash_map::Entry::Occupied(_) => {
+                    return Err(CoreError::Validation {
+                        code: "input.this_request_is_already_resolving",
+                        message: "This request is already resolving.".into(),
+                    });
+                }
             }
         }
         let result = tokio::select! {
@@ -618,6 +631,14 @@ impl Engine {
         if let Some(sender) = self.resolving.lock().unwrap().get(request_id) {
             let _ = sender.send(true);
         }
+    }
+
+    async fn drain_inspections(&self) {
+        for cancel in self.resolving.lock().unwrap().values() {
+            let _ = cancel.send(true);
+        }
+        // The stopping or network-blocked latch prevents new lookups.
+        let _drained = self.inspections.write().await;
     }
 
     pub async fn add(
@@ -689,12 +710,7 @@ impl Engine {
             ));
         }
         let metadata = adapter::preview(bytes.clone())?;
-        if self
-            .snapshot()?
-            .torrents
-            .iter()
-            .any(|t| t.id == metadata.id)
-        {
+        if self.handle(&metadata.id).is_ok() {
             return Err(CoreError::Validation {
                 code: "input.this_torrent_is_already_in_your_library",
                 message: "This torrent is already in your library.".into(),
@@ -727,10 +743,9 @@ impl Engine {
                 .collect::<Vec<_>>(),
         )?;
         if !reuse
-            && metadata
-                .files
+            && selected
                 .iter()
-                .any(|f| selected.contains(&f.index) && root.join(&f.name).exists())
+                .any(|&index| root.join(&metadata.files[index as usize].name).exists())
         {
             return Err(CoreError::Validation { code: "input.files_already_exist_here_enable_verification_of_existing", message: "Files already exist here. Enable verification of existing files or choose another folder.".into() });
         }
@@ -908,7 +923,10 @@ impl Engine {
         let _operation = self.operations.write().await;
         self.ready()?;
         let handle = self.handle(&id)?;
-        if !matches!(handle.stats().state, librqbit::TorrentStatsState::Error) {
+        if !matches!(
+            handle.stats_summary().state,
+            librqbit::TorrentStatsState::Error
+        ) {
             return Ok(());
         }
         if self
@@ -1036,20 +1054,21 @@ impl Engine {
 
     pub async fn shutdown(&self) -> Result<()> {
         self.stopping.store(true, Ordering::SeqCst);
-        for cancel in self.resolving.lock().unwrap().values() {
-            let _ = cancel.send(true);
-        }
+        self.drain_inspections().await;
         let _operation = self.operations.write().await;
         self.session
             .stop_and_wait()
             .await
             .map_err(adapter::engine_error)?;
         self.sample_accounting();
-        if let Some(root) = self.state.root() {
-            self.accounting.lock().unwrap().checkpoint_on_shutdown(root)
-        } else {
-            Ok(())
+        if let Some(root) = self.state.root()
+            && diagnostics::Accounting::checkpoint_on_shutdown(&self.accounting, root).is_err()
+        {
+            // Transfer state is already drained. Leave the last saved totals
+            // intact and let the host finish releasing its runtime and lease.
+            eprintln!("SeedHop: could not save transfer statistics during shutdown.");
         }
+        Ok(())
     }
 
     /// A memory-only engine owns no persistent library lease.
@@ -1063,7 +1082,7 @@ impl Engine {
 
     fn checkpoint_accounting(&self, force: bool) -> Result<()> {
         if let Some(root) = self.state.root() {
-            self.accounting.lock().unwrap().checkpoint(root, force)
+            diagnostics::Accounting::checkpoint(&self.accounting, root, force)
         } else {
             Ok(())
         }

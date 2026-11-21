@@ -1,3 +1,5 @@
+mod support;
+
 use seedhop_core::{Engine, EngineConfig, Snapshot, adapter};
 use std::{path::Path, time::Duration};
 
@@ -260,6 +262,46 @@ async fn queue_caps_reordering_pause_and_completion_survive_restart() {
             .count(),
         0
     );
+    engine.shutdown().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn completed_download_releases_the_only_queue_slot() {
+    let state = tempfile::tempdir().unwrap();
+    let files = tempfile::tempdir().unwrap();
+    let first = support::Swarm::new(1024 * 1024).await;
+    let second = support::Swarm::with_seed_files(
+        512 * 1024,
+        |content| adapter::create_fixture("second", content),
+        |root, content| std::fs::write(root.join("second"), content).unwrap(),
+    )
+    .await;
+    let cfg = config(state.path(), files.path());
+    let engine = Engine::open(cfg).await.unwrap();
+    engine.set_queue(1).await.unwrap();
+    // Keep the first transfer active long enough to observe the queue state.
+    engine.set_limits(512 * 1024, 0).await.unwrap();
+    for swarm in [&first, &second] {
+        engine
+            .add(
+                swarm.metadata.clone(),
+                files.path().display().to_string(),
+                vec![0],
+                false,
+                false,
+            )
+            .await
+            .unwrap();
+    }
+    wait(&engine, |s| s.torrents[1].state == "queued").await;
+    wait(&engine, |s| s.torrents.iter().all(|t| t.state == "seeding")).await;
+    for (name, swarm) in [("payload.bin", first), ("second", second)] {
+        assert_eq!(
+            std::fs::read(files.path().join(name)).unwrap(),
+            swarm.content
+        );
+        swarm.seed.shutdown().await.unwrap();
+    }
     engine.shutdown().await.unwrap();
 }
 

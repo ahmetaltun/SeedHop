@@ -375,9 +375,12 @@ mod tests {
             .await
             .unwrap();
         {
-            // inspect() retains this shared lock while waiting for metadata.
-            // A calendar transition must still reach the existing transfer.
-            let _inspection = engine.operations.read().await;
+            // Hold the same barrier an in-flight magnet lookup holds.
+            let _inspection = engine.inspections.read().await;
+            tokio::time::timeout(std::time::Duration::from_secs(2), engine.set_queue(1))
+                .await
+                .expect("read-only metadata inspection blocked a queue command")
+                .unwrap();
             engine.scheduling.lock().unwrap().config.rules[0].suspend = true;
             tokio::time::timeout(std::time::Duration::from_secs(2), async {
                 loop {

@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
     path::Path,
-    sync::atomic::Ordering,
+    sync::{Mutex, atomic::Ordering},
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -101,28 +101,40 @@ impl Accounting {
             },
         );
     }
-    pub fn checkpoint(&mut self, dir: &Path, force: bool) -> Result<()> {
-        if !force
-            && self
-                .last_checkpoint
-                .is_some_and(|t| t.elapsed().as_secs() < 30)
-        {
-            return Ok(());
-        }
-        let result = if self.remember_statistics {
-            storage::atomic_write(
-                &dir.join("statistics.json"),
-                &serde_json::to_vec(&self.entries).map_err(adapter::engine_error)?,
-            )
-        } else {
-            // Retry an unfinished explicit purge without serializing session
-            // counters. A failed purge must not become a successful skipped save.
-            crate::connection_settings::ConnectionSettings::load(dir)
-                .and_then(|mut saved| saved.complete_statistics_clear(dir))
+    // Callers serialize checkpoints and retention changes through the engine's
+    // operations lock. Snapshot readers can keep sampling while disk I/O runs.
+    pub fn checkpoint(state: &Mutex<Self>, dir: &Path, force: bool) -> Result<()> {
+        let data = {
+            let accounting = state.lock().unwrap();
+            if !force
+                && accounting
+                    .last_checkpoint
+                    .is_some_and(|t| t.elapsed().as_secs() < 30)
+            {
+                return Ok(());
+            }
+            accounting
+                .remember_statistics
+                .then(|| serde_json::to_vec(&accounting.entries))
+        };
+        let persist = || {
+            if let Some(data) = data {
+                data.map_err(adapter::engine_error)
+                    .and_then(|bytes| storage::atomic_write(&dir.join("statistics.json"), &bytes))
+            } else {
+                // Retry an unfinished explicit purge without serializing session
+                // counters. A failed purge must not become a successful skipped save.
+                crate::connection_settings::ConnectionSettings::load(dir)
+                    .and_then(|mut saved| saved.complete_statistics_clear(dir))
+            }
+        };
+        let result = match tokio::runtime::Handle::try_current().map(|h| h.runtime_flavor()) {
+            Ok(tokio::runtime::RuntimeFlavor::MultiThread) => tokio::task::block_in_place(persist),
+            _ => persist(),
         };
         // A failed forced save also invalidates the normal checkpoint timer.
         // Maintenance must retry instead of clearing the warning on a skipped save.
-        self.last_checkpoint = result.as_ref().ok().map(|_| Instant::now());
+        state.lock().unwrap().last_checkpoint = result.as_ref().ok().map(|_| Instant::now());
         result
     }
     pub(crate) fn set_retention(&mut self, remember: bool) {
@@ -143,14 +155,14 @@ impl Accounting {
             totals.last = Some(Instant::now());
         }
     }
-    pub(crate) fn checkpoint_on_shutdown(&mut self, dir: &Path) -> Result<()> {
+    pub(crate) fn checkpoint_on_shutdown(state: &Mutex<Self>, dir: &Path) -> Result<()> {
         // An unfinished privacy purge is durably marked and retried before the
         // next session restores. Never keep a drained engine alive just to retry
         // deleting ancillary statistics, or serialize private session counters.
-        if !self.remember_statistics {
+        if !state.lock().unwrap().remember_statistics {
             return Ok(());
         }
-        self.checkpoint(dir, true)
+        Self::checkpoint(state, dir, true)
     }
     pub fn sample(&mut self, id: String, down: u64, up: u64, seeding: bool, complete: bool) {
         let t = self.entries.entry(id).or_default();
@@ -293,7 +305,7 @@ impl Engine {
         let samples = self.session.with_torrents(|torrents| {
             torrents
                 .map(|(_, torrent)| {
-                    let stats = torrent.stats();
+                    let stats = torrent.stats_summary();
                     (
                         adapter::torrent_id(torrent),
                         torrent
@@ -464,14 +476,17 @@ impl Engine {
         } else {
             Vec::new()
         };
-        let accounting = self.accounting.lock().unwrap();
-        let t = accounting
-            .entries
-            .get(&id)
-            .ok_or_else(|| crate::CoreError::Validation {
-                code: "input.this_torrent_is_no_longer_in_the_library",
-                message: "This torrent is no longer in the library.".into(),
-            })?;
+        let (session_downloaded, session_uploaded, seeding_seconds) = {
+            let accounting = self.accounting.lock().unwrap();
+            let t = accounting
+                .entries
+                .get(&id)
+                .ok_or_else(|| crate::CoreError::Validation {
+                    code: "input.this_torrent_is_no_longer_in_the_library",
+                    message: "This torrent is no longer in the library.".into(),
+                })?;
+            (t.session_downloaded, t.session_uploaded, t.seeding_seconds)
+        };
         let current = now();
         let events = if section == "activity" {
             torrent
@@ -506,9 +521,9 @@ impl Engine {
             dht: !private && self.session.get_dht().is_some(),
             pex: !private,
             local_discovery: false,
-            session_downloaded: t.session_downloaded,
-            session_uploaded: t.session_uploaded,
-            seeding_seconds: t.seeding_seconds,
+            session_downloaded,
+            session_uploaded,
+            seeding_seconds,
             peers,
             trackers,
             events,
@@ -604,7 +619,7 @@ mod tests {
         let mut a = Accounting::default();
         a.new_transfer("x".into());
         a.sample("x".into(), 100, 40, false, false);
-        a.checkpoint(dir.path(), true).unwrap();
+        Accounting::checkpoint(&Mutex::new(a), dir.path(), true).unwrap();
         let mut b = Accounting::load(dir.path()).unwrap();
         b.sample("x".into(), 20, 5, false, false);
         assert_eq!(b.entries["x"].downloaded, Some(120));
@@ -616,13 +631,17 @@ mod tests {
         let mut accounting = Accounting::default();
         accounting.new_transfer("x".into());
         accounting.sample("x".into(), 100, 25, false, false);
-        accounting.checkpoint(dir.path(), true).unwrap();
+        let accounting = Mutex::new(accounting);
+        Accounting::checkpoint(&accounting, dir.path(), true).unwrap();
         std::fs::create_dir(dir.path().join("statistics.pending")).unwrap();
-        assert!(accounting.checkpoint(dir.path(), true).is_err());
-        assert!(accounting.last_checkpoint.is_none());
-        assert_eq!(accounting.entries["x"].downloaded, Some(100));
+        assert!(Accounting::checkpoint(&accounting, dir.path(), true).is_err());
+        assert!(accounting.lock().unwrap().last_checkpoint.is_none());
+        assert_eq!(
+            accounting.lock().unwrap().entries["x"].downloaded,
+            Some(100)
+        );
         std::fs::remove_dir(dir.path().join("statistics.pending")).unwrap();
-        accounting.checkpoint(dir.path(), false).unwrap();
+        Accounting::checkpoint(&accounting, dir.path(), false).unwrap();
         assert_eq!(
             Accounting::load(dir.path()).unwrap().entries["x"].uploaded,
             Some(25)
