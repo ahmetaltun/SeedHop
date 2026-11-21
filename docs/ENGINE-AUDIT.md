@@ -45,6 +45,10 @@ patches reconstruct current source and reverse/reapply byte-identically.
 
 ## Reliability changes
 
+`vendor/patches/0037-seedhop-lightweight-transfer-stats.patch` lets queue and
+accounting checks read aggregate transfer progress without copying per-file
+progress. Full snapshots still include file progress for the inspector.
+
 The General tab's piece maps use
 `vendor/patches/0031-seedhop-piece-map-diagnostics.patch`. Snapshots are requested
 only for General, contain at most 512 bins, and count verified pieces across the

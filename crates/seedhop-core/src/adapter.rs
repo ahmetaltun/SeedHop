@@ -78,7 +78,7 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
         .map(|indices| indices.into_iter().collect::<HashSet<_>>());
     let names = torrent.file_names();
     let priorities = torrent.file_priorities();
-    let files = torrent
+    let files: Vec<_> = torrent
         .with_metadata(|meta| {
             meta.info
                 .iter_file_details()
@@ -97,6 +97,11 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
                 .collect()
         })
         .unwrap_or_default();
+    let selected_bytes = files
+        .iter()
+        .filter(|file| file.selected)
+        .map(|file| file.size)
+        .sum();
     let peers = stats
         .live
         .as_ref()
@@ -147,16 +152,7 @@ pub fn record(torrent: &ManagedTorrent) -> TorrentRecord {
             .and_then(|s| s.time_remaining.as_ref())
             .and_then(|v| serde_json::to_value(v).ok())
             .and_then(|v| v["duration"]["secs"].as_u64()),
-        selected_bytes: torrent
-            .with_metadata(|m| {
-                m.info
-                    .iter_file_details()
-                    .enumerate()
-                    .filter(|(i, _)| selected.as_ref().is_none_or(|s| s.contains(i)))
-                    .map(|(_, f)| f.len)
-                    .sum()
-            })
-            .unwrap_or(0),
+        selected_bytes,
     }
 }
 

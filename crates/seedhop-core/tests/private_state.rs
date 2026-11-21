@@ -213,7 +213,10 @@ async fn private_payloads_use_fresh_roots_and_survive_end_without_restoration() 
         .unwrap();
     settled(&engine, &id).await;
     let root = std::path::PathBuf::from(&engine.snapshot().unwrap().torrents[0].destination);
-    assert_eq!(root.parent().unwrap().parent().unwrap(), parent.path());
+    assert_eq!(
+        root.parent().unwrap().parent().unwrap(),
+        parent.path().canonicalize().unwrap()
+    );
     assert!(!root.display().to_string().contains(&id));
     assert_eq!(
         std::fs::metadata(&root).unwrap().permissions().mode() & 0o777,

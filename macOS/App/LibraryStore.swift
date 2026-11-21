@@ -68,10 +68,12 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     private var peerBaselines: [String:(UInt64,UInt64,TimeInterval)] = [:]
     private var lastTrackerEvent: [String:UInt64] = [:]
     @Published var connected = false
+    private var hasEngineConnection: Bool { connected || snapshotError != nil }
     @Published var connecting = false
     @Published var switching = false
     @Published var statisticsWarning: String?
     @Published var error: String?
+    @Published private(set) var snapshotError: String?
     var externalOpenCoordinator: ExternalOpenCoordinator?
     @Published var showDockSpeeds = WorkspacePreferences.defaults.object(forKey:"showDockSpeeds") as? Bool ?? true {
         didSet { WorkspacePreferences.defaults.set(showDockSpeeds,forKey:"showDockSpeeds") }
@@ -133,6 +135,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     private var snapshotTrackerHosts: [String] = []
     private var polling: Task<Void,Never>?
     private var reconnect: Task<Void,Never>?
+    private var snapshotRequest: UUID?
     // Notification bookkeeping lasts only as long as this app and active library.
     private var notifiedCompletions: Set<String> = []
 
@@ -142,8 +145,11 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         self.client = client ?? EngineClient(privateSession:isPrivate)
         if designPreview { peerEncryption = .allow; savedPeerEncryption = .allow; torrents = PreviewFixtures.torrents; reindexTorrents(); selection = [torrents[0].id]; details = PreviewFixtures.diagnostics(torrents[0],section:"general"); history[torrents[0].id] = PreviewFixtures.trafficHistory(); connected = true; return }
         self.client.onInterruption = { [weak self] in
-            guard let self, !self.switching else { return }
+            guard let self else { return }
+            self.snapshotRequest = nil
+            self.snapshotError = nil
             self.connected = false
+            guard !self.switching else { return }
             if self.isPrivate {
                 self.error = EngineMessage(code:"host.stopping").localizedDescription
                 return
@@ -395,7 +401,13 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         #if SEEDHOP_SANDBOX && !SEEDHOP_VALIDATION
         guard SandboxLibraryMigration.isSetUp else { return }
         #endif
+        if snapshotError != nil {
+            await refresh()
+            return
+        }
         connecting = true; defer { connecting = false }
+        snapshotRequest = nil
+        snapshotError = nil
         if UserDefaults.standard.bool(forKey:"updateRestoreBackground") {
             let service = SMAppService.agent(plistName:SeedHopIdentity.agentPlist)
             do {
@@ -418,14 +430,15 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
             try client.connect(background:backgroundEnabled)
             var request = EngineRequest(command:"connect"); request.destination = downloadDirectory
             let reply = try await client.send(request)
-            if let snapshot = reply.snapshot { apply(snapshot) }
+            guard let snapshot = reply.snapshot else { throw EngineMessage(code:"engine.failed") }
+            apply(snapshot)
             connected = true
             beginPolling()
         } catch { connected = false; self.error = error.localizedDescription }
     }
     func privateProtection() async throws -> String {
         let transport: any EngineTransport
-        if connected { transport = client }
+        if hasEngineConnection { transport = client }
         else {
             let offline = EngineClient()
             try offline.connect(background:false)
@@ -471,7 +484,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
     #if SEEDHOP_SANDBOX
     func stopForLibraryMigration() async throws {
-        guard connected else { return }
+        guard hasEngineConnection else { return }
         guard canPrepareForUpdate else { throw EngineMessage(code:"host.requests_busy") }
         switching = true
         defer { switching = false }
@@ -494,16 +507,29 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         }
     }
     func refresh() async {
-        guard !designPreview, connected, !switching else { return }
+        guard !designPreview, hasEngineConnection, !connecting, !switching,
+              !Task.isCancelled, snapshotRequest == nil else { return }
+        let request = UUID()
+        snapshotRequest = request
+        defer { if snapshotRequest == request { snapshotRequest = nil } }
         do {
             guard let snapshot = try await client.send(EngineRequest(command:"snapshot")).snapshot else {
                 throw UserFacingError(message:String(localized:"Could not reach the torrent engine.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale))
             }
+            guard snapshotRequest == request, !Task.isCancelled, !switching else { return }
             apply(snapshot)
+            if !connected { connected = true }
+        } catch {
+            guard snapshotRequest == request, !Task.isCancelled, !switching else { return }
+            // A timeout or a busy helper can recover on the same connection.
+            // Keep polling and use the last snapshot until fresh data arrives.
+            let message = error.localizedDescription
+            if snapshotError != message { snapshotError = message }
+            if connected { connected = false }
         }
-        catch { connected = false; self.error = error.localizedDescription }
     }
     private func apply(_ snapshot: LibrarySnapshot) {
+        if snapshotError != nil { snapshotError = nil }
         let engineChanged = engineInstance != snapshot.instanceId
         if engineChanged {
             notifiedCompletions.removeAll()
@@ -522,7 +548,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         notifiedCompletions.formIntersection(snapshot.torrents.map(\.id))
         if permitsNotifications, completionNotifications, !clearingActivity, !engineChanged, !torrents.isEmpty {
             for item in snapshot.torrents where item.state == "seeding" && !notifiedCompletions.contains(item.id) {
-                if let previous = torrents.first(where:{$0.id == item.id}), previous.downloadedBytes < previous.totalBytes {
+                if let index = torrentIndices[item.id], torrents[index].downloadedBytes < torrents[index].totalBytes {
                     let content = UNMutableNotificationContent(); content.title = String(localized:"Your files are ready",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); content.body = notificationDetails ? item.name : String(localized:"Open SeedHop to view the completed transfer.",bundle:AppLocalization.shared.bundle,locale:AppLocalization.shared.locale); content.sound = .default
                     UNUserNotificationCenter.current().add(UNNotificationRequest(identifier:item.id,content:content,trigger:nil))
                     notifiedCompletions.insert(item.id)
@@ -604,11 +630,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
             }
             // Sample only real traffic changes or elapsed seconds, never every body read.
             if history[item.id]?.last.map({ date.timeIntervalSince($0.id) >= 1 }) ?? true {
-                var samples = history[item.id] ?? []
-                samples.append(TrafficSample(id:date,download:item.downloadRate,upload:item.uploadRate))
-                samples.removeAll { date.timeIntervalSince($0.id) >= Self.activityRetention }
-                if samples.count > 900 { samples.removeFirst(samples.count - 900) }
-                history[item.id] = samples
+                history[item.id, default:[]].append(TrafficSample(id:date,download:item.downloadRate,upload:item.uploadRate))
+                if (history[item.id]?.count ?? 0) > 900 { history[item.id]?.removeFirst() }
             }
         }
         if snapshot.fileOperation != fileOperation, let operation = snapshot.fileOperation {
@@ -678,7 +701,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
     #if SEEDHOP_DEVELOPMENT
     private func sendStatisticsRequest(_ request: EngineRequest) async throws -> EngineReply {
-        if connected { return try await client.send(request) }
+        if hasEngineConnection { return try await client.send(request) }
         // A temporary foreground helper can edit library policy without invoking
         // a background agent's automatic network restoration.
         let offline = EngineClient()
@@ -726,7 +749,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     /// acknowledgement is reported separately from successful local clearing.
     func clearLocalActivity() async -> Bool? {
         guard canClearLocalActivity else { return nil }
-        let hasConnectedEngine = connected
+        let hasConnectedEngine = hasEngineConnection
         clearingActivity = true
         activityEpoch &+= 1
         activityClearedThrough = UInt64(max(0, Date().timeIntervalSince1970))
@@ -1164,7 +1187,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     }
     func prepareToQuit(stopEverything: Bool) async -> Bool {
         polling?.cancel(); reconnect?.cancel()
-        if !connected || designPreview { return true }
+        if !hasEngineConnection || designPreview { return true }
         if backgroundEnabled && !stopEverything { client.invalidate(); return true }
         do { var r = EngineRequest(command:"shutdown"); r.explicitStop = stopEverything; _ = try await client.send(r); client.invalidate(); return true }
         catch { self.error = error.localizedDescription; beginPolling(); return false }

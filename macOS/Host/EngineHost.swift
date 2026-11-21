@@ -20,6 +20,9 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
     private let queue = DispatchQueue(label: "app.seedhop.host", qos: .userInitiated, attributes: .concurrent)
     private let lifecycle = NSLock()
     private let requestSlots = DispatchSemaphore(value:8)
+    private let inspectionSlots = DispatchSemaphore(value:4)
+    private let snapshotSlot = DispatchSemaphore(value:1)
+    private let detailsSlot = DispatchSemaphore(value:1)
     private var engine: EngineBridge?
     private var stopping = false
     private var connections: [NSXPCConnection] = []
@@ -153,6 +156,19 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             do {
                 let request = try JSONDecoder().decode(EngineRequest.self, from: data)
                 guard request.version == SeedHopIdentity.protocolVersion else { throw HostFailure(code:"host.version_mismatch") }
+                // The app may retry after a timeout while earlier work is
+                // still running. Leave request capacity for control commands.
+                let slots: DispatchSemaphore?
+                switch request.command {
+                case "inspect": slots = self.inspectionSlots
+                case "snapshot": slots = self.snapshotSlot
+                case "torrentDetails": slots = self.detailsSlot
+                default: slots = nil
+                }
+                if let slots, slots.wait(timeout:.now()) != .success {
+                    throw HostFailure(code:"host.requests_busy")
+                }
+                defer { slots?.signal() }
                 response = try self.handle(request)
             } catch BridgeError.Cancelled { response = EngineReply(cancelled:true) }
             catch let BridgeError.Operation(message, notice) { response = EngineReply(error:message,errorMessage:Self.message(notice)) }
@@ -219,25 +235,7 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         }
         #endif
         if r.command == "shutdown" {
-            lifecycle.lock(); stopping = true; let current = engine; lifecycle.unlock()
-            if r.explicitStop == true, let current {
-                for t in try current.snapshot().torrents where t.state != "paused" || t.forceStarted { try current.setPaused(id: t.id, paused: true) }
-            }
-            do { try current?.shutdown() }
-            catch {
-                if privateSession { DispatchQueue.global().asyncAfter(deadline:.now() + 0.2) { exit(1) } }
-                throw error
-            }
-            lifecycle.lock(); defer { lifecycle.unlock() }; engine = nil
-            runIntent.running = false
-            // A preferences-only foreground helper never owned the engine's run
-            // intent. Do not create a library or overwrite a background owner's intent.
-            if !privateSession, current != nil || background { try persistIntent() }
-            privateFolder?.stopAccessingSecurityScopedResource(); privateFolder = nil
-            if let activity { ProcessInfo.processInfo.endActivity(activity); self.activity = nil }
-            // Reply first; process exit is the final disk-ownership barrier.
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) { exit(0) }
-            return EngineReply(stoppedProcessID:ProcessInfo.processInfo.processIdentifier)
+            return try shutdown(explicitStop:r.explicitStop == true)
         }
         if r.command == "networkInfo" || r.command == "networkPolicy" {
             lifecycle.lock(); defer { lifecycle.unlock() }
@@ -256,7 +254,7 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             var reply = EngineReply(snapshot:try Self.snapshot(core.snapshot()))
             reply.privateProcessID = ProcessInfo.processInfo.processIdentifier
             return reply
-        case "connect", "snapshot": return EngineReply(snapshot: try JSONDecoder().decode(LibrarySnapshot.self, from:Data(core.snapshotJson().utf8)))
+        case "connect", "snapshot": return EngineReply(snapshot:try Self.snapshot(core.snapshot()))
         case "torrentDetails": return EngineReply(details: try JSONDecoder().decode(TorrentDetails.self, from:Data(core.torrentDetails(id:r.id ?? "",section:r.section ?? "general",allPeers:r.allPeers ?? false).utf8)))
         case "inspect":
             let p = try core.inspect(requestId: r.requestId, magnet: r.magnet, bytes: r.bytes ?? Data())
@@ -302,13 +300,48 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
         }
         return EngineReply()
     }
-    private func stopForDisconnect() {
+    private func shutdown(explicitStop: Bool, disconnected: Bool = false) throws -> EngineReply {
         lifecycle.lock()
-        guard connections.isEmpty, privateSession || (!stopping && engine != nil) else { lifecycle.unlock(); return }
-        if privateSession && stopping { lifecycle.unlock(); return }
+        if disconnected && (!connections.isEmpty || stopping || (!privateSession && engine == nil)) {
+            lifecycle.unlock()
+            return EngineReply()
+        }
+        guard !stopping else { lifecycle.unlock(); throw HostFailure(code:"host.stopping") }
         stopping = true
+        let current = engine
         lifecycle.unlock()
-        do { _ = try handle(EngineRequest(command:"shutdown")) }
+
+        if explicitStop, let current {
+            do {
+                for torrent in try current.snapshot().torrents where !torrent.pausedIntent || torrent.forceStarted {
+                    try current.setPaused(id:torrent.id,paused:true)
+                }
+            } catch {
+                // The engine still owns its runtime. Let the app refresh the
+                // actual pause state and retry if persisting intent failed.
+                lifecycle.lock(); stopping = false; lifecycle.unlock()
+                throw error
+            }
+        }
+        do { try current?.shutdown() }
+        catch {
+            if privateSession { DispatchQueue.global().asyncAfter(deadline:.now() + 0.2) { exit(1) } }
+            throw error
+        }
+        lifecycle.lock(); defer { lifecycle.unlock() }
+        engine = nil
+        runIntent.running = false
+        privateFolder?.stopAccessingSecurityScopedResource(); privateFolder = nil
+        if let activity { ProcessInfo.processInfo.endActivity(activity); self.activity = nil }
+        // Reply first; process exit is the final disk-ownership barrier.
+        defer { DispatchQueue.global().asyncAfter(deadline:.now() + 0.2) { exit(0) } }
+        // A preferences-only foreground helper never owned the engine's run
+        // intent. Do not create a library or overwrite a background owner's intent.
+        if !privateSession, current != nil || background { try persistIntent() }
+        return EngineReply(stoppedProcessID:ProcessInfo.processInfo.processIdentifier)
+    }
+    private func stopForDisconnect() {
+        do { _ = try shutdown(explicitStop:false,disconnected:true) }
         catch {
             if privateSession { exit(1) }
             NSLog("SeedHop: shutdown failed.")
@@ -325,20 +358,26 @@ final class EngineHost: NSObject, EngineServiceProtocol, NSXPCListenerDelegate {
             listenPort:s.listenPort,downloadLimit:s.downloadLimit,uploadLimit:s.uploadLimit,maxActiveDownloads:s.maxActiveDownloads,torrents:s.torrents.map { t in
                 TorrentItem(id:t.id,name:t.name,state:t.state,totalBytes:t.totalBytes,downloadedBytes:t.downloadedBytes,
                     uploadedBytes:t.uploadedBytes,downloadRate:t.downloadRate,uploadRate:t.uploadRate,peers:t.peers,
-                    destination:t.destination,files:t.files.map(file),trackers:t.trackers,canReannounce:t.canReannounce,error:t.error,queuePosition:t.queuePosition,pausedIntent:t.pausedIntent,forceStarted:t.forceStarted,errorKind:t.errorKind)
+                    destination:t.destination,files:t.files.map(file),trackers:t.trackers,canReannounce:t.canReannounce,error:t.error,
+                    queuePosition:t.queuePosition,pausedIntent:t.pausedIntent,forceStarted:t.forceStarted,sequential:t.sequential,
+                    firstLastPieces:t.firstLastPieces,errorKind:t.errorKind,errorMessage:t.errorMessage.map(message),
+                    networkDownloadedBytes:t.networkDownloadedBytes,networkUploadedBytes:t.networkUploadedBytes,
+                    addedAt:t.addedAt,completedAt:t.completedAt,etaSeconds:t.etaSeconds,selectedBytes:t.selectedBytes)
             },fileOperation:s.fileOperation.map { operation in
                 FileOperationItem(id:operation.id,torrentId:operation.torrentId,kind:operation.kind,
                     phase:operation.phase,completedBytes:operation.completedBytes,totalBytes:operation.totalBytes,
                     cancelRequested:operation.cancelRequested)
             },storageRecovery:s.storageRecovery.map { notice in
                 StorageRecoveryItem(id:notice.id,torrentId:notice.torrentId,activeLocation:notice.activeLocation,message:notice.message,
-                    originalDirectory:notice.originalDirectory,destinationDirectory:notice.destinationDirectory,canKeepCopies:notice.canKeepCopies)
+                    originalDirectory:notice.originalDirectory,destinationDirectory:notice.destinationDirectory,canKeepCopies:notice.canKeepCopies,
+                    messageDescriptor:message(notice.messageDescriptor))
             })
         snapshot.schedule = ScheduleConfig(enabled:s.scheduleEnabled,rules:s.scheduleRules.map { rule in
             ScheduleRule(days:rule.days,startMinute:rule.startMinute,endMinute:rule.endMinute,downloadLimit:rule.downloadLimit,uploadLimit:rule.uploadLimit,suspend:rule.suspend)
         })
         snapshot.scheduleActive = s.scheduleActive
         snapshot.statisticsMessage = s.statisticsMessage.map(message)
+        snapshot.statisticsWarning = s.statisticsWarning
         snapshot.schedulingMessage = s.schedulingMessage.map(message)
         snapshot.schedulingWarning = s.schedulingWarning
         snapshot.normalDownloadLimit = s.normalDownloadLimit

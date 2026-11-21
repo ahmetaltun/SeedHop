@@ -105,11 +105,15 @@ import SwiftUI
         try expect(store.downloadRate == down,"Dock aggregate depended on library filter")
         store.connected = false
         try expect(store.downloadRate == 0 && store.uploadRate == 0,"Disconnected aggregate retained stale rates")
-        let unavailable = LibraryStore(client:UnavailableSnapshotFixture())
+        let transport = UnavailableSnapshotFixture()
+        let unavailable = LibraryStore(client:transport)
         unavailable.torrents = store.torrents
         unavailable.connected = true
         await unavailable.refresh()
-        try expect(!unavailable.connected && unavailable.downloadRate == 0 && unavailable.error != nil,"Missing snapshot retained stale Dock rates")
+        try expect(!unavailable.connected && unavailable.downloadRate == 0 && unavailable.snapshotError != nil,"Missing snapshot retained stale Dock rates")
+        transport.snapshot = PerformanceSelfTest.fixture(1)
+        await unavailable.refresh()
+        try expect(unavailable.connected && unavailable.downloadRate > 0 && unavailable.snapshotError == nil,"Snapshot polling did not recover after a missed reply")
         print("PASS: External opens buffer, deduplicate, serialize reviews, wait for conflicts, and preserve manual imports")
         print("PASS: Dock preference persistence, background polling, and unfiltered aggregates")
         try await verifyAssociationLayout()
@@ -152,8 +156,9 @@ import SwiftUI
 
 @MainActor private final class UnavailableSnapshotFixture: EngineTransport {
     var onInterruption: (() -> Void)?
+    var snapshot: LibrarySnapshot?
     func connect(background: Bool) throws {}
     func invalidate() {}
-    func send(_ request: EngineRequest) async throws -> EngineReply { EngineReply() }
+    func send(_ request: EngineRequest) async throws -> EngineReply { EngineReply(snapshot:snapshot) }
 }
 #endif

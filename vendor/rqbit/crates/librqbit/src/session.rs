@@ -1887,9 +1887,7 @@ impl Session {
         &self,
         torrent: &ManagedTorrent,
     ) -> Vec<Arc<tracker_comms::TrackerControl>> {
-        if self.cancellation_token.is_cancelled()
-            || !matches!(torrent.stats().state, crate::TorrentStatsState::Live)
-        {
+        if self.cancellation_token.is_cancelled() || torrent.live().is_none() {
             return Vec::new();
         }
         let legacy = torrent

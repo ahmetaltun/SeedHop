@@ -233,6 +233,8 @@ impl Engine {
         // Stop first, including when the subsequent save fails. Never leave direct traffic
         // running after the user has requested protection or a different protected route.
         self.network_blocked.store(true, Ordering::SeqCst);
+        self.session.cancellation_token().cancel();
+        self.drain_inspections().await;
         self.session
             .stop_and_wait()
             .await
