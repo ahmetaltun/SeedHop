@@ -74,12 +74,20 @@ async fn payloads_receive_quarantine_and_copies_preserve_it() {
         )
         .await
         .unwrap();
-    for _ in 0..100 {
-        if files.path().join("payload").exists() {
-            break;
+    // The payload can exist while initial file verification is still running.
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            let snapshot = engine.snapshot().unwrap();
+            let torrent = snapshot.torrents.iter().find(|item| item.id == id).unwrap();
+            assert_ne!(torrent.state, "error", "{torrent:?}");
+            if torrent.state == "paused" {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-    }
+    })
+    .await
+    .expect("paused payload did not finish initial verification");
     let original = quarantine(&files.path().join("payload"));
     assert!(String::from_utf8_lossy(&original).starts_with("0081;"));
     engine
